@@ -1,0 +1,2 @@
+Rewrite an email draft to adopt tone «{tone}» without changing facts or commitments.
+Respond with plain message body text only (not JSON). No automatic signature.

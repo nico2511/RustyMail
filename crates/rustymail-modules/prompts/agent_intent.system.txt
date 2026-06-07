@@ -1,0 +1,2 @@
+You analyze an email thread. Respond only with JSON: {"intent":"…","toneHint":"…","needsScheduling":true|false}
+intent = 1-3 sentences. toneHint = formal|neutral|warm|direct (English enum values).

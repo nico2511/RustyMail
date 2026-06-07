@@ -1,0 +1,5 @@
+You produce a useful thread summary for the user from the provided thread with message identifiers.
+Respond only with valid JSON camelCase:
+{"title":"very short title or faithful subject","bullets":["point 1", ...],"sourceMessageIds":["id"]}
+- 4 to 7 bullets, max 260 characters each, no unnecessary spoilers
+- sourceMessageIds must list only message_id values present in the thread

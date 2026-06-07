@@ -1,0 +1,245 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "back": "Back",
+    "close": "Close",
+    "later": "Later",
+    "refresh": "Refresh",
+    "settings": "Settings",
+    "none": "— None —"
+  },
+  "nav": {
+    "inbox": "Inbox",
+    "contacts": "Contacts",
+    "organization": "Organize",
+    "folders": "Folders",
+    "compose": "New message",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "sectionsAria": "Settings sections",
+    "tabs": {
+      "accounts": "Accounts",
+      "general": "General",
+      "appearance": "Appearance",
+      "autoSenders": "Auto senders",
+      "ai": "AI & dictation",
+      "addressBook": "Address book",
+      "storage": "Storage",
+      "shortcuts": "Shortcuts",
+      "developer": "Developer"
+    },
+    "general": {
+      "languageHeading": "Language",
+      "languageExplain": "Display language (menus, settings): French or English from your choice. Other codes show the UI in English for now. Mother language also drives dictation, translations, and AI output.",
+      "motherLanguage": "Application language",
+      "langFr": "Français",
+      "langFrFR": "Français (France)",
+      "langEn": "English",
+      "langEnUS": "English (US)",
+      "langPt": "Português",
+      "langPtBR": "Português (Brasil)",
+      "langEs": "Español",
+      "langDe": "Deutsch",
+      "langIt": "Italiano",
+      "globalAddressBook": "Global address book",
+      "globalAddressBookExplain": "<strong>On:</strong> one address book for all accounts. Duplicate emails appear once.<br /><br /><strong>Off:</strong> only contacts for the selected account.",
+      "activitySuggestions": "View suggestions (local activity)",
+      "activitySuggestionsExplain": "Records activity <strong>on this device only</strong> to suggest saved views. Off = no collection.",
+      "archiveHeading": "Archiving",
+      "archiveExplain": "Hierarchical: Archive/YYYY/MM-month (app locale). Flat: server folder (Gmail All Mail, Archive…).",
+      "archiveMode": "Mode",
+      "archiveHierarchical": "Hierarchical",
+      "archiveFlat": "Flat (server)",
+      "archiveRoot": "IMAP root",
+      "startupHeading": "Startup",
+      "startupExplain": "Default account at launch. “First account” = first in Settings → Accounts.",
+      "defaultAccount": "Startup account",
+      "firstAccount": "First account in list",
+      "noAccount": "— No account configured —",
+      "inboxHeading": "Message list",
+      "inboxExplain": "Default filter when opening an IMAP folder.",
+      "defaultListFilter": "Default main view",
+      "filterAll": "All",
+      "filterUnread": "Unread",
+      "filterStarred": "Starred (all folders)",
+      "filterFocused": "Focused (excluding auto senders)",
+      "filterAuto": "Auto (newsletters / auto senders)"
+    },
+    "ai": {
+      "tabsAria": "AI settings",
+      "tabFeatures": "Features",
+      "tabDictation": "Dictation",
+      "tabLlm": "On my PC & cloud",
+      "tabSemantic": "Semantic",
+      "tabBackground": "Background",
+      "tabPrompts": "Prompts",
+      "featuresHeading": "Features",
+      "featuresLead": "Enable or disable each AI capability without changing engines (dictation, LLM, semantic). The quick “AI” panel uses the same toggles.",
+      "promptsHeading": "Prompt catalog (LLM)",
+      "promptsLead": "Instructions sent to the model (English). Visible answers follow your mother language.",
+      "promptsReadOnly": "Read-only — custom editing coming later.",
+      "promptsOutputLang": "User output language: {lang}",
+      "promptsSkillsHeading": "Skills (reply assistant)",
+      "promptsNoCatalog": "Catalog unavailable (run the Tauri app).",
+      "promptsLoadError": "Could not load catalog: {error}"
+    }
+  },
+  "ai": {
+    "features": {
+      "groups": {
+        "thread": "Thread & inbox",
+        "compose": "Composer",
+        "search": "Search & contacts",
+        "security": "Security"
+      },
+      "threadSummary": {
+        "label": "Thread summary",
+        "description": "“Summarize” button and panel: LLM summary of the open thread (streaming)."
+      },
+      "threadTranslate": {
+        "label": "Thread translation",
+        "description": "Translates the whole thread to mother language (Settings → General)."
+      },
+      "messageTranslate": {
+        "label": "Per-message translation",
+        "description": "Translation under messages in a different language than yours."
+      },
+      "inboxDigest": {
+        "label": "Inbox action brief",
+        "description": "AI brief for the folder: decisions, actions, risks."
+      },
+      "orgProposals": {
+        "label": "Organize (AI proposals)",
+        "description": "LLM-suggested groupings in the organization center."
+      },
+      "threadQa": {
+        "label": "Thread Q&A",
+        "description": "Natural-language questions about the thread content."
+      },
+      "autoThreadSummary": {
+        "label": "Auto summary on open",
+        "description": "Automatic summary when the thread has enough messages."
+      },
+      "composeRewrite": {
+        "label": "AI rewrite",
+        "description": "Rewrites selection or draft in the chosen tone."
+      },
+      "composeGrammar": {
+        "label": "Grammar check",
+        "description": "Fixes spelling and grammar in the draft."
+      },
+      "quickReplyThread": {
+        "label": "Quick replies (thread)",
+        "description": "Short suggestions under the thread."
+      },
+      "quickReplyCompose": {
+        "label": "Quick replies (composer)",
+        "description": "Suggestions in the full composer."
+      },
+      "agentPrepareReply": {
+        "label": "“Prepare reply” assistant",
+        "description": "Multi-step analysis, draft, and review."
+      },
+      "searchNl": {
+        "label": "Natural-language search",
+        "description": "Parses a query into filters and tags."
+      },
+      "addressAutocomplete": {
+        "label": "@contacts autocomplete",
+        "description": "Suggests contacts when typing @."
+      },
+      "contactProfile": {
+        "label": "AI contact profile",
+        "description": "Summary and topics from local mail for a contact."
+      },
+      "securityLlm": {
+        "label": "Security analysis (LLM)",
+        "description": "Enriches anti-phishing with LLM intent."
+      }
+    }
+  },
+  "assist": {
+    "skills": {
+      "analyzeIntent": "Intent",
+      "extractFacts": "Facts",
+      "actionItems": "Actions",
+      "riskFlagger": "Risks",
+      "draftReply": "Draft",
+      "toneAdapter": "Tone",
+      "consistencyCheck": "Consistency",
+      "slotSuggestion": "Time slots"
+    },
+    "mode": {
+      "quick": "Quick",
+      "deep": "Deep",
+      "strictSafe": "Strict safe"
+    }
+  },
+  "prompts": {
+    "outputLanguageHint": "User output: {lang}",
+    "features": {
+      "summary": "Thread summary",
+      "translation": "Translation",
+      "grammar": "Grammar check",
+      "writing": "Rewrite",
+      "quickReply": "Quick replies",
+      "qa": "Thread Q&A",
+      "searchNl": "NL search",
+      "inboxDigest": "Inbox digest",
+      "actionBrief": "Action brief",
+      "contactProfile": "Contact profile",
+      "orgProposals": "Organization proposals",
+      "fluxAffiner": "Flux affiner",
+      "securityLlm": "Security LLM",
+      "agentIntent": "Agent — intent",
+      "agentDraft": "Agent — draft",
+      "agentSlots": "Agent — slots",
+      "assistActions": "Assist — actions",
+      "assistTone": "Assist — tone",
+      "assistFacts": "Assist — facts",
+      "assistConsistency": "Assist — consistency"
+    }
+  },
+  "onboarding": {
+    "stepOf": "Step {current} / {total}",
+    "welcomeTitle": "Welcome to RustyMail",
+    "welcomeLead": "A few quick choices, then a short guide. Full control stays in Settings.",
+    "languageLabel": "Interface language",
+    "languageFr": "Français",
+    "languageEn": "English",
+    "featuresTitle": "Useful features",
+    "featuresLead": "Tick what you want to try. Small models (search, dictation) download in the background.",
+    "dictationTitle": "Voice dictation",
+    "dictationSub": "Local Whisper — hold F9 in the composer (change in Settings → AI).",
+    "semanticTitle": "Semantic search",
+    "semanticSub": "Find mail by meaning, not only keywords (MiniLM model).",
+    "localLlmTitle": "Local AI chat (llama-server)",
+    "localLlmSub": "Optional. The large GGUF is configured later in Settings → AI.",
+    "llamaDetected": "llama-server detected on this PC.",
+    "llamaMissing": "llama-server not found. You can install it via winget below.",
+    "llamaDetectError": "Detection failed: {error}",
+    "wingetInstall": "Install llama-server (winget)",
+    "guideTitle": "Getting started",
+    "guideLead": "Recommended next steps:",
+    "guideAccounts": "Add a mail account: Settings → Accounts (IMAP / password or app password).",
+    "guideModels": "Lightweight models download automatically on first use (status bar).",
+    "guideDictation": "Dictation: open a message, hold F9, speak, release.",
+    "guideLocalLlm": "Local LLM: Settings → AI → download the GGUF when ready (~2 GB).",
+    "guideSettings": "OpenRouter keys, organization, archive: all in Settings when you need them.",
+    "next": "Next",
+    "finish": "Get started",
+    "skipAll": "Skip — configure in Settings"
+  },
+  "toast": {
+    "prefsSaved": "Preferences saved.",
+    "openThreadForAgent": "Open a thread for the reply assistant.",
+    "selectAccountForAgent": "Select an account for the reply assistant.",
+    "agentAutoMail": "Assistant unavailable for automated / newsletter messages.",
+    "enableAgentInSettings": "Enable “Prepare reply” assistant in AI settings.",
+    "runTauri": "Available in the Tauri desktop app."
+  }
+}

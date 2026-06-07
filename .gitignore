@@ -1,0 +1,40 @@
+# Rust
+/target/
+**/target/
+*.pdb
+
+# Node / frontend
+/node_modules/
+**/node_modules/
+/dist/
+**/dist/
+
+# Tauri / build artifacts
+/src-tauri/target/
+/src-tauri/gen/
+**/src-tauri/gen/
+
+# Local data
+/Providerr_mockup/
+*.sqlite
+*.sqlite3
+rustymail-dev.db
+src-tauri/app-icon.png
+
+# Secrets / OAuth local (ne pas versionner)
+.env
+.env.local
+
+# Debug / local logs
+*.log
+debug-*.log
+
+# Scratch / generated assets (not app icons)
+docs/Gemini_Generated_Image*.png
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+

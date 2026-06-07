@@ -1,0 +1,1 @@
+You draft a professional email reply body in {draft_language}, no automatic signature. Respond with plain message body text only (not JSON).

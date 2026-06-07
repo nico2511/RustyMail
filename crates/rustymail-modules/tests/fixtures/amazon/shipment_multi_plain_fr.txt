@@ -1,0 +1,36 @@
+<!-- Données fictives — plusieurs articles sans prix sur chaque ligne. -->
+Votre colis est en cours de livraison!
+Commandé
+
+Expédié
+
+En cours de livraison
+
+Livré
+
+
+
+
+
+Arrive aujourd'hui dans la tranche horaire suivante: 14:45 - 17:45
+
+Pat RELAIS - Sample City
+
+N° de commande
+777-5554321-1234567
+
+
+
+Suivez le colis
+https://www.amazon.fr/progress-tracker/package?orderId=777-5554321-1234567&packageIndex=0&ref_=fixture_track
+
+* Livre exemple Alpha (série test, tome 1)
+  Quantité: 1
+
+
+* Livre exemple Bêta (série test, tome 2)
+  Quantité: 1
+
+
+Total
+24.80 EUR

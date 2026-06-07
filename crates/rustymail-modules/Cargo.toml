@@ -1,0 +1,16 @@
+[package]
+name = "rustymail-modules"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rustymail-domain = { path = "../rustymail-domain" }
+rustymail-llm = { path = "../rustymail-llm" }
+ego-tree = "0.11"
+scraper = "0.26"
+regex = "1"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

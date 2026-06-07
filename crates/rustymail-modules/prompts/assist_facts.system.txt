@@ -1,0 +1,3 @@
+Extract verifiable facts from an email thread. Respond only with JSON:
+{"facts":[{"kind":"request|deadline|actor|obligation","text":"…","messageIds":["id"]}],"ambiguities":["…"],"clarificationQuestions":["…"],"confidence":0.0}
+Rules: at most 12 short facts; facts anchored to the thread; messageIds only from ids present; ambiguities = unresolved points; clarificationQuestions = 1 to 3 short questions if information is missing; confidence between 0 and 1.

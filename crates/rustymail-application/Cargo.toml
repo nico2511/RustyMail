@@ -1,0 +1,14 @@
+[package]
+name = "rustymail-application"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rustymail-domain = { path = "../rustymail-domain" }
+rustymail-modules = { path = "../rustymail-modules" }
+rustymail-llm = { path = "../rustymail-llm" }
+pulldown-cmark = "0.13"
+serde.workspace = true
+thiserror.workspace = true

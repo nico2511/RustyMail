@@ -1,0 +1,25 @@
+Merci pour votre commande, A. Testeur.
+
+Livraison prévue mercredi
+
+Relais exemple - Sample City
+
+N° de commande
+777-5554321-1234567
+
+
+
+Consulter ou modifier cette commande
+https://www.amazon.fr/your-orders/order-details?orderID=777-5554321-1234567&ref_=sample
+
+* Livre exemple Alpha (Collection test, 1)
+  Quantité: 1
+  9.90 EUR
+
+* Livre exemple Bêta (Collection test, 2)
+  Quantité: 2
+  19.80 EUR
+
+
+Total
+29.70 EUR

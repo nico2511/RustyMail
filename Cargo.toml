@@ -1,0 +1,26 @@
+[workspace]
+members = [
+    "crates/rustymail-domain",
+    "crates/rustymail-modules",
+    "crates/rustymail-application",
+    "crates/rustymail-infrastructure",
+    "crates/rustymail-llm",
+    "crates/rustymail-semantic",
+    "src-tauri"
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.1"
+authors = ["RustyMail contributors"]
+license = "MIT"
+
+[profile.release]
+lto = "thin"
+strip = true
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"

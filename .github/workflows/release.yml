@@ -1,0 +1,102 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read app version
+        id: meta
+        shell: pwsh
+        run: |
+          $json = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $ver = $json.version
+          if (-not $ver) { throw "version missing in tauri.conf.json" }
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          "tag=v$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "Building RustyMail $ver (tag v$ver)"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri (Windows)
+        run: npm run tauri:build -- --bundles nsis
+
+      - name: List build outputs
+        shell: pwsh
+        run: |
+          foreach ($root in @('target/release', 'src-tauri/target/release')) {
+            if (Test-Path $root) {
+              Write-Host "== $root =="
+              Get-ChildItem -Recurse $root -Include *.exe,*.msi -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty FullName
+            }
+          }
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: rustymail-windows
+          path: |
+            target/release/bundle/nsis/**
+            target/release/rustymail.exe
+            src-tauri/target/release/bundle/nsis/**
+            src-tauri/target/release/rustymail.exe
+          if-no-files-found: error
+
+  publish:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read app version
+        id: meta
+        shell: bash
+        run: |
+          ver=$(grep -m1 '"version"' src-tauri/tauri.conf.json | sed 's/.*"version": "\([^"]*\)".*/\1/')
+          test -n "$ver"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "tag=v$ver" >> "$GITHUB_OUTPUT"
+          echo "Publishing release v$ver"
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: rustymail-windows
+          path: dist
+
+      - name: Verify artifacts
+        run: |
+          find dist -type f \( -name '*.exe' -o -name '*.msi' \) | head -20
+          test "$(find dist -type f \( -name '*.exe' -o -name '*.msi' \) | wc -l)" -gt 0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: RustyMail ${{ steps.meta.outputs.version }}
+          files: dist/**
+          generate_release_notes: true
+          make_latest: true
+          overwrite_files: true

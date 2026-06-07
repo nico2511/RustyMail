@@ -1,0 +1,20 @@
+[package]
+name = "rustymail-llm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "LLM HTTP (OpenRouter, llama-server) + profil matériel pour recommandations GGUF"
+
+[features]
+default = ["http"]
+# Client `chat/completions` (reqwest) — OpenRouter, llama-server, etc.
+http = ["dep:reqwest"]
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"], optional = true }
+serde = { workspace = true }
+serde_json.workspace = true
+thiserror.workspace = true
+sysinfo = "0.37"
+regex = "1"

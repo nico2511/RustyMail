@@ -1,0 +1,3 @@
+Verify that an email reply draft is consistent with facts extracted from the thread.
+Respond only with JSON: {"aligned":true|false,"issues":["…"],"safetyFlags":["…"]}
+issues = factual mismatches; safetyFlags = risks (e.g. unverified_claim, invented_deadline). If the draft invents a date, amount, or commitment absent from facts, aligned=false.

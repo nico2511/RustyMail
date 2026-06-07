@@ -1,0 +1,21 @@
+[package]
+name = "rustymail-semantic"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Local semantic embeddings (MiniLM ONNX) for RustyMail"
+
+[features]
+# ONNX désactivé par défaut pour que `cargo test -p rustymail-semantic` lie sans conflits MSVC sur Windows.
+default = []
+embeddings-onnx = ["dep:ort", "dep:tokenizers", "dep:ndarray"]
+
+[dependencies]
+thiserror.workspace = true
+
+ndarray = { version = "0.17", features = ["std"], optional = true }
+ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "download-binaries", "ndarray", "tls-rustls"], optional = true }
+# Pas de `esaxx_fast` : le C++ d’esaxx est lié en /MT, ORT précompilé en /MD → LNK2038/LNK1169 sur MSVC.
+# L’encodage runtime (WordPiece / BPE) n’en a pas besoin (esaxx sert surtout à l’entraînement Unigram).
+tokenizers = { version = "0.21", default-features = false, features = ["progressbar", "onig"], optional = true }

@@ -1,0 +1,52 @@
+[package]
+name = "rustymail"
+version.workspace = true
+description = "Privacy-first desktop email client prototype"
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+name = "rustymail_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+default = []
+
+[dependencies]
+rustymail-application = { path = "../crates/rustymail-application" }
+rustymail-domain = { path = "../crates/rustymail-domain" }
+rustymail-infrastructure = { path = "../crates/rustymail-infrastructure" }
+rustymail-modules = { path = "../crates/rustymail-modules" }
+rustymail-llm = { path = "../crates/rustymail-llm" }
+rfd = "0.15"
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2.11", features = [] }
+ureq = { version = "2.9", default-features = false, features = ["tls"] }
+dirs = "5"
+hound = "3.5"
+env_logger = "0.11"
+log = "0.4"
+dotenvy = "0.15"
+tauri-plugin-opener = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+transcribe-rs = { version = "0.3.11", default-features = false, features = ["whisper-cpp", "whisper-metal"] }
+
+# Job Windows : si le process parent disparaît (Ctrl+C, tuer la tâche), le sous-processus llama-server est terminé avec le job.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
+webview2-com = "0.38.2"
+windows-core = "0.61"
+
+# whisper.cpp en CPU sans SDK Vulkan obligatoire. Option : ajouter whisper-vulkan / whisper-cuda ici si besoin.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+transcribe-rs = { version = "0.3.11", default-features = false, features = ["whisper-cpp"] }

@@ -1,0 +1,3 @@
+Extract requested or implicit actions/tasks from an email thread.
+Respond only with JSON: {"actions":[{"text":"…","owner":"","dueHint":""}]}
+At most 6 short actions.

@@ -1,0 +1,245 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "ok": "OK",
+    "back": "Retour",
+    "close": "Fermer",
+    "later": "Plus tard",
+    "refresh": "Rafraîchir",
+    "settings": "Paramètres",
+    "none": "— Aucun —"
+  },
+  "nav": {
+    "inbox": "Réception",
+    "contacts": "Carnet",
+    "organization": "Organiser",
+    "folders": "Dossiers",
+    "compose": "Nouveau message",
+    "settings": "Paramètres"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "sectionsAria": "Sections des paramètres",
+    "tabs": {
+      "accounts": "Comptes",
+      "general": "Général",
+      "appearance": "Apparence",
+      "autoSenders": "Expéditeurs auto",
+      "ai": "IA & dictée",
+      "addressBook": "Carnet",
+      "storage": "Stockage",
+      "shortcuts": "Raccourcis",
+      "developer": "Développeur"
+    },
+    "general": {
+      "languageHeading": "Langue",
+      "languageExplain": "Langue d’affichage (menus, paramètres) : français ou anglais selon votre choix. Les autres codes affichent l’interface en anglais pour l’instant. La langue mère sert aussi à la dictée, aux traductions et aux réponses IA.",
+      "motherLanguage": "Langue de l’application",
+      "langFr": "Français",
+      "langFrFR": "Français (France)",
+      "langEn": "English",
+      "langEnUS": "English (US)",
+      "langPt": "Português",
+      "langPtBR": "Português (Brasil)",
+      "langEs": "Español",
+      "langDe": "Deutsch",
+      "langIt": "Italiano",
+      "globalAddressBook": "Carnet global",
+      "globalAddressBookExplain": "<strong>Coché :</strong> un seul carnet pour tous vos comptes (perso, pro…). Si la même adresse e-mail apparaît sur deux comptes, vous ne la voyez qu’une fois.<br /><br /><strong>Décoché :</strong> le carnet ne montre que les contacts du compte actuellement sélectionné.",
+      "activitySuggestions": "Suggestions de vues (activité locale)",
+      "activitySuggestionsExplain": "Enregistre votre activité <strong>uniquement sur cet appareil</strong> pour proposer des vues enregistrées. Désactivé = aucune collecte.",
+      "archiveHeading": "Archivage",
+      "archiveExplain": "Hiérarchique : Archive/AAAA/MM-mois (locale app). Plat : dossier serveur (Gmail All Mail, Archive…).",
+      "archiveMode": "Mode",
+      "archiveHierarchical": "Hiérarchique",
+      "archiveFlat": "Plat (serveur)",
+      "archiveRoot": "Racine IMAP",
+      "startupHeading": "Démarrage",
+      "startupExplain": "Compte ouvert par défaut au lancement. « Premier compte » = le premier de la liste dans Paramètres → Comptes.",
+      "defaultAccount": "Compte au démarrage",
+      "firstAccount": "Premier compte de la liste",
+      "noAccount": "— Aucun compte configuré —",
+      "inboxHeading": "Liste des mails",
+      "inboxExplain": "Filtre affiché par défaut à l’ouverture d’un dossier IMAP.",
+      "defaultListFilter": "Vue principale par défaut",
+      "filterAll": "Tout",
+      "filterUnread": "Non lus",
+      "filterStarred": "Suivis (tous dossiers)",
+      "filterFocused": "Priorité (hors expéditeurs auto)",
+      "filterAuto": "Auto (newsletters / expéditeurs auto)"
+    },
+    "ai": {
+      "tabsAria": "Paramètres IA",
+      "tabFeatures": "Fonctionnalités",
+      "tabDictation": "Dictée",
+      "tabLlm": "Sur mon PC & cloud",
+      "tabSemantic": "Sémantique",
+      "tabBackground": "Arrière‑plan",
+      "tabPrompts": "Prompts",
+      "featuresHeading": "Fonctionnalités",
+      "featuresLead": "Active ou désactive chaque capacité IA sans toucher aux moteurs (dictée, LLM, sémantique). Le panneau rapide « IA » reprend les mêmes interrupteurs.",
+      "promptsHeading": "Catalogue de prompts (LLM)",
+      "promptsLead": "Instructions envoyées au modèle (anglais). Les réponses visibles suivent votre langue mère.",
+      "promptsReadOnly": "Lecture seule — modification personnalisée à venir.",
+      "promptsOutputLang": "Langue de sortie utilisateur : {lang}",
+      "promptsSkillsHeading": "Skills (assistant réponse)",
+      "promptsNoCatalog": "Catalogue indisponible (lancez l’app Tauri).",
+      "promptsLoadError": "Impossible de charger le catalogue : {error}"
+    }
+  },
+  "ai": {
+    "features": {
+      "groups": {
+        "thread": "Fil & boîte",
+        "compose": "Compositeur",
+        "search": "Recherche & contacts",
+        "security": "Sécurité"
+      },
+      "threadSummary": {
+        "label": "Synthèse de fil",
+        "description": "Bouton et panneau « Résumer » : résumé LLM du fil ouvert (streaming)."
+      },
+      "threadTranslate": {
+        "label": "Traduction de fil",
+        "description": "Traduit tout le fil vers la langue mère (Paramètres → Général)."
+      },
+      "messageTranslate": {
+        "label": "Traduction par message",
+        "description": "Traduction sous chaque message dont la langue diffère de la vôtre."
+      },
+      "inboxDigest": {
+        "label": "Brief d’action (boîte)",
+        "description": "Brief IA du dossier : décisions, actions et risques."
+      },
+      "orgProposals": {
+        "label": "Organiser (propositions IA)",
+        "description": "Regroupements suggérés par LLM dans le centre d’organisation."
+      },
+      "threadQa": {
+        "label": "Questions sur le fil (Q&A)",
+        "description": "Questions en langage naturel sur le contenu du fil."
+      },
+      "autoThreadSummary": {
+        "label": "Synthèse auto à l’ouverture",
+        "description": "Résumé automatique si le fil contient assez de messages."
+      },
+      "composeRewrite": {
+        "label": "Réécriture IA",
+        "description": "Réécrit la sélection ou le brouillon selon le ton choisi."
+      },
+      "composeGrammar": {
+        "label": "Correction grammaticale",
+        "description": "Corrige orthographe et grammaire du brouillon."
+      },
+      "quickReplyThread": {
+        "label": "Réponses rapides (fil)",
+        "description": "Suggestions courtes sous le fil."
+      },
+      "quickReplyCompose": {
+        "label": "Réponses rapides (compositeur)",
+        "description": "Suggestions dans le compositeur."
+      },
+      "agentPrepareReply": {
+        "label": "Assistant « Préparer réponse »",
+        "description": "Analyse, brouillon, relecture en plusieurs étapes."
+      },
+      "searchNl": {
+        "label": "Recherche en langage naturel",
+        "description": "Interprète une requête et remplit filtres et tags."
+      },
+      "addressAutocomplete": {
+        "label": "Autocomplétion @contacts",
+        "description": "Suggère des contacts lors de la saisie @."
+      },
+      "contactProfile": {
+        "label": "Profil IA contact",
+        "description": "Résumé et sujets depuis les mails locaux d’un contact."
+      },
+      "securityLlm": {
+        "label": "Analyse sécurité (LLM)",
+        "description": "Enrichit l’anti‑phishing par une intention LLM."
+      }
+    }
+  },
+  "assist": {
+    "skills": {
+      "analyzeIntent": "Intention",
+      "extractFacts": "Faits",
+      "actionItems": "Actions",
+      "riskFlagger": "Risques",
+      "draftReply": "Brouillon",
+      "toneAdapter": "Ton",
+      "consistencyCheck": "Cohérence",
+      "slotSuggestion": "Créneaux"
+    },
+    "mode": {
+      "quick": "Rapide",
+      "deep": "Approfondi",
+      "strictSafe": "Prudent"
+    }
+  },
+  "prompts": {
+    "outputLanguageHint": "Sortie utilisateur : {lang}",
+    "features": {
+      "summary": "Synthèse de fil",
+      "translation": "Traduction",
+      "grammar": "Correction grammaticale",
+      "writing": "Réécriture",
+      "quickReply": "Réponses rapides",
+      "qa": "Q&A fil",
+      "searchNl": "Recherche NL",
+      "inboxDigest": "Brief boîte",
+      "actionBrief": "Brief d’action",
+      "contactProfile": "Profil contact",
+      "orgProposals": "Organisation (propositions)",
+      "fluxAffiner": "Affiner flux",
+      "securityLlm": "Sécurité LLM",
+      "agentIntent": "Agent — intention",
+      "agentDraft": "Agent — brouillon",
+      "agentSlots": "Agent — créneaux",
+      "assistActions": "Assist — actions",
+      "assistTone": "Assist — ton",
+      "assistFacts": "Assist — faits",
+      "assistConsistency": "Assist — cohérence"
+    }
+  },
+  "onboarding": {
+    "stepOf": "Étape {current} / {total}",
+    "welcomeTitle": "Bienvenue dans RustyMail",
+    "welcomeLead": "Quelques choix rapides, puis un mini-guide. Tout le détail reste dans Paramètres.",
+    "languageLabel": "Langue de l’interface",
+    "languageFr": "Français",
+    "languageEn": "English",
+    "featuresTitle": "Fonctions utiles",
+    "featuresLead": "Cochez ce que vous voulez essayer. Les petits modèles (recherche, dictée) se téléchargent en arrière-plan.",
+    "dictationTitle": "Dictée vocale",
+    "dictationSub": "Whisper local — maintenir F9 dans le compositeur (modifiable dans Paramètres → IA).",
+    "semanticTitle": "Recherche sémantique",
+    "semanticSub": "Trouve des mails par sens, pas seulement par mots-clés (modèle MiniLM).",
+    "localLlmTitle": "Chat IA local (llama-server)",
+    "localLlmSub": "Optionnel. Le gros fichier GGUF se configure ensuite dans Paramètres → IA.",
+    "llamaDetected": "llama-server détecté sur ce PC.",
+    "llamaMissing": "llama-server absent. Vous pourrez l’installer via winget ci-dessous.",
+    "llamaDetectError": "Détection impossible : {error}",
+    "wingetInstall": "Installer llama-server (winget)",
+    "guideTitle": "Pour bien démarrer",
+    "guideLead": "Prochaines étapes recommandées :",
+    "guideAccounts": "Ajoutez un compte mail : Paramètres → Comptes (IMAP / mot de passe ou app password).",
+    "guideModels": "Les modèles légers se téléchargent automatiquement au premier usage (barre de statut).",
+    "guideDictation": "Dictée : ouvrez un message, maintenez F9, parlez, relâchez.",
+    "guideLocalLlm": "LLM local : Paramètres → IA → téléchargez le GGUF quand vous êtes prêt (~2 Go).",
+    "guideSettings": "Clés OpenRouter, organisation, archive : tout est dans Paramètres quand vous en avez besoin.",
+    "next": "Suivant",
+    "finish": "Commencer",
+    "skipAll": "Passer — tout dans Paramètres"
+  },
+  "toast": {
+    "prefsSaved": "Préférences enregistrées.",
+    "openThreadForAgent": "Ouvrez un fil pour l’assistant réponse.",
+    "selectAccountForAgent": "Sélectionnez un compte pour l’assistant réponse.",
+    "agentAutoMail": "Assistant indisponible pour les messages automatiques / newsletters.",
+    "enableAgentInSettings": "Activez « Assistant Préparer réponse » dans les réglages IA.",
+    "runTauri": "Fonction disponible dans l’app Tauri."
+  }
+}

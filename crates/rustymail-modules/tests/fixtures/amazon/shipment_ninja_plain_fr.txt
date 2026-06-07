@@ -1,0 +1,29 @@
+<!-- Données fictives — modèle « en cours de livraison » (colis + créneau + suivi). -->
+Votre colis est en cours de livraison!
+Commandé
+
+Expédié
+
+En cours de livraison
+
+Livré
+
+
+
+
+
+Arrive aujourd'hui dans la tranche horaire suivante: 10:15 - 13:15
+
+Pat RELAIS - Sample City
+
+N° de commande
+777-5554321-1234567
+
+
+
+Suivez le colis
+https://www.amazon.fr/progress-tracker/package?orderId=777-5554321-1234567&packageIndex=0&ref_=fixture_track
+
+* Mixeur exemple Pro 700 W argent (réf. QA-100)
+  Quantité: 1
+  49.90 EUR

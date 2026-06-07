@@ -1,0 +1,28 @@
+{
+  "name": "rustymail2",
+  "private": true,
+  "version": "0.1.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "tauri:build": "tauri build",
+    "verify:compile": "cargo check -p rustymail",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-opener": "^2.5.4",
+    "dompurify": "^3.4.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.0",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "^3.2.4"
+  }
+}
