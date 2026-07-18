@@ -1,0 +1,10 @@
+# cargo-audit config (used by `.github/workflows/cargo-audit.yml`)
+#
+# quick-xml 0.39.x remains only via wayland-scanner (Linux build-time proc-macro
+# that parses trusted Wayland protocol XML). Runtime/untrusted XML paths use
+# quick-xml >= 0.41. Drop these ignores when wayland-scanner moves off ^0.39.
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]

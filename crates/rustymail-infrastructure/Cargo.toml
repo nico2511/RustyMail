@@ -38,7 +38,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "mul
 url = "2"
 log = "0.4"
 ureq = { version = "2.9", default-features = false, features = ["tls"] }
-quick-xml = { version = "0.37", features = ["serialize"] }
+quick-xml = { version = "0.41", features = ["serialize"] }
 urlencoding = "2"
 rand = "0.8"
 open = "5"
