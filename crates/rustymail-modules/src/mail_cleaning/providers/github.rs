@@ -139,14 +139,16 @@ fn try_github_digest(html: &str, ctx: &CleaningInput<'_>) -> Option<String> {
         return None;
     }
 
-    Some(build_github_digest(&title, &paragraphs, action_url.as_deref()))
+    Some(build_github_digest(
+        &title,
+        &paragraphs,
+        action_url.as_deref(),
+    ))
 }
 
 fn find_action_url(doc: &Html, html: &str) -> Option<String> {
     let Ok(sel) = Selector::parse("a[href]") else {
-        return RE_PR_ISSUE_URL
-            .find(html)
-            .map(|m| sanitize_url(m.as_str()));
+        return RE_PR_ISSUE_URL.find(html).map(|m| sanitize_url(m.as_str()));
     };
     for a in doc.select(&sel) {
         let Some(href) = a.attr("href") else {
@@ -162,9 +164,7 @@ fn find_action_url(doc: &Html, html: &str) -> Option<String> {
             }
         }
     }
-    RE_PR_ISSUE_URL
-        .find(html)
-        .map(|m| sanitize_url(m.as_str()))
+    RE_PR_ISSUE_URL.find(html).map(|m| sanitize_url(m.as_str()))
 }
 
 fn sanitize_url(href: &str) -> String {

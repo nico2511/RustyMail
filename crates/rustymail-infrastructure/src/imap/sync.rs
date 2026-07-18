@@ -1831,7 +1831,11 @@ mod thread_pick_tests {
             [],
         )
         .expect("threads");
-        for (id, tid, uid) in [("m1", "t1", 10i64), ("m2", "t2", 20i64), ("m3", "t1", 30i64)] {
+        for (id, tid, uid) in [
+            ("m1", "t1", 10i64),
+            ("m2", "t2", 20i64),
+            ("m3", "t1", 30i64),
+        ] {
             conn.execute(
                 "INSERT INTO messages (id, thread_id, account_id, mailbox, imap_uid, sender_name, sender_email, subject, received_at, body, is_read, position)
                  VALUES (?1, ?2, 'acc', 'INBOX', ?3, 'A', 'a@x', 'S', '2026-01-01T00:00:00Z', 'b', 1, 0)",
@@ -1851,7 +1855,9 @@ mod thread_pick_tests {
             .unwrap();
         assert_eq!(left, 2);
         let t2: i64 = conn
-            .query_row("SELECT COUNT(*) FROM threads WHERE id='t2'", [], |r| r.get(0))
+            .query_row("SELECT COUNT(*) FROM threads WHERE id='t2'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(t2, 0, "empty thread after prune must be removed");
         let uids = list_local_imap_uids(&db, "acc", "INBOX").expect("list");

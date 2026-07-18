@@ -330,8 +330,7 @@ pub fn sqlite_draft_orphan_sessions_list(
 
     let mut out = Vec::new();
     for row in rows {
-        let (session_id, updated_at, revision_count, payload) =
-            row.map_err(|e| e.to_string())?;
+        let (session_id, updated_at, revision_count, payload) = row.map_err(|e| e.to_string())?;
         let (title, preview) = match payload.as_deref() {
             Some(json) => draft_title_preview_from_payload(json),
             None => ("Sans objet".into(), String::new()),

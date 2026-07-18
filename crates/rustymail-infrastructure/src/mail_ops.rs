@@ -147,12 +147,14 @@ pub fn pick_archive_folder(list: &[String]) -> Option<String> {
     }
 
     // Serveurs dot-only : préférer `INBOX.Archive` (Thunderbird) plutôt qu’un `Archive` racine parallèle.
+    // `mailbox_logical_path_key` strippe le segment `inbox`, donc on teste le préfixe wire.
     if infer_hierarchy_delimiter_from_list(&hits) == '.' {
         let mut inbox_archive: Vec<String> = hits
             .iter()
             .filter(|n| {
-                let k = mailbox_logical_path_key(n);
-                k.first().is_some_and(|s| s == "inbox") && k.iter().any(|s| s == "archive")
+                let lower = n.to_ascii_lowercase();
+                let under_inbox = lower.starts_with("inbox.") || lower.starts_with("inbox/");
+                under_inbox && mailbox_logical_path_key(n).iter().any(|s| s == "archive")
             })
             .cloned()
             .collect();

@@ -29,6 +29,13 @@ pub(crate) fn looks_like_text_for_heuristics(s: &str) -> bool {
     if probe.is_empty() {
         return false;
     }
+    // ZIP/PDF et autres binaires portent souvent des NUL / contrôles hors whitespace.
+    if probe
+        .chars()
+        .any(|c| c == '\0' || (c.is_control() && !matches!(c, '\n' | '\r' | '\t')))
+    {
+        return false;
+    }
     let mut good = 0u32;
     let total = probe.chars().count() as u32;
     for c in probe.chars() {
