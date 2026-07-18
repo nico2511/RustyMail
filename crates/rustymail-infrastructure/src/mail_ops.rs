@@ -14,6 +14,8 @@ use crate::imap::ops::{
     resolve_mailbox_imap_command_names, resolve_mailbox_wire_name,
     resolve_wire_mailbox_for_logical_path, uid_move_with_fallback, uid_store, MailboxListEntry,
 };
+use crate::account_imap_lock::acquire_account_imap_lock;
+use crate::imap_tombstones::record_imap_uid_tombstones;
 use crate::login_session_for_account;
 use crate::mailbox_local_cache::register_mailbox_local_cache;
 use crate::ImapSession;
@@ -188,12 +190,15 @@ pub struct ArchiveDestination {
     pub wire_mailbox: String,
 }
 
-/// Résultat d’un archivage IMAP (message utilisateur + dossier cible réel sur le serveur).
+/// Résultat d’un déplacement IMAP (message utilisateur + dossier cible réel sur le serveur).
 #[derive(Debug, Clone)]
 pub struct ArchiveMoveResult {
     pub message: String,
     pub dest_mailbox: String,
 }
+
+/// Alias sémantique pour trash / move-to-mailbox (même forme qu’archive).
+pub type ThreadMailboxMoveResult = ArchiveMoveResult;
 
 #[derive(Clone)]
 struct ThreadImapRow {
@@ -575,12 +580,15 @@ fn delete_local_after_move(path: &Path, message_ids: &[String]) -> Result<(), St
 /// MOVE IMAP sur une session déjà authentifiée (évite un 2ᵉ LOGIN + LIST).
 async fn imap_move_thread_on_session(
     path: &Path,
+    account_id: &str,
+    thread_id: &str,
     session: &mut ImapSession,
     entries: &[MailboxListEntry],
     src: &ThreadMoveSource,
     dest_mailbox: &str,
 ) -> Result<(usize, String), String> {
     let uids: Vec<async_imap::types::Uid> = src.imap_rows.iter().map(|r| r.imap_uid).collect();
+    let uid_nums: Vec<u32> = src.imap_rows.iter().map(|r| r.imap_uid).collect();
     let list: Vec<String> = entries.iter().map(|e| e.decoded_name.clone()).collect();
     let src_wire = resolve_mailbox_wire_name(&src.effective_mailbox, &list);
     let dest_targets = resolve_mailbox_imap_command_names(dest_mailbox, entries);
@@ -588,6 +596,14 @@ async fn imap_move_thread_on_session(
     let set = format_uid_set(&uids);
     let accepted = uid_move_with_fallback(session, &set, &dest_targets).await?;
     let dest_for_sync = decode_imap_mailbox_name(&accepted);
+    // Tombstones AVANT le DELETE local : une sync concurrente ne doit pas réécrire ces UIDs.
+    let _ = record_imap_uid_tombstones(
+        path,
+        account_id,
+        &src.effective_mailbox,
+        &uid_nums,
+        Some(thread_id),
+    );
     let ids: Vec<String> = src.imap_rows.iter().map(|r| r.message_id.clone()).collect();
     let moved = ids.len();
     delete_local_after_move(path, &ids)?;
@@ -607,6 +623,7 @@ pub async fn empty_trash_mailbox(
                 .to_string(),
         );
     }
+    let _lock = acquire_account_imap_lock(&account.id.0).await;
     let resolved = crate::resolve_scoped_mailbox_from_path(path, &account.id.0, mailbox.trim())?;
     if resolved.trim().is_empty() {
         return Err("Dossier vide".to_string());
@@ -652,6 +669,7 @@ pub async fn empty_trash_mailbox(
     };
 
     if !imap_uids.is_empty() {
+        let _ = record_imap_uid_tombstones(path, &account.id.0, resolved.as_str(), &imap_uids, None);
         let uids: Vec<async_imap::types::Uid> = imap_uids.iter().copied().map(|u| u.into()).collect();
         let mut session = login_session_for_account(account).await?;
         imap_session_select_mailbox(&mut session, resolved.as_str()).await?;
@@ -675,21 +693,28 @@ pub async fn move_thread_to_trash(
     account: &Account,
     source_mailbox: &str,
     thread_id: &str,
-) -> Result<String, String> {
+) -> Result<ThreadMailboxMoveResult, String> {
+    let _lock = acquire_account_imap_lock(&account.id.0).await;
     let src = resolve_thread_move_source(path, &account.id.0, thread_id, source_mailbox)?;
 
     if src.imap_rows.is_empty() {
         let n_stub = trash_local_stub_thread_only(path, &account.id.0, source_mailbox, thread_id)?;
         if n_stub > 0 {
-            return Ok(format!(
-                "{n_stub} message(s) retiré(s) du cache local (sans UID IMAP dans ce dossier)."
-            ));
+            return Ok(ThreadMailboxMoveResult {
+                message: format!(
+                    "{n_stub} message(s) retiré(s) du cache local (sans UID IMAP dans ce dossier)."
+                ),
+                dest_mailbox: source_mailbox.trim().to_string(),
+            });
         }
         let n_all = trash_thread_local_cache_only(path, &account.id.0, thread_id)?;
         if n_all > 0 {
-            return Ok(format!(
-                "{n_all} message(s) retiré(s) du cache local (fil déjà déplacé côté serveur)."
-            ));
+            return Ok(ThreadMailboxMoveResult {
+                message: format!(
+                    "{n_all} message(s) retiré(s) du cache local (fil déjà déplacé côté serveur)."
+                ),
+                dest_mailbox: source_mailbox.trim().to_string(),
+            });
         }
         return Err(
             "Aucun message pour ce fil. Synchronisez la boîte ou ouvrez le dossier où se trouve le mail."
@@ -704,13 +729,24 @@ pub async fn move_thread_to_trash(
         "Aucun dossier corbeille trouvé (Trash, [Gmail]/Trash, etc.). Vérifiez LIST côté serveur."
             .to_string()
     })?;
-    let (n, dest) =
-        imap_move_thread_on_session(path, &mut session, &entries, &src, &target).await?;
+    let (n, dest) = imap_move_thread_on_session(
+        path,
+        &account.id.0,
+        thread_id,
+        &mut session,
+        &entries,
+        &src,
+        &target,
+    )
+    .await?;
     let _ = session.logout().await;
     if !src.stub_ids.is_empty() {
         relocate_local_stub_thread(path, &account.id.0, source_mailbox, thread_id, &dest)?;
     }
-    Ok(format!("{n} message(s) déplacé(s) vers {dest}."))
+    Ok(ThreadMailboxMoveResult {
+        message: format!("{n} message(s) déplacé(s) vers {dest}."),
+        dest_mailbox: dest,
+    })
 }
 
 /// Calcule la cible d’archivage (chemin logique + nom boîte serveur).
@@ -751,6 +787,7 @@ pub async fn move_thread_to_archive(
     source_mailbox: &str,
     thread_id: &str,
 ) -> Result<ArchiveMoveResult, String> {
+    let _lock = acquire_account_imap_lock(&account.id.0).await;
     let src = resolve_thread_move_source(path, &account.id.0, thread_id, source_mailbox)?;
 
     if src.imap_rows.is_empty() && src.stub_ids.is_empty() {
@@ -787,8 +824,16 @@ pub async fn move_thread_to_archive(
         .map(|w| decode_imap_mailbox_name(&w))
         .unwrap_or_else(|| dest.wire_mailbox.clone());
     dest.wire_mailbox = target.clone();
-    let (n, dest_actual) =
-        imap_move_thread_on_session(path, &mut session, &entries, &src, &target).await?;
+    let (n, dest_actual) = imap_move_thread_on_session(
+        path,
+        &account.id.0,
+        thread_id,
+        &mut session,
+        &entries,
+        &src,
+        &target,
+    )
+    .await?;
     let _ = session.logout().await;
     if !src.stub_ids.is_empty() {
         relocate_local_stub_thread(path, &account.id.0, source_mailbox, thread_id, &dest_actual)?;
@@ -916,13 +961,16 @@ pub async fn move_thread_to_mailbox(
     source_mailbox: &str,
     thread_id: &str,
     dest_mailbox: &str,
-) -> Result<String, String> {
+) -> Result<ThreadMailboxMoveResult, String> {
     let dest = dest_mailbox.trim();
     if dest.is_empty() {
         return Err("Mailbox cible vide".to_string());
     }
     if dest.eq_ignore_ascii_case(source_mailbox.trim()) {
-        return Ok("Déjà dans ce dossier".to_string());
+        return Ok(ThreadMailboxMoveResult {
+            message: "Déjà dans ce dossier".to_string(),
+            dest_mailbox: dest.to_string(),
+        });
     }
     if is_trash_like_mailbox(dest) {
         return Err(
@@ -936,6 +984,7 @@ pub async fn move_thread_to_mailbox(
                 .to_string(),
         );
     }
+    let _lock = acquire_account_imap_lock(&account.id.0).await;
     let src = resolve_thread_move_source(path, &account.id.0, thread_id, source_mailbox)?;
     if src.imap_rows.is_empty() && src.stub_ids.is_empty() {
         return Err(
@@ -945,7 +994,10 @@ pub async fn move_thread_to_mailbox(
     }
     if src.imap_rows.is_empty() {
         let n = relocate_local_stub_thread(path, &account.id.0, source_mailbox, thread_id, dest)?;
-        return Ok(format!("{n} message(s) déplacé(s) localement → {dest}."));
+        return Ok(ThreadMailboxMoveResult {
+            message: format!("{n} message(s) déplacé(s) localement → {dest}."),
+            dest_mailbox: dest.to_string(),
+        });
     }
 
     let mut session = login_session_for_account(account).await?;
@@ -954,15 +1006,26 @@ pub async fn move_thread_to_mailbox(
     for wire in &dest_targets {
         let _ = register_mailbox_local_cache(path, &account.id.0, wire);
     }
-    let (n, dest_actual) =
-        imap_move_thread_on_session(path, &mut session, &entries, &src, dest).await?;
+    let (n, dest_actual) = imap_move_thread_on_session(
+        path,
+        &account.id.0,
+        thread_id,
+        &mut session,
+        &entries,
+        &src,
+        dest,
+    )
+    .await?;
     let _ = session.logout().await;
 
     if !src.stub_ids.is_empty() {
         relocate_local_stub_thread(path, &account.id.0, source_mailbox, thread_id, &dest_actual)?;
     }
 
-    Ok(format!("{n} message(s) déplacé(s) → {dest_actual}."))
+    Ok(ThreadMailboxMoveResult {
+        message: format!("{n} message(s) déplacé(s) → {dest_actual}."),
+        dest_mailbox: dest_actual,
+    })
 }
 
 fn update_local_is_read(path: &Path, message_ids: &[String], is_read: bool) -> Result<(), String> {

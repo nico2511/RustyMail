@@ -46,6 +46,8 @@ mod org_post_move;
 mod folder_ops;
 mod mailbox_local_cache;
 mod text_sample;
+mod imap_tombstones;
+mod account_imap_lock;
 
 pub const KEYRING_SERVICE: &str = "RustyMail";
 const MAX_ATTACHMENT_DOWNLOAD_BYTES: usize = 75 * 1024 * 1024;
@@ -140,7 +142,7 @@ pub use imap::ops;
 pub use imap::{login_session, login_session_for_account, map_imap_error, ImapSession};
 pub use mail_ops::{
     empty_trash_mailbox, is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive,
-    ArchiveMoveResult, ArchiveDestination,
+    ArchiveMoveResult, ArchiveDestination, ThreadMailboxMoveResult,
     move_thread_to_mailbox, move_thread_to_trash, pick_archive_folder, pick_trash_folder,
     set_thread_seen,
 };
@@ -152,6 +154,10 @@ pub use org_apply::{
 pub use org_post_move::{
     post_move_heuristic_refresh, spawn_post_move_background_sync, PostMoveRefreshOutcome,
 };
+pub use imap_tombstones::{
+    active_tombstone_uids, filter_tombstoned_uids, record_imap_uid_tombstones,
+};
+pub use account_imap_lock::{acquire_account_imap_lock, with_account_imap_lock};
 pub use org_retag::{org_retag_account, org_retag_threads};
 pub use mailbox_local_cache::{
     purge_mailbox_local_cache, register_mailbox_local_cache, rename_mailbox_local_cache,
@@ -1177,6 +1183,7 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
     org_memory::migrate_org_memory(connection)?;
     saved_searches::migrate_saved_searches(connection)?;
     activity::migrate_activity(connection)?;
+    imap_tombstones::migrate_imap_tombstones(connection)?;
 
     Ok(())
 }

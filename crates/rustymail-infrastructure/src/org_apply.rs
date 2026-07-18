@@ -296,9 +296,12 @@ pub async fn org_apply_proposal_with(
             continue;
         }
         let result = match action {
-            OrgSuggestedAction::Trash => {
-                move_thread_to_trash(path, &account, &mailbox, &tid).await
-            }
+            OrgSuggestedAction::Trash => move_thread_to_trash(path, &account, &mailbox, &tid)
+                .await
+                .map(|out| {
+                    sync_mailboxes.insert(out.dest_mailbox.clone());
+                    out.message
+                }),
             OrgSuggestedAction::Archive => move_thread_to_archive(path, &account, &mailbox, &tid)
                 .await
                 .map(|out| {
@@ -310,7 +313,12 @@ pub async fn org_apply_proposal_with(
                     .target_mailbox
                     .as_deref()
                     .ok_or_else(|| "Dossier cible manquant.".to_string())?;
-                move_thread_to_mailbox(path, &account, &mailbox, &tid, dest).await
+                move_thread_to_mailbox(path, &account, &mailbox, &tid, dest)
+                    .await
+                    .map(|out| {
+                        sync_mailboxes.insert(out.dest_mailbox.clone());
+                        out.message
+                    })
             }
             OrgSuggestedAction::MarkRead => {
                 set_thread_seen(path, &account, &mailbox, &tid, true).await

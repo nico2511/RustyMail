@@ -21,9 +21,10 @@ use super::ops::{
 };
 use super::session::{login_session_for_account, map_imap_error, ImapSession};
 use crate::{
+    account_imap_lock::acquire_account_imap_lock,
     address_contacts::upsert_contacts_from_message_row, ensure_imap_uid_validity,
-    get_imap_last_uid, merge_thread_tag_csv, open_sqlite_migrated, set_imap_last_uid,
-    text_sample::append_utf8_byte_sample, update_message_read_by_imap_uid,
+    filter_tombstoned_uids, get_imap_last_uid, merge_thread_tag_csv, open_sqlite_migrated,
+    set_imap_last_uid, text_sample::append_utf8_byte_sample, update_message_read_by_imap_uid,
 };
 
 const FETCH_BATCH: usize = 20;
@@ -725,6 +726,7 @@ pub async fn sync_inbox(
     mailbox: &str,
     limit: Option<usize>,
 ) -> Result<ImapSyncResult, String> {
+    let _lock = acquire_account_imap_lock(&account.id.0).await;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).max(1);
     let mut session = login_session_for_account(account).await?;
     let dec = decode_imap_mailbox_name(mailbox);
@@ -744,6 +746,16 @@ pub async fn sync_inbox(
 }
 
 pub async fn sync_mailboxes_single_session(
+    db_path: impl AsRef<Path> + Send,
+    account: &Account,
+    mailboxes: &[String],
+    limit_per_mailbox: Option<usize>,
+) -> Result<SyncMailboxesOutcome, String> {
+    let _lock = acquire_account_imap_lock(&account.id.0).await;
+    sync_mailboxes_single_session_locked(db_path, account, mailboxes, limit_per_mailbox).await
+}
+
+async fn sync_mailboxes_single_session_locked(
     db_path: impl AsRef<Path> + Send,
     account: &Account,
     mailboxes: &[String],
@@ -916,6 +928,21 @@ async fn sync_mailbox_with_session(
     if uids.len() > limit {
         let start = uids.len() - limit;
         uids = uids[start..].to_vec();
+    }
+    // Ne pas réinsérer des UIDs récemment déplacés/supprimés (course sync ↔ MOVE).
+    {
+        let mut uid_nums: Vec<u32> = uids.iter().copied().map(|u| u.into()).collect();
+        let skipped = filter_tombstoned_uids(db_path, &account.id.0, &mailbox, &mut uid_nums)?;
+        if skipped > 0 {
+            log::info!(
+                target: "rustymail::audit",
+                "imap_sync: skipped {skipped} tombstoned UID(s) account={} mailbox={}",
+                account.id.0,
+                mailbox
+            );
+            let keep: HashSet<u32> = uid_nums.into_iter().collect();
+            uids.retain(|u| keep.contains(&u32::from(*u)));
+        }
     }
 
     if uids.is_empty() {
@@ -1340,6 +1367,7 @@ fn upsert_threads_to_db(
     account_id: &str,
     mailbox: &str,
 ) -> Result<(), String> {
+    let tombstoned = crate::active_tombstone_uids(path, account_id, mailbox).unwrap_or_default();
     let mut connection =
         crate::open_sqlite_migrated(path).map_err(|error| error.to_string())?;
     let transaction = connection
@@ -1381,6 +1409,17 @@ fn upsert_threads_to_db(
             )
             .map_err(|error| error.to_string())?;
         for (position, message) in thread.messages.iter().enumerate() {
+            let imap_uid: Option<i64> = message
+                .id
+                .0
+                .rsplit('-')
+                .next()
+                .and_then(|tail| tail.parse::<i64>().ok());
+            if let Some(uid) = imap_uid {
+                if uid > 0 && tombstoned.contains(&(uid as u32)) {
+                    continue;
+                }
+            }
             let (to_header, cc_header, reply_to_header) = message_headers
                 .get(&message.id.0)
                 .cloned()
@@ -1432,12 +1471,7 @@ fn upsert_threads_to_db(
                         thread.id.0,
                         account_id,
                         mailbox,
-                        message
-                            .id
-                            .0
-                            .rsplit('-')
-                            .next()
-                            .and_then(|tail| tail.parse::<i64>().ok()),
+                        imap_uid,
                         message.sender.name.as_deref().unwrap_or(""),
                         message.sender.email,
                         message.subject,
@@ -1571,6 +1605,64 @@ mod thread_pick_tests {
         assert_eq!(sanitize_attachment_id_segment("user@example.com"), "userexamplecom");
         assert_eq!(sanitize_attachment_id_segment(" Boîte/测试 "), "Bote");
         assert_eq!(sanitize_attachment_id_segment(""), "scope");
+    }
+
+    #[test]
+    fn upsert_skips_tombstoned_uids_after_local_delete() {
+        use rustymail_domain::{EmailAddress, Message, MessageId, MessageReferences, ThreadId};
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = dir.path().join("tombstone.db");
+        let _ = open_sqlite_migrated(&db).expect("migrate");
+
+        crate::record_imap_uid_tombstones(&db, "acc", "INBOX", &[99], Some("t-gone"))
+            .expect("tombstone");
+
+        let thread = Thread {
+            id: ThreadId("t-gone".into()),
+            subject: "Gone".into(),
+            tags: vec![],
+            entities: vec![],
+            followed: false,
+            messages: vec![Message {
+                id: MessageId("m-imap-acc-inbox-99".into()),
+                sender: EmailAddress {
+                    name: Some("A".into()),
+                    email: "a@example.com".into(),
+                },
+                recipients: vec![],
+                reply_to: vec![],
+                subject: "Gone".into(),
+                received_at: "2026-01-01T00:00:00Z".into(),
+                plain_body: "x".into(),
+                html_body: None,
+                attachments: vec![],
+                tags: vec![],
+                is_read: true,
+                is_pinned: false,
+                references: MessageReferences {
+                    message_id_header: Some("<gone@x>".into()),
+                    in_reply_to: None,
+                    references: vec![],
+                },
+                authentication_results: None,
+                return_path: None,
+                detected_lang: None,
+            }],
+        };
+
+        upsert_threads_to_db(&db, &[thread], &HashMap::new(), &HashMap::new(), &HashMap::new(), "acc", "INBOX")
+            .expect("upsert");
+
+        let conn = open_sqlite_migrated(&db).expect("reopen");
+        let n: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM messages WHERE account_id='acc' AND imap_uid=99",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(n, 0, "tombstoned UID must not be reinserted by sync upsert");
     }
 }
 

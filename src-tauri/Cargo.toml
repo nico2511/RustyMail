@@ -14,6 +14,8 @@ tauri-build = { version = "2", features = [] }
 
 [features]
 default = []
+# Lit `.env` à la racine du dépôt au moment du build et injecte les variables OAuth dans le binaire release (usage perso uniquement).
+embed-dev-oauth = []
 
 [dependencies]
 rustymail-application = { path = "../crates/rustymail-application" }

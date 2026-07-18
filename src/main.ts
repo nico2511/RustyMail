@@ -1105,6 +1105,59 @@ let idleAiCachePrefetchIdleHandle: number | null = null;
 /** Annule les flux prefetch idle (`summarizeThreadCore` / `translateThreadCore` en mode cache). */
 let idlePrefetchAbort: AbortController | null = null;
 
+/** Fils retirés optimistiquement (trash/archive/move) — masqués un moment malgré un resync. */
+const RECENTLY_REMOVED_THREAD_TTL_MS = 60_000;
+const recentlyRemovedThreadIds = new Map<string, number>();
+
+function markThreadsRecentlyRemoved(ids: Iterable<string>): void {
+  const exp = Date.now() + RECENTLY_REMOVED_THREAD_TTL_MS;
+  for (const raw of ids) {
+    const id = String(raw ?? "").trim();
+    if (id) recentlyRemovedThreadIds.set(id, exp);
+  }
+}
+
+function clearThreadsRecentlyRemoved(ids: Iterable<string>): void {
+  for (const raw of ids) {
+    const id = String(raw ?? "").trim();
+    if (id) recentlyRemovedThreadIds.delete(id);
+  }
+}
+
+function pruneRecentlyRemovedThreads(): void {
+  const now = Date.now();
+  for (const [id, exp] of recentlyRemovedThreadIds) {
+    if (exp <= now) recentlyRemovedThreadIds.delete(id);
+  }
+}
+
+function filterRecentlyRemovedThreads(list: ThreadListItem[]): ThreadListItem[] {
+  pruneRecentlyRemovedThreads();
+  if (recentlyRemovedThreadIds.size === 0) return list;
+  return list.filter((t) => {
+    const exp = recentlyRemovedThreadIds.get(String(t.id));
+    return exp === undefined || exp <= Date.now();
+  });
+}
+
+/** Applique une page serveur en respectant le filet « recently removed ». */
+function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
+  const filtered = filterRecentlyRemovedThreads(page);
+  if (append) {
+    const seen = new Set(state.threads.map((t) => String(t.id)));
+    state.threads = [
+      ...state.threads.filter((t) => {
+        const exp = recentlyRemovedThreadIds.get(String(t.id));
+        return exp === undefined || exp <= Date.now();
+      }),
+      ...filtered.filter((t) => !seen.has(String(t.id))),
+    ];
+  } else {
+    state.threads = filtered;
+    state.threadOffset = 0;
+  }
+}
+
 function cancelMailboxDigestIdleHandle(): void {
   if (mailboxDigestIdleHandle === null) return;
   if (typeof window.cancelIdleCallback === "function") {
@@ -4583,10 +4636,9 @@ async function loadThreadsForSearchContext(append = false): Promise<void> {
     return;
   }
   if (append) {
-    state.threads = [...state.threads, ...page];
+    applyServerThreadPage(page, true);
   } else {
-    state.threads = page;
-    state.threadOffset = 0;
+    applyServerThreadPage(page, false);
   }
   state.threadOffset = state.threads.length;
   state.hasMoreThreads = page.length >= state.threadPageSize;
@@ -4730,10 +4782,9 @@ async function loadMailView(append: boolean = false) {
     }
   }
   if (append) {
-    state.threads = [...state.threads, ...page];
+    applyServerThreadPage(page, true);
   } else {
-    state.threads = page;
-    state.threadOffset = 0;
+    applyServerThreadPage(page, false);
   }
   state.threadOffset = state.threads.length;
   state.hasMoreThreads = page.length >= state.threadPageSize;
@@ -4987,6 +5038,7 @@ async function onThreadMove(
   const prevSelectedId = state.selectedThreadId;
   const prevView = state.view;
   const prevOrgReport = state.organization.report;
+  markThreadsRecentlyRemoved([threadId]);
   state.threads = state.threads.filter((t) => t.id !== threadId);
   if (state.view === "thread" && state.selectedThreadId === threadId) {
     state.view = "list";
@@ -5009,6 +5061,7 @@ async function onThreadMove(
     if (state.view === "organization") void refreshOrganizationReport();
   } catch (err) {
     console.error(cmd, err);
+    clearThreadsRecentlyRemoved([threadId]);
     state.threads = prevThreads;
     state.selectedThreadId = prevSelectedId;
     state.view = prevView;
@@ -5070,6 +5123,7 @@ async function bulkTrashVisibleThreads(): Promise<void> {
   const prevOrgReport = state.organization.report;
 
   const ids = visible.map((t) => String(t.id));
+  markThreadsRecentlyRemoved(ids);
   state.threads = state.threads.filter((t) => !ids.includes(String(t.id)));
   if (state.view === "thread" && state.selectedThreadId && ids.includes(String(state.selectedThreadId))) {
     state.view = "list";
@@ -5106,6 +5160,7 @@ async function bulkTrashVisibleThreads(): Promise<void> {
 
   if (errors.length) {
     // On restaure l’état pour éviter une vue incohérente.
+    clearThreadsRecentlyRemoved(ids);
     state.threads = prevThreads;
     state.selectedThreadId = prevSelectedId;
     state.view = prevView;
@@ -5212,6 +5267,7 @@ async function onThreadMoveTo(threadId: string, destMailbox: string) {
   const prevSelectedId = state.selectedThreadId;
   const prevView = state.view;
   const prevOrgReport = state.organization.report;
+  markThreadsRecentlyRemoved([tid]);
   state.threads = state.threads.filter((t) => t.id !== tid);
   if (state.view === "thread" && state.selectedThreadId === tid) {
     state.view = "list";
@@ -5241,6 +5297,7 @@ async function onThreadMoveTo(threadId: string, destMailbox: string) {
     if (state.view === "organization") void refreshOrganizationReport();
   } catch (err) {
     console.error("move_thread_mailbox", err);
+    clearThreadsRecentlyRemoved([tid]);
     state.threads = prevThreads;
     state.selectedThreadId = prevSelectedId;
     state.view = prevView;
@@ -7451,6 +7508,7 @@ async function bulkArchiveSearchViewThreads(): Promise<void> {
   });
   const prevThreads = state.threads;
   const ids = new Set(visible.map((t) => String(t.id)));
+  markThreadsRecentlyRemoved(ids);
   state.threads = state.threads.filter((t) => !ids.has(String(t.id)));
   if (state.view === "thread" && state.selectedThreadId && ids.has(String(state.selectedThreadId))) {
     state.view = "list";
@@ -7482,6 +7540,7 @@ async function bulkArchiveSearchViewThreads(): Promise<void> {
     clearStatusBarJob("bulk-archive");
   }
   if (errors.length) {
+    clearThreadsRecentlyRemoved(ids);
     state.threads = prevThreads;
     toast(`Archivage partiel : ${errors[0]}`);
     render();
@@ -16826,12 +16885,14 @@ async function searchThreads() {
     restoreSearchInputSelection(selStart, selEnd, gen);
     return;
   }
-  state.threads = await safeInvoke<ThreadListItem[]>(
-    "search_threads",
-    {
-      query: buildSearchQueryFromCurrentState(),
-    },
-    []
+  state.threads = filterRecentlyRemovedThreads(
+    await safeInvoke<ThreadListItem[]>(
+      "search_threads",
+      {
+        query: buildSearchQueryFromCurrentState(),
+      },
+      []
+    ),
   );
 
   if (gen !== searchThreadsGeneration) {

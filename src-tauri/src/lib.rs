@@ -1699,15 +1699,17 @@ async fn move_thread_trash(
     let result =
         rustymail_infrastructure::move_thread_to_trash(&paths.db_path, &account, &mbox, &thread_id)
             .await?;
-    // Le MOVE met déjà à jour SQLite (`delete_local_after_move`) : pas de resync bloquante.
+    // Le MOVE met déjà à jour SQLite + tombstones : pas de resync bloquante.
+    // Reset last_uid uniquement sur la destination (corbeille), jamais sur la source.
     rustymail_infrastructure::spawn_post_move_background_sync(
         paths.db_path.clone(),
         account.clone(),
-        vec![mbox.clone()],
+        vec![mbox.clone(), result.dest_mailbox.clone()],
+        vec![result.dest_mailbox.clone()],
         vec![thread_id.clone()],
         25,
     );
-    Ok(result)
+    Ok(result.message)
 }
 
 /// Supprime définitivement tous les messages listés en local dans le dossier corbeille courant (IMAP + SQLite).
@@ -1764,6 +1766,7 @@ async fn move_thread_archive(
         paths.db_path.clone(),
         account.clone(),
         vec![mbox.clone(), outcome.dest_mailbox.clone()],
+        vec![outcome.dest_mailbox.clone()],
         vec![thread_id.clone()],
         25,
     );
@@ -1804,11 +1807,12 @@ async fn move_thread_mailbox(
     rustymail_infrastructure::spawn_post_move_background_sync(
         paths.db_path.clone(),
         account.clone(),
-        vec![source.clone(), dest.clone()],
+        vec![source.clone(), result.dest_mailbox.clone()],
+        vec![result.dest_mailbox.clone()],
         vec![thread_id.clone()],
         25,
     );
-    Ok(result)
+    Ok(result.message)
 }
 
 #[tauri::command]
@@ -2019,20 +2023,27 @@ async fn subscribe_imap_mailbox(
     Ok(format!("Mailbox abonnée: {}", mailbox.trim()))
 }
 
-/// Charge `.env` à la racine du dépôt — **build debug / `tauri dev` uniquement** (pas les installateurs release).
-#[cfg(debug_assertions)]
-fn load_developer_dotenv() {
-    let repo_env = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(".env");
-    if repo_env.is_file() {
-        let _ = dotenvy::from_path_override(&repo_env);
-    }
-    let _ = dotenvy::dotenv();
+#[cfg(feature = "embed-dev-oauth")]
+mod oauth_embed {
+    include!(concat!(env!("OUT_DIR"), "/oauth_embed.rs"));
 }
 
-#[cfg(not(debug_assertions))]
-fn load_developer_dotenv() {}
+/// Charge `.env` à la racine du dépôt (debug) ou les OAuth embarqués au build (`embed-dev-oauth`, release perso).
+fn load_developer_dotenv() {
+    #[cfg(debug_assertions)]
+    {
+        let repo_env = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(".env");
+        if repo_env.is_file() {
+            let _ = dotenvy::from_path_override(&repo_env);
+        }
+        let _ = dotenvy::dotenv();
+    }
+
+    #[cfg(feature = "embed-dev-oauth")]
+    oauth_embed::inject_embedded_oauth_env();
+}
 
 pub fn run() {
     load_developer_dotenv();

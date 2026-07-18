@@ -609,6 +609,8 @@ pub fn resolve_mailbox_move_targets(
 
 /// Run `UID MOVE`; if it fails (e.g. no `MOVE` capability), copy + `\\Deleted` + `EXPUNGE`.
 /// Returns the mailbox name accepted by the server (for sync / SQLite keys).
+/// After a successful move, verifies the UIDs are gone from the selected (source) mailbox
+/// and retries `\\Deleted` + `EXPUNGE` once if any remain.
 pub async fn uid_move_with_fallback(
     session: &mut ImapSession,
     uid_set: &str,
@@ -620,7 +622,10 @@ pub async fn uid_move_with_fallback(
     let mut last_err = String::new();
     for target in target_mailboxes {
         match session.uid_mv(uid_set, target.as_str()).await {
-            Ok(()) => return Ok(target.clone()),
+            Ok(()) => {
+                ensure_source_uids_gone(session, uid_set).await?;
+                return Ok(target.clone());
+            }
             Err(e) => last_err = map_imap_error(e),
         }
     }
@@ -634,6 +639,7 @@ pub async fn uid_move_with_fallback(
                 let _: Vec<_> = stream.try_collect().await.map_err(map_imap_error)?;
                 let exp = session.expunge().await.map_err(map_imap_error)?;
                 let _: Vec<_> = exp.try_collect().await.map_err(map_imap_error)?;
+                ensure_source_uids_gone(session, uid_set).await?;
                 return Ok(target.clone());
             }
             Err(e) => last_err = map_imap_error(e),
@@ -644,6 +650,45 @@ pub async fn uid_move_with_fallback(
     } else {
         last_err
     })
+}
+
+/// Si des UIDs restent encore dans la boîte source après MOVE/COPY, force `\\Deleted` + EXPUNGE.
+async fn ensure_source_uids_gone(session: &mut ImapSession, uid_set: &str) -> Result<(), String> {
+    let remaining: Vec<async_imap::types::Uid> = session
+        .uid_search(format!("UID {uid_set}"))
+        .await
+        .map_err(map_imap_error)?
+        .into_iter()
+        .collect();
+    if remaining.is_empty() {
+        return Ok(());
+    }
+    log::warn!(
+        target: "rustymail::audit",
+        "imap_move: {} UID(s) encore présents après déplacement — retry \\Deleted+EXPUNGE",
+        remaining.len()
+    );
+    let set = format_uid_set(&remaining);
+    let stream = session
+        .uid_store(&set, "+FLAGS (\\Deleted)")
+        .await
+        .map_err(map_imap_error)?;
+    let _: Vec<_> = stream.try_collect().await.map_err(map_imap_error)?;
+    expunge_after_delete_flags(session).await?;
+    let still: Vec<_> = session
+        .uid_search(format!("UID {uid_set}"))
+        .await
+        .map_err(map_imap_error)?
+        .into_iter()
+        .collect();
+    if !still.is_empty() {
+        log::warn!(
+            target: "rustymail::audit",
+            "imap_move: {} UID(s) persistent après EXPUNGE (serveur lent ou policy) — tombstones locaux couvrent la fenêtre",
+            still.len()
+        );
+    }
+    Ok(())
 }
 
 /// Supprime définitivement du serveur les messages déjà marqués `\\Deleted` dans la boîte **sélectionnée**.

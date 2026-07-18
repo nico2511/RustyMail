@@ -264,8 +264,17 @@ pub async fn org_apply_proposal_cmd(
             if let Some(acc) = accounts.into_iter().find(|a| a.id.0 == account_id) {
                 let sync_ids = progress.mailboxes_to_sync.clone();
                 let thread_ids = progress.threads_affected.clone();
-                let _ = post_move_heuristic_refresh(&db, &acc, sync_ids, thread_ids, Some(80))
-                    .await;
+                // Pas de reset last_uid ici : les destinations ont déjà été syncées
+                // via les moves ; un reset source ferait réapparaître des UIDs.
+                let _ = post_move_heuristic_refresh(
+                    &db,
+                    &acc,
+                    sync_ids,
+                    Vec::<String>::new(),
+                    thread_ids,
+                    Some(80),
+                )
+                .await;
             }
         }
     }

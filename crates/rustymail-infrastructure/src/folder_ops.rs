@@ -169,6 +169,7 @@ pub async fn archive_mailbox_threads(
             db_path.to_path_buf(),
             account.clone(),
             sync_mbs,
+            dest_mailboxes.clone(),
             thread_ids.clone(),
             25,
         );

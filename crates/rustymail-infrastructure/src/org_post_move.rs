@@ -1,4 +1,8 @@
 //! Après un déplacement IMAP : sync des dossiers touchés + retag heuristique des fils concernés.
+//!
+//! Important : on ne remet **pas** `last_uid` à 0 sur le dossier **source** (évite de
+//! re-fetcher des UIDs encore visibles côté serveur pendant une fenêtre de course).
+//! Le reset du curseur ne s’applique qu’aux dossiers **destination**.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -22,10 +26,14 @@ pub struct PostMoveRefreshOutcome {
 }
 
 /// Synchronise les dossiers indiqués puis recalcule les tags des fils listés (s’ils existent encore en base).
+///
+/// - `sync_mailboxes` : dossiers à resynchroniser (source et/ou destination)
+/// - `reset_last_uid_mailboxes` : sous-ensemble pour lequel on force un re-fetch (typiquement la **destination**)
 pub async fn post_move_heuristic_refresh(
     path: &Path,
     account: &Account,
     sync_mailboxes: impl IntoIterator<Item = String>,
+    reset_last_uid_mailboxes: impl IntoIterator<Item = String>,
     thread_ids: impl IntoIterator<Item = String>,
     limit_per_mailbox: Option<usize>,
 ) -> Result<PostMoveRefreshOutcome, String> {
@@ -35,6 +43,12 @@ pub async fn post_move_heuristic_refresh(
         .filter(|m| !m.is_empty())
         .collect::<HashSet<_>>()
         .into_iter()
+        .collect();
+
+    let reset_mailboxes: HashSet<String> = reset_last_uid_mailboxes
+        .into_iter()
+        .map(|m| m.trim().to_string())
+        .filter(|m| !m.is_empty())
         .collect();
 
     let threads: Vec<String> = thread_ids
@@ -47,7 +61,7 @@ pub async fn post_move_heuristic_refresh(
 
     if !mailboxes.is_empty() {
         let account_id = account.id.0.as_str();
-        for mb in &mailboxes {
+        for mb in &reset_mailboxes {
             let _ = reset_imap_last_uid(path, account_id, mb);
         }
         let limit = limit_per_mailbox.unwrap_or(DEFAULT_SYNC_LIMIT);
@@ -89,10 +103,11 @@ pub fn spawn_post_move_background_sync(
     path: std::path::PathBuf,
     account: Account,
     sync_mailboxes: Vec<String>,
+    reset_last_uid_mailboxes: Vec<String>,
     thread_ids: Vec<String>,
     limit_per_mailbox: usize,
 ) {
-    if sync_mailboxes.is_empty() {
+    if sync_mailboxes.is_empty() && reset_last_uid_mailboxes.is_empty() {
         return;
     }
     tokio::spawn(async move {
@@ -100,6 +115,7 @@ pub fn spawn_post_move_background_sync(
             &path,
             &account,
             sync_mailboxes,
+            reset_last_uid_mailboxes,
             thread_ids,
             Some(limit_per_mailbox),
         )
