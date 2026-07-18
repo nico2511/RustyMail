@@ -9,9 +9,9 @@ use rustymail_infrastructure::{
     ImportVcardResult, ListAddressContactsResult, ListAddressContactsScopedResult,
     ManualContactUpsert,
 };
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
-use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::ipc_guard;
@@ -207,11 +207,8 @@ pub fn export_address_contacts_vcard_cmd(
     ipc_guard::validate_account_id(&account_id)?;
     let prefs = load_app_prefs(&paths.prefs_path);
     let global = global_scope.unwrap_or(prefs.general.address_book_global_scope);
-    let content = export_address_contacts_vcard(
-        paths.db_path.as_path(),
-        account_id.trim(),
-        global,
-    )?;
+    let content =
+        export_address_contacts_vcard(paths.db_path.as_path(), account_id.trim(), global)?;
     #[cfg(test)]
     return Ok(content);
     #[cfg(not(test))]

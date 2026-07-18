@@ -3,6 +3,48 @@ import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import DOMPurify from "dompurify";
 import { ipcThrottleMs, invokeAiCacheGet } from "./ipc_bridge";
+import {
+  clearThreadsRecentlyRemoved,
+  filterRecentlyRemovedThreads,
+  markThreadsRecentlyRemoved,
+} from "./recentlyRemovedThreads";
+import {
+  collapseLargeDataImageMarkdown,
+  expandInlineImagePlaceholders,
+} from "./composeMarkdownImages";
+import {
+  LOCAL_SAVED_DRAFTS_MAILBOX,
+  SAVED_DRAFT_THREAD_PREFIX,
+  UNIFIED_INBOX_MAILBOX,
+  isSavedDraftsVirtualMailbox,
+  isUnifiedInboxMailbox,
+  isVirtualMailbox,
+  mailboxKind,
+  mailboxKindIcon,
+  mailboxKindLabelFr,
+  mailboxesAllowedForMove,
+  pickSystemMailboxes,
+  preferredInboxMailboxName,
+  savedDraftIdFromThreadId,
+  threadMailboxColumnTitle,
+  threadMailboxListLabel,
+} from "./mailboxKinds";
+import {
+  SYNC_MAILBOXES_BATCH_SIZE,
+  chunkStringList,
+  mergeSyncMailboxesOutcomes,
+  syncInvokeTimeoutMs as syncInvokeTimeoutMsFor,
+  type SyncMailboxesOutcome,
+} from "./imapSyncTypes";
+import { notifyImapWatchFocusedMailbox as notifyImapWatchFocusedMailboxCore } from "./imapWatchFocus";
+import { mergeServerThreadPage } from "./mailListPage";
+import { appendQuotedMessageToDraft } from "./composeQuote";
+import {
+  formatFriendlyThreadListDate,
+  parseThreadListActivityDate,
+  savedDraftDatesColumnSnippet,
+  threadListActivityTooltip,
+} from "./threadListDates";
 import type { AppPrefs, AppPrefsAi } from "./prefs_defaults";
 import {
   WHISPER_PTT_KEY_CODES,
@@ -169,16 +211,22 @@ import {
   type OrganizationViewState,
 } from "./organizationView";
 import {
+  ORG_V2_APPLY_CHUNK_SIZE,
+  chunkStringIds,
+  collectOrgProposalApplyIds,
   defaultOrganizationV2State,
+  mergeOrgApplyProgress,
   optimisticOrgV2PatchAfterApply,
   optimisticOrgV2RemoveProposal,
   orgV2IgnoreMailbox,
+  orgV2ProposalBatchCleared,
   orgV2RecordDecision,
   orgV2ScanAccount,
   orgV2UnignoreMailbox,
   renderOrganizationV2View,
   type OrganizationV2ViewState,
 } from "./organizationViewV2";
+import type { OrgApplyProgress } from "./organizationView";
 import {
   archiveMailboxThreads,
   defaultFolderManagerState,
@@ -258,6 +306,8 @@ type ThreadListItem = {
   tags: Tag[];
   /** Dossier IMAP (depuis SQLite ; optionnel en mode démo). */
   mailbox?: string;
+  /** Compte propriétaire (liste unifiée). */
+  accountId?: string;
   /** Nombre total de pièces jointes sur le fil (Tauri / JSON camelCase). */
   attachmentCount?: number;
   /** Fil détecté comme expéditeur automatique (règles newsletter). */
@@ -306,7 +356,7 @@ type LlmTranslationResult = {
   preservedEntityIds: string[];
 };
 
-type HtmlCleaningProviderKind = "generic" | "amazon" | "deblock";
+type HtmlCleaningProviderKind = "generic" | "amazon" | "deblock" | "github";
 
 type CleanedMessageView = {
   messageId: string;
@@ -567,6 +617,20 @@ type CloseComposeModal =
       hasSavedRecord: boolean;
     };
 
+type OrphanDraftSessionItem = {
+  sessionId: string;
+  updatedAt: string;
+  revisionCount: number;
+  title: string;
+  preview: string;
+};
+
+type ResumeDraftModal =
+  | null
+  | {
+      sessions: OrphanDraftSessionItem[];
+    };
+
 type State = {
   view: View;
   accounts: Account[];
@@ -810,6 +874,8 @@ type State = {
   accountFormOAuthPrefill: { email: string; displayName: string } | null;
   /** Modale fermeture composer : enregistrer dans « Sauvés » ou fermer. */
   closeComposeModal: CloseComposeModal;
+  /** Modale reprise : sessions orphelines après crash / fermeture brutale. */
+  resumeDraftModal: ResumeDraftModal;
   /** Assistant compte : faux = champs IMAP/SMTP repliés sous « Afficher les serveurs ». */
   accountServersPanelOpen: boolean;
   /** Nouveau compte : formulaire IMAP mot de passe (sinon écran assistant OAuth). */
@@ -1105,57 +1171,11 @@ let idleAiCachePrefetchIdleHandle: number | null = null;
 /** Annule les flux prefetch idle (`summarizeThreadCore` / `translateThreadCore` en mode cache). */
 let idlePrefetchAbort: AbortController | null = null;
 
-/** Fils retirés optimistiquement (trash/archive/move) — masqués un moment malgré un resync. */
-const RECENTLY_REMOVED_THREAD_TTL_MS = 60_000;
-const recentlyRemovedThreadIds = new Map<string, number>();
-
-function markThreadsRecentlyRemoved(ids: Iterable<string>): void {
-  const exp = Date.now() + RECENTLY_REMOVED_THREAD_TTL_MS;
-  for (const raw of ids) {
-    const id = String(raw ?? "").trim();
-    if (id) recentlyRemovedThreadIds.set(id, exp);
-  }
-}
-
-function clearThreadsRecentlyRemoved(ids: Iterable<string>): void {
-  for (const raw of ids) {
-    const id = String(raw ?? "").trim();
-    if (id) recentlyRemovedThreadIds.delete(id);
-  }
-}
-
-function pruneRecentlyRemovedThreads(): void {
-  const now = Date.now();
-  for (const [id, exp] of recentlyRemovedThreadIds) {
-    if (exp <= now) recentlyRemovedThreadIds.delete(id);
-  }
-}
-
-function filterRecentlyRemovedThreads(list: ThreadListItem[]): ThreadListItem[] {
-  pruneRecentlyRemovedThreads();
-  if (recentlyRemovedThreadIds.size === 0) return list;
-  return list.filter((t) => {
-    const exp = recentlyRemovedThreadIds.get(String(t.id));
-    return exp === undefined || exp <= Date.now();
-  });
-}
-
 /** Applique une page serveur en respectant le filet « recently removed ». */
 function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
-  const filtered = filterRecentlyRemovedThreads(page);
-  if (append) {
-    const seen = new Set(state.threads.map((t) => String(t.id)));
-    state.threads = [
-      ...state.threads.filter((t) => {
-        const exp = recentlyRemovedThreadIds.get(String(t.id));
-        return exp === undefined || exp <= Date.now();
-      }),
-      ...filtered.filter((t) => !seen.has(String(t.id))),
-    ];
-  } else {
-    state.threads = filtered;
-    state.threadOffset = 0;
-  }
+  const { threads, threadOffsetReset } = mergeServerThreadPage(state.threads, page, append);
+  state.threads = threads;
+  if (threadOffsetReset) state.threadOffset = 0;
 }
 
 function cancelMailboxDigestIdleHandle(): void {
@@ -1701,6 +1721,7 @@ const state: State = {
   savedDraftsMailboxCount: 0,
   personalTreeOpen: {},
   closeComposeModal: null,
+  resumeDraftModal: null,
   accountServersPanelOpen: false,
   oauthLockedEmail: null,
   accountFormAuthKind: "password",
@@ -2045,11 +2066,11 @@ async function refreshDraftRevisions(limit = 50) {
   }
 }
 
-async function saveDraftRevisionNow() {
+async function saveDraftRevisionNow(): Promise<boolean> {
   const accountId = currentAccount()?.id?.trim() ?? "";
   const sessionId = state.draftSessionId?.trim() ?? "";
-  if (!isTauriRuntime() || !accountId || !sessionId) return;
-  if (!state.draft) return;
+  if (!isTauriRuntime() || !accountId || !sessionId) return false;
+  if (!state.draft) return false;
   persistDraft();
   try {
     await withTimeout(
@@ -2063,8 +2084,41 @@ async function saveDraftRevisionNow() {
     if (state.composeLayout === "historique") {
       void refreshDraftRevisions(60);
     }
+    // Autosave « Sauvés » : le brouillon survit à un crash même sans clic Enregistrer.
+    if (composeDraftHasMeaningfulContent()) {
+      await upsertSavedDraftSilent();
+    }
+    return true;
   } catch (error) {
     console.error("draft_revision_save", error);
+    toast(`Enregistrement local impossible : ${tauriErrorMessage(error)}`);
+    return false;
+  }
+}
+
+/** Upsert « Sauvés » sans toast (autosave / flush). */
+async function upsertSavedDraftSilent(): Promise<boolean> {
+  if (!isTauriRuntime()) return false;
+  const accountId = currentAccount()?.id?.trim();
+  if (!accountId || !state.draftSessionId?.trim() || !state.draft) return false;
+  const titleRaw = state.draft.subject?.trim() ?? "";
+  const title = titleRaw.length ? titleRaw : "Sans objet";
+  try {
+    const newId = await withTimeout(
+      invoke<string>("saved_draft_upsert", {
+        accountId,
+        sessionId: state.draftSessionId.trim(),
+        title,
+      }),
+      MAIL_ACTION_TIMEOUT_MS
+    );
+    const tid = newId.trim();
+    if (tid.length) state.savedDraftRecordId = tid;
+    void refreshSavedDraftsMailboxCount();
+    return true;
+  } catch (e) {
+    console.error("saved_draft_upsert (silent)", e);
+    return false;
   }
 }
 
@@ -2078,6 +2132,17 @@ function scheduleDraftRevisionSave(delayMs = DRAFT_REVISION_DEBOUNCE_MS) {
     draftRevisionDebounceTimer = null;
     void saveDraftRevisionNow();
   }, Math.max(150, delayMs));
+}
+
+/** Flush immédiat du debounce (fermeture app / onglet masqué). */
+async function flushDraftRevisionPending(): Promise<void> {
+  if (draftRevisionDebounceTimer !== null) {
+    window.clearTimeout(draftRevisionDebounceTimer);
+    draftRevisionDebounceTimer = null;
+  }
+  if (state.view === "compose" && state.draft && state.draftSessionId) {
+    await saveDraftRevisionNow();
+  }
 }
 
 function composeDraftHasMeaningfulContent(): boolean {
@@ -2135,26 +2200,40 @@ async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }): Promis
   }
 }
 
-async function finalizeCloseComposeFromUser() {
-  persistDraft();
-  await saveDraftRevisionNow();
-  if (
-    isTauriRuntime() &&
-    currentAccount()?.id?.trim() &&
-    state.draftSessionId &&
-    state.draft &&
-    composeDraftHasMeaningfulContent() &&
-    !state.savedDraftRecordId
-  ) {
-    state.closeComposeModal = {
-      subject: state.draft.subject ?? "",
-      hasSavedRecord: false,
-    };
-    render();
+/** Purge révisions (+ ligne Sauvés si présente) pour abandonner la session. */
+async function discardCurrentDraftSession(): Promise<void> {
+  if (!isTauriRuntime()) {
+    clearDraftSession();
     return;
   }
-  state.closeComposeModal = null;
+  const accountId = currentAccount()?.id?.trim() ?? "";
+  const sessionId = state.draftSessionId?.trim() ?? "";
+  const savedId = state.savedDraftRecordId?.trim() ?? "";
+  if (draftRevisionDebounceTimer !== null) {
+    window.clearTimeout(draftRevisionDebounceTimer);
+    draftRevisionDebounceTimer = null;
+  }
+  try {
+    if (accountId && savedId) {
+      await withTimeout(
+        invoke("saved_draft_delete", { accountId, savedDraftId: savedId }),
+        MAIL_ACTION_TIMEOUT_MS
+      );
+    } else if (accountId && sessionId) {
+      await withTimeout(
+        invoke("draft_revision_purge_session", { accountId, sessionId }),
+        MAIL_ACTION_TIMEOUT_MS
+      );
+    }
+  } catch (e) {
+    console.error("discardCurrentDraftSession", e);
+    toast(`Impossible de supprimer le brouillon local : ${tauriErrorMessage(e)}`);
+  }
   clearDraftSession();
+  void refreshSavedDraftsMailboxCount();
+}
+
+async function leaveComposeViewAfterClose(): Promise<void> {
   if (navCanGoBack()) {
     await goBack();
     return;
@@ -2162,6 +2241,105 @@ async function finalizeCloseComposeFromUser() {
   state.view = state.selectedThread ? "thread" : "list";
   if (state.view === "thread" && state.selectedThread && threadReadingIsSimpleLayout()) {
     state.aiOpen = true;
+  }
+  render();
+}
+
+async function finalizeCloseComposeFromUser() {
+  persistDraft();
+  await flushDraftRevisionPending();
+  if (
+    isTauriRuntime() &&
+    currentAccount()?.id?.trim() &&
+    state.draftSessionId &&
+    state.draft &&
+    composeDraftHasMeaningfulContent()
+  ) {
+    // Autosave déjà fait dans flush ; proposer garder / supprimer.
+    state.closeComposeModal = {
+      subject: state.draft.subject ?? "",
+      hasSavedRecord: Boolean(state.savedDraftRecordId),
+    };
+    render();
+    return;
+  }
+  // Brouillon vide : nettoyer d’éventuelles révisions vides.
+  if (isTauriRuntime() && state.draftSessionId && !state.savedDraftRecordId) {
+    const accountId = currentAccount()?.id?.trim() ?? "";
+    const sessionId = state.draftSessionId.trim();
+    if (accountId && sessionId) {
+      void invoke("draft_revision_purge_session", { accountId, sessionId }).catch(() => {});
+    }
+  }
+  state.closeComposeModal = null;
+  clearDraftSession();
+  await leaveComposeViewAfterClose();
+}
+
+async function checkOrphanDraftSessionsOnBoot(): Promise<void> {
+  if (!isTauriRuntime()) return;
+  const accountId = currentAccount()?.id?.trim();
+  if (!accountId) return;
+  try {
+    const sessions = await withTimeout(
+      invoke<OrphanDraftSessionItem[]>("draft_orphan_sessions_list", { accountId, limit: 10 }),
+      BOOT_INVOKE_TIMEOUT_MS
+    );
+    if (sessions?.length) {
+      state.resumeDraftModal = { sessions };
+      render();
+    }
+  } catch (e) {
+    console.error("draft_orphan_sessions_list", e);
+  }
+}
+
+async function resumeOrphanDraftSession(sessionId: string): Promise<void> {
+  const sid = sessionId.trim();
+  const accountId = currentAccount()?.id?.trim();
+  if (!sid || !accountId || !isTauriRuntime()) return;
+  try {
+    const draft = await withTimeout(
+      invoke<Draft>("draft_orphan_session_open", { accountId, sessionId: sid }),
+      MAIL_ACTION_TIMEOUT_MS
+    );
+    state.resumeDraftModal = null;
+    startNewDraftSession();
+    state.draftSessionId = sid;
+    state.draft = draft;
+    loadComposeMarkdownIntoEditor(draft.markdownBody ?? "");
+    enterComposeView();
+    state.composeCcBccOpen = draftHasRecipientsExtra(draft);
+    state.composeLayout = "split";
+    syncPreviewOpenFromComposeLayout();
+    resetMarkdownEditorHistory();
+    // Rattache à « Sauvés » pour les prochains crashs.
+    await upsertSavedDraftSilent();
+    toast("Brouillon repris.");
+    render();
+    window.setTimeout(() => void computePreview(), 0);
+    scheduleDraftRevisionSave(350);
+  } catch (e) {
+    console.error("draft_orphan_session_open", e);
+    toast(`Reprise impossible : ${tauriErrorMessage(e)}`);
+  }
+}
+
+async function dismissOrphanDraftSession(sessionId: string): Promise<void> {
+  const sid = sessionId.trim();
+  const accountId = currentAccount()?.id?.trim();
+  if (!sid || !accountId || !isTauriRuntime()) return;
+  try {
+    await withTimeout(
+      invoke("draft_revision_purge_session", { accountId, sessionId: sid }),
+      MAIL_ACTION_TIMEOUT_MS
+    );
+  } catch (e) {
+    console.error("purge orphan", e);
+  }
+  if (state.resumeDraftModal) {
+    const next = state.resumeDraftModal.sessions.filter((s) => s.sessionId !== sid);
+    state.resumeDraftModal = next.length ? { sessions: next } : null;
   }
   render();
 }
@@ -2364,203 +2542,6 @@ let composeDragDepth = 0;
 const markdownUndoStack: string[] = [];
 const markdownRedoStack: string[] = [];
 
-const INLINE_DATA_IMAGE_THRESHOLD = 4096;
-
-function clampPreviewLabelFromAlt(altRaw: string): string {
-  const t = altRaw.replace(/\s+/g, " ").trim();
-  if (!t) return "capture";
-  return t.length > 80 ? `${t.slice(0, 77)}…` : t;
-}
-
-function encodeMarkdownImageAltForDataUrl(altRaw: string): string {
-  try {
-    const enc = btoa(unescape(encodeURIComponent(altRaw)));
-    return enc.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
-  } catch {
-    return btoa(altRaw)
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/u, "");
-  }
-}
-
-function decodeMarkdownImageAltFromStored(stored: string): string {
-  const pad = stored.length % 4 === 0 ? "" : "=".repeat(4 - (stored.length % 4));
-  const b64 = stored.replace(/-/g, "+").replace(/_/g, "/") + pad;
-  try {
-    return decodeURIComponent(
-      Array.prototype.map
-        .call(atob(b64), (c: string) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-  } catch {
-    try {
-      return atob(b64);
-    } catch {
-      return "";
-    }
-  }
-}
-
-function iterMarkdownImages(markdown: string, visit: (full: string, alt: string, url: string) => void) {
-  let i = 0;
-  const s = markdown;
-  while (i < s.length) {
-    const bang = s.indexOf("![", i);
-    if (bang === -1) break;
-    let depth = 1;
-    let j = bang + 2;
-    let closeBracket = -1;
-    while (j < s.length && depth > 0) {
-      if (s[j] === "[" && j > 0 && s[j - 1] !== "\\") depth += 1;
-      else if (s[j] === "]" && (j === 0 || s[j - 1] !== "\\")) {
-        depth -= 1;
-        if (depth === 0) {
-          closeBracket = j;
-          break;
-        }
-      }
-      j += 1;
-    }
-    if (closeBracket === -1 || s[closeBracket + 1] !== "(") {
-      i = bang + 1;
-      continue;
-    }
-    const alt = s.slice(bang + 2, closeBracket);
-    const urlStart = closeBracket + 2;
-    let depthP = 1;
-    let k = urlStart;
-    let closeParen = -1;
-    while (k < s.length && depthP > 0) {
-      if (s[k] === "(") depthP += 1;
-      else if (s[k] === ")") {
-        depthP -= 1;
-        if (depthP === 0) {
-          closeParen = k;
-          break;
-        }
-      }
-      k += 1;
-    }
-    if (closeParen === -1) {
-      i = bang + 2;
-      continue;
-    }
-    const url = s.slice(urlStart, closeParen).trim();
-    const full = s.slice(bang, closeParen + 1);
-    visit(full, alt, url);
-    i = closeParen + 1;
-  }
-}
-
-function collapseLargeDataImageMarkdown(markdown: string): string {
-  const parts: string[] = [];
-  let last = 0;
-  iterMarkdownImages(markdown, (full: string, alt: string, url: string) => {
-    const start = markdown.indexOf(full, last);
-    if (start === -1) return;
-    parts.push(markdown.slice(last, start));
-    last = start + full.length;
-    if (url.length <= INLINE_DATA_IMAGE_THRESHOLD) {
-      parts.push(full);
-      return;
-    }
-    let stored = alt;
-    if (alt.includes("]") || alt.includes("![")) {
-      stored = `b64:${encodeMarkdownImageAltForDataUrl(alt)}`;
-    }
-    const labelSource = stored.startsWith("b64:")
-      ? decodeMarkdownImageAltFromStored(stored.slice(4))
-      : alt;
-    const label = clampPreviewLabelFromAlt(labelSource);
-    parts.push(`![📷 ${label}](rustymail-inline://${stored})`);
-  });
-  parts.push(markdown.slice(last));
-  return parts.join("");
-}
-
-/** Index des grosses images inline du canonical pour réinjecter les data URLs depuis le textarea avec placeholders. */
-function buildLargeDataImageMap(canonical: string): Map<string, string> {
-  const map = new Map<string, string>();
-  iterMarkdownImages(canonical, (full: string, alt: string, url: string) => {
-    if (url.length <= INLINE_DATA_IMAGE_THRESHOLD) return;
-    let keyAlt = alt;
-    if (alt.includes("]") || alt.includes("![")) {
-      keyAlt = `b64:${encodeMarkdownImageAltForDataUrl(alt)}`;
-    }
-    map.set(keyAlt, full);
-  });
-  return map;
-}
-
-function expandInlineImagePlaceholders(displayMarkdown: string, canonical: string): string {
-  const imgs = buildLargeDataImageMap(canonical);
-  const out: string[] = [];
-  let i = 0;
-  const s = displayMarkdown;
-  while (i < s.length) {
-    const bang = s.indexOf("![", i);
-    if (bang === -1) {
-      out.push(s.slice(i));
-      break;
-    }
-    out.push(s.slice(i, bang));
-    let depth = 1;
-    let j = bang + 2;
-    let closeBracket = -1;
-    while (j < s.length && depth > 0) {
-      if (s[j] === "[" && j > 0 && s[j - 1] !== "\\") depth += 1;
-      else if (s[j] === "]" && (j === 0 || s[j - 1] !== "\\")) {
-        depth -= 1;
-        if (depth === 0) {
-          closeBracket = j;
-          break;
-        }
-      }
-      j += 1;
-    }
-    if (closeBracket === -1) {
-      out.push(s.slice(bang));
-      break;
-    }
-    if (s[closeBracket + 1] !== "(") {
-      out.push(s[bang]);
-      i = bang + 1;
-      continue;
-    }
-    const urlStart = closeBracket + 2;
-    let depthP = 1;
-    let k = urlStart;
-    let closeParen = -1;
-    while (k < s.length && depthP > 0) {
-      if (s[k] === "(") depthP += 1;
-      else if (s[k] === ")") {
-        depthP -= 1;
-        if (depthP === 0) {
-          closeParen = k;
-          break;
-        }
-      }
-      k += 1;
-    }
-    if (closeParen === -1) {
-      out.push(s.slice(bang));
-      break;
-    }
-    const url = s.slice(urlStart, closeParen).trim();
-    const prefix = "rustymail-inline://";
-    if (url.startsWith(prefix)) {
-      const key = url.slice(prefix.length);
-      const full = imgs.get(key);
-      out.push(full ?? s.slice(bang, closeParen + 1));
-    } else {
-      out.push(s.slice(bang, closeParen + 1));
-    }
-    i = closeParen + 1;
-  }
-  return out.join("");
-}
-
 /** Reconstruit le Markdown « réel » à partir du textarea + canonical (pour résoudre les placeholders). */
 function composeDisplayToCanonical(display: string): string {
   return expandInlineImagePlaceholders(display, state.composeCanonicalBody || state.draft?.markdownBody || display);
@@ -2736,92 +2717,6 @@ const IDLE_AI_CACHE_PREFETCH_DEBOUNCE_MS = 9000;
 const IDLE_AI_CACHE_PREFETCH_MAX_THREADS = 3;
 /** Timeout `requestIdleCallback` pour lancer le passage prefetch. */
 const IDLE_AI_CACHE_IDLE_CALLBACK_TIMEOUT_MS = 12_000;
-
-/** Boîte virtuelle : liste SQLite `saved_drafts`, pas un dossier IMAP. */
-const LOCAL_SAVED_DRAFTS_MAILBOX = "__LOCAL_SAVED_DRAFTS__";
-const SAVED_DRAFT_THREAD_PREFIX = "saved-draft:";
-
-type MailboxKind = "inbox" | "drafts" | "sent" | "archive" | "spam" | "trash";
-
-/** Aligné sur `is_inbox_like_mailbox` (Rust) — INBOX, `[Gmail]/Inbox`, etc. */
-function isInboxLikeMailbox(name: string): boolean {
-  const n = String(name ?? "").trim().toLowerCase();
-  return n === "inbox" || /^inbox\b/.test(n) || n.endsWith("/inbox");
-}
-
-function preferredInboxMailboxName(mailboxes: string[]): string | undefined {
-  const fromSystem = pickSystemMailboxes(mailboxes).find((x) => x.kind === "inbox");
-  if (fromSystem) return fromSystem.name;
-  return mailboxes.find((mb) => isInboxLikeMailbox(mb));
-}
-
-function mailboxKind(name: string): MailboxKind | null {
-  const raw = String(name ?? "").trim();
-  if (!raw) return null;
-  const n = raw.toLowerCase();
-  if (isInboxLikeMailbox(raw)) return "inbox";
-  if (/(draft)/.test(n)) return "drafts";
-  if (/(sent|sent items|outbox)/.test(n)) return "sent";
-  if (/(archive|all mail|tous les messages)/.test(n)) return "archive";
-  if (/(junk|spam|indésirable|indesirable)/.test(n)) return "spam";
-  if (/(trash|deleted items|deleted|bin|corbeille|poubelle)/.test(n)) return "trash";
-  return null;
-}
-
-function mailboxKindIcon(kind: MailboxKind): string {
-  switch (kind) {
-    case "inbox":
-      return "IN";
-    case "drafts":
-      return "DR";
-    case "sent":
-      return "SE";
-    case "archive":
-      return "AR";
-    case "spam":
-      return "SP";
-    case "trash":
-      return "TR";
-  }
-}
-
-function mailboxKindLabelFr(kind: MailboxKind): string {
-  switch (kind) {
-    case "inbox":
-      return "Boîte de réception";
-    case "drafts":
-      return "Brouillons";
-    case "sent":
-      return "Envoyés";
-    case "archive":
-      return "Archive";
-    case "spam":
-      return "Indésirables";
-    case "trash":
-      return "Corbeille";
-  }
-}
-
-/** Libellé court pour colonne « dossier » dans la liste (FR). */
-function threadMailboxListLabel(raw: string | undefined): { label: string; full: string } {
-  const full = (raw ?? "").trim() || "INBOX";
-  if (full === LOCAL_SAVED_DRAFTS_MAILBOX) {
-    return { label: "Sauvés", full: LOCAL_SAVED_DRAFTS_MAILBOX };
-  }
-  const k = mailboxKind(full);
-  if (k === "inbox") return { label: "Réception", full };
-  if (k === "drafts") return { label: "Brouillon", full };
-  if (k === "sent") return { label: "Envoyés", full };
-  if (k === "archive") return { label: "Archive", full };
-  if (k === "spam") return { label: "Indésir.", full };
-  if (k === "trash") return { label: "Corbeille", full };
-  return { label: full, full };
-}
-
-function threadMailboxColumnTitle(mbRaw: string): string {
-  const { label, full } = threadMailboxListLabel(mbRaw);
-  return label === full ? `Dossier : ${full}` : `Dossier : ${label} — ${full}`;
-}
 
 function navMailboxSegment(mailbox?: string): string {
   const { label } = threadMailboxListLabel(mailbox ?? state.selectedMailbox);
@@ -3165,172 +3060,6 @@ function cleanThreadListPreview(raw: string): string {
   return s;
 }
 
-/** Dossiers proposés en cible de déplacement : on retire corbeille / envoyés (verrou côté backend aussi). */
-function mailboxesAllowedForMove(names: string[]): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const raw of names ?? []) {
-    const name = (raw ?? "").trim();
-    if (!name || name === LOCAL_SAVED_DRAFTS_MAILBOX) continue;
-    const k = mailboxKind(name);
-    if (k === "trash" || k === "sent") continue;
-    const key = name.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(name);
-  }
-  out.sort((a, b) => {
-    const ak = mailboxKind(a);
-    const bk = mailboxKind(b);
-    if (ak === "inbox" && bk !== "inbox") return -1;
-    if (bk === "inbox" && ak !== "inbox") return 1;
-    return a.localeCompare(b, "fr", { sensitivity: "base" });
-  });
-  return out;
-}
-
-/** Parse `received_at` SQLite / ISO ; retourne null si la valeur est déjà un libellé court non ISO. */
-function parseThreadListActivityDate(raw: string): Date | null {
-  const t = raw.trim();
-  if (!t) return null;
-  let ms = Date.parse(t);
-  if (!Number.isFinite(ms) && /^\d{4}-\d{2}-\d{2}$/.test(t)) {
-    ms = Date.parse(`${t}T12:00:00Z`);
-  }
-  return Number.isFinite(ms) ? new Date(ms) : null;
-}
-
-/** Infobulle : date complète lisible (fuseau local navigateur). */
-function threadListActivityTooltip(raw: string): string {
-  const trimmed = raw.trim();
-  const d = parseThreadListActivityDate(trimmed);
-  if (!d) return trimmed;
-  try {
-    return new Intl.DateTimeFormat("fr-FR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      timeZoneName: "short",
-    }).format(d);
-  } catch {
-    return trimmed;
-  }
-}
-
-/** Colonne étroite : dernière modif + date de création (liste Sauvés). */
-function savedDraftDatesColumnSnippet(createdIso: string | undefined, updatedIso: string | undefined): {
-  line1: string;
-  line2: string;
-  tip: string;
-} {
-  const upd = parseThreadListActivityDate(updatedIso ?? "");
-  const cre = parseThreadListActivityDate(createdIso ?? "");
-  const line1 = upd ?
-      new Intl.DateTimeFormat("fr-FR", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(upd)
-    : "";
-  let line2 = "";
-  if (cre) {
-    const creOpts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
-    if (cre.getFullYear() !== new Date().getFullYear()) creOpts.year = "2-digit";
-    line2 = `créé ${new Intl.DateTimeFormat("fr-FR", creOpts).format(cre)}`;
-  }
-  const tips: string[] = [];
-  if (createdIso?.trim()) tips.push(`Création : ${threadListActivityTooltip(createdIso.trim())}`);
-  if (updatedIso?.trim()) tips.push(`Dernière modif : ${threadListActivityTooltip(updatedIso.trim())}`);
-  return { line1, line2, tip: tips.length ? tips.join(" · ") : line1 || line2 };
-}
-
-/** Affichage liste : relatif / court plutôt que ISO brut. */
-function formatFriendlyThreadListDate(raw: string, nowArg?: Date): string {
-  const trimmed = raw.trim();
-  const d = parseThreadListActivityDate(trimmed);
-  if (!d) return trimmed;
-
-  const now = nowArg ?? new Date();
-  const startOfLocalDay = (date: Date) =>
-    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-
-  const dDay = startOfLocalDay(d);
-  const nDay = startOfLocalDay(now);
-  const diffDays = Math.round((nDay - dDay) / 86400000);
-
-  const timeFmt = new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-
-  try {
-    if (diffDays === 0) return timeFmt.format(d);
-
-    if (diffDays === 1) return `Hier, ${timeFmt.format(d)}`;
-
-    if (diffDays >= 2 && diffDays <= 6) {
-      return new Intl.DateTimeFormat("fr-FR", {
-        weekday: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(d);
-    }
-
-    if (diffDays < 0) {
-      return new Intl.DateTimeFormat("fr-FR", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(d);
-    }
-
-    if (d.getFullYear() === now.getFullYear()) {
-      return new Intl.DateTimeFormat("fr-FR", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(d);
-    }
-
-    return new Intl.DateTimeFormat("fr-FR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(d);
-  } catch {
-    return trimmed;
-  }
-}
-
-function pickSystemMailboxes(all: string[]): Array<{ kind: MailboxKind; name: string }> {
-  const seen = new Set<string>();
-  const order: MailboxKind[] = ["inbox", "drafts", "sent", "archive", "spam", "trash"];
-  const picked: Array<{ kind: MailboxKind; name: string }> = [];
-  for (const kind of order) {
-    const match = all.find((mb) => mailboxKind(mb) === kind);
-    if (match && !seen.has(match)) {
-      seen.add(match);
-      picked.push({ kind, name: match });
-    }
-  }
-  return picked;
-}
-
 function isTauriRuntime(): boolean {
   // Tauri v2 typically exposes `__TAURI__` (not always `__TAURI_INTERNALS__`).
   return "__TAURI__" in window || "__TAURI_INTERNALS__" in window;
@@ -3344,17 +3073,6 @@ async function aiCacheKeySegment(): Promise<string> {
   } catch {
     return "none";
   }
-}
-
-function isSavedDraftsVirtualMailbox(mb: string | undefined): boolean {
-  return String(mb ?? "").trim() === LOCAL_SAVED_DRAFTS_MAILBOX;
-}
-
-function savedDraftIdFromThreadId(threadId: string): string | null {
-  const tid = String(threadId ?? "");
-  if (!tid.startsWith(SAVED_DRAFT_THREAD_PREFIX)) return null;
-  const id = tid.slice(SAVED_DRAFT_THREAD_PREFIX.length).trim();
-  return id.length ? id : null;
 }
 
 /**
@@ -3848,56 +3566,8 @@ async function bindTauriNativeFileDropAsync(): Promise<void> {
   }
 }
 
-type ImapSyncResult = {
-  mailbox: string;
-  messageCount: number;
-  threadCount: number;
-  fetchedUids: number;
-  /** Serveur a changé UIDVALIDITY : cache IMAP du dossier purgé et resync depuis le début. */
-  uidValidityReset?: boolean;
-  /** Messages locaux dont le flag \\Seen a été recalé sur la fenêtre récente. */
-  flagsReconciled?: number;
-};
-
-type SyncMailboxAlias = {
-  requested: string;
-  syncedAs: string;
-};
-
-type MailboxSyncError = {
-  mailbox: string;
-  error: string;
-};
-
-type SyncMailboxesOutcome = {
-  results: ImapSyncResult[];
-  skippedNotOnServer?: string[];
-  syncedMailboxAliases?: SyncMailboxAlias[];
-  syncErrors?: MailboxSyncError[];
-};
-
-/** Aligné sur `ipc_guard::MAX_SYNC_MAILBOXES` (Tauri). */
-const SYNC_MAILBOXES_BATCH_SIZE = 64;
-
-function chunkStringList(items: string[], batchSize: number): string[][] {
-  const out: string[][] = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    out.push(items.slice(i, i + batchSize));
-  }
-  return out;
-}
-
-function mergeSyncMailboxesOutcomes(a: SyncMailboxesOutcome, b: SyncMailboxesOutcome): SyncMailboxesOutcome {
-  return {
-    results: [...(a.results ?? []), ...(b.results ?? [])],
-    skippedNotOnServer: Array.from(new Set([...(a.skippedNotOnServer ?? []), ...(b.skippedNotOnServer ?? [])])),
-    syncedMailboxAliases: [...(a.syncedMailboxAliases ?? []), ...(b.syncedMailboxAliases ?? [])],
-    syncErrors: [...(a.syncErrors ?? []), ...(b.syncErrors ?? [])],
-  };
-}
-
 function syncInvokeTimeoutMs(mailboxCount: number): number {
-  return Math.min(600_000, Math.max(SYNC_INVOKE_TIMEOUT_MS, 45_000 + mailboxCount * 2_500));
+  return syncInvokeTimeoutMsFor(mailboxCount, SYNC_INVOKE_TIMEOUT_MS);
 }
 
 function accountForImapSync(): Account | undefined {
@@ -4040,7 +3710,7 @@ function currentAccount(): Account | undefined {
 /** Préfixe IMAP suggéré quand on crée un sous-dossier (dossier courant + « / »). */
 function mailboxPathPrefixForCreate(): string {
   const m = (state.selectedMailbox ?? "").trim();
-  if (!m || isSavedDraftsVirtualMailbox(m)) return "";
+  if (!m || isVirtualMailbox(m)) return "";
   return m.endsWith("/") ? m : `${m}/`;
 }
 
@@ -4691,6 +4361,50 @@ async function applyListFilter(next: typeof state.listFilter): Promise<void> {
 
 async function loadMailView(append: boolean = false) {
   if (!append) invalidateIdleAiCachePrefetch();
+  if (isUnifiedInboxMailbox(state.selectedMailbox)) {
+    if (!isTauriRuntime() || state.accounts.length === 0) {
+      if (!append) {
+        state.threads = [];
+        state.threadOffset = 0;
+        state.hasMoreThreads = false;
+      }
+      return;
+    }
+    let page: ThreadListItem[];
+    try {
+      page = await withTimeout(
+        invoke<ThreadListItem[]>("list_threads", {
+          unified: true,
+          pageSize: state.threadPageSize,
+          pageOffset: append ? state.threadOffset : 0,
+          followedOnly: state.listFilter === "starred",
+        }),
+        BOOT_INVOKE_TIMEOUT_MS,
+      );
+      state.mailListError = "";
+    } catch (error) {
+      const detail = tauriErrorMessage(error);
+      console.error("list_threads (unified)", error);
+      state.mailListError = `Boîte unifiée : ${detail}`;
+      if (!append) {
+        state.threads = [];
+        state.threadOffset = 0;
+        state.hasMoreThreads = false;
+      }
+      return;
+    }
+    if (append) applyServerThreadPage(page, true);
+    else applyServerThreadPage(page, false);
+    state.threadOffset = state.threads.length;
+    state.hasMoreThreads = page.length >= state.threadPageSize;
+    if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
+      state.selectedThreadId = state.threads[0]?.id;
+      state.selectedThread = undefined;
+    }
+    scheduleMailboxDigestRefresh();
+    scheduleIdleAiCachePrefetch();
+    return;
+  }
   if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
     if (append) return;
     const account = currentAccount();
@@ -4988,6 +4702,7 @@ async function switchMailbox(nextMailbox: string) {
     clearThreadAiSummaryState();
   }
   state.selectedMailbox = nextMailbox || "INBOX";
+  notifyImapWatchFocusedMailbox(state.selectedMailbox);
   exitSearchModeForMailboxBrowse();
   state.searchScope = "mailbox";
   state.listFilter = defaultListFilterFromPrefs();
@@ -5696,6 +5411,7 @@ async function boot() {
     bindKeyboard();
     bindMouseNavigation();
     bindMicPushToTalk();
+    bindDraftPersistenceFlush();
 
     state.status = await safeInvoke<AppStatus>("app_status", undefined, fallbackStatus(), BOOT_INVOKE_TIMEOUT_MS);
     await bindTauriNativeFileDropAsync();
@@ -5737,8 +5453,10 @@ async function boot() {
     state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: currentAccount()?.id ?? null }, [], BOOT_INVOKE_TIMEOUT_MS);
     ensureValidSelectedMailbox();
     await loadMailView();
+    notifyImapWatchFocusedMailbox(state.selectedMailbox);
     await loadMailboxUnread();
     await refreshSavedDraftsMailboxCount();
+    await checkOrphanDraftSessionsOnBoot();
     await loadAddressBookSidebarCount();
     await refreshSavedSearches(true);
     syncActivityRecordingPrefs();
@@ -5746,6 +5464,18 @@ async function boot() {
     await loadNewsletterRules();
     state.selectedThreadId = state.threads[0]?.id;
     render();
+
+    if (isTauriRuntime() && state.appPrefs.ai.localLlmEnabled) {
+      try {
+        const st = await withTimeout(invoke<LlmRuntimeStatus>("llm_status", {}), BOOT_INVOKE_TIMEOUT_MS);
+        state.llmRuntimeStatus = st;
+        if (!st.llmGateOpen && !state.appPrefs.ai.aiCloudLlmFallback) {
+          toast(t("toast.aiOfflineLexical"));
+        }
+      } catch {
+        /* statut optionnel */
+      }
+    }
 
     if (isTauriRuntime() && !llmIdlePrefetchAfterBootScheduled) {
       llmIdlePrefetchAfterBootScheduled = true;
@@ -5871,6 +5601,7 @@ function render() {
     ${renderQuoteFoldDialog()}
     ${renderThreadTagsDialog()}
     ${renderCloseComposeDialog()}
+    ${renderResumeDraftDialog()}
     ${renderImageDialog()}
     ${renderSplitSendDialog()}
     ${renderTextPromptModal()}
@@ -5948,8 +5679,8 @@ function renderCloseComposeDialog(): string {
           <p style="margin:0">
             ${
               already
-                ? `Ce brouillon est déjà dans <strong>Sauvés</strong>.`
-                : `Ce brouillon n’est pas encore dans <strong>Sauvés</strong> (hors IMAP).`
+                ? `Ce brouillon est déjà dans <strong>Sauvés</strong> (autosave). Vous pouvez le garder ou le supprimer.`
+                : `Le brouillon peut être conservé dans <strong>Sauvés</strong> (hors IMAP) ou supprimé définitivement.`
             }
           </p>
           <p class="dim" style="margin:0">
@@ -5958,8 +5689,47 @@ function renderCloseComposeDialog(): string {
         </div>
         <div class="modal-footer close-compose-modal__footer">
           <button type="button" class="ghost-button" data-action="close-close-compose-modal">Annuler</button>
-          <button type="button" class="ghost-button" data-action="close-compose-without-saving">Fermer sans enregistrer</button>
-          <button type="button" class="primary-button" data-action="save-and-close-compose" ${already ? "disabled" : ""}>Enregistrer</button>
+          <button type="button" class="ghost-button" data-action="close-compose-without-saving">Supprimer définitivement</button>
+          <button type="button" class="primary-button" data-action="save-and-close-compose">Garder dans Sauvés</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderResumeDraftDialog(): string {
+  const m = state.resumeDraftModal;
+  if (!m?.sessions?.length) return "";
+  const rows = m.sessions
+    .map((s) => {
+      const tip = escapeAttr(s.preview || s.title);
+      return `
+        <div class="resume-draft-row" style="display:grid;gap:6px;padding:10px 0;border-top:1px solid color-mix(in srgb, var(--border) 80%, transparent)">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline">
+            <strong title="${tip}">${escapeHtml(s.title)}</strong>
+            <span class="dim" style="font-size:0.85em">${escapeHtml(formatFriendlyThreadListDate(s.updatedAt))}</span>
+          </div>
+          ${s.preview ? `<p class="dim" style="margin:0;font-size:0.9em">${escapeHtml(s.preview)}</p>` : ""}
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="primary-button" data-action="resume-orphan-draft" data-session-id="${escapeAttr(s.sessionId)}">Reprendre</button>
+            <button type="button" class="ghost-button" data-action="dismiss-orphan-draft" data-session-id="${escapeAttr(s.sessionId)}">Ignorer</button>
+          </div>
+        </div>`;
+    })
+    .join("");
+  return `
+    <div class="modal-backdrop" data-action="close-resume-draft-modal">
+      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Reprendre un brouillon">
+        <div class="modal-header">
+          <strong>Brouillon non terminé</strong>
+          <button type="button" class="icon-pill" data-action="close-resume-draft-modal" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+        <div class="modal-body" style="display:grid;gap:4px">
+          <p style="margin:0 0 8px">Une session précédente a laissé des versions locales. Reprendre ou ignorer ?</p>
+          ${rows}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="ghost-button" data-action="close-resume-draft-modal">Plus tard</button>
         </div>
       </div>
     </div>
@@ -6379,6 +6149,14 @@ function renderSidebar() {
         ${
           isTauriRuntime() && account
             ? `<div class="sidebar-folder-group sidebar-folder-group--virtual-local">
+              ${
+                state.accounts.length > 1
+                  ? `<button type="button" class="folder-button ${state.selectedMailbox === UNIFIED_INBOX_MAILBOX ? "active" : ""}" data-mailbox="${escapeAttr(UNIFIED_INBOX_MAILBOX)}" aria-label="Tous les comptes — boîtes de réception">
+                <span class="folder-icon">All</span>
+                <span class="folder-name">Tous les comptes</span>
+              </button>`
+                  : ""
+              }
               <button type="button" class="folder-button ${state.selectedMailbox === LOCAL_SAVED_DRAFTS_MAILBOX ? "active" : ""}" data-mailbox="${escapeAttr(LOCAL_SAVED_DRAFTS_MAILBOX)}" aria-label="Sauvés — ${state.savedDraftsMailboxCount} brouillon${state.savedDraftsMailboxCount === 1 ? "" : "s"}">
                 <span class="folder-icon">Sv</span>
                 <span class="folder-name">Sauvés</span>
@@ -6721,46 +6499,102 @@ async function runOrgV2Apply(
   threadIds?: string[] | null,
 ): Promise<void> {
   const proposalId = proposal.id;
+  const applyIds = collectOrgProposalApplyIds(proposal, threadIds);
+  const chunks =
+    applyIds.length > ORG_V2_APPLY_CHUNK_SIZE
+      ? chunkStringIds(applyIds, ORG_V2_APPLY_CHUNK_SIZE)
+      : applyIds.length > 0
+        ? [applyIds]
+        : [null];
+
   state.organizationV2.applying = true;
-  state.organizationV2.applyMessage = "Application…";
+  state.organizationV2.applyCancelRequested = false;
+  state.organizationV2.applyDone = 0;
+  state.organizationV2.applyTotal = applyIds.length > 0 ? applyIds.length : null;
+  state.organizationV2.applyMessage =
+    applyIds.length > 0 ? `Application… 0/${applyIds.length}` : "Application…";
   render();
+
+  let merged: OrgApplyProgress = {
+    done: 0,
+    total: applyIds.length,
+    message: "",
+    errors: [],
+    mailboxesToSync: [],
+    threadsAffected: [],
+  };
+  let cancelled = false;
+
   try {
-    const p = await orgApplyProposal(
-      accountId,
-      proposalId,
-      proposal,
-      trashAck,
-      actionOverride,
-      deleteMailboxAck,
-      threadIds ?? null,
-    );
-    state.organizationV2.applyMessage = p.message;
-    toast(p.message);
-    if (p.errors.length > 0) toast(p.errors.slice(0, 2).join(" · "));
-    if (state.organizationV2.report) {
-      const patched = optimisticOrgV2PatchAfterApply(state.organizationV2.report, proposalId, p);
-      const remaining = patched.proposals.find((x) => x.id === proposalId);
-      const batchDone =
-        !remaining ||
-        remaining.applicable === false ||
-        (remaining.totalCount === 0 &&
-          remaining.threadRefs.filter((r) => !r.threadId.startsWith("mailbox:")).length === 0 &&
-          remaining.threadRefs.filter((r) => r.threadId.startsWith("mailbox:")).length === 0);
-      if (batchDone) {
-        await orgV2RecordDecision(accountId, proposal, "applied");
-        state.organizationV2.report = {
-          ...patched,
-          proposals: patched.proposals.filter((x) => x.id !== proposalId),
-        };
-      } else {
-        state.organizationV2.report = patched;
+    for (let i = 0; i < chunks.length; i++) {
+      if (state.organizationV2.applyCancelRequested) {
+        cancelled = true;
+        break;
       }
+      const chunk = chunks[i];
+      const p = await orgApplyProposal(
+        accountId,
+        proposalId,
+        proposal,
+        trashAck,
+        actionOverride,
+        deleteMailboxAck,
+        chunk,
+      );
+      merged = mergeOrgApplyProgress(merged, p);
+      state.organizationV2.applyDone = merged.done;
+      if (applyIds.length > 0) {
+        state.organizationV2.applyMessage = `Application… ${Math.min(merged.done, applyIds.length)}/${applyIds.length}`;
+      } else {
+        state.organizationV2.applyMessage = p.message || "Application…";
+      }
+      if (state.organizationV2.report) {
+        state.organizationV2.report = optimisticOrgV2PatchAfterApply(
+          state.organizationV2.report,
+          proposalId,
+          p,
+        );
+      }
+      render();
     }
-    render();
+
+    const remaining = state.organizationV2.report?.proposals.find((x) => x.id === proposalId);
+    const batchCleared = orgV2ProposalBatchCleared(remaining);
+    const cleanSuccess = batchCleared && merged.errors.length === 0 && !cancelled;
+
+    if (cleanSuccess) {
+      await orgV2RecordDecision(accountId, proposal, "applied");
+      if (state.organizationV2.report) {
+        state.organizationV2.report = optimisticOrgV2RemoveProposal(
+          state.organizationV2.report,
+          proposalId,
+        );
+      }
+      state.organizationV2.applyMessage = merged.message || "Lot appliqué.";
+      toast(state.organizationV2.applyMessage);
+    } else if (cancelled) {
+      state.organizationV2.applyMessage = `Interrompu — ${merged.done} traité(s).`;
+      toast(state.organizationV2.applyMessage);
+    } else if (batchCleared && merged.errors.length > 0) {
+      // Carte vide côté UI mais erreurs : ne pas figer la mémoire « applied ».
+      state.organizationV2.applyMessage =
+        merged.message || `Terminé avec ${merged.errors.length} erreur(s).`;
+      toast(state.organizationV2.applyMessage);
+    } else {
+      state.organizationV2.applyMessage =
+        merged.message ||
+        `Partiel — ${merged.done} ok${merged.errors.length ? `, ${merged.errors.length} erreur(s)` : ""}.`;
+      toast(state.organizationV2.applyMessage);
+    }
+
+    if (merged.errors.length > 0) {
+      toast(merged.errors.slice(0, 3).join(" · "));
+    }
+
     const hadImapChange =
-      p.done > 0 ||
-      (p.mailboxesToSync?.length ?? 0) > 0 ||
-      (p.threadsAffected?.length ?? 0) > 0;
+      merged.done > 0 ||
+      (merged.mailboxesToSync?.length ?? 0) > 0 ||
+      (merged.threadsAffected?.length ?? 0) > 0;
     if (hadImapChange) {
       await refreshMailboxesAfterImapChange();
       if (state.view === "list" && isTauriRuntime()) {
@@ -6771,11 +6605,19 @@ async function runOrgV2Apply(
         }
       }
     }
-    await refreshOrganizationV2Report();
+    // Rescan seulement si reste du travail / erreurs (évite d’effacer un patch optimiste propre).
+    if (!cleanSuccess) {
+      await refreshOrganizationV2Report();
+    } else {
+      // Léger rafraîchissement mémoire / compteurs sans bloquer longtemps.
+      void refreshOrganizationV2Report();
+    }
   } catch (e) {
     toast(tauriErrorMessage(e));
   } finally {
     state.organizationV2.applying = false;
+    state.organizationV2.applyCancelRequested = false;
+    state.organizationV2.applyTotal = null;
     render();
   }
 }
@@ -8191,7 +8033,12 @@ function gatherStatusBarProgressJobs(): StatusBarProgressJob[] {
     put({ id: "org-v2-scan", label: "Analyse Organiser V2", done: 0, total: null });
   } else if (state.organizationV2.applying) {
     const msg = (state.organizationV2.applyMessage || "Application Organiser V2").replace(/…+$/, "").trim();
-    put({ id: "org-v2-apply", label: msg || "Application Organiser V2", done: 0, total: null });
+    put({
+      id: "org-v2-apply",
+      label: msg || "Application Organiser V2",
+      done: state.organizationV2.applyDone,
+      total: state.organizationV2.applyTotal,
+    });
   }
 
   if (state.folderManager.archiveProgress?.trim()) {
@@ -8639,6 +8486,14 @@ function renderThreadRow(thread: ThreadListItem) {
   const mbRaw = thread.mailbox ?? state.selectedMailbox ?? "INBOX";
   const { label: folderLabel } = threadMailboxListLabel(mbRaw);
   const folderTitle = escapeAttr(threadMailboxColumnTitle(mbRaw));
+  const accountBadge = (() => {
+    const aid = thread.accountId?.trim();
+    if (!aid || !isUnifiedInboxMailbox(state.selectedMailbox)) return "";
+    const acc = state.accounts.find((a) => a.id === aid);
+    const label = (acc?.email || acc?.displayName || aid).trim();
+    if (!label) return "";
+    return `<span class="inbox-thread-account-badge dim" title="${escapeAttr(label)}">${escapeHtml(label)}</span>`;
+  })();
   const unread = Boolean(thread.unread);
   const toggleSeenTitle = unread ? "Marquer comme lu" : "Marquer comme non lu";
   const activityRaw = thread.lastActivity ?? "";
@@ -8737,6 +8592,7 @@ function renderThreadRow(thread: ThreadListItem) {
         <span class="inbox-thread-stack">
           <span class="inbox-thread-line1">
             <span class="inbox-thread-from">${escapeHtml(firstParticipant)}</span>
+            ${accountBadge}
             <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="${activityDatetime}" title="${activityTip}">${escapeHtml(activityDisplay)}</time>
           </span>
           <span class="inbox-thread-subject">
@@ -10852,7 +10708,11 @@ function hasStructuredHtmlCleaningProvider(message: CleanedMessageView): boolean
   const p = message.htmlCleaningProvider;
   if (p && p !== "generic") return true;
   const ch = message.cleanedHtmlBody ?? "";
-  return ch.includes("rustymail:amazon-digest") || ch.includes("rustymail:deblock-digest");
+  return (
+    ch.includes("rustymail:amazon-digest") ||
+    ch.includes("rustymail:deblock-digest") ||
+    ch.includes("rustymail:github-digest")
+  );
 }
 
 /**
@@ -11225,13 +11085,13 @@ function renderMailSecurityPop(message: CleanedMessageView, opts?: { compact?: b
   const ms = normalizedMailSecurity(message);
   // UX: ne pas afficher de badge quand tout va bien (évite "RAS" omniprésent et inutile).
   if (ms.severity === "ok") return "";
-  const label = ms.severity === "attention" ? "À vérifier" : "Suspicion";
+  const label = ms.severity === "attention" ? t("security.attention") : t("security.suspicion");
   const chipClass =
     ms.severity === "attention" ? "mail-security-hit--attention" : "mail-security-hit--suspicion";
   const hasLlmHint =
     Boolean(ms.llmBudget) || (ms.findings?.some((f) => f.kind === "llmIntent") ?? false);
   const iaPill = hasLlmHint
-    ? `<span class="mail-security-ia-pill" title="Signal ou budget lié à une analyse IA">IA</span>`
+    ? `<span class="mail-security-ia-pill" title="${escapeAttr(t("security.iaHint"))}">IA</span>`
     : "";
   const mid = message.messageId?.trim();
   const iaSecurityOn = isAiFeatureEnabled(state.appPrefs.ai, "featureSecurityLlmEnabled");
@@ -11248,24 +11108,39 @@ function renderMailSecurityPop(message: CleanedMessageView, opts?: { compact?: b
       (f) =>
         `<li class="mail-security-finding mail-security-finding--${escapeAttr(String(f.severity))}">${escapeHtml(f.messageFr)}${
           f.kind === "llmIntent" ?
-            ` <span class="dim mail-security-kind-ia" title="Contribution IA">(IA)</span>`
+            ` <span class="dim mail-security-kind-ia" title="${escapeAttr(t("security.iaContribution"))}">(IA)</span>`
           : ""
         }</li>`
     ) ?? [];
   const findingsBlock = findings.length
     ? `<ul class="mail-security-findings" role="list">${findings.join("")}</ul>`
     : iaPending
-      ? `<p class="mail-security-panel__pending dim">Analyse IA en cours…</p>`
+      ? `<p class="mail-security-panel__pending dim">${escapeHtml(t("security.iaPending"))}</p>`
       : "";
+  const senderEmail = (message.senderEmail || "").trim();
+  const tid = state.selectedThreadId ?? "";
+  const sourceMb = (state.selectedMailbox || "INBOX").trim();
+  const actions =
+    opts?.compact || isVirtualMailbox(sourceMb)
+      ? ""
+      : `<div class="mail-security-panel__actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+          <button type="button" class="ghost-button" data-action="security-move-junk" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${escapeAttr(sourceMb)}">${escapeHtml(t("security.moveJunk"))}</button>
+          ${
+            senderEmail.includes("@")
+              ? `<button type="button" class="ghost-button" data-action="security-mark-newsletter" data-sender-email="${escapeAttr(senderEmail)}">${escapeHtml(t("security.markNewsletter"))}</button>`
+              : ""
+          }
+        </div>`;
   const wrap = opts?.compact ? "mail-security-pop mail-security-pop--compact" : "mail-security-pop";
   return `<details class="${wrap}">
-  <summary class="mail-security-hit ${chipClass}" title="${escapeAttr(`Sécurité : ${label} (cliquer pour le détail)`) }" aria-label="${escapeAttr(`Sécurité : ${label}`)}">
+  <summary class="mail-security-hit ${chipClass}" title="${escapeAttr(t("security.chipTitle", { label }))}" aria-label="${escapeAttr(t("security.chipAria", { label }))}">
     <span class="mail-security-hit__ico" aria-hidden="true">${iconSvg("shield")}</span>
     ${iaPill}
   </summary>
   <div class="mail-security-panel">
     <p class="mail-security-panel__lead">${escapeHtml(ms.summaryFr)}</p>
-    ${findingsBlock ? `<p class="mail-security-panel__kicker">Détail</p>${findingsBlock}` : ""}
+    ${findingsBlock ? `<p class="mail-security-panel__kicker">${escapeHtml(t("security.detail"))}</p>${findingsBlock}` : ""}
+    ${actions}
   </div>
 </details>`;
 }
@@ -11926,34 +11801,24 @@ function buildSemanticStatsBlockHtml(): string {
       cnt.accountId === accForStats.id &&
       cnt.mailbox.trim().toLowerCase() === mbNorm
   );
-  const mailboxSide = escapeHtml(state.selectedMailbox || "INBOX");
+  const mailboxSide = state.selectedMailbox || "INBOX";
   if (!isTauriRuntime()) {
-    return `<p class="settings-explain settings-explain--lead" role="status">
-        Compteurs d’embeddings SQLite : disponibles dans l’app desktop (Tauri).
-      </p>`;
+    return `<p class="settings-explain settings-explain--lead" role="status">${escapeHtml(t("semantic.tauriOnly"))}</p>`;
   }
   if (!accForStats) {
-    return `<p class="settings-explain settings-explain--lead" role="status">
-          Sélectionne un compte et une boîte dans la barre latérale pour afficher les compteurs d’indexation.
-        </p>`;
+    return `<p class="settings-explain settings-explain--lead" role="status">${escapeHtml(t("semantic.pickAccount"))}</p>`;
   }
   if (!countsOk || !cnt) {
-    return `<p class="settings-explain settings-explain--lead" role="status">
-            Compteurs : chargement ou indisponible pour « ${mailboxSide} » — vérifie le compte actif puis <strong>Actualiser les compteurs</strong>.
-          </p>`;
+    return `<p class="settings-explain settings-explain--lead" role="status">${escapeHtml(t("semantic.loading", { mailbox: mailboxSide }))}</p>`;
   }
   const c = cnt;
   return `<div class="settings-semantic-stats surface-sm" role="status" style="margin:0 0 14px;padding:12px 14px;border-radius:var(--radius-lg);font-size:13px;line-height:1.55">
-            <strong>Index embeddings (${escapeHtml(c.modelId)})</strong>
+            <strong>${escapeHtml(t("semantic.title", { model: c.modelId }))}</strong>
             <ul style="margin:8px 0 0;padding-left:1.15em">
-              <li>Boîte « <strong>${escapeHtml(c.mailbox)}</strong> » : <strong>${c.embeddingsInMailbox}</strong> message(s) avec embedding,
-                <strong>${c.messagesInMailboxCached}</strong> message(s) en cache SQLite pour ce dossier.</li>
-              <li>Ce compte (toutes boîtes déjà traitées cumulées) : <strong>${c.embeddingsTotalForAccount}</strong> embedding(s) stocké(s).</li>
+              <li>${escapeHtml(t("semantic.mailboxLine", { mailbox: c.mailbox, embedded: c.embeddingsInMailbox, cached: c.messagesInMailboxCached }))}</li>
+              <li>${escapeHtml(t("semantic.accountLine", { total: c.embeddingsTotalForAccount }))}</li>
             </ul>
-            <p class="dim" style="margin:10px 0 0;font-size:12px;line-height:1.5">
-              Bouton ci-dessous : indexation pour <strong>tout le compte</strong> parmi les messages déjà sync en base locale (INBOX, corbeille, envoyés…).
-              Seuls les courriels présents dans SQLite sont traités ; un dossier encore vide après sync peut être complété après une nouvelle synchro.
-            </p>
+            <p class="dim" style="margin:10px 0 0;font-size:12px;line-height:1.5">${escapeHtml(t("semantic.hint"))}</p>
           </div>`;
 }
 
@@ -15268,6 +15133,60 @@ async function handleAction(action: string, element?: HTMLElement) {
       else toast("Lien de désabonnement invalide.");
       break;
     }
+    case "security-mark-newsletter": {
+      const email = element?.dataset.senderEmail?.trim() ?? "";
+      if (!email.includes("@") || !isTauriRuntime()) break;
+      void (async () => {
+        try {
+          await withTimeout(invoke("add_newsletter_rule", { input: email }), MAIL_ACTION_TIMEOUT_MS);
+          await loadNewsletterRules();
+          toast(t("toast.newsletterRuleAdded"));
+          render();
+        } catch (e) {
+          toast(tauriErrorMessage(e));
+        }
+      })();
+      break;
+    }
+    case "security-move-junk": {
+      const tid = element?.dataset.threadId?.trim() ?? "";
+      const source = element?.dataset.sourceMailbox?.trim() || state.selectedMailbox || "INBOX";
+      if (!tid || !isTauriRuntime()) break;
+      void (async () => {
+        const spam = state.mailboxes.find((m) => mailboxKind(m) === "spam");
+        if (!spam) {
+          toast(t("toast.junkFolderMissing"));
+          return;
+        }
+        const account = currentAccount();
+        if (!account?.id) return;
+        try {
+          markThreadsRecentlyRemoved([tid]);
+          await withTimeout(
+            invoke<string>("move_thread_mailbox", {
+              accountId: account.id,
+              mailbox: source,
+              threadId: tid,
+              destMailbox: spam,
+            }),
+            MAIL_ACTION_TIMEOUT_MS,
+          );
+          toast(t("toast.movedToJunk"));
+          state.threads = state.threads.filter((t) => String(t.id) !== tid);
+          if (state.selectedThreadId === tid) {
+            state.selectedThreadId = undefined;
+            state.selectedThread = undefined;
+            state.view = "list";
+          }
+          await loadMailboxUnread();
+          render();
+        } catch (e) {
+          clearThreadsRecentlyRemoved([tid]);
+          toast(tauriErrorMessage(e));
+        }
+      })();
+      break;
+    }
     case "close-compose":
       void finalizeCloseComposeFromUser();
       break;
@@ -15276,13 +15195,12 @@ async function handleAction(action: string, element?: HTMLElement) {
       render();
       break;
     case "close-compose-without-saving":
-      state.closeComposeModal = null;
-      clearDraftSession();
-      if (navCanGoBack()) void goBack();
-      else {
-        state.view = state.selectedThread ? "thread" : "list";
+      void (async () => {
+        state.closeComposeModal = null;
         render();
-      }
+        await discardCurrentDraftSession();
+        await leaveComposeViewAfterClose();
+      })();
       break;
     case "save-and-close-compose": {
       void (async () => {
@@ -15290,15 +15208,25 @@ async function handleAction(action: string, element?: HTMLElement) {
         render();
         const ok = await saveDraftToSavedListNow({ silentToast: true });
         if (ok) {
-          toast("Ajouté à « Sauvés », compositeur fermé.");
+          toast("Conservé dans « Sauvés », compositeur fermé.");
           clearDraftSession();
-          if (navCanGoBack()) await goBack();
-          else {
-            state.view = state.selectedThread ? "thread" : "list";
-            render();
-          }
+          await leaveComposeViewAfterClose();
         }
       })();
+      break;
+    }
+    case "close-resume-draft-modal":
+      state.resumeDraftModal = null;
+      render();
+      break;
+    case "resume-orphan-draft": {
+      const sid = element?.dataset.sessionId ?? "";
+      void resumeOrphanDraftSession(sid);
+      break;
+    }
+    case "dismiss-orphan-draft": {
+      const sid = element?.dataset.sessionId ?? "";
+      void dismissOrphanDraftSession(sid);
       break;
     }
     case "toggle-sidebar":
@@ -15858,6 +15786,13 @@ async function handleAction(action: string, element?: HTMLElement) {
       void confirmThenRunOrgV2Apply(acc.id, proposalId);
       break;
     }
+    case "org-v2-cancel-apply":
+      if (state.organizationV2.applying) {
+        state.organizationV2.applyCancelRequested = true;
+        state.organizationV2.applyMessage = "Arrêt demandé…";
+        render();
+      }
+      break;
     case "org-v2-trash-cancel":
       state.organizationV2.trashConfirmOpen = false;
       state.organizationV2.pendingTrashProposalId = null;
@@ -16760,6 +16695,13 @@ async function openThread(
     return;
   }
   const tid = threadId.trim();
+  if (isUnifiedInboxMailbox(state.selectedMailbox)) {
+    const row = state.threads.find((t) => String(t.id) === tid);
+    const aid = row?.accountId?.trim();
+    if (aid && state.accounts.some((a) => a.id === aid) && state.selectedAccountId !== aid) {
+      state.selectedAccountId = aid;
+    }
+  }
   if (!opts?.skipHistory) beginNavigation("thread");
   const prev = state.selectedThreadId;
   const keepAi =
@@ -17310,14 +17252,30 @@ async function saveAccount() {
   render();
 }
 
+/** Informe la veille IMAP du dossier affiché (sync hors INBOX en arrière-plan). */
+function notifyImapWatchFocusedMailbox(mailbox?: string): void {
+  notifyImapWatchFocusedMailboxCore({
+    isTauri: isTauriRuntime(),
+    accountId: currentAccount()?.id,
+    mailbox: mailbox ?? state.selectedMailbox ?? "",
+  });
+}
+
 /** Rafraîchit la liste après sync IMAP déjà faite côté Rust (IDLE/polling) — sans 2e passage réseau. */
 async function refreshUiAfterImapPush(mailboxHint?: string) {
   if (!isTauriRuntime()) return;
-  const mb = (mailboxHint || state.selectedMailbox || "INBOX").trim();
-  if (mb && state.selectedMailbox !== mb) {
-    state.selectedMailbox = mb;
-  }
+  const pushed = (mailboxHint || "").trim();
+  const current = (state.selectedMailbox || "INBOX").trim();
+  const sameFolder =
+    !pushed ||
+    pushed.localeCompare(current, undefined, { sensitivity: "accent" }) === 0;
   try {
+    // Sync secondaire (Sent/Trash/…) : met à jour les badges sans changer le dossier ouvert.
+    if (!sameFolder) {
+      await loadMailboxUnread();
+      render();
+      return;
+    }
     if (isSearchActive()) {
       await searchThreads();
     } else if (usesSearchContextLoader()) {
@@ -17512,8 +17470,12 @@ async function syncInbox(options?: { background?: boolean; allMailboxes?: boolea
       }
     }
     const totalFetched = results.reduce((sum, r) => sum + (r.fetchedUids ?? 0), 0);
+    const totalPruned = results.reduce((sum, r) => sum + (r.uidsPruned ?? 0), 0);
     const touched = results.map((r) => r.mailbox).filter(Boolean);
     let syncLine = `${totalFetched} importés · ${touched.length} dossier${touched.length === 1 ? "" : "s"}`;
+    if (totalPruned > 0) {
+      syncLine += ` · ${totalPruned} retiré${totalPruned === 1 ? "" : "s"} (absents serveur)`;
+    }
     if (syncAllFolders) {
       syncLine = `Compte synchronisé · ${syncLine}`;
     }
@@ -17545,7 +17507,15 @@ async function syncInbox(options?: { background?: boolean; allMailboxes?: boolea
       state.semanticModelAvailable &&
       totalFetched > 0
     ) {
-      void invoke("reindex_semantic_mailbox_cmd", { accountId: account.id, mailbox }).catch(() => {});
+      const uniqueTouched = Array.from(new Set(touched.map((m) => String(m).trim()).filter(Boolean)));
+      for (const mb of uniqueTouched) {
+        void invoke("reindex_semantic_mailbox_cmd", { accountId: account.id, mailbox: mb }).catch(
+          () => {},
+        );
+      }
+      if (uniqueTouched.length > 1 && !options?.background) {
+        toast(t("toast.semanticIndexing"));
+      }
     }
     render();
     void refreshSavedSearches(true);
@@ -17619,12 +17589,7 @@ async function prepareReplyToMessage(messageId: string) {
   }
   const header = `${formatThreadReadingWhen(msg.receivedAt)} — ${msg.sender}`;
   const body = (msg.cleanedText || msg.sourceText || "").trim();
-  const quoted = body
-    .split("\n")
-    .map((line) => `> ${line}`.trimEnd())
-    .join("\n");
-  const intro = (state.draft?.markdownBody ?? "").trimEnd();
-  const next = `${intro}\n\n> ${header}\n${quoted}\n\n`;
+  const next = appendQuotedMessageToDraft(state.draft?.markdownBody ?? "", header, body);
   loadComposeMarkdownIntoEditor(next);
   enterComposeView();
   startNewDraftSession();
@@ -19266,6 +19231,7 @@ function mouseNavBlockedByOverlay(): boolean {
     state.quoteFoldModal ||
       state.threadTagsModalOpen ||
       state.closeComposeModal ||
+      state.resumeDraftModal ||
       state.imageModal ||
       state.splitSendConfirm ||
       state.moveOpen ||
@@ -19318,6 +19284,17 @@ function bindMouseNavigation() {
   );
 }
 
+function bindDraftPersistenceFlush() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      void flushDraftRevisionPending();
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    void flushDraftRevisionPending();
+  });
+}
+
 function bindKeyboard() {
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "t") {
@@ -19344,6 +19321,18 @@ function bindKeyboard() {
         event.preventDefault();
         finalizeSettingsAiModalClose();
         state.settingsAiModal = null;
+        render();
+        return;
+      }
+      if (state.resumeDraftModal) {
+        event.preventDefault();
+        state.resumeDraftModal = null;
+        render();
+        return;
+      }
+      if (state.closeComposeModal) {
+        event.preventDefault();
+        state.closeComposeModal = null;
         render();
         return;
       }

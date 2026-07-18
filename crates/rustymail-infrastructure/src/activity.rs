@@ -7,8 +7,8 @@ use rustymail_domain::{
     SuggestedSavedView, SuggestionDecision, CARD_KIND_SAVED_VIEW, EVENT_AFFINER_APPLIED,
     EVENT_BULK_ARCHIVE, EVENT_BULK_MARK_READ, EVENT_CONTACT_OPENED, EVENT_MESSAGE_SENT,
     EVENT_SAVED_VIEW_APPLIED, EVENT_SAVED_VIEW_CREATED, EVENT_SAVED_VIEW_SEEN,
-    EVENT_SEARCH_COMMITTED, EVENT_SUGGESTION_CLICKED, EVENT_SUGGESTION_SHOWN,
-    EVENT_THREAD_CLOSED, EVENT_THREAD_OPENED,
+    EVENT_SEARCH_COMMITTED, EVENT_SUGGESTION_CLICKED, EVENT_SUGGESTION_SHOWN, EVENT_THREAD_CLOSED,
+    EVENT_THREAD_OPENED,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -81,7 +81,9 @@ fn now_iso() -> String {
 }
 
 fn cutoff_iso(days: i64) -> String {
-    (Utc::now() - Duration::days(days)).format("%Y-%m-%dT%H:%M:%fZ").to_string()
+    (Utc::now() - Duration::days(days))
+        .format("%Y-%m-%dT%H:%M:%fZ")
+        .to_string()
 }
 
 pub fn purge_activity_events_older_than(
@@ -89,11 +91,12 @@ pub fn purge_activity_events_older_than(
     days: i64,
 ) -> Result<u64, rusqlite::Error> {
     let cutoff = cutoff_iso(days);
-    connection.execute(
-        "DELETE FROM activity_events WHERE occurred_at < ?1",
-        params![cutoff],
-    )
-    .map(|n| n as u64)
+    connection
+        .execute(
+            "DELETE FROM activity_events WHERE occurred_at < ?1",
+            params![cutoff],
+        )
+        .map(|n| n as u64)
 }
 
 fn is_allowed_event_type(t: &str) -> bool {
@@ -294,11 +297,7 @@ fn contact_is_favorite(conn: &Connection, account_id: &str, email: &str) -> bool
     .unwrap_or(false)
 }
 
-fn compute_score(
-    eng: &SenderEngagement,
-    favorite: bool,
-    policy: &ActivityCardPolicy,
-) -> i32 {
+fn compute_score(eng: &SenderEngagement, favorite: bool, policy: &ActivityCardPolicy) -> i32 {
     let dwell_min = (eng.dwell_ms / 60_000).max(0) as i32;
     let search_bonus = (eng.searches / 2).min(3);
     eng.opens * policy.weight_opens
@@ -310,7 +309,11 @@ fn compute_score(
 
 fn format_rationale(eng: &SenderEngagement) -> String {
     let dwell_min = (eng.dwell_ms / 60_000).max(0);
-    let mut parts = vec![format!("{} ouverture{}", eng.opens, if eng.opens == 1 { "" } else { "s" })];
+    let mut parts = vec![format!(
+        "{} ouverture{}",
+        eng.opens,
+        if eng.opens == 1 { "" } else { "s" }
+    )];
     if eng.replies > 0 {
         parts.push(format!(
             "{} réponse{}",

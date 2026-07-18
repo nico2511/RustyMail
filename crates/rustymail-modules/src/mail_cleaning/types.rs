@@ -7,6 +7,7 @@ pub enum ProviderId {
     Generic,
     Amazon,
     Deblock,
+    GitHub,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

@@ -6,8 +6,8 @@ use serde::Deserialize;
 
 use crate::ai_llm_contracts::{validate_qa_llm_shape, QA_THREAD_JSON_GBNF};
 use crate::ai_llm_util::{
-    budget_report, cancelled_llm_err, gen_params_json_for_prompt, parse_model_json, stream_chunk_or_cancel,
-    truncate_chars, untrusted_mail_for_engine,
+    budget_report, cancelled_llm_err, gen_params_json_for_prompt, parse_model_json,
+    stream_chunk_or_cancel, truncate_chars, untrusted_mail_for_engine,
 };
 use rustymail_domain::ThreadQaAnswer;
 use rustymail_llm::{LlmEngine, LlmError};

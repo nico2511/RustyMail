@@ -1,7 +1,7 @@
 {
   "name": "rustymail2",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,11 @@
     "tauri:build": "tauri build",
     "tauri:build:personal": "tauri build --features embed-dev-oauth",
     "verify:compile": "cargo check -p rustymail",
+    "verify:fmt": "cargo fmt --all -- --check",
+    "verify:clippy": "cargo clippy --workspace --all-targets",
+    "verify:rust-test": "cargo test --workspace --lib --bins",
+    "verify:ts": "tsc --noEmit",
+    "verify:ci": "npm run verify:fmt && npm run verify:clippy && npm run verify:rust-test && npm run verify:ts && npm test",
     "test": "vitest run",
     "test:watch": "vitest"
   },

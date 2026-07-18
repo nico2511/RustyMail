@@ -29,6 +29,11 @@ export type OrgV2ScanReport = {
 export type OrganizationV2ViewState = {
   scanning: boolean;
   applying: boolean;
+  /** Demande d’arrêt entre deux chunks d’apply. */
+  applyCancelRequested: boolean;
+  /** Progression apply (affichage). */
+  applyDone: number;
+  applyTotal: number | null;
   report: OrgV2ScanReport | null;
   applyMessage: string;
   trashConfirmOpen: boolean;
@@ -50,6 +55,9 @@ export function defaultOrganizationV2State(): OrganizationV2ViewState {
   return {
     scanning: false,
     applying: false,
+    applyCancelRequested: false,
+    applyDone: 0,
+    applyTotal: null,
     report: null,
     applyMessage: "",
     trashConfirmOpen: false,
@@ -58,6 +66,61 @@ export function defaultOrganizationV2State(): OrganizationV2ViewState {
     deleteMailboxConfirmOpen: false,
     pendingDeleteMailboxProposalId: null,
   };
+}
+
+/** Taille d’un lot IMAP pour progression UI (apply V2). */
+export const ORG_V2_APPLY_CHUNK_SIZE = 25;
+
+export function collectOrgProposalApplyIds(
+  proposal: OrgProposal,
+  threadIds?: string[] | null,
+): string[] {
+  if (threadIds && threadIds.length > 0) {
+    return Array.from(
+      new Set(threadIds.map((s) => String(s ?? "").trim()).filter(Boolean)),
+    );
+  }
+  const fromRefs = (proposal.threadRefs ?? [])
+    .map((r) => String(r.threadId ?? "").trim())
+    .filter(Boolean);
+  const fromIds = (proposal.threadIds ?? [])
+    .map((s) => String(s ?? "").trim())
+    .filter(Boolean);
+  return Array.from(new Set([...fromRefs, ...fromIds]));
+}
+
+export function chunkStringIds(ids: string[], size: number): string[][] {
+  const n = Math.max(1, size);
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += n) {
+    out.push(ids.slice(i, i + n));
+  }
+  return out;
+}
+
+export function mergeOrgApplyProgress(
+  a: OrgApplyProgress,
+  b: OrgApplyProgress,
+): OrgApplyProgress {
+  return {
+    done: (a.done ?? 0) + (b.done ?? 0),
+    total: Math.max(a.total ?? 0, b.total ?? 0),
+    message: b.message || a.message,
+    errors: [...(a.errors ?? []), ...(b.errors ?? [])],
+    mailboxesToSync: Array.from(
+      new Set([...(a.mailboxesToSync ?? []), ...(b.mailboxesToSync ?? [])]),
+    ),
+    threadsAffected: Array.from(
+      new Set([...(a.threadsAffected ?? []), ...(b.threadsAffected ?? [])]),
+    ),
+  };
+}
+
+export function orgV2ProposalBatchCleared(proposal: OrgProposal | undefined): boolean {
+  if (!proposal || proposal.applicable === false) return true;
+  const threadN = proposal.threadRefs.filter((r) => !r.threadId.startsWith("mailbox:")).length;
+  const mbN = proposal.threadRefs.filter((r) => r.threadId.startsWith("mailbox:")).length;
+  return (proposal.totalCount ?? 0) === 0 && threadN === 0 && mbN === 0;
 }
 
 export async function orgV2ScanAccount(accountId: string): Promise<OrgV2ScanReport> {
@@ -312,7 +375,15 @@ export function renderOrganizationV2View(
         </button>
         ${report ? `<span class="dim"> ${report.proposals.length} action(s) · ${report.stats.threadCount} fils</span>` : ""}
       </div>
-      ${state.applyMessage ? `<p class="org-apply-msg">${escapeHtml(state.applyMessage)}</p>` : ""}
+      ${
+        state.applyMessage
+          ? `<p class="org-apply-msg" role="status">${escapeHtml(state.applyMessage)}${
+              state.applying
+                ? ` <button type="button" class="ghost-button" data-action="org-v2-cancel-apply">Arrêter</button>`
+                : ""
+            }</p>`
+          : ""
+      }
       ${memoryBanner}
     </header>
     <div class="inbox-panel surface organization-panel organization-v2-panel">

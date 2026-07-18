@@ -16,9 +16,7 @@ use crate::imap::ops::{
     resolve_mailbox_imap_command_names, uid_store,
 };
 use crate::imap::{login_session_for_account, ImapSession};
-use crate::mail_ops::{
-    is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive,
-};
+use crate::mail_ops::{is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive};
 use crate::mailbox_local_cache::{purge_mailbox_local_cache, thread_ids_for_mailboxes};
 use crate::org_mailbox_structure::analyze_mailbox_structure;
 use crate::org_memory::{
@@ -62,10 +60,7 @@ pub struct MailboxTreeReport {
     pub summary: OrgMailboxStructure,
 }
 
-pub fn list_mailbox_tree(
-    db_path: &Path,
-    account_id: &str,
-) -> Result<MailboxTreeReport, String> {
+pub fn list_mailbox_tree(db_path: &Path, account_id: &str) -> Result<MailboxTreeReport, String> {
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
     let (structure, _) = analyze_mailbox_structure(&conn, account_id)?;
     let prefs_path = prefs_path_from_db_dir(db_path.parent().unwrap_or(db_path));
@@ -197,14 +192,10 @@ fn descendant_mailboxes(logical_target: &str, all: &[String]) -> Vec<String> {
     hits
 }
 
-fn imap_uids_for_mailbox(
-    path: &Path,
-    account_id: &str,
-    mailbox: &str,
-) -> Result<Vec<u32>, String> {
+fn imap_uids_for_mailbox(path: &Path, account_id: &str, mailbox: &str) -> Result<Vec<u32>, String> {
     let conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
-    let resolved =
-        resolve_scoped_mailbox_for_account(&conn, account_id, mailbox).map_err(|e| e.to_string())?;
+    let resolved = resolve_scoped_mailbox_for_account(&conn, account_id, mailbox)
+        .map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
             "SELECT imap_uid FROM messages
@@ -297,13 +288,10 @@ pub async fn delete_imap_mailbox_with_contents(
         }
         match imap_session_select_mailbox(&mut session, command_names[0].as_str()).await {
             Ok(_) => {
-                let uids = imap_uids_for_mailbox(db_path, &account.id.0, target).unwrap_or_default();
-                if let Ok(n) = expunge_uids_in_mailbox(
-                    &mut session,
-                    command_names[0].as_str(),
-                    &uids,
-                )
-                .await
+                let uids =
+                    imap_uids_for_mailbox(db_path, &account.id.0, target).unwrap_or_default();
+                if let Ok(n) =
+                    expunge_uids_in_mailbox(&mut session, command_names[0].as_str(), &uids).await
                 {
                     messages_removed += n;
                 }

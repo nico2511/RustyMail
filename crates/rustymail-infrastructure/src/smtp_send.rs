@@ -24,9 +24,7 @@ fn parse_mailbox(email: &str, display_name: Option<&str>) -> Result<Mailbox, Str
     ))
 }
 
-async fn build_transport(
-    account: &Account,
-) -> Result<AsyncSmtpTransport<Tokio1Executor>, String> {
+async fn build_transport(account: &Account) -> Result<AsyncSmtpTransport<Tokio1Executor>, String> {
     let mut tls_params = TlsParameters::builder(account.smtp.host.trim().to_string());
     let allow_bad = tls_policy::effective_allow_invalid_tls(account.smtp.allow_invalid_tls);
     if allow_bad {

@@ -3,19 +3,23 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+#[cfg(not(test))]
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use rusqlite::Connection;
 
+#[cfg(not(test))]
 use crate::KEYRING_SERVICE;
 
-const DB_KEYRING_USER: &str = "sqlcipher-db-v1";
 static DB_KEY_CACHE: OnceLock<Vec<u8>> = OnceLock::new();
 const PLAINTEXT_BACKUP_SUFFIX: &str = ".pre-sqlcipher.bak";
 const ENCRYPT_STAGING_SUFFIX: &str = ".encrypting";
 
+#[cfg(not(test))]
+const DB_KEYRING_USER: &str = "sqlcipher-db-v1";
+
+#[cfg(not(test))]
 fn db_keyring_entry() -> Result<keyring_core::Entry, String> {
-    keyring::use_native_store(false)
-        .map_err(|e| format!("keyring native store failed: {e}"))?;
+    keyring::use_native_store(false).map_err(|e| format!("keyring native store failed: {e}"))?;
     keyring_core::Entry::new(KEYRING_SERVICE, DB_KEYRING_USER)
         .map_err(|e| format!("keyring db key entry failed: {e}"))
 }
@@ -59,8 +63,10 @@ fn load_or_create_db_key() -> Result<Vec<u8>, String> {
     }
 }
 
+#[cfg(not(test))]
 fn base64_decode_key(raw: &str) -> Result<Vec<u8>, String> {
-    STANDARD.decode(raw)
+    STANDARD
+        .decode(raw)
         .map_err(|e| format!("db key base64: {e}"))
 }
 
@@ -228,8 +234,10 @@ mod tests {
         let path = tmp.path();
         {
             let conn = open_sqlite_encrypted(path).expect("open new encrypted");
-            conn.execute_batch("CREATE TABLE t (id INTEGER PRIMARY KEY); INSERT INTO t VALUES (1);")
-                .expect("ddl");
+            conn.execute_batch(
+                "CREATE TABLE t (id INTEGER PRIMARY KEY); INSERT INTO t VALUES (1);",
+            )
+            .expect("ddl");
         }
         {
             let conn = open_sqlite_encrypted(path).expect("reopen encrypted");
@@ -247,8 +255,10 @@ mod tests {
         let path = tmp.path();
         {
             let conn = Connection::open(path).expect("plaintext create");
-            conn.execute_batch("CREATE TABLE t (id INTEGER PRIMARY KEY); INSERT INTO t VALUES (42);")
-                .expect("ddl");
+            conn.execute_batch(
+                "CREATE TABLE t (id INTEGER PRIMARY KEY); INSERT INTO t VALUES (42);",
+            )
+            .expect("ddl");
         }
         assert!(is_plaintext_sqlite_file(path));
         migrate_plaintext_to_encrypted(path, &[0xA7u8; 32]).expect("migrate");

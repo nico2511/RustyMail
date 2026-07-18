@@ -181,15 +181,10 @@ pub struct OrgKeywordRule {
     pub target_mailbox: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ArchiveLayout {
     Flat,
+    #[default]
     Hierarchical,
-}
-
-impl Default for ArchiveLayout {
-    fn default() -> Self {
-        Self::Hierarchical
-    }
 }

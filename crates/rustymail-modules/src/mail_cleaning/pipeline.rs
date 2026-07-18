@@ -74,7 +74,8 @@ pub fn clean_html_for_markdown(
     let threshold = threshold.max(50);
     // Amazon semantic digest deliberately drops noisy marketing blobs; bypass mass guard when tagged.
     let digest_bypass_guard = after_plugin.contains("rustymail:amazon-digest")
-        || after_plugin.contains("rustymail:deblock-digest");
+        || after_plugin.contains("rustymail:deblock-digest")
+        || after_plugin.contains("rustymail:github-digest");
     if !digest_bypass_guard && p_mass < threshold && g_mass > 80 {
         diagnostics.push(format!(
             "quality guard: plugin text mass {p_mass} < max({threshold}, 30% of generic {g_mass}); fallback generic"

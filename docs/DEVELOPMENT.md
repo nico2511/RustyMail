@@ -24,6 +24,11 @@ npm install
 | `npm run dev` | Vite dev server (browser UI only, limited without Tauri) |
 | `npm run tauri:dev` | Full desktop app (`tauri dev` with `tauri.dev.conf.json`) |
 | `npm run verify:compile` | `cargo check -p rustymail` |
+| `npm run verify:fmt` | `cargo fmt --check` |
+| `npm run verify:clippy` | `cargo clippy` workspace |
+| `npm run verify:rust-test` | `cargo test` workspace (`--lib --bins`) |
+| `npm run verify:ts` | `tsc --noEmit` |
+| `npm run verify:ci` | Suite locale alignée sur CI PR |
 | `npm test` | Frontend unit tests (Vitest) |
 | `npm run tauri:build` | Release installer (NSIS/MSI on Windows) |
 
@@ -66,6 +71,7 @@ Override with `RUST_LOG` when debugging.
 
 | Workflow | Trigger | Action |
 | -------- | ------- | ------ |
+| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | push/PR to main | `fmt` · `clippy` · `cargo test` · `tsc` · Vitest |
 | [`.github/workflows/cargo-audit.yml`](../.github/workflows/cargo-audit.yml) | push/PR to main | `cargo audit` |
 | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | tag `v*` or manual | Windows Tauri build + GitHub Release |
 

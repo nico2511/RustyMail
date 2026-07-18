@@ -170,12 +170,7 @@ fn partial_to_settings(
     if host.is_empty() {
         return None;
     }
-    let port: u16 = port
-        .as_deref()
-        .unwrap_or("993")
-        .trim()
-        .parse()
-        .ok()?;
+    let port: u16 = port.as_deref().unwrap_or("993").trim().parse().ok()?;
     let sec = socket_to_security(socket.as_deref().unwrap_or("SSL"))?;
     Some(ServerSettings {
         host,

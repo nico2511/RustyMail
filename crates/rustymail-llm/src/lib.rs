@@ -3,15 +3,15 @@
 
 mod engine;
 mod error;
-mod privacy;
 pub mod hardware;
+mod privacy;
 
 pub use engine::LlmEngine;
 pub use error::LlmError;
-pub use privacy::{redact_pii_for_exfiltration, redact_user_content_if_needed};
 pub use hardware::{
     llama_server_gpu_gate_ok, Accelerator, HardwareModelProfile, HardwareModelTier,
 };
+pub use privacy::{redact_pii_for_exfiltration, redact_user_content_if_needed};
 
 /// Conservé pour compatibilité : plus de liaison `llama.cpp` dans le binaire — toujours `false`.
 pub const LOCAL_LLM_NATIVE_BUILD: bool = false;

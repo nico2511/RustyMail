@@ -5,7 +5,8 @@ use std::collections::HashSet;
 use serde::Deserialize;
 
 use crate::ai_llm_util::{
-    budget_report, gen_params_json_for_prompt, parse_model_json, truncate_chars, user_text_for_engine,
+    budget_report, gen_params_json_for_prompt, parse_model_json, truncate_chars,
+    user_text_for_engine,
 };
 use rustymail_domain::{
     ActionBriefAmbiguity, ActionBriefChange, ActionBriefDecision, ActionBriefEvidenceLink,
@@ -266,22 +267,19 @@ fn parse_priority_bucket(
     decisions: &[ActionBriefDecision],
     risks: &[ActionBriefRisk],
 ) -> ActionBriefPriorityBucket {
-    let from_model = raw
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .and_then(|s| match s.to_ascii_lowercase().as_str() {
+    let from_model = raw.map(str::trim).filter(|s| !s.is_empty()).and_then(|s| {
+        match s.to_ascii_lowercase().as_str() {
             "critical" | "critique" => Some(ActionBriefPriorityBucket::Critical),
             "important" => Some(ActionBriefPriorityBucket::Important),
             "routine" => Some(ActionBriefPriorityBucket::Routine),
             _ => None,
-        });
+        }
+    });
     if let Some(b) = from_model {
         return b;
     }
     let any_high = risks.iter().any(|r| {
-        r.severity
-            .to_ascii_lowercase()
-            .contains("high")
+        r.severity.to_ascii_lowercase().contains("high")
             || r.severity.to_ascii_lowercase().contains("élev")
     });
     if any_high {
@@ -423,13 +421,7 @@ fn generate_brief_dto(
     let raw = engine.generate(
         system,
         user,
-        &gen_params_json_for_prompt(
-            engine,
-            system,
-            user,
-            512,
-            max_tokens_for_mode(mode),
-        ),
+        &gen_params_json_for_prompt(engine, system, user, 512, max_tokens_for_mode(mode)),
     )?;
     let dto: LlmBriefDto = parse_model_json(&raw)?;
     Ok((dto, raw))
@@ -455,10 +447,7 @@ pub fn action_brief_with_llm(
     let input_truncated = mailbox_snapshot.chars().count() > 88_000;
 
     let system = system_prompt(mode, output_language);
-    let user = user_text_for_engine(
-        engine,
-        &user_prompt(mode, account_id, mailbox, &snapshot),
-    );
+    let user = user_text_for_engine(engine, &user_prompt(mode, account_id, mailbox, &snapshot));
     let (dto, raw) = match generate_brief_dto(engine, system.as_str(), &user, mode) {
         Ok(pair) => pair,
         Err(LlmError::InvalidJson(_)) => {
@@ -519,39 +508,27 @@ mod brief_context_tests {
 
     #[test]
     fn mode_scales_with_n_ctx() {
-        assert_eq!(
-            action_brief_mode_for_n_ctx(4096),
-            ActionBriefMode::Quick
-        );
-        assert_eq!(
-            action_brief_mode_for_n_ctx(8192),
-            ActionBriefMode::Decision
-        );
-        assert_eq!(
-            action_brief_mode_for_n_ctx(16_384),
-            ActionBriefMode::Deep
-        );
+        assert_eq!(action_brief_mode_for_n_ctx(4096), ActionBriefMode::Quick);
+        assert_eq!(action_brief_mode_for_n_ctx(8192), ActionBriefMode::Decision);
+        assert_eq!(action_brief_mode_for_n_ctx(16_384), ActionBriefMode::Deep);
     }
 
     #[test]
     fn resolve_auto_uses_fitted_mode() {
-        let (mode, limits) =
-            resolve_action_brief_execution(4096, ActionBriefModeRequest::Auto);
+        let (mode, limits) = resolve_action_brief_execution(4096, ActionBriefModeRequest::Auto);
         assert_eq!(mode, ActionBriefMode::Quick);
         assert_eq!(limits.take, 18);
     }
 
     #[test]
     fn resolve_decision_caps_on_small_ctx() {
-        let (mode, _) =
-            resolve_action_brief_execution(4096, ActionBriefModeRequest::Decision);
+        let (mode, _) = resolve_action_brief_execution(4096, ActionBriefModeRequest::Decision);
         assert_eq!(mode, ActionBriefMode::Quick);
     }
 
     #[test]
     fn resolve_quick_always_quick() {
-        let (mode, _) =
-            resolve_action_brief_execution(32_768, ActionBriefModeRequest::Quick);
+        let (mode, _) = resolve_action_brief_execution(32_768, ActionBriefModeRequest::Quick);
         assert_eq!(mode, ActionBriefMode::Quick);
     }
 }

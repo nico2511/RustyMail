@@ -115,7 +115,9 @@ mod tests {
 
     #[test]
     fn rejects_credentialed_urls() {
-        assert!(validate_openai_compatible_base_url("https://user:pass@api.openai.com/v1").is_err());
+        assert!(
+            validate_openai_compatible_base_url("https://user:pass@api.openai.com/v1").is_err()
+        );
     }
 
     #[test]

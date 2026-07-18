@@ -22,8 +22,12 @@ pub fn ensure_minilm_onnx_assets(dest_dir: &Path) -> Result<PathBuf, String> {
     download_hf_file_if_needed(&onnx_url, &dest_dir.join("model.onnx"), "minilm-semantic")
         .map_err(|e| format!("model.onnx : {e}"))?;
     eprintln!("[RustyMail MiniLM]   → {tok_url}");
-    download_hf_file_if_needed(&tok_url, &dest_dir.join("tokenizer.json"), "minilm-semantic")
-        .map_err(|e| format!("tokenizer.json : {e}"))?;
+    download_hf_file_if_needed(
+        &tok_url,
+        &dest_dir.join("tokenizer.json"),
+        "minilm-semantic",
+    )
+    .map_err(|e| format!("tokenizer.json : {e}"))?;
 
     Ok(dest_dir.to_path_buf())
 }

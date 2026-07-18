@@ -1,6 +1,6 @@
 # Current capabilities
 
-**Last updated:** 2026-06-03  
+**Last updated:** 2026-07-18  
 **Reference:** `main` branch — Tauri v2, Rust workspace `core + modules`.
 
 This document describes what the application **can do today**. For architecture see [ARCHITECTURE.md](ARCHITECTURE.md); for AI setup see [AI_AND_MODELS.md](AI_AND_MODELS.md).
@@ -72,7 +72,9 @@ Opening a message produces a `CleanedMessageView`:
 | Reply headers | `In-Reply-To`, `References` on SMTP send |
 | Outbound attachments | Local paths, `multipart/mixed` |
 | Send | Real SMTP (`lettre`); Sent folder copy per config |
-| Local drafts | Revisions (`draft_revision_*`), saved drafts (`saved_draft_*`) |
+| Local drafts | Revisions + autosave « Sauvés », reprise sessions orphelines (`draft_orphan_*`), purge à l’abandon |
+| Unified inbox | `list_threads` `unified: true` — INBOX multi-comptes + badge compte |
+| HTML cleaners | Generic + Amazon + Deblock + GitHub digests |
 | Split send | `plan_split_send` / `execute_split_send_cmd` for multi-recipient cases |
 | Reply guards | Blocks when thread marked newsletter per product rules |
 
@@ -123,7 +125,7 @@ Commands include: translate, rewrite, grammar, quick replies, Q&A, inbox digest,
 ## Known limits
 
 - HTML trust: DOMPurify + guards, not a full “text-only by default” policy
-- Reply-all / forward: ongoing polish (dedup recipients, citations)
+- IMAP IDLE watches **INBOX** continuously; Sent/Drafts/Trash + the UI-focused folder sync on a secondary cadence
 - Generative AI requires external server or OpenRouter
 - Some tag/summary paths stay **deterministic** until an LLM is reachable
 - UI locale packs: `fr` and `en`; not every string may be translated yet

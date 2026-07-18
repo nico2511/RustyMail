@@ -51,11 +51,9 @@ pub struct ManualContactUpsert {
 }
 
 fn now_iso(conn: &Connection) -> String {
-    conn.query_row(
-        "SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now')",
-        [],
-        |r| r.get(0),
-    )
+    conn.query_row("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now')", [], |r| {
+        r.get(0)
+    })
     .unwrap_or_default()
 }
 
@@ -90,7 +88,9 @@ pub fn migrate_address_contacts_l3(connection: &Connection) -> Result<(), rusqli
     )?;
 
     let fts_count: i64 = connection
-        .query_row("SELECT count(*) FROM address_contacts_fts", [], |r| r.get(0))
+        .query_row("SELECT count(*) FROM address_contacts_fts", [], |r| {
+            r.get(0)
+        })
         .unwrap_or(0);
     if fts_count == 0 {
         let _ = connection.execute(
@@ -149,7 +149,11 @@ fn fts_delete_row(conn: &Connection, account_id: &str, email: &str, display_name
 }
 
 /// Retire toutes les lignes FTS pour un e-mail (évite les doublons quand le nom affiché change).
-fn fts_purge_email(conn: &Connection, account_id: &str, email: &str) -> Result<(), rusqlite::Error> {
+fn fts_purge_email(
+    conn: &Connection,
+    account_id: &str,
+    email: &str,
+) -> Result<(), rusqlite::Error> {
     let mut stmt = conn.prepare(
         "SELECT display_name FROM address_contacts_fts WHERE account_id = ?1 AND email = ?2",
     )?;
@@ -198,7 +202,10 @@ pub fn parse_header_address_list(header: &str) -> Vec<EmailAddress> {
             let Some(email) = normalize_email(&single.addr) else {
                 continue;
             };
-            if out.iter().any(|e: &EmailAddress| e.email.eq_ignore_ascii_case(&email)) {
+            if out
+                .iter()
+                .any(|e: &EmailAddress| e.email.eq_ignore_ascii_case(&email))
+            {
                 continue;
             }
             out.push(EmailAddress {
@@ -366,7 +373,8 @@ pub fn upsert_manual_contact(
     )
     .map_err(|e| e.to_string())?;
     fts_sync_row(&conn, account_id, &email, display_name).map_err(|e| e.to_string())?;
-    row_by_email(&conn, account_id, &email).ok_or_else(|| "Contact introuvable après enregistrement.".into())
+    row_by_email(&conn, account_id, &email)
+        .ok_or_else(|| "Contact introuvable après enregistrement.".into())
 }
 
 pub fn delete_manual_contact(
@@ -451,7 +459,9 @@ pub fn list_address_contacts(
     let q = query.trim().to_ascii_lowercase();
     let like = format!(
         "%{}%",
-        q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+        q.replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_")
     );
 
     let total: u32 = if q.is_empty() {
@@ -543,7 +553,9 @@ fn search_like(
     } else {
         format!(
             "{}%",
-            q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+            q.replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_")
         )
     };
     let mut stmt = conn
@@ -705,13 +717,11 @@ pub fn search_address_contacts_scoped(
         return search_like(&conn, account_id, &own, &q, limit);
     }
 
-    search_fts(&conn, account_id, &own, &q, limit).or_else(|_| search_like(&conn, account_id, &own, &q, limit))
+    search_fts(&conn, account_id, &own, &q, limit)
+        .or_else(|_| search_like(&conn, account_id, &own, &q, limit))
 }
 
-pub fn reindex_address_contacts(
-    db_path: &Path,
-    account_id: &str,
-) -> Result<u32, String> {
+pub fn reindex_address_contacts(db_path: &Path, account_id: &str) -> Result<u32, String> {
     let account_id = account_id.trim();
     if account_id.is_empty() {
         return Err("account_id vide".into());
@@ -727,7 +737,14 @@ pub fn reindex_address_contacts(
         )
         .map_err(|e| e.to_string())?;
 
-    let rows: Vec<(String, String, Option<String>, Option<String>, Option<String>, String)> = stmt
+    let rows: Vec<(
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        String,
+    )> = stmt
         .query_map(params![account_id], |row| {
             Ok((
                 row.get(0)?,
@@ -742,9 +759,7 @@ pub fn reindex_address_contacts(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
 
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     let n = rows.len() as u32;
 
     // Reindex doit reconstruire les compteurs de façon idempotente.
@@ -794,10 +809,24 @@ mod tests {
             [],
         )
         .expect("account");
-        upsert_contact(&conn, "a1", "bob@example.com", Some("Bob"), "2020-01-01T00:00:00Z", "from")
-            .expect("u1");
-        upsert_contact(&conn, "a1", "bob@example.com", Some("Robert"), "2021-01-01T00:00:00Z", "to")
-            .expect("u2");
+        upsert_contact(
+            &conn,
+            "a1",
+            "bob@example.com",
+            Some("Bob"),
+            "2020-01-01T00:00:00Z",
+            "from",
+        )
+        .expect("u1");
+        upsert_contact(
+            &conn,
+            "a1",
+            "bob@example.com",
+            Some("Robert"),
+            "2021-01-01T00:00:00Z",
+            "to",
+        )
+        .expect("u2");
         let count: i64 = conn
             .query_row(
                 "SELECT message_count FROM address_contacts WHERE account_id = 'a1' AND email = 'bob@example.com'",
@@ -825,10 +854,24 @@ mod tests {
             [],
         )
         .expect("account");
-        upsert_contact(&conn, "a1", "me@x.com", Some("Me"), "2020-01-01T00:00:00Z", "from")
-            .expect("self");
-        upsert_contact(&conn, "a1", "alice@x.com", Some("Alice"), "2020-01-01T00:00:00Z", "from")
-            .expect("alice");
+        upsert_contact(
+            &conn,
+            "a1",
+            "me@x.com",
+            Some("Me"),
+            "2020-01-01T00:00:00Z",
+            "from",
+        )
+        .expect("self");
+        upsert_contact(
+            &conn,
+            "a1",
+            "alice@x.com",
+            Some("Alice"),
+            "2020-01-01T00:00:00Z",
+            "from",
+        )
+        .expect("alice");
         drop(conn);
         let hits = search_address_contacts(&path, "a1", "ali", 10).expect("search");
         assert_eq!(hits.len(), 1);
@@ -844,11 +887,25 @@ mod tests {
             [],
         )
         .expect("account");
-        upsert_contact(&conn, "a1", "zoe@x.com", Some("Zoe"), "2020-01-01T00:00:00Z", "from")
-            .expect("zoe");
+        upsert_contact(
+            &conn,
+            "a1",
+            "zoe@x.com",
+            Some("Zoe"),
+            "2020-01-01T00:00:00Z",
+            "from",
+        )
+        .expect("zoe");
         for _ in 0..5 {
-            upsert_contact(&conn, "a1", "bob@x.com", Some("Bob"), "2021-01-01T00:00:00Z", "from")
-                .expect("bob");
+            upsert_contact(
+                &conn,
+                "a1",
+                "bob@x.com",
+                Some("Bob"),
+                "2021-01-01T00:00:00Z",
+                "from",
+            )
+            .expect("bob");
         }
         drop(conn);
         upsert_manual_contact(
@@ -877,10 +934,24 @@ mod tests {
             [],
         )
         .expect("account");
-        upsert_contact(&conn, "a1", "dup@x.com", Some("Name A"), "2020-01-01T00:00:00Z", "from")
-            .expect("a");
-        upsert_contact(&conn, "a1", "dup@x.com", Some("Name B"), "2021-01-01T00:00:00Z", "to")
-            .expect("b");
+        upsert_contact(
+            &conn,
+            "a1",
+            "dup@x.com",
+            Some("Name A"),
+            "2020-01-01T00:00:00Z",
+            "from",
+        )
+        .expect("a");
+        upsert_contact(
+            &conn,
+            "a1",
+            "dup@x.com",
+            Some("Name B"),
+            "2021-01-01T00:00:00Z",
+            "to",
+        )
+        .expect("b");
         // Simule d’anciennes entrées FTS orphelines (nom affiché changé sans purge).
         conn.execute(
             "INSERT INTO address_contacts_fts(account_id, email, display_name) VALUES ('a1', 'dup@x.com', 'Stale')",
@@ -903,8 +974,15 @@ mod tests {
             [],
         )
         .expect("account");
-        upsert_contact(&conn, "a1", "alice@x.com", Some("Alice"), "2020-01-01T00:00:00Z", "from")
-            .expect("alice");
+        upsert_contact(
+            &conn,
+            "a1",
+            "alice@x.com",
+            Some("Alice"),
+            "2020-01-01T00:00:00Z",
+            "from",
+        )
+        .expect("alice");
         drop(conn);
         let hits = search_address_contacts(&path, "a1", "a", 10).expect("search");
         assert_eq!(hits.len(), 1);

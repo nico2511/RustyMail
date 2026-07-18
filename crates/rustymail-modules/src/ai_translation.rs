@@ -108,7 +108,14 @@ fn translation_from_raw(
         target_lang: target_lang.to_string(),
         translated_text: strip_css_boilerplate_lines(dto.translated_text.trim()),
         preserved_entity_ids: dto.preserved_entity_ids,
-        budget: budget_report(n_ctx_hint, engine, system, user, Some(raw), text.chars().count() > 32_768),
+        budget: budget_report(
+            n_ctx_hint,
+            engine,
+            system,
+            user,
+            Some(raw),
+            text.chars().count() > 32_768,
+        ),
     })
 }
 
@@ -218,8 +225,14 @@ mod tests {
             ),
             "auto"
         );
-        assert_eq!(normalize_detected_source_lang(Some("en".into()), "auto"), "en");
-        assert_eq!(normalize_detected_source_lang(Some("".into()), "auto"), "auto");
+        assert_eq!(
+            normalize_detected_source_lang(Some("en".into()), "auto"),
+            "en"
+        );
+        assert_eq!(
+            normalize_detected_source_lang(Some("".into()), "auto"),
+            "auto"
+        );
     }
 
     #[test]

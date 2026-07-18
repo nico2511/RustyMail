@@ -35,9 +35,7 @@ fn remove_office_namespace_elements(doc: &mut Html) {
 
 fn is_office_namespace_tag(name: &str) -> bool {
     let n = name.to_ascii_lowercase();
-    OFFICE_TAG_PREFIXES
-        .iter()
-        .any(|p| n.starts_with(p))
+    OFFICE_TAG_PREFIXES.iter().any(|p| n.starts_with(p))
         || matches!(n.as_str(), "vmlframe" | "imagedata" | "shapetype" | "shape")
 }
 

@@ -13,6 +13,7 @@ fn retain_structural_class_attr(value: &str) -> Option<String> {
             c.starts_with("rm-mail-")
                 || c.starts_with("rm-amazon-")
                 || c.starts_with("rm-deblock-")
+                || c.starts_with("rm-github-")
                 || matches!(*c, "gmail_quote" | "gmail_quote_container")
         })
         .collect();
@@ -56,20 +57,12 @@ pub(crate) fn keep_attr(tag: &str, attr: &str) -> bool {
         return false;
     }
     match a.as_str() {
-        "href" | "src" | "alt" | "title" | "colspan" | "rowspan" | "role" | "aria-label" | "id" => true,
+        "href" | "src" | "alt" | "title" | "colspan" | "rowspan" | "role" | "aria-label" | "id" => {
+            true
+        }
         "width" | "height" => matches!(tag, "img" | "video" | "picture" | "source" | "svg"),
-        "style"
-        | "class"
-        | "align"
-        | "valign"
-        | "bgcolor"
-        | "border"
-        | "cellpadding"
-        | "cellspacing"
-        | "face"
-        | "color"
-        | "lang"
-        | "dir" => false,
+        "style" | "class" | "align" | "valign" | "bgcolor" | "border" | "cellpadding"
+        | "cellspacing" | "face" | "color" | "lang" | "dir" => false,
         _ => false,
     }
 }

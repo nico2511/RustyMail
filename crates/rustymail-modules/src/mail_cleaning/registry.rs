@@ -1,5 +1,6 @@
 use super::providers::amazon::{AmazonCleaner, AmazonDetector};
 use super::providers::deblock::{DeblockCleaner, DeblockDetector};
+use super::providers::github::{GitHubCleaner, GitHubDetector};
 use super::traits::{ProviderCleaner, ProviderDetector};
 use super::types::{CleaningInput, DetectionConfidence, ProviderId};
 
@@ -29,6 +30,11 @@ impl ProviderRegistry {
                 id: ProviderId::Deblock,
                 detector: Box::new(DeblockDetector),
                 cleaner: Some(Box::new(DeblockCleaner)),
+            },
+            RegisteredProvider {
+                id: ProviderId::GitHub,
+                detector: Box::new(GitHubDetector),
+                cleaner: Some(Box::new(GitHubCleaner)),
             },
         ])
     }

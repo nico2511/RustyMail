@@ -152,7 +152,9 @@ pub fn assist_routing_plan(
     let skills = resolved_enabled_skills(request);
     let mut steps = Vec::new();
     for skill in &skills {
-        if *skill == AssistSkill::SlotSuggestion && !should_run_slot_skill(request, intent, draft, facts) {
+        if *skill == AssistSkill::SlotSuggestion
+            && !should_run_slot_skill(request, intent, draft, facts)
+        {
             continue;
         }
         if *skill == AssistSkill::DraftReply && needs_clarification_before_draft(request, facts) {
@@ -163,7 +165,9 @@ pub fn assist_routing_plan(
             continue;
         }
         let required = match skill {
-            AssistSkill::AnalyzeIntent | AssistSkill::ExtractFacts | AssistSkill::DraftReply => true,
+            AssistSkill::AnalyzeIntent | AssistSkill::ExtractFacts | AssistSkill::DraftReply => {
+                true
+            }
             AssistSkill::ActionItems
             | AssistSkill::RiskFlagger
             | AssistSkill::ToneAdapter
@@ -327,7 +331,13 @@ pub fn run_assist_phase(
                 .take(3)
                 .collect();
         }
-        finalize_plan(&mut result, request, snap.as_ref(), draft_so_far, prior_facts);
+        finalize_plan(
+            &mut result,
+            request,
+            snap.as_ref(),
+            draft_so_far,
+            prior_facts,
+        );
         result.run_steps.push(run_step.clone());
         return Ok(AssistPhaseOutput { result, run_step });
     }
@@ -362,7 +372,8 @@ pub fn run_assist_phase(
                 result.run_steps.push(run_step.clone());
                 return Ok(AssistPhaseOutput { result, run_step });
             }
-            match extract_facts_with_llm(engine, thread_context, prior_intent, &request.user_prefs) {
+            match extract_facts_with_llm(engine, thread_context, prior_intent, &request.user_prefs)
+            {
                 Ok(out) => {
                     result.facts = Some(out.snapshot.clone());
                     result.confidence = Some(out.snapshot.confidence);
@@ -464,8 +475,13 @@ pub fn run_assist_phase(
                 ambiguities: Vec::new(),
                 confidence: 1.0,
             });
-            let check =
-                consistency_check_with_llm(engine, thread_context, &facts, draft, &request.user_prefs)?;
+            let check = consistency_check_with_llm(
+                engine,
+                thread_context,
+                &facts,
+                draft,
+                &request.user_prefs,
+            )?;
             result.consistency_issues = check.issues;
             result.safety_flags = check.safety_flags;
             if !check.aligned {

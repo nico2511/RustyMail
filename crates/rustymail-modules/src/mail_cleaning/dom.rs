@@ -44,9 +44,7 @@ pub fn is_invisible_mail_char(c: char) -> bool {
 pub fn node_outer_html(node: ego_tree::NodeRef<'_, Node>) -> String {
     match node.value() {
         Node::Text(t) => escape_html_text(t),
-        Node::Element(_) => ElementRef::wrap(node)
-            .map(|e| e.html())
-            .unwrap_or_default(),
+        Node::Element(_) => ElementRef::wrap(node).map(|e| e.html()).unwrap_or_default(),
         _ => String::new(),
     }
 }

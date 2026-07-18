@@ -117,10 +117,14 @@ pub fn analyze_mailbox_structure(
         format!("{root_personal_count} dossier(s) personnels à la racine (hors Inbox / Envoyés / corbeille…)."),
     ];
     if max_depth > 0 {
-        summary_lines.push(format!("Profondeur maximale de l’arbre : {max_depth} niveau(x)."));
+        summary_lines.push(format!(
+            "Profondeur maximale de l’arbre : {max_depth} niveau(x)."
+        ));
     }
     if empty_count > 0 {
-        summary_lines.push(format!("{empty_count} dossier(s) sans message en cache (peut être vide ou non synchronisé)."));
+        summary_lines.push(format!(
+            "{empty_count} dossier(s) sans message en cache (peut être vide ou non synchronisé)."
+        ));
     }
 
     let structure = OrgMailboxStructure {

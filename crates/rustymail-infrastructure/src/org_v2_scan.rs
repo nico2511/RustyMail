@@ -4,9 +4,9 @@ use std::path::Path;
 
 use rustymail_domain::{OrgProposal, OrgProposalKind, OrgV2ScanReport};
 
+use crate::open_sqlite_migrated;
 use crate::org_memory::filter_proposals_with_memory;
 use crate::org_scan::org_scan_account;
-use crate::open_sqlite_migrated;
 
 /// Types de cartes autorisés en V2 (productivité boîte, pas recherche ni tags).
 const V2_KINDS: &[OrgProposalKind] = &[
@@ -34,8 +34,7 @@ pub fn org_v2_scan_account(path: &Path, account_id: &str) -> Result<OrgV2ScanRep
     let base = org_scan_account(path, account_id, false)?;
     let narrowed = filter_v2_kinds(base.proposals);
     let conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
-    let (proposals, memory) =
-        filter_proposals_with_memory(&conn, account_id, narrowed)?;
+    let (proposals, memory) = filter_proposals_with_memory(&conn, account_id, narrowed)?;
     Ok(OrgV2ScanReport {
         proposals,
         stats: base.stats,

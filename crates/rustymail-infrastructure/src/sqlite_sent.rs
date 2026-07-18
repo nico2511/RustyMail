@@ -6,7 +6,8 @@ use std::path::Path;
 
 use crate::{
     address_contacts::{upsert_contacts_from_addresses, upsert_contacts_from_message_row},
-    lang_detect, open_sqlite_migrated, smtp_send::markdown_body_to_html,
+    lang_detect, open_sqlite_migrated,
+    smtp_send::markdown_body_to_html,
 };
 
 fn normalize_msg_id_token(value: &str) -> Option<String> {

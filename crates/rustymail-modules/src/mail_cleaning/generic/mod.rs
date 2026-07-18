@@ -121,7 +121,8 @@ mod tests {
 
     #[test]
     fn keeps_small_logo_image() {
-        let html = r#"<p>Hi</p><img src="https://cdn.example/logo.png" width="40" height="40" alt="Co"/>"#;
+        let html =
+            r#"<p>Hi</p><img src="https://cdn.example/logo.png" width="40" height="40" alt="Co"/>"#;
         let out = generic_html_clean(html);
         assert!(out.contains("logo.png"));
     }

@@ -31,7 +31,10 @@ fn now_rfc3339_secs() -> String {
     Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
-pub fn sqlite_saved_drafts_count(db_path: impl AsRef<Path>, account_id: &str) -> Result<i64, String> {
+pub fn sqlite_saved_drafts_count(
+    db_path: impl AsRef<Path>,
+    account_id: &str,
+) -> Result<i64, String> {
     let aid = account_id.trim();
     if aid.is_empty() {
         return Err("account_id vide".to_string());

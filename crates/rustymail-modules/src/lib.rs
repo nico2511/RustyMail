@@ -1,25 +1,25 @@
-pub mod prompts;
-mod ai_llm_util;
 pub mod ai_llm_contracts;
+mod ai_llm_util;
+pub mod prompts;
 pub use ai_llm_util::LLM_CANCELLED;
-pub mod ai_extraction;
-pub mod ai_summary;
-pub mod ai_tagging;
-pub mod ai_translation;
-pub mod ai_writing;
-pub mod ai_grammar;
-pub mod ai_quick_reply;
+pub mod ai_action_brief;
 pub mod ai_agent_prepare_reply;
 pub mod ai_assist_facts;
 pub mod ai_assist_skills;
 pub mod ai_assist_thread;
 pub mod ai_contact_profile;
-pub mod ai_qa;
-pub mod ai_search_nl;
-pub mod ai_inbox_digest;
-pub mod ai_action_brief;
-pub mod ai_org_proposals;
+pub mod ai_extraction;
 pub mod ai_flux_affiner;
+pub mod ai_grammar;
+pub mod ai_inbox_digest;
+pub mod ai_org_proposals;
+pub mod ai_qa;
+pub mod ai_quick_reply;
+pub mod ai_search_nl;
+pub mod ai_summary;
+pub mod ai_tagging;
+pub mod ai_translation;
+pub mod ai_writing;
 pub mod mail_cleaning;
 
 /// Alias historique : signatures HTML vivent dans [`mail_cleaning::signature_html`].
@@ -37,6 +37,7 @@ fn html_cleaning_kind(resolved: ProviderId) -> HtmlCleaningProviderKind {
         ProviderId::Generic => HtmlCleaningProviderKind::Generic,
         ProviderId::Amazon => HtmlCleaningProviderKind::Amazon,
         ProviderId::Deblock => HtmlCleaningProviderKind::Deblock,
+        ProviderId::GitHub => HtmlCleaningProviderKind::GitHub,
     }
 }
 
@@ -51,7 +52,11 @@ pub fn clean_message(message: &Message) -> CleanedMessageView {
     let cleaned_html_bundle = message.html_body.as_ref().map(|html| {
         let input = mail_cleaning::CleaningInput::from_message(message);
         let r = mail_cleaning::clean_html_builtin(&input, html);
-        (r.html, r.conversation_text, html_cleaning_kind(r.resolved_provider))
+        (
+            r.html,
+            r.conversation_text,
+            html_cleaning_kind(r.resolved_provider),
+        )
     });
     let (cleaned_html_body, conversation_text, html_cleaning_provider) = match cleaned_html_bundle {
         Some((h, conv, provider)) => (Some(h), conv, Some(provider)),

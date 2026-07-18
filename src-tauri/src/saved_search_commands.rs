@@ -107,11 +107,9 @@ pub async fn mark_saved_search_seen_cmd(
     let id = id.to_string();
     let db = paths.db_path.clone();
     let account_id = payload.account_id.trim().to_string();
-    tauri::async_runtime::spawn_blocking(move || {
-        mark_saved_search_seen(&db, &account_id, &id)
-    })
-    .await
-    .map_err(|e| format!("mark saved search seen join: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || mark_saved_search_seen(&db, &account_id, &id))
+        .await
+        .map_err(|e| format!("mark saved search seen join: {e}"))?
 }
 
 #[tauri::command]

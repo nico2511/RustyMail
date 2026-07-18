@@ -5,19 +5,18 @@ use std::path::Path;
 
 use rusqlite::{params, Connection};
 use rustymail_domain::{
-    OrgProposal, OrgProposalKind, OrgProposalSource, OrgScanLlmStatus, OrgScanReport,
-    OrgScanStats,
+    OrgProposal, OrgProposalKind, OrgProposalSource, OrgScanLlmStatus, OrgScanReport, OrgScanStats,
     OrgSuggestedAction, OrgThreadRef,
 };
 
 use crate::app_prefs::{load_app_prefs, prefs_path_from_db_dir};
+use crate::build_thread_from_row;
 use crate::mail_ops::is_trash_like_mailbox;
 use crate::newsletter::{list_newsletter_rules_connection, matches_newsletter_email};
+use crate::open_sqlite_migrated;
 use crate::org_consolidate::scan_duplicate_threads;
 use crate::org_mailbox_structure::analyze_mailbox_structure;
 use crate::org_retag::{effective_thread_mailbox, sender_is_transactional, thread_tags_stale};
-use crate::build_thread_from_row;
-use crate::open_sqlite_migrated;
 use rustymail_llm::LlmEngine;
 use rustymail_modules::ai_org_proposals::org_proposals_with_llm;
 
@@ -26,7 +25,10 @@ const STALE_INBOX_DAYS: i64 = 90;
 
 pub fn is_inbox_like_mailbox(name: &str) -> bool {
     let n = name.trim().to_ascii_lowercase();
-    n == "inbox" || n.ends_with("/inbox") || n.contains("boîte de réception") || n == "boite de reception"
+    n == "inbox"
+        || n.ends_with("/inbox")
+        || n.contains("boîte de réception")
+        || n == "boite de reception"
 }
 
 pub fn is_drafts_like_mailbox(name: &str) -> bool {
@@ -41,9 +43,7 @@ pub fn is_archive_like_mailbox(name: &str) -> bool {
 
 /// Dossiers exclus des propositions « à ranger » (corbeille, archives, brouillons, envoyés, spam).
 pub fn org_exclude_from_range_proposals(name: &str) -> bool {
-    if is_drafts_like_mailbox(name)
-        || is_trash_like_mailbox(name)
-        || is_archive_like_mailbox(name)
+    if is_drafts_like_mailbox(name) || is_trash_like_mailbox(name) || is_archive_like_mailbox(name)
     {
         return true;
     }
@@ -199,7 +199,8 @@ pub fn hydrate_llm_proposals(
             .filter(|r| thread_exists(conn, account_id, &r.thread_id))
             .collect();
         if refs.is_empty() {
-            let search_kws = infer_llm_search_keywords(&proposal.title, &proposal.rationale, &keywords);
+            let search_kws =
+                infer_llm_search_keywords(&proposal.title, &proposal.rationale, &keywords);
             refs = search_threads_by_keywords(conn, account_id, &search_kws, SAMPLE_LIMIT);
         }
         refs = refs
@@ -247,9 +248,9 @@ pub fn enrich_org_report_llm_refs(
             .map(|r| r.thread_id.clone())
             .collect();
     }
-    report.proposals.retain(|p| {
-        p.source != OrgProposalSource::Llm || !p.thread_refs.is_empty()
-    });
+    report
+        .proposals
+        .retain(|p| p.source != OrgProposalSource::Llm || !p.thread_refs.is_empty());
     Ok(())
 }
 
@@ -274,12 +275,7 @@ pub fn org_llm_proposals_for_account(
         &valid_ids,
         output_language,
     )?;
-    Ok(hydrate_llm_proposals(
-        &conn,
-        account_id,
-        &valid_ids,
-        raw,
-    ))
+    Ok(hydrate_llm_proposals(&conn, account_id, &valid_ids, raw))
 }
 
 pub fn org_scan_account(
@@ -343,7 +339,9 @@ pub fn enrich_thread_ref(conn: &Connection, account_id: &str, mut r: OrgThreadRe
         },
     );
     if let Ok((subject, tags, followed, mbox)) = row {
-        if let Ok(thread) = build_thread_from_row(conn, r.thread_id.clone(), subject, tags, followed) {
+        if let Ok(thread) =
+            build_thread_from_row(conn, r.thread_id.clone(), subject, tags, followed)
+        {
             let mb = if r.mailbox.trim().is_empty() {
                 mbox
             } else {
@@ -511,7 +509,10 @@ fn match_keyword_rule(
     refs
 }
 
-fn scan_unread_outside_inbox(conn: &Connection, account_id: &str) -> Result<Vec<OrgProposal>, String> {
+fn scan_unread_outside_inbox(
+    conn: &Connection,
+    account_id: &str,
+) -> Result<Vec<OrgProposal>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT t.id, t.mailbox, t.subject FROM threads t
@@ -523,15 +524,16 @@ fn scan_unread_outside_inbox(conn: &Connection, account_id: &str) -> Result<Vec<
     let mut refs = Vec::new();
     let rows = stmt
         .query_map(params![account_id], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
         })
         .map_err(|e| e.to_string())?;
     for row in rows.flatten() {
         let mb = &row.1;
-        if is_inbox_like_mailbox(mb)
-            || is_drafts_like_mailbox(mb)
-            || is_trash_like_mailbox(mb)
-        {
+        if is_inbox_like_mailbox(mb) || is_drafts_like_mailbox(mb) || is_trash_like_mailbox(mb) {
             continue;
         }
         refs.push(OrgThreadRef {
@@ -583,7 +585,11 @@ fn scan_stale_inbox_read(conn: &Connection, account_id: &str) -> Result<Vec<OrgP
     let mut refs = Vec::new();
     let rows = stmt
         .query_map(params![account_id, cutoff], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
         })
         .map_err(|e| e.to_string())?;
     for row in rows.flatten() {
@@ -936,12 +942,7 @@ fn scan_keyword_clusters(
             continue;
         }
         let kws = normalized_keywords(&rule.keywords);
-        let signal_kw = kws
-            .iter()
-            .take(4)
-            .cloned()
-            .collect::<Vec<_>>()
-            .join(", ");
+        let signal_kw = kws.iter().take(4).cloned().collect::<Vec<_>>().join(", ");
         let signals = if signal_kw.is_empty() {
             vec!["custom_keywords".into()]
         } else {
@@ -1083,7 +1084,12 @@ mod tests {
         .expect("account");
     }
 
-    fn insert_stale_inbox_thread(conn: &Connection, account_id: &str, thread_id: &str, received_at: &str) {
+    fn insert_stale_inbox_thread(
+        conn: &Connection,
+        account_id: &str,
+        thread_id: &str,
+        received_at: &str,
+    ) {
         conn.execute(
             "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags, is_followed)
              VALUES (?1, ?2, 'INBOX', 'm1', 'Old read', '', 0)",
@@ -1105,17 +1111,19 @@ mod tests {
         let conn = open_sqlite_migrated(&path).expect("migrate");
         insert_account(&conn, "acc-a");
         insert_account(&conn, "acc-b");
-        let old = (Utc::now() - Duration::days(120))
-            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let old =
+            (Utc::now() - Duration::days(120)).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
         insert_stale_inbox_thread(&conn, "acc-a", "t-only-a", &old);
         drop(conn);
 
         let report_b = org_scan_account(&path, "acc-b", false).expect("scan b");
-        if let Some(p) = report_b.proposals.iter().find(|p| p.id == "stale-inbox-read") {
+        if let Some(p) = report_b
+            .proposals
+            .iter()
+            .find(|p| p.id == "stale-inbox-read")
+        {
             assert!(
-                !p.thread_refs
-                    .iter()
-                    .any(|r| r.thread_id == "t-only-a"),
+                !p.thread_refs.iter().any(|r| r.thread_id == "t-only-a"),
                 "acc-b must not see acc-a thread"
             );
         }
@@ -1183,11 +1191,8 @@ mod tests {
             .collect();
         assert!(ids.contains("t-fact"));
         assert!(ids.contains("t-promo"));
-        assert!(
-            proposals
-                .iter()
-                .all(|p| p.explain_signals.iter().any(|s| s.starts_with("keywords:")))
-        );
+        assert!(proposals
+            .iter()
+            .all(|p| p.explain_signals.iter().any(|s| s.starts_with("keywords:"))));
     }
-
 }

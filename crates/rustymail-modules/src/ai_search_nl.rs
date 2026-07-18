@@ -66,11 +66,12 @@ pub fn nl_to_search_query(
 
     let language = nl_query_requests_language_filter(trimmed);
 
-    let mode = if text_lc.is_some() && matches!(partial.mode, SearchMode::Semantic | SearchMode::Hybrid) {
-        SearchMode::Lexical
-    } else {
-        partial.mode
-    };
+    let mode =
+        if text_lc.is_some() && matches!(partial.mode, SearchMode::Semantic | SearchMode::Hybrid) {
+            SearchMode::Lexical
+        } else {
+            partial.mode
+        };
 
     let mailbox = partial
         .mailbox

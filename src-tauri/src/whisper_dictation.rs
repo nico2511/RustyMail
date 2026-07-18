@@ -25,13 +25,18 @@ impl std::fmt::Display for WhisperError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             WhisperError::AudioTooShort { seconds } => {
-                write!(f, "Audio trop court ({seconds:.2}s). Parlez plus longtemps.")
+                write!(
+                    f,
+                    "Audio trop court ({seconds:.2}s). Parlez plus longtemps."
+                )
             }
             WhisperError::AudioSilent { rms } => write!(
                 f,
                 "Audio quasi silencieux (RMS={rms:.4}). Vérifiez le micro et le niveau d'entrée."
             ),
-            WhisperError::DecodeFailed { message } => write!(f, "Échec transcription Whisper: {message}"),
+            WhisperError::DecodeFailed { message } => {
+                write!(f, "Échec transcription Whisper: {message}")
+            }
             WhisperError::Other { message } => write!(f, "{message}"),
         }
     }
@@ -216,14 +221,11 @@ fn validate_samples_for_dictation(samples: &[f32], sample_rate: u32) -> Result<(
     }
     let duration_s = samples.len() as f32 / sample_rate as f32;
     if duration_s < 0.4 {
-        return Err(WhisperError::AudioTooShort { seconds: duration_s });
+        return Err(WhisperError::AudioTooShort {
+            seconds: duration_s,
+        });
     }
-    let rms = (samples
-        .iter()
-        .map(|s| s * s)
-        .sum::<f32>()
-        / (samples.len() as f32))
-        .sqrt();
+    let rms = (samples.iter().map(|s| s * s).sum::<f32>() / (samples.len() as f32)).sqrt();
     if rms < 0.005 {
         return Err(WhisperError::AudioSilent { rms });
     }
@@ -233,12 +235,7 @@ fn validate_samples_for_dictation(samples: &[f32], sample_rate: u32) -> Result<(
 pub fn wav_rms_duration(wav: &[u8]) -> Result<(f32, f32), WhisperError> {
     let samples = wav_bytes_to_f32_samples(wav).map_err(|e| WhisperError::Other { message: e })?;
     let duration_s = samples.len() as f32 / 16000.0;
-    let rms = (samples
-        .iter()
-        .map(|s| s * s)
-        .sum::<f32>()
-        / (samples.len().max(1) as f32))
-        .sqrt();
+    let rms = (samples.iter().map(|s| s * s).sum::<f32>() / (samples.len().max(1) as f32)).sqrt();
     Ok((duration_s, rms))
 }
 
@@ -307,13 +304,14 @@ pub fn transcribe_whisper_wav_bytes_typed(
         _ => 0,
     };
 
-    let mut engine = WhisperEngine::load_with_params(&path, load)
-        .map_err(|e: TranscribeError| WhisperError::Other {
-            message: e.to_string(),
+    let mut engine =
+        WhisperEngine::load_with_params(&path, load).map_err(|e: TranscribeError| {
+            WhisperError::Other {
+                message: e.to_string(),
+            }
         })?;
 
-    let samples =
-        wav_bytes_to_f32_samples(wav).map_err(|e| WhisperError::Other { message: e })?;
+    let samples = wav_bytes_to_f32_samples(wav).map_err(|e| WhisperError::Other { message: e })?;
     validate_samples_for_dictation(&samples, 16000)?;
 
     let mut inf = WhisperInferenceParams {

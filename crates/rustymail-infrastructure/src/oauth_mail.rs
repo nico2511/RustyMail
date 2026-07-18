@@ -192,8 +192,7 @@ struct OAuthTokenMetaV2 {
 }
 
 fn keyring_oauth_entry(username: &str) -> Result<keyring_core::Entry, String> {
-    keyring::use_native_store(false)
-        .map_err(|e| format!("keyring native store failed: {e}"))?;
+    keyring::use_native_store(false).map_err(|e| format!("keyring native store failed: {e}"))?;
     keyring_core::Entry::new(KEYRING_SERVICE, username)
         .map_err(|e| format!("keyring oauth entry failed: {e}"))
 }
@@ -241,8 +240,7 @@ fn keyring_oauth_delete(username: &str) {
 
 fn write_oauth_token_file(path: &Path, json: &str) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("oauth tokens mkdir: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("oauth tokens mkdir: {e}"))?;
     }
     std::fs::write(path, json).map_err(|e| format!("oauth tokens file write: {e}"))?;
     #[cfg(unix)]
@@ -294,7 +292,11 @@ fn meta_json_for_keyring(meta: &OAuthTokenMetaV2) -> Result<String, String> {
     Ok(json)
 }
 
-fn store_oauth_tokens_in_file(id: &str, tokens: &StoredMailOAuthTokens, meta: OAuthTokenMetaV2) -> Result<(), String> {
+fn store_oauth_tokens_in_file(
+    id: &str,
+    tokens: &StoredMailOAuthTokens,
+    meta: OAuthTokenMetaV2,
+) -> Result<(), String> {
     let json = serde_json::to_string(tokens).map_err(|e| format!("oauth tokens encode: {e}"))?;
     let path = oauth_token_file_path(id);
     write_oauth_token_file(&path, &json)?;
@@ -487,7 +489,9 @@ fn load_oauth_tokens_at(id: &str) -> Result<StoredMailOAuthTokens, String> {
         }
         sanitize_stored_tokens(&mut tokens);
         if tokens.access_token.is_empty() {
-            return Err("oauth: jeton d’accès vide dans le fichier local — reconnectez le compte.".into());
+            return Err(
+                "oauth: jeton d’accès vide dans le fichier local — reconnectez le compte.".into(),
+            );
         }
         return Ok(tokens);
     }
@@ -506,7 +510,9 @@ fn load_oauth_tokens_at(id: &str) -> Result<StoredMailOAuthTokens, String> {
     };
     sanitize_stored_tokens(&mut tokens);
     if tokens.access_token.is_empty() {
-        return Err("oauth: jeton d’accès vide — reconnectez le compte (Google / Microsoft).".into());
+        return Err(
+            "oauth: jeton d’accès vide — reconnectez le compte (Google / Microsoft).".into(),
+        );
     }
     Ok(tokens)
 }
@@ -713,7 +719,11 @@ fn windows_loopback_port_holder_detail(port: u16) -> Option<String> {
         if !line.contains(&needle) && !line.contains(&format!("127.0.0.1:{port}")) {
             continue;
         }
-        if let Some(pid) = line.split_whitespace().last().and_then(|s| s.parse::<u32>().ok()) {
+        if let Some(pid) = line
+            .split_whitespace()
+            .last()
+            .and_then(|s| s.parse::<u32>().ok())
+        {
             listen_pid = Some(pid);
             break;
         }
@@ -895,7 +905,9 @@ fn parse_query_params(query: &str) -> HashMap<String, String> {
         if let Some((k, v)) = pair.split_once('=') {
             m.insert(
                 k.to_string(),
-                urlencoding::decode(v).map(|c| c.into_owned()).unwrap_or_else(|_| v.to_string()),
+                urlencoding::decode(v)
+                    .map(|c| c.into_owned())
+                    .unwrap_or_else(|_| v.to_string()),
             );
         }
     }
@@ -1059,7 +1071,10 @@ async fn exchange_microsoft_code(
         .map_err(|e| format!("microsoft token json: {e}"))
 }
 
-async fn google_user_email(client: &reqwest::Client, access_token: &str) -> Result<(String, Option<String>), String> {
+async fn google_user_email(
+    client: &reqwest::Client,
+    access_token: &str,
+) -> Result<(String, Option<String>), String> {
     let resp = client
         .get("https://www.googleapis.com/oauth2/v3/userinfo")
         .header(AUTHORIZATION, format!("Bearer {access_token}"))
@@ -1071,7 +1086,10 @@ async fn google_user_email(client: &reqwest::Client, access_token: &str) -> Resu
         let t = resp.text().await.unwrap_or_default();
         return Err(oauth_http_error("google userinfo", status, &t));
     }
-    let v: serde_json::Value = resp.json().await.map_err(|e| format!("userinfo json: {e}"))?;
+    let v: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("userinfo json: {e}"))?;
     let email = v
         .get("email")
         .and_then(|x| x.as_str())
@@ -1125,7 +1143,10 @@ fn microsoft_identity_from_id_token(id_token: &str) -> Result<(String, Option<St
     Ok((email, name))
 }
 
-async fn microsoft_user_email_graph(client: &reqwest::Client, access_token: &str) -> Result<(String, Option<String>), String> {
+async fn microsoft_user_email_graph(
+    client: &reqwest::Client,
+    access_token: &str,
+) -> Result<(String, Option<String>), String> {
     if !access_token.contains('.') {
         return Err(
             "graph /me: le jeton d’accès Outlook (IMAP/SMTP) n’est pas un JWT Graph — utilisez id_token"
@@ -1253,12 +1274,20 @@ async fn refresh_microsoft(
 }
 
 /// Retourne un jeton d’accès valide (rafraîchit si nécessaire) pour IMAP/SMTP XOAUTH2.
-pub async fn ensure_valid_access_token(account_id: &str, kind: &MailAuthKind) -> Result<String, String> {
+pub async fn ensure_valid_access_token(
+    account_id: &str,
+    kind: &MailAuthKind,
+) -> Result<String, String> {
     let client_id = match kind {
-        MailAuthKind::OauthGoogle => std::env::var("RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID")
-            .map_err(|_| "variable d’environnement RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID manquante".to_string())?,
+        MailAuthKind::OauthGoogle => {
+            std::env::var("RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID").map_err(|_| {
+                "variable d’environnement RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID manquante".to_string()
+            })?
+        }
         MailAuthKind::OauthMicrosoft => std::env::var("RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID")
-            .map_err(|_| "variable d’environnement RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID manquante".to_string())?,
+            .map_err(|_| {
+                "variable d’environnement RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID manquante".to_string()
+            })?,
         MailAuthKind::Password => {
             return Err("ensure_valid_access_token: compte en mot de passe".into());
         }
@@ -1271,8 +1300,8 @@ pub async fn ensure_valid_access_token(account_id: &str, kind: &MailAuthKind) ->
         .build()
         .map_err(|e| format!("reqwest: {e}"))?;
 
-    let force_refresh_for_google = matches!(kind, MailAuthKind::OauthGoogle)
-        && !google_scope_allows_imap(&stored.scope);
+    let force_refresh_for_google =
+        matches!(kind, MailAuthKind::OauthGoogle) && !google_scope_allows_imap(&stored.scope);
 
     if force_refresh_for_google {
         log::warn!(
@@ -1350,7 +1379,9 @@ pub struct OAuthDesktopLoginOutcome {
     pub ephemeral_redirect: bool,
 }
 
-pub async fn oauth_google_desktop_login(client_id: &str) -> Result<OAuthDesktopLoginOutcome, String> {
+pub async fn oauth_google_desktop_login(
+    client_id: &str,
+) -> Result<OAuthDesktopLoginOutcome, String> {
     if client_id.trim().is_empty() {
         return Err("client_id Google vide".into());
     }
@@ -1374,13 +1405,16 @@ pub async fn oauth_google_desktop_login(client_id: &str) -> Result<OAuthDesktopL
     open_browser(&auth_url)?;
 
     let params = capture_redirect(loopback.listener.as_ref(), &state, &redirect_uri).await?;
-    let code = params.get("code").ok_or_else(|| "code manquant".to_string())?;
+    let code = params
+        .get("code")
+        .ok_or_else(|| "code manquant".to_string())?;
 
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(45))
         .build()
         .map_err(|e| format!("reqwest: {e}"))?;
-    let token_json = exchange_google_code(&http, client_id, code, &redirect_uri, &code_verifier).await?;
+    let token_json =
+        exchange_google_code(&http, client_id, code, &redirect_uri, &code_verifier).await?;
     let (access, refresh, exp, sc) = token_from_json(&token_json)?;
     if !google_scope_allows_imap(&sc) {
         return Err(
@@ -1409,7 +1443,9 @@ pub async fn oauth_google_desktop_login(client_id: &str) -> Result<OAuthDesktopL
     })
 }
 
-pub async fn oauth_microsoft_desktop_login(client_id: &str) -> Result<OAuthDesktopLoginOutcome, String> {
+pub async fn oauth_microsoft_desktop_login(
+    client_id: &str,
+) -> Result<OAuthDesktopLoginOutcome, String> {
     if client_id.trim().is_empty() {
         return Err("client_id Microsoft vide".into());
     }
@@ -1437,13 +1473,16 @@ pub async fn oauth_microsoft_desktop_login(client_id: &str) -> Result<OAuthDeskt
     open_browser(&auth_url)?;
 
     let params = capture_redirect(loopback.listener.as_ref(), &state, &redirect_uri).await?;
-    let code = params.get("code").ok_or_else(|| "code manquant".to_string())?;
+    let code = params
+        .get("code")
+        .ok_or_else(|| "code manquant".to_string())?;
 
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(45))
         .build()
         .map_err(|e| format!("reqwest: {e}"))?;
-    let token_json = exchange_microsoft_code(&http, client_id, code, &redirect_uri, &code_verifier).await?;
+    let token_json =
+        exchange_microsoft_code(&http, client_id, code, &redirect_uri, &code_verifier).await?;
     let (access, refresh, exp, sc) = token_from_json(&token_json)?;
     let (email, display_name) = microsoft_user_identity(&http, &token_json, &access).await?;
 
@@ -1493,7 +1532,9 @@ mod tests {
             provider: Some(MailOAuthProvider::Google),
             login_email: None,
         };
-        assert!(ensure_oauth_tokens_match_auth_kind(&tokens, &MailAuthKind::OauthMicrosoft).is_err());
+        assert!(
+            ensure_oauth_tokens_match_auth_kind(&tokens, &MailAuthKind::OauthMicrosoft).is_err()
+        );
     }
 
     #[test]
@@ -1501,12 +1542,11 @@ mod tests {
         let state = "expected-state";
         let bad = classify_oauth_redirect_query("state=other&code=abc", state);
         assert_eq!(bad, OAuthRedirectDisposition::Ignore);
-        let good = classify_oauth_redirect_query(
-            &format!("state={state}&code=auth-code"),
-            state,
-        );
+        let good = classify_oauth_redirect_query(&format!("state={state}&code=auth-code"), state);
         match good {
-            OAuthRedirectDisposition::Accept(p) => assert_eq!(p.get("code").map(String::as_str), Some("auth-code")),
+            OAuthRedirectDisposition::Accept(p) => {
+                assert_eq!(p.get("code").map(String::as_str), Some("auth-code"))
+            }
             _ => panic!("expected accept"),
         }
     }
@@ -1519,7 +1559,10 @@ mod tests {
 
     #[test]
     fn normalize_oauth_env_value_strips_quotes() {
-        assert_eq!(super::normalize_oauth_env_value("  \"abc-secret\"  "), "abc-secret");
+        assert_eq!(
+            super::normalize_oauth_env_value("  \"abc-secret\"  "),
+            "abc-secret"
+        );
         assert_eq!(super::normalize_oauth_env_value("'x'"), "x");
     }
 
@@ -1544,7 +1587,10 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().expect("runtime");
         let client = reqwest::Client::new();
         let err = rt
-            .block_on(microsoft_user_email_graph(&client, "opaque-outlook-token-no-dots"))
+            .block_on(microsoft_user_email_graph(
+                &client,
+                "opaque-outlook-token-no-dots",
+            ))
             .expect_err("opaque token");
         assert!(err.contains("pas un JWT Graph"));
     }

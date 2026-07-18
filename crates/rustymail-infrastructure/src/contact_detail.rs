@@ -236,11 +236,7 @@ fn compute_auto_stats(
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
         Err(_) => {
-            return (
-                auto_kind_from_ratio(rule_match, 0, 0),
-                0.0,
-                labels,
-            );
+            return (auto_kind_from_ratio(rule_match, 0, 0), 0.0, labels);
         }
     };
     let thread_ids: Vec<String> = if global {
@@ -336,7 +332,10 @@ fn accept_phone_candidate(raw: &str) -> Option<String> {
     if !has_phone_separator(norm) && !norm.starts_with('+') && !norm.starts_with("tel:") {
         return None;
     }
-    if looks_like_french_phone(&digits, norm) || norm.starts_with('+') || norm.to_ascii_lowercase().starts_with("tel:") {
+    if looks_like_french_phone(&digits, norm)
+        || norm.starts_with('+')
+        || norm.to_ascii_lowercase().starts_with("tel:")
+    {
         return Some(norm.to_string());
     }
     if has_phone_separator(norm) && n >= 9 {
@@ -359,7 +358,15 @@ fn push_phone_unique(out: &mut Vec<String>, candidate: &str) {
 fn extract_phones_from_text(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let lower = text.to_ascii_lowercase();
-    for marker in ["tel:", "tél:", "telephone:", "téléphone:", "phone:", "mobile:", "portable:"] {
+    for marker in [
+        "tel:",
+        "tél:",
+        "telephone:",
+        "téléphone:",
+        "phone:",
+        "mobile:",
+        "portable:",
+    ] {
         let mut search_from = 0usize;
         while let Some(pos) = lower[search_from..].find(marker) {
             let start = search_from + pos + marker.len();
@@ -402,7 +409,11 @@ fn is_noisy_entity_value(value: &str) -> bool {
     if lower.contains("jan-") || lower.contains("feb-") || lower.contains("mar-") {
         return true;
     }
-    if v.chars().all(|c| c.is_ascii_digit() || c == '-' || c == '/') && digit_count(v) >= 8 && !has_phone_separator(v) {
+    if v.chars()
+        .all(|c| c.is_ascii_digit() || c == '-' || c == '/')
+        && digit_count(v) >= 8
+        && !has_phone_separator(v)
+    {
         return true;
     }
     false
@@ -440,7 +451,11 @@ pub fn count_address_contacts_scoped(
     let account_id = account_id.trim();
     if global_scope {
         let n: i64 = conn
-            .query_row("SELECT COUNT(DISTINCT email) FROM address_contacts", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(DISTINCT email) FROM address_contacts",
+                [],
+                |r| r.get(0),
+            )
             .map_err(|e| e.to_string())?;
         return Ok(n.max(0) as u32);
     }
@@ -510,11 +525,7 @@ pub fn list_sender_emails_for_domain(
 }
 
 /// Kind expéditeur pour suggestions d'activité : `human`, `auto`, ou `mixed`.
-pub fn sender_auto_kind_for_account(
-    conn: &Connection,
-    account_id: &str,
-    email: &str,
-) -> String {
+pub fn sender_auto_kind_for_account(conn: &Connection, account_id: &str, email: &str) -> String {
     let rules = match list_newsletter_rules_connection(conn) {
         Ok(r) => r,
         Err(_) => return "human".to_string(),
@@ -553,8 +564,14 @@ pub fn get_address_contact_detail(
 
     let domain = host_of_email(&email).unwrap_or_default();
     let message_count = live_message_count_for_sender(&conn, &email, account_id, global_scope);
-    let (auto_sender_kind, auto_thread_ratio, matched_rule_labels) =
-        compute_auto_stats(&conn, &email, account_id, global_scope, &rules, &account_emails);
+    let (auto_sender_kind, auto_thread_ratio, matched_rule_labels) = compute_auto_stats(
+        &conn,
+        &email,
+        account_id,
+        global_scope,
+        &rules,
+        &account_emails,
+    );
 
     let account_filter = if global_scope {
         String::new()
@@ -600,8 +617,7 @@ pub fn get_address_contact_detail(
                 .unwrap_or_default()
         };
         for r in parsed {
-            let nl =
-                thread_newsletter_from_messages(&conn, &r.0, &account_emails, &rules);
+            let nl = thread_newsletter_from_messages(&conn, &r.0, &account_emails, &rules);
             recent_threads.push(ContactThreadSnippet {
                 thread_id: r.0,
                 subject: r.1,
@@ -709,11 +725,7 @@ pub fn list_address_contacts_scoped(
         list_global_contacts(&conn, &q, offset, limit)?
     } else {
         let inner = crate::address_contacts::list_address_contacts(
-            db_path,
-            account_id,
-            query,
-            offset,
-            limit,
+            db_path, account_id, query, offset, limit,
         )?;
         (inner.items, inner.total)
     };
@@ -747,7 +759,9 @@ fn list_global_contacts(
     } else {
         format!(
             "%{}%",
-            q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+            q.replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_")
         )
     };
     let total: u32 = if q.is_empty() {
@@ -884,7 +898,10 @@ mod phone_extract_tests {
     #[test]
     fn rejects_date_tokens_as_phones() {
         let phones = extract_phones_from_text("Reçu le 20/05/2020 17 et aussi 19/12/2017 12");
-        assert!(phones.is_empty(), "dates must not be listed as phones: {phones:?}");
+        assert!(
+            phones.is_empty(),
+            "dates must not be listed as phones: {phones:?}"
+        );
     }
 
     #[test]

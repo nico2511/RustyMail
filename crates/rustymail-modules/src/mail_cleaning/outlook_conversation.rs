@@ -42,19 +42,15 @@ static SEL_SIGNATURE: LazyLock<Selector> = LazyLock::new(|| {
 });
 
 static SEL_FWD_HEADER: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("#divRplyFwdMsg, #x_divRplyFwdMsg")
-        .expect("outlook forward header selector")
+    Selector::parse("#divRplyFwdMsg, #x_divRplyFwdMsg").expect("outlook forward header selector")
 });
 
-static SEL_INLINE_QUOTE_BLOCKS: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("div, p, blockquote").expect("inline quote blocks selector")
-});
+static SEL_INLINE_QUOTE_BLOCKS: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("div, p, blockquote").expect("inline quote blocks selector"));
 
 static SEL_COMPOSE_JUNK: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse(
-        "#appendonsend, [id*='appendonsend'], [id*='LSI_marker'], .elementToProof",
-    )
-    .expect("outlook compose junk selector")
+    Selector::parse("#appendonsend, [id*='appendonsend'], [id*='LSI_marker'], .elementToProof")
+        .expect("outlook compose junk selector")
 });
 
 static RE_OUTLOOK_INLINE_QUOTE: LazyLock<Regex> = LazyLock::new(|| {
@@ -77,24 +73,19 @@ static RE_ENV_SENT: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static RE_ENV_TO: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?is)(?:à|to)\s*:\s*(.*?)(?:cc|cci|bcc|objet|subject)\s*:")
-        .expect("env to regex")
+    Regex::new(r"(?is)(?:à|to)\s*:\s*(.*?)(?:cc|cci|bcc|objet|subject)\s*:").expect("env to regex")
 });
 
 static RE_ENV_CC: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?is)cc\s*:\s*(.*?)(?:cci|bcc|objet|subject)\s*:")
-        .expect("env cc regex")
+    Regex::new(r"(?is)cc\s*:\s*(.*?)(?:cci|bcc|objet|subject)\s*:").expect("env cc regex")
 });
 
 static RE_ENV_BCC: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?is)(?:cci|bcc)\s*:\s*(.*?)(?:objet|subject)\s*:")
-        .expect("env bcc regex")
+    Regex::new(r"(?is)(?:cci|bcc)\s*:\s*(.*?)(?:objet|subject)\s*:").expect("env bcc regex")
 });
 
-static RE_ENV_SUBJECT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?is)(?:objet|subject)\s*:\s*(.+)")
-        .expect("env subject regex")
-});
+static RE_ENV_SUBJECT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?is)(?:objet|subject)\s*:\s*(.+)").expect("env subject regex"));
 
 static RE_SUBJECT_BODY_SPLIT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -113,23 +104,20 @@ static RE_HEADER_JUNK_BODY: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static RE_CHAINED_HEADER_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?is)^(?:(?:objet|envoy[ée]|envoye|sent|de|from|à|to|cc)\s*:\s*)+",
-    )
-    .expect("chained header prefix regex")
+    Regex::new(r"(?is)^(?:(?:objet|envoy[ée]|envoye|sent|de|from|à|to|cc)\s*:\s*)+")
+        .expect("chained header prefix regex")
 });
 
 static RE_HTML_AFTER_GT_HEADER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?is)>\s*(?:(?:objet|envoy[ée]|envoye|sent|de|from|à|to|cc)\s*:\s*)+",
-    )
-    .expect("html after-gt header regex")
+    Regex::new(r"(?is)>\s*(?:(?:objet|envoy[ée]|envoye|sent|de|from|à|to|cc)\s*:\s*)+")
+        .expect("html after-gt header regex")
 });
 
 /// Construit un rapport conversationnel si ≥2 tranches détectées.
 pub fn try_build_report(html: &str) -> Option<ConversationReport> {
     if html.contains("rustymail:amazon-digest")
         || html.contains("rustymail:deblock-digest")
+        || html.contains("rustymail:github-digest")
         || html.contains("rm-conversation-report")
     {
         return None;
@@ -200,9 +188,7 @@ pub fn try_build_report(html: &str) -> Option<ConversationReport> {
         return None;
     }
 
-    turns.retain(|t| {
-        visible_char_count(&t.body_text) >= 4 && !body_is_header_junk(&t.body_text)
-    });
+    turns.retain(|t| visible_char_count(&t.body_text) >= 4 && !body_is_header_junk(&t.body_text));
     if turns.is_empty() {
         return None;
     }
@@ -239,7 +225,11 @@ fn build_report(turns: Vec<Turn>) -> ConversationReport {
         };
         html.push_str(&format!(
             "<section class=\"rm-conversation-turn{}\" data-turn=\"{n}\"{depth_attr}>\n",
-            if cited { " rm-conversation-turn--cited" } else { "" }
+            if cited {
+                " rm-conversation-turn--cited"
+            } else {
+                ""
+            }
         ));
         if cited || turn.envelope.has_any() {
             html.push_str("<table class=\"rm-conversation-envelope\"><tbody>\n");
@@ -326,9 +316,7 @@ fn render_participant_chip(p: &Participant) -> String {
         return format!("<span class=\"rm-conversation-chip\">{label}</span>");
     }
     let title = escape_html_text(&p.email);
-    format!(
-        "<span class=\"rm-conversation-chip\" title=\"{title}\">{label}</span>"
-    )
+    format!("<span class=\"rm-conversation-chip\" title=\"{title}\">{label}</span>")
 }
 
 fn format_participants_plain(participants: &[Participant]) -> String {
@@ -671,7 +659,10 @@ fn strip_leading_inline_headers(text: &str) -> String {
     normalize_plain_lines(&lines.join("\n"))
 }
 
-fn embedded_body_from_boundary(doc: &Html, boundary_id: Option<NodeId>) -> Option<(String, String)> {
+fn embedded_body_from_boundary(
+    doc: &Html,
+    boundary_id: Option<NodeId>,
+) -> Option<(String, String)> {
     let id = boundary_id?;
     let el = doc.tree.get(id).and_then(|n| ElementRef::wrap(n))?;
     let probe = normalize_probe(&el.text().collect::<String>());
@@ -824,7 +815,12 @@ fn augment_slices_after_boundaries(
     }
 }
 
-fn assign_subtree_to_slice(doc: &Html, id: NodeId, slice_idx: usize, map: &mut HashMap<NodeId, usize>) {
+fn assign_subtree_to_slice(
+    doc: &Html,
+    id: NodeId,
+    slice_idx: usize,
+    map: &mut HashMap<NodeId, usize>,
+) {
     let Some(node) = doc.tree.get(id) else {
         return;
     };
@@ -888,9 +884,9 @@ fn content_nodes_for_slice(
                 && !boundaries.contains(&id)
                 && visible_char_count(&element_text(doc, id)) >= 4
                 && !is_outlook_header_only_block(doc, id)
-                && !nodes.iter().any(|&other| {
-                    other != id && is_descendant_of(doc, id, other)
-                })
+                && !nodes
+                    .iter()
+                    .any(|&other| other != id && is_descendant_of(doc, id, other))
         })
         .collect()
 }
@@ -925,9 +921,7 @@ fn top_level_nodes_in_slice(
                     None => false,
                 }
                 && !nodes.iter().any(|&other| {
-                    other != id
-                        && element_node(doc, other)
-                        && is_descendant_of(doc, id, other)
+                    other != id && element_node(doc, other) && is_descendant_of(doc, id, other)
                 })
                 && !contains_boundary_descendant(doc, id, boundaries)
         })
@@ -974,8 +968,8 @@ fn plain_from_node(el: ElementRef<'_>, out: &mut String, block_context: bool) {
                     let tag = child_el.value().name.local.as_ref();
                     match tag {
                         "br" => out.push('\n'),
-                        "p" | "div" | "blockquote" | "li" | "tr"
-                        | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+                        "p" | "div" | "blockquote" | "li" | "tr" | "h1" | "h2" | "h3" | "h4"
+                        | "h5" | "h6" => {
                             if !out.is_empty() && !out.ends_with('\n') {
                                 out.push('\n');
                             }
@@ -1155,7 +1149,8 @@ mod tests {
 
     #[test]
     fn parses_envelope_fields() {
-        let text = "De : Alice <a@example.com>\nEnvoyé : lundi\nÀ : Bob\nCc : Eve\nObjet : TR: Test";
+        let text =
+            "De : Alice <a@example.com>\nEnvoyé : lundi\nÀ : Bob\nCc : Eve\nObjet : TR: Test";
         let env = parse_envelope(text);
         assert_eq!(env.from.len(), 1);
         assert_eq!(env.from[0].name, "Alice");
@@ -1233,7 +1228,9 @@ mod tests {
     #[test]
     fn body_is_header_junk_rejects_chained_labels() {
         assert!(body_is_header_junk("Objet :Envoyé :"));
-        assert!(!body_is_header_junk("Objet :Envoyé :>Nous estimons que oui."));
+        assert!(!body_is_header_junk(
+            "Objet :Envoyé :>Nous estimons que oui."
+        ));
     }
 
     #[test]

@@ -209,7 +209,10 @@ pub fn llm_maybe_migrate_gguf_cache(
 pub fn llm_gguf_path_for_runtime(models_local_llm_root: &Path, prefs: &AiPrefs) -> PathBuf {
     let _ = llm_maybe_migrate_gguf_cache(models_local_llm_root, prefs);
     let canonical = llm_expected_gguf_path(models_local_llm_root, prefs);
-    if fs::metadata(&canonical).map(|m| m.len() > 0).unwrap_or(false) {
+    if fs::metadata(&canonical)
+        .map(|m| m.len() > 0)
+        .unwrap_or(false)
+    {
         return canonical;
     }
     let legacy = llm_legacy_gguf_pref_path(models_local_llm_root, prefs);
@@ -305,13 +308,16 @@ pub fn ensure_local_llm_gguf_download(
         prefs.local_llm_hf_revision.trim(),
         remote_file.as_ref(),
     );
-    let tmp = dest.parent().map(Path::to_path_buf).unwrap_or_default().join(format!(
-        "{}.part",
-        dest
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("model.gguf")
-    ));
+    let tmp = dest
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_default()
+        .join(format!(
+            "{}.part",
+            dest.file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("model.gguf")
+        ));
     let _ = fs::remove_file(&tmp);
 
     llm_gguf_download_cancel_clear();
@@ -513,9 +519,7 @@ pub fn build_llm_status(
 
 #[cfg(test)]
 mod hf_repo_resolve_tests {
-    use super::{
-        resolved_hf_remote_gguf_path, resolved_hf_repo_for_download,
-    };
+    use super::{resolved_hf_remote_gguf_path, resolved_hf_repo_for_download};
 
     #[test]
     fn overrides_7b_repo_when_file_is_14b() {
@@ -581,8 +585,8 @@ mod hf_repo_resolve_tests {
 #[cfg(test)]
 mod gguf_cache_path_tests {
     use super::{
-        llm_expected_gguf_path, llm_gguf_cached, llm_maybe_migrate_gguf_cache,
-        llm_repo_cache_dir, resolved_hf_repo_for_download,
+        llm_expected_gguf_path, llm_gguf_cached, llm_maybe_migrate_gguf_cache, llm_repo_cache_dir,
+        resolved_hf_repo_for_download,
     };
     use crate::AiPrefs;
     use std::fs;
@@ -590,7 +594,10 @@ mod gguf_cache_path_tests {
 
     fn scratch_local_llm_root() -> PathBuf {
         let mut p = std::env::temp_dir();
-        p.push(format!("rustymail_gguf_cache_tests_{}", uuid::Uuid::new_v4()));
+        p.push(format!(
+            "rustymail_gguf_cache_tests_{}",
+            uuid::Uuid::new_v4()
+        ));
         p
     }
 

@@ -36,6 +36,9 @@ pub struct ThreadListItem {
     /// Dossier IMAP où vit le fil (liste, recherche multi-dossiers).
     #[serde(default)]
     pub mailbox: String,
+    /// Compte propriétaire du fil (liste unifiée / badge UI). Absent sur les chemins legacy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
     /// Nombre total d’entrées `attachments` sur les messages du fil (SQLite).
     #[serde(default)]
     pub attachment_count: usize,
@@ -52,6 +55,8 @@ pub enum HtmlCleaningProviderKind {
     Generic,
     Amazon,
     Deblock,
+    #[serde(rename = "github")]
+    GitHub,
 }
 
 impl Thread {
@@ -91,6 +96,7 @@ impl Thread {
             pinned: self.followed || any_msg_pinned,
             tags: self.tags.clone(),
             mailbox: mailbox.into(),
+            account_id: None,
             attachment_count,
             is_newsletter_thread: false,
         }

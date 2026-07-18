@@ -70,10 +70,7 @@ fn tags_for_thread(
         }
         append_utf8_byte_sample(&mut body_sample, &m.plain_body, 4000);
     }
-    let subject = messages
-        .last()
-        .map(|m| m.subject.as_str())
-        .unwrap_or("");
+    let subject = messages.last().map(|m| m.subject.as_str()).unwrap_or("");
     if let Some(kind) = infer_content_kind(subject, &body_sample) {
         let t = Tag::kind(kind);
         if !tags.contains(&t) {
@@ -665,6 +662,9 @@ pub struct ImapSyncResult {
     pub uid_validity_reset: bool,
     #[serde(default, skip_serializing_if = "serde_skip_zero_usize")]
     pub flags_reconciled: usize,
+    /// UIDs présents en SQLite mais absents du serveur (MOVE/delete externe).
+    #[serde(default, skip_serializing_if = "serde_skip_zero_usize")]
+    pub uids_pruned: usize,
 }
 
 /// When LIST and the sidebar disagree on apostrophes/normalization but map to one folder.
@@ -806,8 +806,12 @@ async fn sync_mailboxes_single_session_locked(
             None => {
                 let variants =
                     mailbox_select_variant_strings(&m, &decode_imap_mailbox_name(&m), Some(&m));
-                match imap_session_select_variants(&mut session, &variants, Some(&server_mailbox_list))
-                    .await
+                match imap_session_select_variants(
+                    &mut session,
+                    &variants,
+                    Some(&server_mailbox_list),
+                )
+                .await
                 {
                     Ok(_) => Some(PlannedMailboxSync {
                         requested: m.clone(),
@@ -911,12 +915,8 @@ async fn sync_mailbox_with_session(
     if mailbox.is_empty() {
         return Err("IMAP: mailbox is empty".to_string());
     }
-    let uid_validity_reset = ensure_imap_uid_validity(
-        db_path,
-        &account.id.0,
-        &mailbox,
-        mbox.uid_validity,
-    )?;
+    let uid_validity_reset =
+        ensure_imap_uid_validity(db_path, &account.id.0, &mailbox, mbox.uid_validity)?;
     let last_uid = get_imap_last_uid(db_path, &account.id.0, &mailbox)?;
     let mut uids: Vec<async_imap::types::Uid> = session
         .uid_search(format!("UID {}:*", last_uid.saturating_add(1)))
@@ -945,6 +945,10 @@ async fn sync_mailbox_with_session(
         }
     }
 
+    // Purge les UIDs locaux absents du serveur (MOVE/delete hors app, EXPUNGE…).
+    let uids_pruned =
+        prune_vanished_mailbox_uids(db_path, &account.id.0, &mailbox, session).await?;
+
     if uids.is_empty() {
         let flags_reconciled =
             reconcile_recent_flags(db_path, &account.id.0, &mailbox, session, last_uid).await?;
@@ -955,6 +959,7 @@ async fn sync_mailbox_with_session(
             fetched_uids: 0,
             uid_validity_reset,
             flags_reconciled,
+            uids_pruned,
         });
     }
 
@@ -977,7 +982,8 @@ async fn sync_mailbox_with_session(
         fetches.extend(part);
     }
 
-    let mut by_thread: HashMap<String, (String, Option<String>, Vec<Message>, bool)> = HashMap::new();
+    let mut by_thread: HashMap<String, (String, Option<String>, Vec<Message>, bool)> =
+        HashMap::new();
     let mut message_headers: HashMap<String, (Option<String>, Option<String>, Option<String>)> =
         HashMap::new();
     let mut message_unsub_index: HashMap<String, (Option<String>, String)> = HashMap::new();
@@ -1059,9 +1065,8 @@ async fn sync_mailbox_with_session(
                 .collect();
             let list_unsubscribe =
                 if crate::unsubscribe_detect::list_unsubscribe_header_present(&parsed_headers) {
-                    header_value(&mail.headers, "List-Unsubscribe").or_else(|| {
-                        header_value(&mail.headers, "List-Unsubscribe-Post")
-                    })
+                    header_value(&mail.headers, "List-Unsubscribe")
+                        .or_else(|| header_value(&mail.headers, "List-Unsubscribe-Post"))
                 } else {
                     None
                 };
@@ -1240,10 +1245,7 @@ async fn sync_mailbox_with_session(
                 message.html_body.as_deref(),
                 8,
             );
-        message_unsub_index.insert(
-            message.id.0.clone(),
-            (list_unsub_stored, unsub_urls_json),
-        );
+        message_unsub_index.insert(message.id.0.clone(), (list_unsub_stored, unsub_urls_json));
 
         match by_thread.get_mut(&thread_id) {
             Some((_subject, _root, messages, thread_unsub)) => {
@@ -1270,13 +1272,13 @@ async fn sync_mailbox_with_session(
         .map(|(thread_id, (subject, _root, messages, has_unsub))| {
             let has_attachments = messages.iter().any(|m| !m.attachments.is_empty());
             Thread {
-            id: ThreadId(thread_id),
-            subject,
-            tags: tags_for_thread(&mailbox, &messages, has_unsub, has_attachments),
-            entities: Vec::new(),
-            messages,
-            followed: false,
-        }
+                id: ThreadId(thread_id),
+                subject,
+                tags: tags_for_thread(&mailbox, &messages, has_unsub, has_attachments),
+                entities: Vec::new(),
+                messages,
+                followed: false,
+            }
         })
         .collect();
     threads.sort_by(|a, b| a.id.0.cmp(&b.id.0));
@@ -1306,7 +1308,156 @@ async fn sync_mailbox_with_session(
         fetched_uids: uids.len(),
         uid_validity_reset,
         flags_reconciled,
+        uids_pruned,
     })
+}
+
+/// UIDs IMAP encore en SQLite pour ce dossier.
+fn list_local_imap_uids(
+    db_path: &Path,
+    account_id: &str,
+    mailbox: &str,
+) -> Result<Vec<u32>, String> {
+    let connection = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
+    let mut stmt = connection
+        .prepare(
+            "
+            SELECT imap_uid FROM messages
+            WHERE account_id = ?1 AND mailbox = ?2
+              AND imap_uid IS NOT NULL AND imap_uid > 0
+            ",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![account_id, mailbox], |row| {
+            let uid: i64 = row.get(0)?;
+            Ok(uid.max(0) as u32)
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        let uid = row.map_err(|e| e.to_string())?;
+        if uid > 0 {
+            out.push(uid);
+        }
+    }
+    out.sort_unstable();
+    out.dedup();
+    Ok(out)
+}
+
+/// Supprime messages (+ PJ / embeddings) pour des UIDs IMAP disparus, puis fils vides.
+pub(crate) fn delete_local_messages_by_imap_uids(
+    db_path: &Path,
+    account_id: &str,
+    mailbox: &str,
+    vanished_uids: &[u32],
+) -> Result<usize, String> {
+    if vanished_uids.is_empty() {
+        return Ok(0);
+    }
+    let mut connection = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
+    let tx = connection.transaction().map_err(|e| e.to_string())?;
+    let mut deleted = 0usize;
+    let mut thread_ids: HashSet<String> = HashSet::new();
+
+    for uid in vanished_uids {
+        let row: Option<(String, String)> = tx
+            .query_row(
+                "
+                SELECT id, thread_id FROM messages
+                WHERE account_id = ?1 AND mailbox = ?2 AND imap_uid = ?3
+                LIMIT 1
+                ",
+                params![account_id, mailbox, i64::from(*uid)],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        let Some((msg_id, tid)) = row else {
+            continue;
+        };
+        tx.execute(
+            "DELETE FROM message_embeddings WHERE message_id = ?1",
+            params![msg_id],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute(
+            "DELETE FROM message_attachments WHERE message_id = ?1",
+            params![msg_id],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute("DELETE FROM messages WHERE id = ?1", params![msg_id])
+            .map_err(|e| e.to_string())?;
+        thread_ids.insert(tid);
+        deleted += 1;
+    }
+
+    for tid in thread_ids {
+        let c: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM messages WHERE thread_id = ?1",
+                params![tid],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if c == 0 {
+            tx.execute("DELETE FROM threads WHERE id = ?1", params![tid])
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(deleted)
+}
+
+/// Compare le cache local aux UIDs encore présents sur le serveur ; purge les fantômes.
+async fn prune_vanished_mailbox_uids(
+    db_path: &Path,
+    account_id: &str,
+    mailbox: &str,
+    session: &mut ImapSession,
+) -> Result<usize, String> {
+    let local = list_local_imap_uids(db_path, account_id, mailbox)?;
+    if local.is_empty() {
+        return Ok(0);
+    }
+
+    let mut still_present: HashSet<u32> = HashSet::new();
+    const SEARCH_CHUNK: usize = 100;
+    for chunk in local.chunks(SEARCH_CHUNK) {
+        let set = chunk
+            .iter()
+            .map(|u| u.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        let found: Vec<async_imap::types::Uid> = session
+            .uid_search(format!("UID {set}"))
+            .await
+            .map_err(map_imap_error)?
+            .into_iter()
+            .collect();
+        for uid in found {
+            still_present.insert(u32::from(uid));
+        }
+    }
+
+    let vanished: Vec<u32> = local
+        .into_iter()
+        .filter(|u| !still_present.contains(u))
+        .collect();
+    if vanished.is_empty() {
+        return Ok(0);
+    }
+
+    let n = delete_local_messages_by_imap_uids(db_path, account_id, mailbox, &vanished)?;
+    if n > 0 {
+        log::info!(
+            target: "rustymail::audit",
+            "imap_sync: pruned {n} vanished UID(s) account={account_id} mailbox={mailbox}"
+        );
+    }
+    Ok(n)
 }
 
 async fn reconcile_recent_flags(
@@ -1368,8 +1519,7 @@ fn upsert_threads_to_db(
     mailbox: &str,
 ) -> Result<(), String> {
     let tombstoned = crate::active_tombstone_uids(path, account_id, mailbox).unwrap_or_default();
-    let mut connection =
-        crate::open_sqlite_migrated(path).map_err(|error| error.to_string())?;
+    let mut connection = crate::open_sqlite_migrated(path).map_err(|error| error.to_string())?;
     let transaction = connection
         .transaction()
         .map_err(|error| error.to_string())?;
@@ -1588,21 +1738,17 @@ mod thread_pick_tests {
         )
         .expect("message");
 
-        let picked = pick_thread_id_for_imported_message(
-            &db,
-            account,
-            "INBOX",
-            Some(mid),
-            None,
-            &[],
-            mid,
-        );
+        let picked =
+            pick_thread_id_for_imported_message(&db, account, "INBOX", Some(mid), None, &[], mid);
         assert_eq!(picked, local_thread);
     }
 
     #[test]
     fn attachment_id_segment_is_stable_and_ascii() {
-        assert_eq!(sanitize_attachment_id_segment("user@example.com"), "userexamplecom");
+        assert_eq!(
+            sanitize_attachment_id_segment("user@example.com"),
+            "userexamplecom"
+        );
         assert_eq!(sanitize_attachment_id_segment(" Boîte/测试 "), "Bote");
         assert_eq!(sanitize_attachment_id_segment(""), "scope");
     }
@@ -1651,8 +1797,16 @@ mod thread_pick_tests {
             }],
         };
 
-        upsert_threads_to_db(&db, &[thread], &HashMap::new(), &HashMap::new(), &HashMap::new(), "acc", "INBOX")
-            .expect("upsert");
+        upsert_threads_to_db(
+            &db,
+            &[thread],
+            &HashMap::new(),
+            &HashMap::new(),
+            &HashMap::new(),
+            "acc",
+            "INBOX",
+        )
+        .expect("upsert");
 
         let conn = open_sqlite_migrated(&db).expect("reopen");
         let n: i64 = conn
@@ -1663,6 +1817,45 @@ mod thread_pick_tests {
             )
             .unwrap();
         assert_eq!(n, 0, "tombstoned UID must not be reinserted by sync upsert");
+    }
+
+    #[test]
+    fn prune_deletes_local_uids_missing_from_server_set() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = dir.path().join("prune.db");
+        let conn = open_sqlite_migrated(&db).expect("migrate");
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags)
+             VALUES ('t1', 'acc', 'INBOX', '<a@x>', 'A', ''),
+                    ('t2', 'acc', 'INBOX', '<b@x>', 'B', '')",
+            [],
+        )
+        .expect("threads");
+        for (id, tid, uid) in [("m1", "t1", 10i64), ("m2", "t2", 20i64), ("m3", "t1", 30i64)] {
+            conn.execute(
+                "INSERT INTO messages (id, thread_id, account_id, mailbox, imap_uid, sender_name, sender_email, subject, received_at, body, is_read, position)
+                 VALUES (?1, ?2, 'acc', 'INBOX', ?3, 'A', 'a@x', 'S', '2026-01-01T00:00:00Z', 'b', 1, 0)",
+                params![id, tid, uid],
+            )
+            .expect("msg");
+        }
+        // Serveur ne contient plus UID 20 → message m2 / fil t2 doivent disparaître.
+        let n = delete_local_messages_by_imap_uids(&db, "acc", "INBOX", &[20]).expect("prune");
+        assert_eq!(n, 1);
+        let left: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM messages WHERE account_id='acc' AND mailbox='INBOX'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(left, 2);
+        let t2: i64 = conn
+            .query_row("SELECT COUNT(*) FROM threads WHERE id='t2'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(t2, 0, "empty thread after prune must be removed");
+        let uids = list_local_imap_uids(&db, "acc", "INBOX").expect("list");
+        assert_eq!(uids, vec![10, 30]);
     }
 }
 

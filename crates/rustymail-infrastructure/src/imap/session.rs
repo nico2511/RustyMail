@@ -133,7 +133,10 @@ pub async fn login_session(account: &Account, password: &str) -> Result<ImapSess
 }
 
 /// Connexion IMAP avec SASL XOAUTH2 (jeton d’accès OAuth2).
-pub async fn login_session_xoauth2(account: &Account, access_token: &str) -> Result<ImapSession, String> {
+pub async fn login_session_xoauth2(
+    account: &Account,
+    access_token: &str,
+) -> Result<ImapSession, String> {
     let client = match account.imap.security {
         SecurityMode::Tls => {
             connect_tls_client(
@@ -196,7 +199,8 @@ pub async fn login_session_for_account(account: &Account) -> Result<ImapSession,
         }
         MailAuthKind::OauthGoogle | MailAuthKind::OauthMicrosoft => {
             let _ = oauth_mail::bind_oauth_tokens_for_account(account);
-            let tok = oauth_mail::ensure_valid_access_token(&account.id.0, &account.auth_kind).await?;
+            let tok =
+                oauth_mail::ensure_valid_access_token(&account.id.0, &account.auth_kind).await?;
             login_session_xoauth2(account, &tok).await
         }
     }

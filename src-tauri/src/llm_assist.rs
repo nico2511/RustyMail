@@ -1,8 +1,8 @@
 //! IPC assistance fil — plan, phases, télémétrie UI, cache faits.
 
 use rustymail_domain::{
-    AssistFactsSnapshot, AssistIntentSnapshot, AssistMode, AssistPhase, AssistRequest, AssistResult,
-    AssistRunStep, AssistUserPrefs, MailSecuritySeverity,
+    AssistFactsSnapshot, AssistIntentSnapshot, AssistMode, AssistPhase, AssistRequest,
+    AssistResult, AssistRunStep, AssistUserPrefs, MailSecuritySeverity,
 };
 use rustymail_infrastructure::{
     load_app_prefs, sqlite_ai_cache_get, sqlite_ai_cache_put, AiFeature,
@@ -114,7 +114,10 @@ fn assist_thread_context(
     }
 }
 
-fn ai_cache_assist_facts_key(prefs: &rustymail_infrastructure::AppPrefs, thread_id: &str) -> String {
+fn ai_cache_assist_facts_key(
+    prefs: &rustymail_infrastructure::AppPrefs,
+    thread_id: &str,
+) -> String {
     format!(
         "assist_facts:v3:{}:{}",
         ai_cache_model_segment(prefs),
@@ -157,7 +160,10 @@ pub struct LlmAssistPlanPayload {
     pub prior_facts: Option<AssistFactsSnapshot>,
 }
 
-fn llm_assist_plan_compute(paths: &AppPaths, payload: LlmAssistPlanPayload) -> Result<AssistResult, String> {
+fn llm_assist_plan_compute(
+    paths: &AppPaths,
+    payload: LlmAssistPlanPayload,
+) -> Result<AssistResult, String> {
     crate::ipc_guard::validate_thread_id(&payload.base.thread_id)?;
     crate::ipc_guard::validate_account_id(&payload.base.account_id)?;
     let prefs = load_app_prefs(&paths.prefs_path);
@@ -201,10 +207,7 @@ pub struct LlmAssistPhasePayload {
     pub force_draft: bool,
 }
 
-fn try_load_cached_facts(
-    db_path: &std::path::Path,
-    key: &str,
-) -> Option<CachedAssistFacts> {
+fn try_load_cached_facts(db_path: &std::path::Path, key: &str) -> Option<CachedAssistFacts> {
     let raw = sqlite_ai_cache_get(db_path, key).ok()??;
     serde_json::from_str(&raw).ok()
 }

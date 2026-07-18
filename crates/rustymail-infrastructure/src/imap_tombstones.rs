@@ -107,8 +107,8 @@ pub fn active_tombstone_uids_conn(
     account_id: &str,
     mailbox: &str,
 ) -> Result<HashSet<u32>, String> {
-    let resolved = resolve_scoped_mailbox_for_account(conn, account_id, mailbox)
-        .map_err(|e| e.to_string())?;
+    let resolved =
+        resolve_scoped_mailbox_for_account(conn, account_id, mailbox).map_err(|e| e.to_string())?;
     let now = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
     let mut stmt = conn
         .prepare(

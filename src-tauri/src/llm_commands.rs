@@ -16,7 +16,8 @@ use rustymail_llm::{
 };
 use rustymail_modules::{
     ai_action_brief::{
-        self, parse_action_brief_mode_request, resolve_action_brief_execution, ActionBriefSnapshotLimits,
+        self, parse_action_brief_mode_request, resolve_action_brief_execution,
+        ActionBriefSnapshotLimits,
     },
     ai_agent_prepare_reply::{self, AgentIntentResult, AgentPrepareReplyStep, AgentStepResult},
     ai_contact_profile, ai_flux_affiner, ai_grammar, ai_qa, ai_quick_reply, ai_search_nl,
@@ -52,10 +53,7 @@ pub(crate) fn ensure_llm_gate_args(prefs: &AppPrefs, paths: &AppPaths) -> Result
 }
 
 fn llm_gate(prefs: &AppPrefs, paths: &AppPaths) -> Result<(), String> {
-    crate::rate_guard::cooldown(
-        "llm_invoke_pulse",
-        std::time::Duration::from_millis(360),
-    )?;
+    crate::rate_guard::cooldown("llm_invoke_pulse", std::time::Duration::from_millis(360))?;
     ensure_llm_gate_args(prefs, paths)?;
     Ok(())
 }
@@ -251,7 +249,6 @@ fn mailbox_action_brief_snapshot(
     Ok((lines, ids))
 }
 
-
 pub(crate) fn open_thread_domain(
     db_path: &std::path::Path,
     thread_id: &str,
@@ -261,8 +258,7 @@ pub(crate) fn open_thread_domain(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Fil introuvable.".to_string())?;
     let temp = rustymail_application::AppCore::new(vec![thread]);
-    temp
-        .open_thread(&rustymail_domain::ThreadId(thread_id.to_string()))
+    temp.open_thread(&rustymail_domain::ThreadId(thread_id.to_string()))
         .map_err(|e| e.to_string())
 }
 
@@ -309,7 +305,11 @@ pub(crate) fn ai_cache_summary_key(prefs: &AppPrefs, thread_id: &str) -> String 
     )
 }
 
-pub(crate) fn ai_cache_translate_thread_key(prefs: &AppPrefs, thread_id: &str, target_lang: &str) -> String {
+pub(crate) fn ai_cache_translate_thread_key(
+    prefs: &AppPrefs,
+    thread_id: &str,
+    target_lang: &str,
+) -> String {
     format!(
         "translate:v2:{}:p{}:thread:{}:{}",
         ai_cache_model_segment(prefs),
@@ -363,9 +363,7 @@ pub fn summarize_thread_llm_attempt(
             Some(s)
         }
         Err(err) => {
-            eprintln!(
-                "[RustyMail] Synthèse fil LLM échouée, repli ligne par ligne: {err}"
-            );
+            eprintln!("[RustyMail] Synthèse fil LLM échouée, repli ligne par ligne: {err}");
             None
         }
     }
@@ -472,9 +470,11 @@ pub async fn llm_translate_thread(
     let paths = Clone::clone(&*paths);
     let thread_id = thread_id.trim().to_string();
     let target_lang = target_lang.trim().to_string();
-    tauri::async_runtime::spawn_blocking(move || llm_translate_thread_compute(&paths, thread_id, target_lang))
-        .await
-        .map_err(|e| format!("llm_translate_thread join: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        llm_translate_thread_compute(&paths, thread_id, target_lang)
+    })
+    .await
+    .map_err(|e| format!("llm_translate_thread join: {e}"))?
 }
 
 fn llm_rewrite_compose_compute(
@@ -510,7 +510,10 @@ pub async fn llm_rewrite_compose(
         .map_err(|e| format!("llm_rewrite_compose join: {e}"))?
 }
 
-fn llm_grammar_compose_compute(paths: &AppPaths, text: String) -> Result<rustymail_domain::GrammarResult, String> {
+fn llm_grammar_compose_compute(
+    paths: &AppPaths,
+    text: String,
+) -> Result<rustymail_domain::GrammarResult, String> {
     let prefs = load_app_prefs(&paths.prefs_path);
     llm_gate_feature(&prefs, paths, AiFeature::ComposeGrammar)?;
     let mut engine = build_llm_engine(&prefs, paths)?;
@@ -556,7 +559,9 @@ pub async fn llm_quick_reply_thread(
         .map_err(|e| format!("llm_quick_reply_thread join: {e}"))?
 }
 
-fn llm_quick_reply_compose_compute(paths: &AppPaths) -> Result<rustymail_domain::QuickRepliesResult, String> {
+fn llm_quick_reply_compose_compute(
+    paths: &AppPaths,
+) -> Result<rustymail_domain::QuickRepliesResult, String> {
     let prefs = load_app_prefs(&paths.prefs_path);
     llm_gate_feature(&prefs, paths, AiFeature::QuickReplyCompose)?;
     let mut engine = build_llm_engine(&prefs, paths)?;
@@ -565,7 +570,9 @@ fn llm_quick_reply_compose_compute(paths: &AppPaths) -> Result<rustymail_domain:
 }
 
 #[tauri::command]
-pub async fn llm_quick_reply_compose(paths: State<'_, AppPaths>) -> Result<rustymail_domain::QuickRepliesResult, String> {
+pub async fn llm_quick_reply_compose(
+    paths: State<'_, AppPaths>,
+) -> Result<rustymail_domain::QuickRepliesResult, String> {
     let paths = Clone::clone(&*paths);
     tauri::async_runtime::spawn_blocking(move || llm_quick_reply_compose_compute(&paths))
         .await
@@ -678,8 +685,8 @@ pub async fn llm_inbox_digest(
     tauri::async_runtime::spawn_blocking(move || {
         llm_inbox_digest_compute(&paths, &account_id, &mailbox, mode_request)
     })
-        .await
-        .map_err(|e| format!("digest join: {e}"))?
+    .await
+    .map_err(|e| format!("digest join: {e}"))?
 }
 
 fn llm_security_signals_augment_compute(
@@ -700,9 +707,11 @@ pub async fn llm_security_signals_augment(
     payload: MailSecuritySignals,
 ) -> Result<MailSecuritySignals, String> {
     let paths = Clone::clone(&*paths);
-    tauri::async_runtime::spawn_blocking(move || llm_security_signals_augment_compute(&paths, payload))
-        .await
-        .map_err(|e| format!("llm_security_signals_augment join: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        llm_security_signals_augment_compute(&paths, payload)
+    })
+    .await
+    .map_err(|e| format!("llm_security_signals_augment join: {e}"))?
 }
 
 #[derive(Debug, Deserialize)]
@@ -749,9 +758,11 @@ pub async fn llm_agent_prepare_reply_step(
     payload: LlmAgentPrepareReplyPayload,
 ) -> Result<AgentStepResult, String> {
     let paths = Clone::clone(&*paths);
-    tauri::async_runtime::spawn_blocking(move || llm_agent_prepare_reply_step_compute(&paths, payload))
-        .await
-        .map_err(|e| format!("llm_agent_prepare_reply_step join: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        llm_agent_prepare_reply_step_compute(&paths, payload)
+    })
+    .await
+    .map_err(|e| format!("llm_agent_prepare_reply_step join: {e}"))?
 }
 
 #[derive(Debug, Deserialize)]
@@ -784,10 +795,12 @@ fn llm_contact_profile_compute(
         .global_scope
         .unwrap_or(prefs.general.address_book_global_scope);
     let cache_key = ai_cache_contact_profile_key(&prefs, &payload.account_id, &payload.email);
-    if let Ok(Some(cached)) = rustymail_infrastructure::sqlite_ai_cache_get(&paths.db_path, &cache_key)
+    if let Ok(Some(cached)) =
+        rustymail_infrastructure::sqlite_ai_cache_get(&paths.db_path, &cache_key)
     {
-        if let Ok(parsed) =
-            serde_json::from_str::<rustymail_modules::ai_contact_profile::ContactProfileResult>(&cached)
+        if let Ok(parsed) = serde_json::from_str::<
+            rustymail_modules::ai_contact_profile::ContactProfileResult,
+        >(&cached)
         {
             return Ok(parsed);
         }

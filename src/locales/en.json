@@ -240,6 +240,32 @@
     "selectAccountForAgent": "Select an account for the reply assistant.",
     "agentAutoMail": "Assistant unavailable for automated / newsletter messages.",
     "enableAgentInSettings": "Enable “Prepare reply” assistant in AI settings.",
-    "runTauri": "Available in the Tauri desktop app."
+    "runTauri": "Available in the Tauri desktop app.",
+    "newsletterRuleAdded": "Sender added to auto-sender rules.",
+    "movedToJunk": "Moved to Junk.",
+    "junkFolderMissing": "Junk folder not found for this account.",
+    "semanticIndexing": "Semantic indexing of synced folders…",
+    "aiOfflineLexical": "Generative AI unavailable — lexical search and local heuristics remain active."
+  },
+  "security": {
+    "attention": "Review",
+    "suspicion": "Suspicious",
+    "detail": "Details",
+    "iaHint": "Signal or budget from AI analysis",
+    "iaContribution": "AI contribution",
+    "iaPending": "AI analysis in progress…",
+    "chipTitle": "Security: {label} (click for details)",
+    "chipAria": "Security: {label}",
+    "moveJunk": "Move to Junk",
+    "markNewsletter": "Treat as newsletter"
+  },
+  "semantic": {
+    "tauriOnly": "SQLite embedding counts: available in the desktop app (Tauri).",
+    "pickAccount": "Select an account and mailbox in the sidebar to show indexing counts.",
+    "loading": "Counts: loading or unavailable for “{mailbox}” — check the active account then Refresh counts.",
+    "title": "Embeddings index ({model})",
+    "mailboxLine": "Mailbox “{mailbox}”: {embedded} message(s) with embedding, {cached} message(s) in SQLite cache for this folder.",
+    "accountLine": "This account (all mailboxes processed so far): {total} embedding(s) stored.",
+    "hint": "Button below: index the whole account among messages already synced in the local database."
   }
 }

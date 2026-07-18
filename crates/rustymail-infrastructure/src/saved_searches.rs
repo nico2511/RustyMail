@@ -184,7 +184,10 @@ pub fn get_saved_search(db_path: &Path, account_id: &str, id: &str) -> Result<Sa
     )
 }
 
-pub fn upsert_saved_search(db_path: &Path, input: SavedSearchUpsert) -> Result<SavedSearch, String> {
+pub fn upsert_saved_search(
+    db_path: &Path,
+    input: SavedSearchUpsert,
+) -> Result<SavedSearch, String> {
     let aid = input.account_id.trim();
     if aid.is_empty() {
         return Err("account_id vide.".into());
@@ -247,7 +250,11 @@ pub fn delete_saved_search(db_path: &Path, account_id: &str, id: &str) -> Result
     Ok(())
 }
 
-pub fn mark_saved_search_seen(db_path: &Path, account_id: &str, id: &str) -> Result<SavedSearch, String> {
+pub fn mark_saved_search_seen(
+    db_path: &Path,
+    account_id: &str,
+    id: &str,
+) -> Result<SavedSearch, String> {
     let now = now_iso();
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
     let n = conn
@@ -286,9 +293,7 @@ pub fn count_new_for_saved_search(db_path: &Path, saved: &SavedSearch) -> Result
         .filter(|s| !s.is_empty())
     {
         None => None,
-        Some(raw) => Some(
-            parse_activity_after(raw).unwrap_or_else(Utc::now),
-        ),
+        Some(raw) => Some(parse_activity_after(raw).unwrap_or_else(Utc::now)),
     };
     count_threads_matching_query(db_path, &saved.query, since)
 }

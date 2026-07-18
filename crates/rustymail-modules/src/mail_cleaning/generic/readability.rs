@@ -5,8 +5,7 @@ use regex::Regex;
 static RE_BR_RUN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?is)(?:<br\s*/?>\s*){3,}").expect("br run"));
 static RE_BULLET_P: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?is)<p[^>]*>\s*[•·▪▫‣⁃-]\s*([^<]+?)\s*</p>")
-        .expect("bullet paragraph")
+    Regex::new(r"(?is)<p[^>]*>\s*[•·▪▫‣⁃-]\s*([^<]+?)\s*</p>").expect("bullet paragraph")
 });
 
 /// Ajustements légers post-nettoyage (sauts de ligne, listes pseudo-texte).

@@ -3,7 +3,9 @@
 use serde::Deserialize;
 
 use crate::ai_agent_prepare_reply::AgentIntentResult;
-use crate::ai_llm_util::{gen_params_for_tier, gen_params_text_echo_for_prompt, parse_model_json, truncate_chars};
+use crate::ai_llm_util::{
+    gen_params_for_tier, gen_params_text_echo_for_prompt, parse_model_json, truncate_chars,
+};
 use rustymail_domain::{
     AssistLlmTier, AssistRecommendation, AssistUserPrefs, MailSecuritySeverity,
 };
@@ -107,14 +109,7 @@ pub fn adapt_draft_tone_with_llm(
     let raw = engine.generate(
         system.as_str(),
         &user,
-        &gen_params_text_echo_for_prompt(
-            engine,
-            system.as_str(),
-            &user,
-            &draft_clip,
-            1024,
-            8192,
-        ),
+        &gen_params_text_echo_for_prompt(engine, system.as_str(), &user, &draft_clip, 1024, 8192),
     )?;
     let t = if raw.trim_start().starts_with('{') {
         #[derive(Deserialize)]

@@ -4,7 +4,9 @@ use ego_tree::NodeId;
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 
-use crate::mail_cleaning::dom::{detach_nodes, element_visible_mass, node_depth, visible_char_count};
+use crate::mail_cleaning::dom::{
+    detach_nodes, element_visible_mass, node_depth, visible_char_count,
+};
 
 static PRUNE_EMPTY_SELECTORS: LazyLock<Vec<Selector>> = LazyLock::new(|| {
     [
@@ -23,8 +25,7 @@ static MEANINGFUL_DESCENDANT: LazyLock<Selector> = LazyLock::new(|| {
     .expect("meaningful descendant selector")
 });
 
-static RE_OTP: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\b\d{4,8}\b").expect("otp regex"));
+static RE_OTP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b\d{4,8}\b").expect("otp regex"));
 
 pub fn prune_empty_boilerplate(html: &str) -> String {
     let mut doc = Html::parse_fragment(html);

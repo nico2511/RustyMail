@@ -1,8 +1,8 @@
 //! IPC vue Dossiers (arbre personnel).
 
 use rustymail_infrastructure::{
-    archive_mailbox_threads, delete_imap_mailbox_with_contents, list_mailbox_tree,
-    load_app_prefs, load_accounts, prefs_path_from_db_dir, rename_mailbox_subtree_local_cache,
+    archive_mailbox_threads, delete_imap_mailbox_with_contents, list_mailbox_tree, load_accounts,
+    load_app_prefs, prefs_path_from_db_dir, rename_mailbox_subtree_local_cache,
     retag_threads_in_mailboxes, set_mailbox_locked, ArchiveMailboxThreadsOutcome,
     DeleteMailboxWithContentsOutcome, MailboxTreeReport,
 };
@@ -42,7 +42,10 @@ pub struct DeleteMailboxWithContentsPayload {
     pub destructive_ack: Option<String>,
 }
 
-fn resolve_account(paths: &AppPaths, account_id: &str) -> Result<rustymail_domain::Account, String> {
+fn resolve_account(
+    paths: &AppPaths,
+    account_id: &str,
+) -> Result<rustymail_domain::Account, String> {
     let accounts = load_accounts(&paths.db_path).map_err(|e| e.to_string())?;
     let id = account_id.trim();
     accounts
@@ -110,13 +113,8 @@ pub async fn delete_imap_mailbox_with_contents_cmd(
     let account = resolve_account(&paths, &payload.account_id)?;
     let prefs_path = prefs_path_from_db_dir(paths.db_path.parent().unwrap_or(&paths.db_path));
     let prefs = load_app_prefs(&prefs_path);
-    delete_imap_mailbox_with_contents(
-        &paths.db_path,
-        &account,
-        payload.mailbox.trim(),
-        &prefs,
-    )
-    .await
+    delete_imap_mailbox_with_contents(&paths.db_path, &account, payload.mailbox.trim(), &prefs)
+        .await
 }
 
 #[derive(serde::Deserialize)]
@@ -140,8 +138,12 @@ pub async fn rename_mailbox_subtree_retag_cmd(
     let from = payload.from_mailbox.clone();
     let to = payload.to_mailbox.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let (_, affected) =
-            rename_mailbox_subtree_local_cache(&db_path, account_id.trim(), from.trim(), to.trim())?;
+        let (_, affected) = rename_mailbox_subtree_local_cache(
+            &db_path,
+            account_id.trim(),
+            from.trim(),
+            to.trim(),
+        )?;
         retag_threads_in_mailboxes(&db_path, account_id.trim(), &affected)
     })
     .await

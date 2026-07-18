@@ -30,11 +30,9 @@ pub fn ensure_llm_gate(
     llama_server_binary_nonempty: bool,
     llama_server_gguf_cached: bool,
 ) -> Result<(), &'static str> {
-    let openrouter_ok =
-        openrouter_enabled && openrouter_key_present && openrouter_model_nonempty;
-    let llama_spawn_ready = llama_server_spawn_enabled
-        && llama_server_binary_nonempty
-        && llama_server_gguf_cached;
+    let openrouter_ok = openrouter_enabled && openrouter_key_present && openrouter_model_nonempty;
+    let llama_spawn_ready =
+        llama_server_spawn_enabled && llama_server_binary_nonempty && llama_server_gguf_cached;
     let llama_ok = llama_server_enabled
         && llama_server_url_nonempty
         && llama_server_gpu_ok
@@ -49,7 +47,9 @@ pub fn ensure_llm_gate(
         return Err("OpenRouter activé : renseignez un identifiant de modèle.");
     }
     if llama_server_enabled && !llama_server_url_nonempty {
-        return Err("llama-server activé : renseignez une URL de base (ex. http://127.0.0.1:8080/v1).");
+        return Err(
+            "llama-server activé : renseignez une URL de base (ex. http://127.0.0.1:8080/v1).",
+        );
     }
     if llama_server_enabled && !llama_server_model_nonempty && !llama_spawn_ready {
         return Err(
@@ -61,13 +61,20 @@ pub fn ensure_llm_gate(
             "Lancement llama-server : indiquez la commande (ex. llama-server sur le PATH) ou le chemin complet vers l’exécutable (Paramètres → IA → Sur mon PC & cloud).",
         );
     }
-    if llama_server_enabled && llama_server_spawn_enabled && llama_server_binary_nonempty && !llama_server_gguf_cached
+    if llama_server_enabled
+        && llama_server_spawn_enabled
+        && llama_server_binary_nonempty
+        && !llama_server_gguf_cached
     {
         return Err(
             "Lancement llama-server : aucun GGUF trouvé dans le cache RustyMail — téléchargez ou vérifiez dépôt / fichier.",
         );
     }
-    if llama_server_enabled && llama_server_url_nonempty && (llama_server_model_nonempty || llama_spawn_ready) && !llama_server_gpu_ok {
+    if llama_server_enabled
+        && llama_server_url_nonempty
+        && (llama_server_model_nonempty || llama_spawn_ready)
+        && !llama_server_gpu_ok
+    {
         return Err(
             "llama-server : profil matériel insuffisant ou accélérateur non détecté — activez l’override CPU avancé si vous savez ce que vous faites.",
         );

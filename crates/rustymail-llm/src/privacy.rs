@@ -30,9 +30,7 @@ fn phone_re() -> &'static Regex {
 }
 
 fn iban_re() -> &'static Regex {
-    IBAN_RE.get_or_init(|| {
-        Regex::new(r"(?i)\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b").expect("iban re")
-    })
+    IBAN_RE.get_or_init(|| Regex::new(r"(?i)\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b").expect("iban re"))
 }
 
 fn card_re() -> &'static Regex {
@@ -56,19 +54,23 @@ fn jwt_re() -> &'static Regex {
 }
 
 fn msg_id_re() -> &'static Regex {
-    MSG_ID_RE.get_or_init(|| {
-        Regex::new(r"(?i)\bmessage_id\s*=\s*[^\s\]]+").expect("msg id re")
-    })
+    MSG_ID_RE.get_or_init(|| Regex::new(r"(?i)\bmessage_id\s*=\s*[^\s\]]+").expect("msg id re"))
 }
 
 /// Masque emails, téléphones, IBAN, cartes, jetons et identifiants de message dans un texte destiné à un LLM distant.
 pub fn redact_pii_for_exfiltration(input: &str) -> String {
     let mut out = input.to_string();
-    out = email_re().replace_all(&out, "[REDACTED_EMAIL]").into_owned();
-    out = phone_re().replace_all(&out, "[REDACTED_PHONE]").into_owned();
+    out = email_re()
+        .replace_all(&out, "[REDACTED_EMAIL]")
+        .into_owned();
+    out = phone_re()
+        .replace_all(&out, "[REDACTED_PHONE]")
+        .into_owned();
     out = iban_re().replace_all(&out, "[REDACTED_IBAN]").into_owned();
     out = card_re().replace_all(&out, "[REDACTED_CARD]").into_owned();
-    out = bearer_re().replace_all(&out, "[REDACTED_TOKEN]").into_owned();
+    out = bearer_re()
+        .replace_all(&out, "[REDACTED_TOKEN]")
+        .into_owned();
     out = jwt_re().replace_all(&out, "[REDACTED_JWT]").into_owned();
     out = msg_id_re()
         .replace_all(&out, "message_id=[REDACTED_ID]")

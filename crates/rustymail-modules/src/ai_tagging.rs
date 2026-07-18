@@ -275,10 +275,7 @@ mod tests {
 
     #[test]
     fn tag_message_canonicalizes_mail_subdomain() {
-        let tags = tag_message(
-            &sample_message("shop@mail.amazon.fr", "Hello", ""),
-            &[],
-        );
+        let tags = tag_message(&sample_message("shop@mail.amazon.fr", "Hello", ""), &[]);
         assert!(tags.iter().any(|t| t.as_filter() == "source:amazon.fr"));
     }
 
@@ -320,15 +317,14 @@ mod tests {
     #[test]
     fn generic_hello_has_no_content_kind() {
         let tags = tag_message(&sample_message("a@b.com", "Hello", "How are you?"), &[]);
-        assert!(!tags.iter().any(|t| t.family == rustymail_domain::TagFamily::Kind));
+        assert!(!tags
+            .iter()
+            .any(|t| t.family == rustymail_domain::TagFamily::Kind));
     }
 
     #[test]
     fn bank_statement_is_finance() {
-        assert_eq!(
-            infer_content_kind("Relevé de compte", ""),
-            Some("finance")
-        );
+        assert_eq!(infer_content_kind("Relevé de compte", ""), Some("finance"));
     }
 
     #[test]

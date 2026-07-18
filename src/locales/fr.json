@@ -240,6 +240,32 @@
     "selectAccountForAgent": "Sélectionnez un compte pour l’assistant réponse.",
     "agentAutoMail": "Assistant indisponible pour les messages automatiques / newsletters.",
     "enableAgentInSettings": "Activez « Assistant Préparer réponse » dans les réglages IA.",
-    "runTauri": "Fonction disponible dans l’app Tauri."
+    "runTauri": "Fonction disponible dans l’app Tauri.",
+    "newsletterRuleAdded": "Expéditeur ajouté aux règles automatiques.",
+    "movedToJunk": "Déplacé vers Indésirables.",
+    "junkFolderMissing": "Dossier Indésirables introuvable sur ce compte.",
+    "semanticIndexing": "Indexation sémantique des dossiers synchronisés…",
+    "aiOfflineLexical": "IA générative indisponible — recherche lexicale et heuristiques locales restent actives."
+  },
+  "security": {
+    "attention": "À vérifier",
+    "suspicion": "Suspicion",
+    "detail": "Détail",
+    "iaHint": "Signal ou budget lié à une analyse IA",
+    "iaContribution": "Contribution IA",
+    "iaPending": "Analyse IA en cours…",
+    "chipTitle": "Sécurité : {label} (cliquer pour le détail)",
+    "chipAria": "Sécurité : {label}",
+    "moveJunk": "Déplacer vers Indésirables",
+    "markNewsletter": "Traiter comme newsletter"
+  },
+  "semantic": {
+    "tauriOnly": "Compteurs d’embeddings SQLite : disponibles dans l’app desktop (Tauri).",
+    "pickAccount": "Sélectionnez un compte et une boîte dans la barre latérale pour afficher les compteurs d’indexation.",
+    "loading": "Compteurs : chargement ou indisponible pour « {mailbox} » — vérifiez le compte actif puis Actualiser les compteurs.",
+    "title": "Index embeddings ({model})",
+    "mailboxLine": "Boîte « {mailbox} » : {embedded} message(s) avec embedding, {cached} message(s) en cache SQLite pour ce dossier.",
+    "accountLine": "Ce compte (toutes boîtes déjà traitées cumulées) : {total} embedding(s) stocké(s).",
+    "hint": "Bouton ci-dessous : indexation pour tout le compte parmi les messages déjà sync en base locale."
   }
 }

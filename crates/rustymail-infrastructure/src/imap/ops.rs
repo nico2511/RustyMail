@@ -36,10 +36,7 @@ pub fn mailbox_select_variant_strings(
     };
     push(&mut out, raw_from_list);
     push(&mut out, display_decoded);
-    push(
-        &mut out,
-        &encode_utf7_imap(display_decoded.to_string()),
-    );
+    push(&mut out, &encode_utf7_imap(display_decoded.to_string()));
     if let Some(sr) = sidebar_request {
         push(&mut out, sr);
         let dsr = decode_imap_mailbox_name(sr);
@@ -112,9 +109,7 @@ fn push_inbox_qualified_variants(out: &mut Vec<String>, body: &str, delim: char)
 }
 
 pub fn augmented_mailbox_select_variants(seed: &[String], list: Option<&[String]>) -> Vec<String> {
-    let delim = list
-        .map(infer_hierarchy_delimiter_from_list)
-        .unwrap_or('.');
+    let delim = list.map(infer_hierarchy_delimiter_from_list).unwrap_or('.');
     let mut out: Vec<String> = Vec::new();
     let push_unique = |v: &mut Vec<String>, s: String| {
         if s.trim().is_empty() {
@@ -158,7 +153,10 @@ pub fn resolve_mailbox_wire_name(requested: &str, list: &[String]) -> String {
         return req.to_string();
     }
     let want_log = mailbox_logical_path_key(req);
-    if let Some(hit) = list.iter().find(|n| mailbox_logical_path_key(n) == want_log) {
+    if let Some(hit) = list
+        .iter()
+        .find(|n| mailbox_logical_path_key(n) == want_log)
+    {
         return hit.clone();
     }
     let want_nfc = mailbox_name_match_key(req);
@@ -409,7 +407,9 @@ pub fn filter_imap_command_names_on_server(
     names
         .into_iter()
         .filter(|name| {
-            entries.iter().any(|e| e.raw_list_name == *name || e.decoded_name == *name)
+            entries
+                .iter()
+                .any(|e| e.raw_list_name == *name || e.decoded_name == *name)
         })
         .collect()
 }
@@ -600,10 +600,7 @@ pub async fn list_selectable_mailboxes(account: &Account) -> Result<Vec<String>,
 }
 
 /// Alias historique — voir [`resolve_mailbox_imap_command_names`].
-pub fn resolve_mailbox_move_targets(
-    requested: &str,
-    entries: &[MailboxListEntry],
-) -> Vec<String> {
+pub fn resolve_mailbox_move_targets(requested: &str, entries: &[MailboxListEntry]) -> Vec<String> {
     resolve_mailbox_imap_command_names(requested, entries)
 }
 
@@ -789,7 +786,10 @@ mod mailbox_logical_path_tests {
     fn space_after_slash_same_as_tight_slash() {
         let spaced = "Prefix/ DOSSIERS PERSO/Succession NICOLE";
         let tight = "Prefix/DOSSIERS PERSO/Succession NICOLE";
-        assert_eq!(mailbox_logical_path_key(spaced), mailbox_logical_path_key(tight));
+        assert_eq!(
+            mailbox_logical_path_key(spaced),
+            mailbox_logical_path_key(tight)
+        );
     }
 
     #[test]
@@ -814,11 +814,8 @@ mod mailbox_logical_path_tests {
             "INBOX.Archive".to_string(),
             "INBOX.Archive.2024.05-mai".to_string(),
         ];
-        let wire = resolve_wire_mailbox_for_logical_path(
-            "Archive/2024/05-mai",
-            "INBOX.Archive",
-            &list,
-        );
+        let wire =
+            resolve_wire_mailbox_for_logical_path("Archive/2024/05-mai", "INBOX.Archive", &list);
         assert_eq!(wire, "INBOX.Archive.2024.05-mai");
     }
 
@@ -826,11 +823,8 @@ mod mailbox_logical_path_tests {
     fn wire_archive_path_builds_when_missing() {
         use super::resolve_wire_mailbox_for_logical_path;
         let list = vec!["INBOX.Archive".to_string()];
-        let wire = resolve_wire_mailbox_for_logical_path(
-            "Archive/2024/05-mai",
-            "INBOX.Archive",
-            &list,
-        );
+        let wire =
+            resolve_wire_mailbox_for_logical_path("Archive/2024/05-mai", "INBOX.Archive", &list);
         assert_eq!(wire, "INBOX.Archive.2024.05-mai");
     }
 
@@ -840,8 +834,12 @@ mod mailbox_logical_path_tests {
         let seed = vec![" DOSSIERS PERSO.Boxproof".to_string()];
         let expanded = super::augmented_mailbox_select_variants(&seed, Some(&list));
         assert!(expanded.iter().any(|s| s == " DOSSIERS PERSO.Boxproof"));
-        assert!(expanded.iter().any(|s| s == "INBOX.DOSSIERS PERSO.Boxproof"));
-        assert!(!expanded.iter().any(|s| s == "INBOX. DOSSIERS PERSO.Boxproof"));
+        assert!(expanded
+            .iter()
+            .any(|s| s == "INBOX.DOSSIERS PERSO.Boxproof"));
+        assert!(!expanded
+            .iter()
+            .any(|s| s == "INBOX. DOSSIERS PERSO.Boxproof"));
         assert!(!expanded.iter().any(|s| s.contains('/')));
     }
 
@@ -863,7 +861,9 @@ mod mailbox_logical_path_tests {
         ];
         let seed = vec!["DOSSIERS PERSO.Boxproof".to_string()];
         let expanded = super::augmented_mailbox_select_variants(&seed, Some(&list));
-        assert!(expanded.iter().any(|s| s == "INBOX.DOSSIERS PERSO.Boxproof"));
+        assert!(expanded
+            .iter()
+            .any(|s| s == "INBOX.DOSSIERS PERSO.Boxproof"));
         assert!(!expanded.iter().any(|s| s.contains('/')));
     }
 
@@ -872,7 +872,9 @@ mod mailbox_logical_path_tests {
         let list = vec!["INBOX.DOSSIERS PERSO.Boxproof".to_string()];
         let seed = vec!["DOSSIERS PERSO/Boxproof".to_string()];
         let expanded = super::augmented_mailbox_select_variants(&seed, Some(&list));
-        assert!(expanded.iter().any(|s| s == "INBOX.DOSSIERS PERSO.Boxproof"));
+        assert!(expanded
+            .iter()
+            .any(|s| s == "INBOX.DOSSIERS PERSO.Boxproof"));
         assert!(!expanded.iter().any(|s| s.contains('/')));
     }
 
@@ -881,7 +883,9 @@ mod mailbox_logical_path_tests {
         let list = vec!["DOSSIERS PERSO/Boxproof".to_string()];
         let seed = vec!["DOSSIERS PERSO/Boxproof".to_string()];
         let expanded = super::augmented_mailbox_select_variants(&seed, Some(&list));
-        assert!(expanded.iter().any(|s| s == "INBOX/DOSSIERS PERSO/Boxproof"));
+        assert!(expanded
+            .iter()
+            .any(|s| s == "INBOX/DOSSIERS PERSO/Boxproof"));
     }
 
     #[test]
@@ -947,7 +951,7 @@ mod mailbox_logical_path_tests {
 
     #[test]
     fn imap_command_names_prefers_list_raw_wire() {
-        use super::{MailboxListEntry, resolve_mailbox_imap_command_names};
+        use super::{resolve_mailbox_imap_command_names, MailboxListEntry};
         let entries = vec![MailboxListEntry {
             raw_list_name: "INBOX.DOSSIERS PERSO.Boxproof".to_string(),
             decoded_name: "INBOX.DOSSIERS PERSO.Boxproof".to_string(),
@@ -962,24 +966,22 @@ mod mailbox_logical_path_tests {
 
     #[test]
     fn imap_command_names_thunderbird_slash_to_dot_list() {
-        use super::{MailboxListEntry, resolve_mailbox_imap_command_names};
+        use super::{resolve_mailbox_imap_command_names, MailboxListEntry};
         let entries = vec![MailboxListEntry {
             raw_list_name: "INBOX.Archive.2025.05-mai".to_string(),
             decoded_name: "INBOX.Archive.2025.05-mai".to_string(),
         }];
         let names = resolve_mailbox_imap_command_names("Archive/2025/05-mai", &entries);
-        assert!(
-            names
-                .first()
-                .is_some_and(|s| s == "INBOX.Archive.2025.05-mai")
-        );
+        assert!(names
+            .first()
+            .is_some_and(|s| s == "INBOX.Archive.2025.05-mai"));
     }
 
     #[test]
     fn filter_imap_command_names_drops_invented_slash_on_dot_server() {
         use super::{
-            MailboxListEntry, filter_imap_command_names_on_server,
-            resolve_mailbox_imap_command_names,
+            filter_imap_command_names_on_server, resolve_mailbox_imap_command_names,
+            MailboxListEntry,
         };
         let entries = vec![MailboxListEntry {
             raw_list_name: "INBOX.Archive".to_string(),
@@ -994,7 +996,7 @@ mod mailbox_logical_path_tests {
     #[test]
     fn move_targets_alias_matches_imap_command_names() {
         use super::{
-            MailboxListEntry, resolve_mailbox_imap_command_names, resolve_mailbox_move_targets,
+            resolve_mailbox_imap_command_names, resolve_mailbox_move_targets, MailboxListEntry,
         };
         let entries = vec![MailboxListEntry {
             raw_list_name: "INBOX.Trash".to_string(),

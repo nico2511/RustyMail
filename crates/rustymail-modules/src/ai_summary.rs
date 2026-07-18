@@ -7,8 +7,8 @@ use serde::Deserialize;
 
 use crate::ai_llm_contracts::{validate_summary_llm_shape, SUMMARY_THREAD_JSON_GBNF};
 use crate::ai_llm_util::{
-    budget_report, cancelled_llm_err, gen_params_json_for_prompt, parse_model_json, stream_chunk_or_cancel,
-    truncate_chars, untrusted_mail_for_engine,
+    budget_report, cancelled_llm_err, gen_params_json_for_prompt, parse_model_json,
+    stream_chunk_or_cancel, truncate_chars, untrusted_mail_for_engine,
 };
 use rustymail_domain::{DiscussionThreadView, Message, TokenBudgetReport};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -136,8 +136,7 @@ fn summary_from_raw(
                     Some(raw),
                     user.contains("[tronqué]"),
                 );
-                fallback.budget.strategy =
-                    format!("local_llm_summary:fallback_text:{}", parse_err);
+                fallback.budget.strategy = format!("local_llm_summary:fallback_text:{}", parse_err);
                 return Ok(fallback);
             }
             return Err(LlmError::InvalidJson(parse_err.to_string()));
@@ -146,12 +145,7 @@ fn summary_from_raw(
 
     validate_summary_llm_shape(&dto.title, &dto.bullets, &dto.source_message_ids)?;
 
-    let title = dto
-        .title
-        .trim()
-        .chars()
-        .take(260)
-        .collect::<String>();
+    let title = dto.title.trim().chars().take(260).collect::<String>();
     let title_resolved = if title.is_empty() {
         view.subject.clone()
     } else {
@@ -209,7 +203,8 @@ pub fn summarize_thread_with_llm(
     let system = summary_system(output_language);
     let user = untrusted_mail_for_engine(engine, "thread-summary", &transcript_for_summary(view));
     let params = gen_params_json_for_prompt(engine, system.as_str(), &user, 512, 4096);
-    let raw = engine.generate_with_schema(system.as_str(), &user, &params, SUMMARY_THREAD_JSON_GBNF)?;
+    let raw =
+        engine.generate_with_schema(system.as_str(), &user, &params, SUMMARY_THREAD_JSON_GBNF)?;
     summary_from_raw(&raw, view, engine, system.as_str(), &user)
 }
 

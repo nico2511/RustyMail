@@ -111,7 +111,9 @@ pub fn html_has_unsubscribe_link(html: &str) -> bool {
             continue;
         }
         let rest = &part[1..];
-        let end = rest.find(quote as char as u8 as char).unwrap_or(rest.len().min(500));
+        let end = rest
+            .find(quote as char as u8 as char)
+            .unwrap_or(rest.len().min(500));
         let href = &rest[..end.min(rest.len())];
         if href_has_unsubscribe_signal(href) {
             return true;
@@ -126,7 +128,11 @@ pub fn message_has_unsubscribe_signal(
     plain: &str,
     html: Option<&str>,
 ) -> bool {
-    if list_unsubscribe.map(str::trim).filter(|s| !s.is_empty()).is_some() {
+    if list_unsubscribe
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .is_some()
+    {
         return true;
     }
     let blob = format!(
@@ -195,7 +201,11 @@ pub fn unsubscribe_url_score(href: &str) -> i32 {
             score += 70;
         }
     }
-    if low.contains("/click") || low.contains("/redirect") || low.contains("/track") || low.contains("/open") {
+    if low.contains("/click")
+        || low.contains("/redirect")
+        || low.contains("/track")
+        || low.contains("/open")
+    {
         score -= 20;
     }
     if low.contains("utm_") {
@@ -260,11 +270,7 @@ fn anchor_text_looks_like_unsubscribe(text: &str) -> bool {
 
 fn anchor_text_weak_unsubscribe_label(text: &str) -> bool {
     let t = text.trim().to_ascii_lowercase();
-    t == "ici"
-        || t == "here"
-        || t == "click here"
-        || t == "cliquez ici"
-        || t == "cliquez"
+    t == "ici" || t == "here" || t == "click here" || t == "cliquez ici" || t == "cliquez"
 }
 
 fn html_context_before_index(html_lc: &str, index: usize) -> &str {
@@ -354,9 +360,7 @@ pub fn parse_list_unsubscribe_header(raw: &str) -> Vec<String> {
             let s = part
                 .trim()
                 .trim_matches(|c| c == '<' || c == '>' || c == '"');
-            if (s.starts_with("http://")
-                || s.starts_with("https://")
-                || s.starts_with("mailto:"))
+            if (s.starts_with("http://") || s.starts_with("https://") || s.starts_with("mailto:"))
                 && seen.insert(s.to_string())
             {
                 out.push(s.to_string());
@@ -446,13 +450,7 @@ pub fn migrate_message_unsubscribe_urls(conn: &Connection) -> Result<(), rusqlit
     )?;
     let rows: Vec<(String, Option<String>, String, Option<String>, String)> = stmt
         .query_map([], |r| {
-            Ok((
-                r.get(0)?,
-                r.get(1)?,
-                r.get(2)?,
-                r.get(3)?,
-                r.get(4)?,
-            ))
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
         })?
         .filter_map(|r| r.ok())
         .collect();
@@ -614,7 +612,8 @@ mod tests {
 
     #[test]
     fn detects_yuka_style_unsubscribe_path() {
-        let href = "https://r.jc.yuka.io/mk/un/v2/sh/8qykxLwJZEwZdw3eTSjNnEgtouuIn5jeZhB/qXtadGCwHyW4";
+        let href =
+            "https://r.jc.yuka.io/mk/un/v2/sh/8qykxLwJZEwZdw3eTSjNnEgtouuIn5jeZhB/qXtadGCwHyW4";
         assert!(href_has_unsubscribe_signal(href));
     }
 

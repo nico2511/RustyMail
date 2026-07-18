@@ -15,8 +15,19 @@ use crate::{open_sqlite_migrated, parse_tags, text_sample::append_utf8_byte_samp
 use rustymail_modules::ai_tagging::{infer_content_kind, is_message_content_kind};
 
 const TRANSACTIONAL_RX: &[&str] = &[
-    "facture", "invoice", "reçu", "recu", "échéance", "echeance", "paiement", "payment",
-    "relevé", "releve", "commande", "order", "receipt",
+    "facture",
+    "invoice",
+    "reçu",
+    "recu",
+    "échéance",
+    "echeance",
+    "paiement",
+    "payment",
+    "relevé",
+    "releve",
+    "commande",
+    "order",
+    "receipt",
 ];
 
 /// Préfixes courants d’expéditeurs transactionnels (partie locale avant `@`).
@@ -91,13 +102,11 @@ pub fn retag_csv_for_thread(
     // Ne jamais conserver d’anciens tags `kind:` (dossier, langue, contenu) — recalculés ci-dessous.
     let kept: Vec<Tag> = parse_tags(tags_csv)
         .into_iter()
-        .filter(|t| {
-            match t.family {
-                TagFamily::Kind => false,
-                TagFamily::State => t.value != "unsubscribe" && t.value != "attachment",
-                TagFamily::Entity => false,
-                TagFamily::Source => t.value != "imap",
-            }
+        .filter(|t| match t.family {
+            TagFamily::Kind => false,
+            TagFamily::State => t.value != "unsubscribe" && t.value != "attachment",
+            TagFamily::Entity => false,
+            TagFamily::Source => t.value != "imap",
         })
         .collect();
 
@@ -228,12 +237,20 @@ pub fn org_retag_threads(
         let row = conn.query_row(
             "SELECT mailbox, subject, tags FROM threads WHERE id = ?1 AND account_id = ?2",
             params![tid, account_id],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)),
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            },
         );
         let Ok((mailbox, subject, tags_csv)) = row else {
             continue;
         };
-        if apply_retag_for_thread(conn, account_id, tid, &mailbox, &subject, &tags_csv, &rules, false)? {
+        if apply_retag_for_thread(
+            conn, account_id, tid, &mailbox, &subject, &tags_csv, &rules, false,
+        )? {
             done += 1;
         }
     }
@@ -248,9 +265,7 @@ pub fn org_retag_account(
     let conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
     let rules = list_newsletter_rules_connection(&conn).map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare(
-            "SELECT t.id, t.mailbox, t.subject, t.tags FROM threads t WHERE t.account_id = ?1",
-        )
+        .prepare("SELECT t.id, t.mailbox, t.subject, t.tags FROM threads t WHERE t.account_id = ?1")
         .map_err(|e| e.to_string())?;
     let rows: Vec<(String, String, String, String)> = stmt
         .query_map(params![account_id], |r| {
@@ -264,14 +279,7 @@ pub fn org_retag_account(
     let mut errors = Vec::new();
     for (tid, mailbox, subject, tags_csv) in rows {
         match apply_retag_for_thread(
-            &conn,
-            account_id,
-            &tid,
-            &mailbox,
-            &subject,
-            &tags_csv,
-            &rules,
-            dry_run,
+            &conn, account_id, &tid, &mailbox, &subject, &tags_csv, &rules, dry_run,
         ) {
             Ok(true) => done += 1,
             Ok(false) => {}
@@ -434,8 +442,7 @@ pub fn migrate_thread_attachment_state_tags(conn: &Connection) -> Result<(), rus
         .collect();
 
     for (thread_id, account_id, tags_csv) in rows {
-        let has = thread_has_attachments(conn, &account_id, &thread_id)
-            .unwrap_or(false);
+        let has = thread_has_attachments(conn, &account_id, &thread_id).unwrap_or(false);
         let has_tag = parse_tags(&tags_csv)
             .iter()
             .any(|t| t.family == TagFamily::State && t.value == "attachment");
@@ -450,7 +457,11 @@ pub fn migrate_thread_attachment_state_tags(conn: &Connection) -> Result<(), rus
                 tags.push(t);
             }
         }
-        let new_csv = tags.iter().map(Tag::as_filter).collect::<Vec<_>>().join(",");
+        let new_csv = tags
+            .iter()
+            .map(Tag::as_filter)
+            .collect::<Vec<_>>()
+            .join(",");
         conn.execute(
             "UPDATE threads SET tags = ?1 WHERE id = ?2 AND account_id = ?3",
             params![new_csv, thread_id, account_id],
@@ -514,7 +525,10 @@ mod tests {
     #[test]
     fn sender_is_transactional_requires_subject_signal() {
         assert!(!sender_is_transactional("billing@shop.example", "Hello"));
-        assert!(!sender_is_transactional("hello@shop.example", "Your invoice"));
+        assert!(!sender_is_transactional(
+            "hello@shop.example",
+            "Your invoice"
+        ));
     }
 
     #[test]
@@ -559,7 +573,10 @@ mod tests {
     #[test]
     fn thread_tags_stale_only_on_conflicting_mailbox_kind() {
         assert!(!thread_tags_stale("INBOX", "source:imap,source:amazon.fr"));
-        assert!(!thread_tags_stale("INBOX", "kind:facture,kind:inbox,source:imap"));
+        assert!(!thread_tags_stale(
+            "INBOX",
+            "kind:facture,kind:inbox,source:imap"
+        ));
         assert!(thread_tags_stale("INBOX", "kind:archive,source:imap"));
         assert!(thread_tags_stale(
             "INBOX",
@@ -672,17 +689,8 @@ mod tests {
     fn retag_csv_adds_and_removes_state_attachment() {
         let with = retag_csv_for_thread("INBOX", "", "a@b.com", "Hi", "", &[], false, true, &[]);
         assert!(with.contains("state:attachment"));
-        let without = retag_csv_for_thread(
-            "INBOX",
-            &with,
-            "a@b.com",
-            "Hi",
-            "",
-            &[],
-            false,
-            false,
-            &[],
-        );
+        let without =
+            retag_csv_for_thread("INBOX", &with, "a@b.com", "Hi", "", &[], false, false, &[]);
         assert!(!without.contains("state:attachment"));
     }
 

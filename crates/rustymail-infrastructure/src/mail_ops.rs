@@ -4,22 +4,22 @@ use rusqlite::params;
 
 use rustymail_domain::Account;
 
-use crate::archive_layout::{parse_archive_layout, resolve_archive_target};
-use crate::app_prefs::{load_app_prefs, prefs_path_from_db_dir};
-use crate::imap::ops::{
-    decode_imap_mailbox_name, expunge_after_delete_flags, format_uid_set,
-    hierarchy_delimiter_for_mailbox_ops, imap_create_mailbox, imap_session_select_mailbox,
-    imap_session_select_mailbox_with_list, list_selectable_mailbox_entries,
-    filter_imap_command_names_on_server, list_selectable_mailboxes,
-    resolve_mailbox_imap_command_names, resolve_mailbox_wire_name,
-    resolve_wire_mailbox_for_logical_path, uid_move_with_fallback, uid_store, MailboxListEntry,
-};
 use crate::account_imap_lock::acquire_account_imap_lock;
+use crate::app_prefs::{load_app_prefs, prefs_path_from_db_dir};
+use crate::archive_layout::{parse_archive_layout, resolve_archive_target};
+use crate::imap::ops::{
+    decode_imap_mailbox_name, expunge_after_delete_flags, filter_imap_command_names_on_server,
+    format_uid_set, hierarchy_delimiter_for_mailbox_ops, imap_create_mailbox,
+    imap_session_select_mailbox, imap_session_select_mailbox_with_list,
+    list_selectable_mailbox_entries, list_selectable_mailboxes, resolve_mailbox_imap_command_names,
+    resolve_mailbox_wire_name, resolve_wire_mailbox_for_logical_path, uid_move_with_fallback,
+    uid_store, MailboxListEntry,
+};
 use crate::imap_tombstones::record_imap_uid_tombstones;
 use crate::login_session_for_account;
 use crate::mailbox_local_cache::register_mailbox_local_cache;
-use crate::ImapSession;
 use crate::open_sqlite_migrated;
+use crate::ImapSession;
 
 /// Ordre de préférence pour la corbeille (noms IMAP fréquents).
 const TRASH_CANDIDATES: &[&str] = &[
@@ -135,7 +135,10 @@ pub fn pick_archive_folder(list: &[String]) -> Option<String> {
     }
     for name in list {
         let l = name.to_ascii_lowercase();
-        if name.eq_ignore_ascii_case("Archive") || l.ends_with("/archive") || l.ends_with(".archive") {
+        if name.eq_ignore_ascii_case("Archive")
+            || l.ends_with("/archive")
+            || l.ends_with(".archive")
+        {
             push_hit(name);
         }
     }
@@ -236,8 +239,7 @@ fn load_thread_imap_rows_for_root_in_mailbox(
     let Some(root) = root.filter(|r| !r.trim().is_empty()) else {
         return Ok(Vec::new());
     };
-    let resolved_mailbox =
-        crate::resolve_scoped_mailbox_from_path(path, account_id, mailbox)?;
+    let resolved_mailbox = crate::resolve_scoped_mailbox_from_path(path, account_id, mailbox)?;
     let conn = crate::open_sqlite_migrated(path).map_err(|e| e.to_string())?;
     let mut s = conn
         .prepare(
@@ -278,8 +280,7 @@ fn load_thread_stub_ids_for_root_in_mailbox(
     let Some(root) = root.filter(|r| !r.trim().is_empty()) else {
         return Ok(Vec::new());
     };
-    let resolved_mailbox =
-        crate::resolve_scoped_mailbox_from_path(path, account_id, mailbox)?;
+    let resolved_mailbox = crate::resolve_scoped_mailbox_from_path(path, account_id, mailbox)?;
     let conn = crate::open_sqlite_migrated(path).map_err(|e| e.to_string())?;
     let mut s = conn
         .prepare(
@@ -354,21 +355,17 @@ fn resolve_thread_move_source(
     thread_id: &str,
     mailbox_hint: &str,
 ) -> Result<ThreadMoveSource, String> {
-    let hint_resolved =
-        crate::resolve_scoped_mailbox_from_path(path, account_id, mailbox_hint)?;
-    let mut imap_rows =
-        load_thread_imap_rows(path, account_id, mailbox_hint, thread_id)?;
+    let hint_resolved = crate::resolve_scoped_mailbox_from_path(path, account_id, mailbox_hint)?;
+    let mut imap_rows = load_thread_imap_rows(path, account_id, mailbox_hint, thread_id)?;
     let mut stub_ids =
         load_thread_local_stub_message_ids(path, account_id, mailbox_hint, thread_id)?;
     let mut effective = hint_resolved.clone();
 
     if imap_rows.is_empty() && stub_ids.is_empty() {
-        imap_rows = load_thread_imap_rows_for_root_in_mailbox(
-            path, account_id, thread_id, mailbox_hint,
-        )?;
-        stub_ids = load_thread_stub_ids_for_root_in_mailbox(
-            path, account_id, thread_id, mailbox_hint,
-        )?;
+        imap_rows =
+            load_thread_imap_rows_for_root_in_mailbox(path, account_id, thread_id, mailbox_hint)?;
+        stub_ids =
+            load_thread_stub_ids_for_root_in_mailbox(path, account_id, thread_id, mailbox_hint)?;
     }
 
     if imap_rows.is_empty() && stub_ids.is_empty() {
@@ -669,8 +666,10 @@ pub async fn empty_trash_mailbox(
     };
 
     if !imap_uids.is_empty() {
-        let _ = record_imap_uid_tombstones(path, &account.id.0, resolved.as_str(), &imap_uids, None);
-        let uids: Vec<async_imap::types::Uid> = imap_uids.iter().copied().map(|u| u.into()).collect();
+        let _ =
+            record_imap_uid_tombstones(path, &account.id.0, resolved.as_str(), &imap_uids, None);
+        let uids: Vec<async_imap::types::Uid> =
+            imap_uids.iter().copied().map(|u| u.into()).collect();
         let mut session = login_session_for_account(account).await?;
         imap_session_select_mailbox(&mut session, resolved.as_str()).await?;
         const CHUNK: usize = 500;
@@ -684,7 +683,9 @@ pub async fn empty_trash_mailbox(
 
     delete_local_after_move(path, &all_ids)?;
     let n = all_ids.len();
-    Ok(format!("{n} message(s) définitivement supprimé(s) de la corbeille."))
+    Ok(format!(
+        "{n} message(s) définitivement supprimé(s) de la corbeille."
+    ))
 }
 
 /// Résout la corbeille, déplace. Erreur si aucun dossier corbeille et pas de repli sûr.
@@ -801,7 +802,8 @@ pub async fn move_thread_to_archive(
     let mut target = dest.wire_mailbox.clone();
 
     if src.imap_rows.is_empty() {
-        let n = relocate_local_stub_thread(path, &account.id.0, source_mailbox, thread_id, &target)?;
+        let n =
+            relocate_local_stub_thread(path, &account.id.0, source_mailbox, thread_id, &target)?;
         return Ok(ArchiveMoveResult {
             message: format!("{n} message(s) classé(s) localement sous « {target} »."),
             dest_mailbox: target,
@@ -872,9 +874,7 @@ fn pick_move_hierarchy_anchor(list: &[String]) -> String {
     }) {
         return inbox.clone();
     }
-    list.first()
-        .cloned()
-        .unwrap_or_else(|| "INBOX".to_string())
+    list.first().cloned().unwrap_or_else(|| "INBOX".to_string())
 }
 
 /// Crée la hiérarchie IMAP manquante sur la session courante (sans second LOGIN).
@@ -1102,9 +1102,6 @@ mod archive_pick_tests {
     #[test]
     fn prefers_inbox_archive_on_dot_server() {
         let list = vec!["Archive".to_string(), "INBOX.Archive".to_string()];
-        assert_eq!(
-            pick_archive_folder(&list).as_deref(),
-            Some("INBOX.Archive")
-        );
+        assert_eq!(pick_archive_folder(&list).as_deref(), Some("INBOX.Archive"));
     }
 }

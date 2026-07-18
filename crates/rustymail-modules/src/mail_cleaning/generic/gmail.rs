@@ -17,13 +17,11 @@ static GMAIL_QUOTE_SELECTORS: LazyLock<Vec<Selector>> = LazyLock::new(|| {
     .collect()
 });
 
-static RE_GMAIL_WROTE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^on\s+.+\bwrote:\s*$").expect("gmail wrote header")
-});
+static RE_GMAIL_WROTE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^on\s+.+\bwrote:\s*$").expect("gmail wrote header"));
 
-static RE_TRIMMED: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)show trimmed content").expect("trimmed content")
-});
+static RE_TRIMMED: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)show trimmed content").expect("trimmed content"));
 
 pub fn clean_gmail_noise(doc: &mut Html) {
     remove_gmail_quote_blocks(doc);

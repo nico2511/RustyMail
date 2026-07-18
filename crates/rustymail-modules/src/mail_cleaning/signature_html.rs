@@ -54,7 +54,10 @@ static RE_POSTAL_CODE_FR: LazyLock<Regex> =
 
 /// Enveloppe la queue signature dans `<div class="rm-mail-signature">` (masquée côté UI).
 pub fn fold_signature_tail(html: &str) -> String {
-    if html.contains("rustymail:amazon-digest") || html.contains("rustymail:deblock-digest") {
+    if html.contains("rustymail:amazon-digest")
+        || html.contains("rustymail:deblock-digest")
+        || html.contains("rustymail:github-digest")
+    {
         return html.to_string();
     }
     // Signatures explicites (#Signature, x_Signature…) : traitées par outlook_forward (wrap isolé).
@@ -240,26 +243,24 @@ fn element_tag_name(el: ElementRef<'_>) -> &str {
 
 /// Déjà plié par outlook_forward ou bloc explicite Outlook (#Signature, divRplyFwdMsg…).
 fn is_inside_signature_fold_region(el: ElementRef<'_>) -> bool {
-    el.ancestors()
-        .filter_map(ElementRef::wrap)
-        .any(|a| {
-            if let Some(class) = a.value().attr("class") {
-                if class.split_whitespace().any(|c| {
-                    c == "rm-mail-signature"
-                        || c == "rm-mail-forward-header"
-                        || c == "rm-mail-outlook-quote-header"
-                }) {
-                    return true;
-                }
+    el.ancestors().filter_map(ElementRef::wrap).any(|a| {
+        if let Some(class) = a.value().attr("class") {
+            if class.split_whitespace().any(|c| {
+                c == "rm-mail-signature"
+                    || c == "rm-mail-forward-header"
+                    || c == "rm-mail-outlook-quote-header"
+            }) {
+                return true;
             }
-            if let Some(id) = a.value().attr("id") {
-                let id = id.to_ascii_lowercase();
-                if id.contains("signature") || id.contains("rplyfwdmsg") {
-                    return true;
-                }
+        }
+        if let Some(id) = a.value().attr("id") {
+            let id = id.to_ascii_lowercase();
+            if id.contains("signature") || id.contains("rplyfwdmsg") {
+                return true;
             }
-            false
-        })
+        }
+        false
+    })
 }
 
 fn choose_split_element(marker: ElementRef<'_>) -> ElementRef<'_> {
@@ -475,7 +476,9 @@ mod tests {
         let out = fold_signature_tail(html);
         assert!(out.contains("Corps du message"));
         assert!(out.contains("rm-mail-signature"));
-        let (visible, _) = out.split_once("rm-mail-signature").expect("signature wrapper");
+        let (visible, _) = out
+            .split_once("rm-mail-signature")
+            .expect("signature wrapper");
         assert!(!visible.contains("Jean Exemple"));
     }
 
@@ -521,7 +524,8 @@ mod tests {
 
     #[test]
     fn ignores_early_cordialement_in_thread() {
-        let html = r#"<div><p>Cordialement, voici la réponse.</p><p>Suite du fil.</p><p>Fin.</p></div>"#;
+        let html =
+            r#"<div><p>Cordialement, voici la réponse.</p><p>Suite du fil.</p><p>Fin.</p></div>"#;
         let out = fold_signature_tail(html);
         assert!(!out.contains("rm-mail-signature"));
     }

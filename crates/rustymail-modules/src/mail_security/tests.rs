@@ -136,7 +136,10 @@ fn composite_phishing_when_auth_fail_and_urgency() {
     m.authentication_results = Some("receiver.example; spf=fail smtp.mailfrom=x.com".into());
     m.subject = "URGENT : confirmez votre compte".into();
     let s = analyze_mail_security(&m);
-    assert!(s.findings.iter().any(|f| f.code == "composite_phishing_risk"));
+    assert!(s
+        .findings
+        .iter()
+        .any(|f| f.code == "composite_phishing_risk"));
 }
 
 #[test]

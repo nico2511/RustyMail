@@ -145,9 +145,7 @@ pub fn consistency_check_with_llm(
     let draft_clip = truncate_chars(draft, 8000);
     let facts_json = serde_json::to_string(facts).unwrap_or_else(|_| "{}".into());
     let system = crate::prompts::system_prompt_for_language("assist_consistency", lang);
-    let user = format!(
-        "FIL :\n{ctx}\n\nFAITS :\n{facts_json}\n\nBROUILLON :\n{draft_clip}"
-    );
+    let user = format!("FIL :\n{ctx}\n\nFAITS :\n{facts_json}\n\nBROUILLON :\n{draft_clip}");
     let raw = engine.generate(
         system.as_str(),
         &user,

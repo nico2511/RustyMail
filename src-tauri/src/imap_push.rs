@@ -38,3 +38,11 @@ pub fn refresh_imap_push_accounts_db(app: &AppHandle, db_path: &Path) {
         coord.0.sync_accounts(&accounts);
     }
 }
+
+/// Informe IDLE du dossier actuellement affiché (sync hors INBOX).
+pub fn set_focused_mailbox(app: &AppHandle, account_id: &str, mailbox: &str) {
+    let Some(coord) = app.try_state::<ImapPushHandle>() else {
+        return;
+    };
+    coord.0.set_focused_mailbox(account_id, mailbox);
+}

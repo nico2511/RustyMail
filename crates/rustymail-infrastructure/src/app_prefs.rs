@@ -48,15 +48,15 @@ pub struct GeneralPrefs {
     /// Dialog d’accueil minimal (winget llama) déjà fermé.
     #[serde(default = "default_first_run_dismissed")]
     pub first_run_dismissed: bool,
-  /// MiniLM + Whisper bootstrap téléchargés au moins une fois.
-  #[serde(default)]
-  pub bootstrap_models_completed: bool,
-  /// Suggestions de vues + télémétrie activité locale (100 % on-device).
-  #[serde(default = "default_activity_suggestions_enabled")]
-  pub activity_suggestions_enabled: bool,
-  /// Dossiers verrouillés par compte (vue Dossiers — pas de drag/delete/rename).
-  #[serde(default)]
-  pub locked_mailboxes_by_account: HashMap<String, Vec<String>>,
+    /// MiniLM + Whisper bootstrap téléchargés au moins une fois.
+    #[serde(default)]
+    pub bootstrap_models_completed: bool,
+    /// Suggestions de vues + télémétrie activité locale (100 % on-device).
+    #[serde(default = "default_activity_suggestions_enabled")]
+    pub activity_suggestions_enabled: bool,
+    /// Dossiers verrouillés par compte (vue Dossiers — pas de drag/delete/rename).
+    #[serde(default)]
+    pub locked_mailboxes_by_account: HashMap<String, Vec<String>>,
 }
 
 fn default_activity_suggestions_enabled() -> bool {

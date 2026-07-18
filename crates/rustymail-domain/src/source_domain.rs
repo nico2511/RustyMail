@@ -98,7 +98,10 @@ mod tests {
     #[test]
     fn host_of_email_strips_chevrons() {
         assert_eq!(host_of_email("<x@y.z>"), Some("y.z".into()));
-        assert_eq!(host_of_email("Foo@Substack.COM"), Some("substack.com".into()));
+        assert_eq!(
+            host_of_email("Foo@Substack.COM"),
+            Some("substack.com".into())
+        );
     }
 
     #[test]

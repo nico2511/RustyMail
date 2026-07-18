@@ -54,7 +54,9 @@ impl WinKillJob {
                 size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
             ) == 0
             {
-                log::warn!("SetInformationJobObject(KILL_ON_JOB_CLOSE) a échoué pour llama-server.");
+                log::warn!(
+                    "SetInformationJobObject(KILL_ON_JOB_CLOSE) a échoué pour llama-server."
+                );
                 let _ = CloseHandle(job);
                 return None;
             }
@@ -156,9 +158,7 @@ pub fn probe_first_model_id(base_api_v1: &str, bearer: Option<&str>) -> Result<S
     if let Some(ref a) = auth {
         req = req.set("Authorization", a.as_str());
     }
-    let resp = req
-        .call()
-        .map_err(|e| format!("GET {url}: {e}"))?;
+    let resp = req.call().map_err(|e| format!("GET {url}: {e}"))?;
     if !(200..300).contains(&resp.status()) {
         return Err(format!("GET {} → HTTP {}", url, resp.status()));
     }
@@ -292,7 +292,10 @@ pub fn ensure_managed_llama_server(paths: &AppPaths, prefs: &AppPrefs) -> Result
     }
     if !llm_gguf_cached(&paths.llm_models_dir, &prefs.ai) {
         kill_managed_if_any();
-        return Err("GGUF absent du cache RustyMail — téléchargez le poids ou corrigez dépôt / fichier.".into());
+        return Err(
+            "GGUF absent du cache RustyMail — téléchargez le poids ou corrigez dépôt / fichier."
+                .into(),
+        );
     }
 
     let gguf = llm_gguf_path_for_runtime(&paths.llm_models_dir, &prefs.ai);
@@ -402,10 +405,7 @@ pub fn ensure_managed_llama_server(paths: &AppPaths, prefs: &AppPrefs) -> Result
         if !need_model_list {
             return Ok(());
         }
-        match probe_first_model_id(
-            prefs.ai.llama_server_base_url.trim(),
-            bearer.as_deref(),
-        ) {
+        match probe_first_model_id(prefs.ai.llama_server_base_url.trim(), bearer.as_deref()) {
             Ok(_) => return Ok(()),
             Err(_) => continue,
         }

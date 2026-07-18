@@ -4,8 +4,8 @@ use tauri::{AppHandle, Runtime};
 
 #[cfg(windows)]
 mod win {
-    use tauri::{AppHandle, Manager, Runtime};
     use tauri::webview::PlatformWebview;
+    use tauri::{AppHandle, Manager, Runtime};
     use webview2_com::{Microsoft::Web::WebView2::Win32::*, PermissionRequestedEventHandler};
     use windows_core::{Interface, PCWSTR};
 

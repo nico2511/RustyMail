@@ -56,7 +56,11 @@ pub(crate) fn effective_grammar<'a>(p: &'a LlmGenParams, schema_gbnf: &'a str) -
         }
     }
     let t = schema_gbnf.trim();
-    if t.is_empty() { None } else { Some(t) }
+    if t.is_empty() {
+        None
+    } else {
+        Some(t)
+    }
 }
 
 fn extract_jsonish_text(raw: &str) -> &str {
@@ -155,7 +159,11 @@ impl HttpChatEngine {
     }
 
     /// OpenRouter : Bearer obligatoire + en-têtes recommandés par le fournisseur.
-    pub fn new_open_router(api_key: String, base_url: String, model: String) -> Result<Self, LlmError> {
+    pub fn new_open_router(
+        api_key: String,
+        base_url: String,
+        model: String,
+    ) -> Result<Self, LlmError> {
         if api_key.trim().is_empty() {
             return Err(LlmError::Msg("OpenRouter: clé API vide.".into()));
         }
@@ -207,7 +215,10 @@ impl HttpChatEngine {
         format!("{}/chat/completions", self.base_url)
     }
 
-    fn apply_auth(&self, req: reqwest::blocking::RequestBuilder) -> reqwest::blocking::RequestBuilder {
+    fn apply_auth(
+        &self,
+        req: reqwest::blocking::RequestBuilder,
+    ) -> reqwest::blocking::RequestBuilder {
         match self.kind {
             HttpChatBackendKind::OpenRouter => req
                 .header("Authorization", format!("Bearer {}", self.api_key))
@@ -473,18 +484,12 @@ mod grammar_tests {
             grammar_gbnf: Some("from-params".into()),
             ..Default::default()
         };
-        assert_eq!(
-            effective_grammar(&p, "from-schema"),
-            Some("from-params")
-        );
+        assert_eq!(effective_grammar(&p, "from-schema"), Some("from-params"));
     }
 
     #[test]
     fn effective_grammar_falls_back_to_schema() {
         let p = LlmGenParams::default();
-        assert_eq!(
-            effective_grammar(&p, "from-schema"),
-            Some("from-schema")
-        );
+        assert_eq!(effective_grammar(&p, "from-schema"), Some("from-schema"));
     }
 }

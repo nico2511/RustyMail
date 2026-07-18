@@ -91,12 +91,12 @@ fn looks_like_double_extension(file_name: &str) -> bool {
         return false;
     }
     let final_ext = parts.last().map(String::as_str).unwrap_or("");
-    let previous = parts
-        .iter()
-        .rev()
-        .skip(1)
-        .take(2)
-        .any(|p| matches!(p.as_str(), "pdf" | "doc" | "docx" | "xls" | "xlsx" | "jpg" | "png"));
+    let previous = parts.iter().rev().skip(1).take(2).any(|p| {
+        matches!(
+            p.as_str(),
+            "pdf" | "doc" | "docx" | "xls" | "xlsx" | "jpg" | "png"
+        )
+    });
     previous && (RISK_EXT.contains(&final_ext) || MACRO_EXT.contains(&final_ext))
 }
 

@@ -23,10 +23,7 @@ pub fn normalize_output_language(lang: &str) -> String {
     if s.is_empty() {
         return "fr".to_string();
     }
-    s.split('-')
-        .next()
-        .unwrap_or(s)
-        .to_ascii_lowercase()
+    s.split('-').next().unwrap_or(s).to_ascii_lowercase()
 }
 
 pub fn render_template(template: &str, ctx: &PromptCtx) -> String {

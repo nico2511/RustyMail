@@ -1,7 +1,7 @@
 //! IPC activité locale + suggestions de vues.
 
 use rustymail_domain::{
-    ActivityCardCalibrationStats, ActivityEventInput, ActivityCardPolicy, SuggestedSavedView,
+    ActivityCardCalibrationStats, ActivityCardPolicy, ActivityEventInput, SuggestedSavedView,
     SuggestionDecision,
 };
 use rustymail_infrastructure::{
@@ -72,11 +72,9 @@ pub async fn record_activity_events_cmd(
     let db = paths.db_path.clone();
     let account_id = payload.account_id.trim().to_string();
     let events = payload.events;
-    tauri::async_runtime::spawn_blocking(move || {
-        record_activity_events(&db, &account_id, &events)
-    })
-    .await
-    .map_err(|e| format!("record activity join: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || record_activity_events(&db, &account_id, &events))
+        .await
+        .map_err(|e| format!("record activity join: {e}"))?
 }
 
 #[tauri::command]

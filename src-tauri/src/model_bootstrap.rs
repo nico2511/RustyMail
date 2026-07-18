@@ -102,6 +102,10 @@ pub fn bootstrap_models_present(minilm_dir: &Path) -> bool {
     let tok = minilm_dir.join("tokenizer.json");
     onnx.is_file()
         && tok.is_file()
-        && std::fs::metadata(&onnx).map(|m| m.len() > 0).unwrap_or(false)
-        && std::fs::metadata(&tok).map(|m| m.len() > 0).unwrap_or(false)
+        && std::fs::metadata(&onnx)
+            .map(|m| m.len() > 0)
+            .unwrap_or(false)
+        && std::fs::metadata(&tok)
+            .map(|m| m.len() > 0)
+            .unwrap_or(false)
 }

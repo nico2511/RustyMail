@@ -1,6 +1,8 @@
 //! Import / export vCard 3.0 (sous-ensemble FN, EMAIL, NOTE, CATEGORIES).
 
-use crate::address_contacts::{list_address_contacts, upsert_manual_contact, AddressContactRow, ManualContactUpsert};
+use crate::address_contacts::{
+    list_address_contacts, upsert_manual_contact, AddressContactRow, ManualContactUpsert,
+};
 use crate::open_sqlite_migrated;
 use serde::Serialize;
 use std::path::Path;
@@ -76,12 +78,7 @@ pub fn export_address_contacts_vcard(
     loop {
         let page = if global_scope {
             crate::contact_detail::list_address_contacts_scoped(
-                db_path,
-                account_id,
-                "",
-                offset,
-                100,
-                true,
+                db_path, account_id, "", offset, 100, true,
             )?
             .items
             .into_iter()
@@ -139,11 +136,25 @@ fn parse_vcard_block(lines: &[String]) -> Option<(String, String, String, bool)>
                 email = val.to_ascii_lowercase();
             }
         } else if upper.starts_with("FN:") {
-            name = line.split_once(':').map(|(_, v)| v).unwrap_or("").trim().to_string();
+            name = line
+                .split_once(':')
+                .map(|(_, v)| v)
+                .unwrap_or("")
+                .trim()
+                .to_string();
         } else if upper.starts_with("NOTE:") {
-            notes = line.split_once(':').map(|(_, v)| v).unwrap_or("").trim().to_string();
+            notes = line
+                .split_once(':')
+                .map(|(_, v)| v)
+                .unwrap_or("")
+                .trim()
+                .to_string();
         } else if upper.starts_with("CATEGORIES:") {
-            let val = line.split_once(':').map(|(_, v)| v).unwrap_or("").to_ascii_lowercase();
+            let val = line
+                .split_once(':')
+                .map(|(_, v)| v)
+                .unwrap_or("")
+                .to_ascii_lowercase();
             if val.contains("rustymail-favorite") {
                 favorite = true;
             }
@@ -175,10 +186,7 @@ pub fn parse_vcards(content: &str) -> Vec<(String, String, String, bool)> {
             current.push(line);
         }
     }
-    blocks
-        .iter()
-        .filter_map(|b| parse_vcard_block(b))
-        .collect()
+    blocks.iter().filter_map(|b| parse_vcard_block(b)).collect()
 }
 
 pub fn import_address_contacts_vcard(

@@ -100,8 +100,16 @@ describe("hasSavableSearchCriteria", () => {
 describe("hasCommittedSearchCriteria", () => {
   it("ignore le seul filtre liste (Non lus, etc.)", () => {
     const s = snapshotFromStructuralState({
-      ...emptyStructural(),
+      search: "",
+      searchSenders: [],
+      searchTags: [],
+      searchMailboxPath: null,
+      searchAccountOverrideId: null,
+      searchNewsletterRule: null,
+      searchScope: "mailbox",
       listFilter: "unread",
+      searchNlMode: null,
+      searchLanguageFilter: null,
     });
     expect(hasCommittedSearchCriteria(s)).toBe(false);
     expect(hasSavableSearchCriteria(s)).toBe(true);

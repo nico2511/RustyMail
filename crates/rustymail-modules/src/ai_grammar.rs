@@ -1,6 +1,8 @@
 use serde::Deserialize;
 
-use crate::ai_llm_util::{budget_report, extract_json_candidate, gen_params_json_for_prompt, truncate_chars};
+use crate::ai_llm_util::{
+    budget_report, extract_json_candidate, gen_params_json_for_prompt, truncate_chars,
+};
 use rustymail_domain::{GrammarResult, GrammarSuggestion};
 use rustymail_llm::{LlmEngine, LlmError};
 
@@ -119,7 +121,9 @@ fn dedupe_flat_json_object(obj: &str) -> Option<String> {
     const ORDER: &[&str] = &["offset", "length", "original", "replacement", "reason"];
     let mut out: Vec<&str> = Vec::new();
     for key in ORDER {
-        let Some(segs) = by_key.get(*key) else { continue };
+        let Some(segs) = by_key.get(*key) else {
+            continue;
+        };
         let pick = if matches!(*key, "original" | "replacement" | "reason") {
             segs.last().copied()
         } else {

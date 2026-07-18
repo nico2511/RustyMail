@@ -2,8 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use rustymail_domain::{
-    MailSecurityFinding, MailSecurityFindingKind, MailSecurityFindingSeverity, MailSecuritySeverity,
-    MailSecuritySignals, Message,
+    MailSecurityFinding, MailSecurityFindingKind, MailSecurityFindingSeverity,
+    MailSecuritySeverity, MailSecuritySignals, Message,
 };
 
 const MANY_URL_THRESHOLD: usize = 10;
@@ -60,8 +60,7 @@ pub fn merge_heuristic_and_llm_findings(
         hard.iter().map(|f| f.code.clone()).collect();
 
     let mut merged = hard;
-    let llm_codes: std::collections::HashSet<String> =
-        llm.iter().map(|f| f.code.clone()).collect();
+    let llm_codes: std::collections::HashSet<String> = llm.iter().map(|f| f.code.clone()).collect();
 
     for lf in llm {
         if hard_codes.contains(&lf.code) {
@@ -469,18 +468,12 @@ fn check_punycode_or_homoglyph_urls(message: &Message, out: &mut Vec<MailSecurit
 }
 
 fn check_composite_phishing_score(findings: &mut Vec<MailSecurityFinding>) {
-    if findings
-        .iter()
-        .any(|f| f.code == "composite_phishing_risk")
-    {
+    if findings.iter().any(|f| f.code == "composite_phishing_risk") {
         return;
     }
-    let auth_fail = findings.iter().any(|f| {
-        matches!(
-            f.code.as_str(),
-            "spf_fail" | "dkim_fail" | "dmarc_fail"
-        )
-    });
+    let auth_fail = findings
+        .iter()
+        .any(|f| matches!(f.code.as_str(), "spf_fail" | "dkim_fail" | "dmarc_fail"));
     let pressure = findings
         .iter()
         .any(|f| f.code == "urgency_or_credential_language");

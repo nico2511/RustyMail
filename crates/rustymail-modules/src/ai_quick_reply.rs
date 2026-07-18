@@ -2,7 +2,8 @@ use serde::Deserialize;
 
 use crate::ai_llm_contracts::validate_quick_replies_shape;
 use crate::ai_llm_util::{
-    budget_report, gen_params_json_for_prompt, parse_model_json, truncate_chars, untrusted_mail_for_engine,
+    budget_report, gen_params_json_for_prompt, parse_model_json, truncate_chars,
+    untrusted_mail_for_engine,
 };
 use rustymail_domain::QuickRepliesResult;
 use rustymail_llm::{LlmEngine, LlmError};
@@ -64,7 +65,9 @@ pub fn quick_replies_with_llm(
             system.as_str(),
             &user,
             Some(raw.as_str()),
-            thread_context.map(|s| s.chars().count() > 24_000).unwrap_or(false),
+            thread_context
+                .map(|s| s.chars().count() > 24_000)
+                .unwrap_or(false),
         ),
     })
 }

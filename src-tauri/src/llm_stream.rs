@@ -4,14 +4,16 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use rustymail_domain::{AssistFactsSnapshot, AssistMode};
 use rustymail_domain::{ThreadQaAnswer, TranslationResult};
 use rustymail_infrastructure::{load_app_prefs, sqlite_ai_cache_put, AiFeature};
-use rustymail_domain::{AssistFactsSnapshot, AssistMode};
 use rustymail_modules::ai_agent_prepare_reply::{AgentDraftResult, AgentIntentResult};
 use rustymail_modules::ai_assist_thread::run_assist_draft_streaming;
 use rustymail_modules::{ai_qa, ai_summary, ai_translation, LLM_CANCELLED};
 
-use crate::llm_assist::{assist_thread_context_with_engine, default_assist_request, emit_assist_telemetry};
+use crate::llm_assist::{
+    assist_thread_context_with_engine, default_assist_request, emit_assist_telemetry,
+};
 use rustymail_modules::ai_summary::SummaryResult;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -123,7 +125,10 @@ fn summary_display_text(summary: &SummaryResult) -> String {
 }
 
 #[tauri::command]
-pub fn llm_stream_cancel(registry: State<'_, LlmJobRegistry>, job_id: String) -> Result<(), String> {
+pub fn llm_stream_cancel(
+    registry: State<'_, LlmJobRegistry>,
+    job_id: String,
+) -> Result<(), String> {
     crate::ipc_guard::validate_job_id(&job_id)?;
     registry.cancel(job_id.trim());
     Ok(())
@@ -384,12 +389,8 @@ pub async fn llm_stream_agent_prepare_draft(
         let prefs = load_app_prefs(&paths.prefs_path);
         llm_gate_feature(&prefs, &paths, AiFeature::AgentPrepareReply)?;
         let mut engine = build_llm_engine(&prefs, &paths)?;
-        let request = default_assist_request(
-            thread_id.as_str(),
-            account_id.as_str(),
-            &prefs,
-            assist_mode,
-        );
+        let request =
+            default_assist_request(thread_id.as_str(), account_id.as_str(), &prefs, assist_mode);
         let thread = assist_thread_context_with_engine(&paths, thread_id.as_str(), &engine)?;
         let (draft, run_step) = run_assist_draft_streaming(
             &mut engine,

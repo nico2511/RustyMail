@@ -11,12 +11,12 @@ use crate::imap::ops::{
     list_selectable_mailbox_entries, list_selectable_mailboxes, mailbox_logical_path_key,
     mailbox_name_match_key, resolve_mailbox_imap_command_names,
 };
-use crate::mailbox_local_cache::purge_mailbox_local_cache;
 use crate::login_session_for_account;
 use crate::mail_ops::{
     move_thread_to_archive, move_thread_to_mailbox, move_thread_to_trash, pick_trash_folder,
     set_thread_seen,
 };
+use crate::mailbox_local_cache::purge_mailbox_local_cache;
 use crate::org_retag::org_retag_account;
 use crate::org_scan::{enrich_thread_ref, is_protected_mailbox_for_org_delete};
 use crate::{load_accounts, open_sqlite_migrated};
@@ -55,7 +55,9 @@ fn resolve_wire_mailbox(logical: &str, list: &[String]) -> Option<String> {
         .cloned()
         .or_else(|| {
             let mk = mailbox_name_match_key(trimmed);
-            list.iter().find(|m| mailbox_name_match_key(m) == mk).cloned()
+            list.iter()
+                .find(|m| mailbox_name_match_key(m) == mk)
+                .cloned()
         })
 }
 
@@ -74,10 +76,7 @@ fn local_mailbox_has_messages(
     Ok(n > 0)
 }
 
-fn collect_mailbox_names(
-    refs: &[(String, String)],
-    thread_ids: Option<&[String]>,
-) -> Vec<String> {
+fn collect_mailbox_names(refs: &[(String, String)], thread_ids: Option<&[String]>) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     for (tid, mailbox) in refs {
@@ -140,19 +139,19 @@ async fn org_delete_mailboxes(
             continue;
         }
         let select_variants = command_names.clone();
-        let mbox = match imap_session_select_variants(&mut session, &select_variants, Some(&list)).await
-        {
-            Ok((m, _)) => m,
-            Err(e) => {
-                let _ = purge_mailbox_local_cache(path, account_id, &logical);
-                errors.push(format!(
-                    "{logical}: absent du serveur — cache local retiré ({e})"
-                ));
-                done += 1;
-                threads_affected.push(format!("mailbox:{logical}"));
-                continue;
-            }
-        };
+        let mbox =
+            match imap_session_select_variants(&mut session, &select_variants, Some(&list)).await {
+                Ok((m, _)) => m,
+                Err(e) => {
+                    let _ = purge_mailbox_local_cache(path, account_id, &logical);
+                    errors.push(format!(
+                        "{logical}: absent du serveur — cache local retiré ({e})"
+                    ));
+                    done += 1;
+                    threads_affected.push(format!("mailbox:{logical}"));
+                    continue;
+                }
+            };
         if mbox.exists > 0 {
             errors.push(format!(
                 "{logical}: non vide côté serveur ({} message(s)) — synchronisez ce dossier puis relancez l’analyse.",
@@ -362,10 +361,7 @@ pub async fn org_apply_proposal_with(
     })
 }
 
-pub fn org_resolve_archive_path(
-    path: &Path,
-    thread_id: &str,
-) -> Result<String, String> {
+pub fn org_resolve_archive_path(path: &Path, thread_id: &str) -> Result<String, String> {
     let prefs_path = crate::app_prefs::prefs_path_from_db_dir(path.parent().unwrap_or(path));
     let prefs = crate::app_prefs::load_app_prefs(&prefs_path);
     let layout = crate::archive_layout::parse_archive_layout(&prefs.general.archive_layout);

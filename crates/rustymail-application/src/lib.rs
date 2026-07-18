@@ -44,65 +44,148 @@ fn pick_reply_target_message<'a>(
     thread.messages.last()
 }
 
-/// `To` = expéditeur du message ciblé ; `Cc` = autres destinataires To/Cc de ce message (sans doublon, sans l’expéditeur).
-fn reply_to_cc_from_message(m: &Message) -> (Vec<EmailAddress>, Vec<EmailAddress>) {
-    let sender = m.sender.clone();
-    let sender_lc = sender.email.to_ascii_lowercase();
-    let mut cc = Vec::new();
-    for recipient in &m.recipients {
-        let rcpt_lc = recipient.email.to_ascii_lowercase();
-        if rcpt_lc == sender_lc {
-            continue;
-        }
-        if cc.iter().any(|existing: &EmailAddress| {
-            existing.email.eq_ignore_ascii_case(&recipient.email)
-        }) {
-            continue;
-        }
-        cc.push(recipient.clone());
+fn email_key(addr: &EmailAddress) -> String {
+    addr.email.trim().to_ascii_lowercase()
+}
+
+fn push_unique_address(list: &mut Vec<EmailAddress>, addr: EmailAddress) {
+    let key = email_key(&addr);
+    if key.is_empty() {
+        return;
     }
-    (vec![sender], cc)
+    if list.iter().any(|existing| email_key(existing) == key) {
+        return;
+    }
+    list.push(addr);
+}
+
+fn is_excluded_email(email: &str, exclude: &[String]) -> bool {
+    let key = email.trim().to_ascii_lowercase();
+    if key.is_empty() {
+        return true;
+    }
+    exclude
+        .iter()
+        .any(|e| e.trim().eq_ignore_ascii_case(key.as_str()))
+}
+
+/// Destinataire principal : premier `Reply-To` valide, sinon `From`.
+fn primary_reply_address(m: &Message) -> EmailAddress {
+    m.reply_to
+        .iter()
+        .find(|a| !a.email.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| m.sender.clone())
+}
+
+/// Réponse simple : `To` = Reply-To/From uniquement (pas de Cc).
+fn reply_to_only_from_message(m: &Message) -> (Vec<EmailAddress>, Vec<EmailAddress>) {
+    (vec![primary_reply_address(m)], Vec::new())
+}
+
+/// Reply-all : `To` = Reply-To/From ; `Cc` = autres destinataires dédupliqués, hors soi.
+fn reply_all_to_cc_from_message(
+    m: &Message,
+    exclude_emails: &[String],
+) -> (Vec<EmailAddress>, Vec<EmailAddress>) {
+    let primary = primary_reply_address(m);
+    let primary_key = email_key(&primary);
+    let mut to = Vec::new();
+    if !is_excluded_email(&primary.email, exclude_emails) {
+        push_unique_address(&mut to, primary);
+    }
+
+    let mut cc = Vec::new();
+    // Inclure l’expéditeur original s’il n’est pas déjà le To principal (cas Reply-To différent).
+    if !is_excluded_email(&m.sender.email, exclude_emails) && email_key(&m.sender) != primary_key {
+        push_unique_address(&mut cc, m.sender.clone());
+    }
+    for recipient in &m.recipients {
+        if is_excluded_email(&recipient.email, exclude_emails) {
+            continue;
+        }
+        if email_key(recipient) == primary_key {
+            continue;
+        }
+        push_unique_address(&mut cc, recipient.clone());
+    }
+    // Si To est vide (on s’exclut soi-même), basculer le premier Cc en To.
+    if to.is_empty() {
+        if let Some(first) = cc.first().cloned() {
+            to.push(first);
+            if !cc.is_empty() {
+                cc.remove(0);
+            }
+        }
+    }
+    (to, cc)
 }
 
 fn reply_headers_from_message(m: &Message) -> (Option<String>, Vec<String>) {
     let in_reply_to = m.references.message_id_header.clone();
     let mut refs = m.references.references.clone();
     if let Some(mid) = &m.references.message_id_header {
-        refs.push(mid.clone());
+        if !refs
+            .iter()
+            .any(|r| r.trim().eq_ignore_ascii_case(mid.trim()))
+        {
+            refs.push(mid.clone());
+        }
     }
     (in_reply_to, refs)
 }
 
-fn forward_markdown_body_from_message(m: &Message) -> String {
-    let from = m
-        .sender
+fn subject_with_prefix(subject: &str, prefix: &str) -> String {
+    let trimmed = subject.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    let p = prefix.to_ascii_lowercase();
+    if lower.starts_with(&p) {
+        trimmed.to_string()
+    } else {
+        format!("{prefix}{trimmed}")
+    }
+}
+
+fn format_address_line(addr: &EmailAddress) -> String {
+    match addr
         .name
         .as_ref()
-        .map(|n| format!("{n} <{}>", m.sender.email))
-        .unwrap_or_else(|| m.sender.email.clone());
-    let to = if m.recipients.is_empty() {
-        String::new()
-    } else {
-        m.recipients
-            .iter()
-            .map(|r| {
-                r.name
-                    .as_ref()
-                    .map(|n| format!("{n} <{}>", r.email))
-                    .unwrap_or_else(|| r.email.clone())
-            })
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-    let quoted = m
-        .plain_body
-        .lines()
-        .map(|line| format!("> {line}"))
+        .map(|n| n.trim())
+        .filter(|n| !n.is_empty())
+    {
+        Some(n) => format!("{n} <{}>", addr.email.trim()),
+        None => addr.email.trim().to_string(),
+    }
+}
+
+fn forward_markdown_body_from_message(m: &Message) -> String {
+    let from = format_address_line(&m.sender);
+    let to = m
+        .recipients
+        .iter()
+        .map(format_address_line)
         .collect::<Vec<_>>()
-        .join("\n");
+        .join(", ");
+    let body = m.plain_body.replace("\r\n", "\n").replace('\r', "\n");
+    let mut quoted_lines = Vec::new();
+    let mut blank_run = 0usize;
+    for line in body.lines() {
+        if line.trim().is_empty() {
+            blank_run += 1;
+            if blank_run > 1 {
+                continue;
+            }
+            quoted_lines.push(">".to_string());
+        } else {
+            blank_run = 0;
+            quoted_lines.push(format!("> {line}"));
+        }
+    }
+    let quoted = quoted_lines.join("\n");
     format!(
-        "Hi,\n\n---------- Forwarded message ----------\nFrom: {from}\nDate: {}\nSubject: {}\nTo: {to}\n\n{quoted}\n",
-        m.received_at, m.subject
+        "\n\n---------- Forwarded message ----------\nFrom: {from}\nDate: {}\nSubject: {}\nTo: {to}\n\n{quoted}\n",
+        m.received_at.trim(),
+        m.subject.trim()
     )
 }
 
@@ -274,7 +357,7 @@ impl AppCore {
         let Some(target) = pick_reply_target_message(thread, message_id) else {
             return Err(ApplicationError::ThreadEmpty);
         };
-        let (to, cc) = reply_to_cc_from_message(target);
+        let (to, cc) = reply_to_only_from_message(target);
         let (in_reply_to, references) = reply_headers_from_message(target);
 
         let draft = Draft {
@@ -283,11 +366,7 @@ impl AppCore {
             to,
             cc,
             bcc: Vec::new(),
-            subject: if thread.subject.starts_with("Re:") {
-                thread.subject.clone()
-            } else {
-                format!("Re: {}", thread.subject)
-            },
+            subject: subject_with_prefix(&thread.subject, "Re: "),
             markdown_body: "Hi,\n\n".to_string(),
             send_html: true,
             in_reply_to,
@@ -300,7 +379,12 @@ impl AppCore {
         Ok(draft)
     }
 
-    pub fn prepare_reply_all(&mut self, id: &ThreadId) -> Result<Draft, ApplicationError> {
+    /// `exclude_emails` : adresses du compte local (et alias) à retirer du To/Cc.
+    pub fn prepare_reply_all(
+        &mut self,
+        id: &ThreadId,
+        exclude_emails: &[String],
+    ) -> Result<Draft, ApplicationError> {
         let thread = self
             .threads
             .iter()
@@ -309,7 +393,7 @@ impl AppCore {
         let Some(target) = pick_reply_target_message(thread, None) else {
             return Err(ApplicationError::ThreadEmpty);
         };
-        let (to, cc) = reply_to_cc_from_message(target);
+        let (to, cc) = reply_all_to_cc_from_message(target, exclude_emails);
         let (in_reply_to, references) = reply_headers_from_message(target);
 
         let draft = Draft {
@@ -318,11 +402,7 @@ impl AppCore {
             to,
             cc,
             bcc: Vec::new(),
-            subject: if thread.subject.starts_with("Re:") {
-                thread.subject.clone()
-            } else {
-                format!("Re: {}", thread.subject)
-            },
+            subject: subject_with_prefix(&thread.subject, "Re: "),
             markdown_body: "Hi all,\n\n".to_string(),
             send_html: true,
             in_reply_to,
@@ -348,11 +428,7 @@ impl AppCore {
             return Err(ApplicationError::ThreadEmpty);
         };
         let body = forward_markdown_body_from_message(m);
-        let subject = if m.subject.starts_with("Fwd:") {
-            m.subject.clone()
-        } else {
-            format!("Fwd: {}", m.subject)
-        };
+        let subject = subject_with_prefix(&m.subject, "Fwd: ");
         let draft = Draft {
             id: DraftId(format!("draft-{}", self.drafts.len() + 1)),
             kind: DraftKind::Forward,
@@ -535,5 +611,110 @@ pub fn message(
         is_pinned: false,
         authentication_results: None,
         return_path: None,
+    }
+}
+
+#[cfg(test)]
+mod reply_forward_tests {
+    use super::*;
+    use rustymail_domain::{MessageId, MessageReferences, ThreadId};
+
+    fn sample_message() -> Message {
+        Message {
+            id: MessageId("m1".into()),
+            sender: EmailAddress {
+                name: Some("Alice".into()),
+                email: "alice@example.com".into(),
+            },
+            recipients: vec![
+                EmailAddress {
+                    name: None,
+                    email: "me@rustymail.local".into(),
+                },
+                EmailAddress {
+                    name: Some("Bob".into()),
+                    email: "bob@example.com".into(),
+                },
+                EmailAddress {
+                    name: None,
+                    email: "alice@example.com".into(),
+                },
+                EmailAddress {
+                    name: None,
+                    email: "bob@example.com".into(),
+                },
+            ],
+            reply_to: vec![EmailAddress {
+                name: None,
+                email: "alice+lists@example.com".into(),
+            }],
+            subject: "Re: Hello".into(),
+            received_at: "2026-07-18T10:00:00Z".into(),
+            plain_body: "Line one\n\n\nLine two\n".into(),
+            html_body: None,
+            references: MessageReferences {
+                message_id_header: Some("<m1@example.com>".into()),
+                in_reply_to: None,
+                references: vec!["<root@example.com>".into()],
+            },
+            attachments: vec![],
+            tags: vec![],
+            detected_lang: None,
+            is_read: true,
+            is_pinned: false,
+            authentication_results: None,
+            return_path: None,
+        }
+    }
+
+    #[test]
+    fn reply_only_uses_reply_to_without_cc() {
+        let m = sample_message();
+        let (to, cc) = reply_to_only_from_message(&m);
+        assert_eq!(to.len(), 1);
+        assert_eq!(to[0].email, "alice+lists@example.com");
+        assert!(cc.is_empty());
+    }
+
+    #[test]
+    fn reply_all_dedups_and_excludes_self() {
+        let m = sample_message();
+        let (to, cc) = reply_all_to_cc_from_message(&m, &["me@rustymail.local".into()]);
+        assert_eq!(to.len(), 1);
+        assert_eq!(to[0].email, "alice+lists@example.com");
+        let cc_emails: Vec<_> = cc.iter().map(|a| a.email.as_str()).collect();
+        assert!(cc_emails.contains(&"bob@example.com"));
+        assert!(cc_emails.contains(&"alice@example.com"));
+        assert_eq!(cc_emails.len(), 2);
+        assert!(!cc_emails
+            .iter()
+            .any(|e| e.eq_ignore_ascii_case("me@rustymail.local")));
+    }
+
+    #[test]
+    fn subject_prefix_is_case_insensitive() {
+        assert_eq!(subject_with_prefix("RE: Hello", "Re: "), "RE: Hello");
+        assert_eq!(subject_with_prefix("Hello", "Re: "), "Re: Hello");
+        assert_eq!(subject_with_prefix("fwd: X", "Fwd: "), "fwd: X");
+    }
+
+    #[test]
+    fn forward_collapses_blank_lines_and_quotes() {
+        let m = sample_message();
+        let body = forward_markdown_body_from_message(&m);
+        assert!(body.contains("---------- Forwarded message ----------"));
+        assert!(body.contains("> Line one"));
+        assert!(body.contains("> Line two"));
+        assert!(!body.contains(">\n>\n>"));
+        let mut core = AppCore::new(vec![Thread {
+            id: ThreadId("t1".into()),
+            subject: "Hello".into(),
+            messages: vec![m],
+            tags: vec![],
+            entities: vec![],
+            followed: false,
+        }]);
+        let draft = core.prepare_forward(&ThreadId("t1".into()), None).unwrap();
+        assert_eq!(draft.subject, "Fwd: Re: Hello");
     }
 }

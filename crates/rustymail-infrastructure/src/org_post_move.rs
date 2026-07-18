@@ -11,8 +11,8 @@ use rustymail_domain::Account;
 
 use rusqlite::params;
 
-use crate::org_retag::org_retag_threads;
 use crate::open_sqlite_migrated;
+use crate::org_retag::org_retag_threads;
 use crate::reset_imap_last_uid;
 use crate::resolve_scoped_mailbox_for_account;
 use crate::sync_mailboxes_single_session;

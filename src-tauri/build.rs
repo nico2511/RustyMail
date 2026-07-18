@@ -81,7 +81,8 @@ fn embed_oauth_from_dotenv(repo_root: &Path) {
 }
 
 fn main() {
-    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
+    let manifest_dir =
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
     if std::env::var("CARGO_FEATURE_EMBED_DEV_OAUTH").is_ok() {
         embed_oauth_from_dotenv(&manifest_dir.join(".."));
     }

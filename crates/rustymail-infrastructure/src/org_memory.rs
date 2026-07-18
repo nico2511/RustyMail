@@ -117,7 +117,10 @@ pub fn ignore_mailbox(path: &Path, account_id: &str, mailbox: &str) -> Result<()
     )
 }
 
-pub fn list_auto_archive_mailboxes(conn: &Connection, account_id: &str) -> Result<Vec<String>, String> {
+pub fn list_auto_archive_mailboxes(
+    conn: &Connection,
+    account_id: &str,
+) -> Result<Vec<String>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT rule_key FROM org_memory
@@ -135,7 +138,11 @@ pub fn list_auto_archive_mailboxes(conn: &Connection, account_id: &str) -> Resul
     Ok(out)
 }
 
-pub fn is_mailbox_auto_archive(conn: &Connection, account_id: &str, mailbox: &str) -> Result<bool, String> {
+pub fn is_mailbox_auto_archive(
+    conn: &Connection,
+    account_id: &str,
+    mailbox: &str,
+) -> Result<bool, String> {
     let mb = mailbox.trim();
     if mb.is_empty() {
         return Ok(false);
@@ -152,7 +159,11 @@ pub fn is_mailbox_auto_archive(conn: &Connection, account_id: &str, mailbox: &st
     Ok(n > 0)
 }
 
-pub fn set_mailbox_auto_archive(path: &Path, account_id: &str, mailbox: &str) -> Result<(), String> {
+pub fn set_mailbox_auto_archive(
+    path: &Path,
+    account_id: &str,
+    mailbox: &str,
+) -> Result<(), String> {
     let mb = mailbox.trim();
     if mb.is_empty() {
         return Err("Dossier vide.".into());
@@ -171,7 +182,11 @@ pub fn set_mailbox_auto_archive(path: &Path, account_id: &str, mailbox: &str) ->
     )
 }
 
-pub fn clear_mailbox_auto_archive(path: &Path, account_id: &str, mailbox: &str) -> Result<(), String> {
+pub fn clear_mailbox_auto_archive(
+    path: &Path,
+    account_id: &str,
+    mailbox: &str,
+) -> Result<(), String> {
     let mb = mailbox.trim();
     if mb.is_empty() {
         return Err("Dossier vide.".into());
@@ -307,10 +322,7 @@ fn memory_suppresses_proposal(
     Ok(decision == "applied" || decision == "dismissed")
 }
 
-fn strip_ignored_mailbox_threads(
-    proposal: &mut OrgProposal,
-    ignored: &HashSet<String>,
-) {
+fn strip_ignored_mailbox_threads(proposal: &mut OrgProposal, ignored: &HashSet<String>) {
     if ignored.is_empty() {
         return;
     }

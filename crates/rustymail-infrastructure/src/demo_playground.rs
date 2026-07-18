@@ -39,7 +39,13 @@ fn demo_account_row() -> Account {
     }
 }
 
-fn mk_thread(account: &str, mailbox: &str, root_key: &str, subject: &str, messages: Vec<rustymail_domain::Message>) -> Thread {
+fn mk_thread(
+    account: &str,
+    mailbox: &str,
+    root_key: &str,
+    subject: &str,
+    messages: Vec<rustymail_domain::Message>,
+) -> Thread {
     let id = thread_id_for_root(account, mailbox, root_key);
     Thread {
         id: ThreadId(id),
@@ -271,7 +277,11 @@ fn professional_demo_threads(account: &str, mailbox: &str) -> Vec<Thread> {
     ]
 }
 
-fn insert_demo_dataset(tx: &rusqlite::Transaction<'_>, account_id: &str, mailbox: &str) -> Result<usize, rusqlite::Error> {
+fn insert_demo_dataset(
+    tx: &rusqlite::Transaction<'_>,
+    account_id: &str,
+    mailbox: &str,
+) -> Result<usize, rusqlite::Error> {
     let threads = professional_demo_threads(account_id, mailbox);
     let mut n = 0usize;
     let mut imap_uid: i64 = 900_000;
@@ -337,7 +347,10 @@ fn insert_demo_dataset(tx: &rusqlite::Transaction<'_>, account_id: &str, mailbox
     Ok(n)
 }
 
-fn purge_account_mail(tx: &rusqlite::Transaction<'_>, account_id: &str) -> Result<(), rusqlite::Error> {
+fn purge_account_mail(
+    tx: &rusqlite::Transaction<'_>,
+    account_id: &str,
+) -> Result<(), rusqlite::Error> {
     tx.execute(
         "DELETE FROM message_embeddings WHERE message_id IN (SELECT id FROM messages WHERE account_id = ?1)",
         [account_id],
@@ -355,7 +368,9 @@ fn purge_account_mail(tx: &rusqlite::Transaction<'_>, account_id: &str) -> Resul
 /// Réinsère compte + fils fictifs pro. Idempotent : écrase les données mail du compte démo uniquement.
 pub fn sqlite_reset_demo_playground(db_path: &Path) -> Result<String, String> {
     let account = demo_account_row();
-    account.validate().map_err(|e| format!("compte démo invalide: {e:?}"))?;
+    account
+        .validate()
+        .map_err(|e| format!("compte démo invalide: {e:?}"))?;
 
     let mut connection = crate::open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
     connection
@@ -373,15 +388,13 @@ pub fn sqlite_reset_demo_playground(db_path: &Path) -> Result<String, String> {
     crate::upsert_account_row(&connection, &account).map_err(|e| e.to_string())?;
 
     if existed == 0 {
-        crate::set_keyring_password(
-            DEMO_PLAYGROUND_ACCOUNT_ID,
-            "rustymail-demo-not-for-sync",
-        )?;
+        crate::set_keyring_password(DEMO_PLAYGROUND_ACCOUNT_ID, "rustymail-demo-not-for-sync")?;
     }
 
     let tx = connection.transaction().map_err(|e| e.to_string())?;
     purge_account_mail(&tx, DEMO_PLAYGROUND_ACCOUNT_ID).map_err(|e| e.to_string())?;
-    let n = insert_demo_dataset(&tx, DEMO_PLAYGROUND_ACCOUNT_ID, "INBOX").map_err(|e| e.to_string())?;
+    let n =
+        insert_demo_dataset(&tx, DEMO_PLAYGROUND_ACCOUNT_ID, "INBOX").map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(format!(

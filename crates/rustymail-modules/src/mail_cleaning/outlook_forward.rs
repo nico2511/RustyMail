@@ -14,22 +14,17 @@ static SEL_SIGNATURE: LazyLock<Selector> = LazyLock::new(|| {
 });
 
 static SEL_FWD_HEADER: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("#divRplyFwdMsg, #x_divRplyFwdMsg")
-        .expect("outlook forward header selector")
+    Selector::parse("#divRplyFwdMsg, #x_divRplyFwdMsg").expect("outlook forward header selector")
 });
 
-static SEL_INLINE_QUOTE_BLOCKS: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("div, p, blockquote").expect("inline quote blocks selector")
-});
+static SEL_INLINE_QUOTE_BLOCKS: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("div, p, blockquote").expect("inline quote blocks selector"));
 
-static SEL_HR: LazyLock<Selector> =
-    LazyLock::new(|| Selector::parse("hr").expect("hr selector"));
+static SEL_HR: LazyLock<Selector> = LazyLock::new(|| Selector::parse("hr").expect("hr selector"));
 
 static SEL_COMPOSE_JUNK: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse(
-        "#appendonsend, [id*='appendonsend'], [id*='LSI_marker'], .elementToProof",
-    )
-    .expect("outlook compose junk selector")
+    Selector::parse("#appendonsend, [id*='appendonsend'], [id*='LSI_marker'], .elementToProof")
+        .expect("outlook compose junk selector")
 });
 
 static RE_OUTLOOK_INLINE_QUOTE: LazyLock<Regex> = LazyLock::new(|| {
@@ -41,7 +36,10 @@ static RE_OUTLOOK_INLINE_QUOTE: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Retire le bruit typique des transferts Outlook (sans nesting conversationnel complet).
 pub fn fold_outlook_forward_noise(html: &str) -> String {
-    if html.contains("rustymail:amazon-digest") || html.contains("rustymail:deblock-digest") {
+    if html.contains("rustymail:amazon-digest")
+        || html.contains("rustymail:deblock-digest")
+        || html.contains("rustymail:github-digest")
+    {
         return html.to_string();
     }
     let mut doc = Html::parse_fragment(html);

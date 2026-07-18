@@ -56,7 +56,11 @@ fn winget_list_has_package(id: &str) -> bool {
 /// Résout le chemin affiché pour l’UI (PATH ou binaire explicite).
 pub fn detect_llama_server(binary_hint: &str) -> LlamaServerDetectResult {
     let hint = binary_hint.trim();
-    let probe = if hint.is_empty() { "llama-server" } else { hint };
+    let probe = if hint.is_empty() {
+        "llama-server"
+    } else {
+        hint
+    };
     let on_path = program_on_path(probe);
     let winget_installed = winget_list_has_package(WINGET_LLAMA_PACKAGE_ID);
     let resolved_path = if on_path {
@@ -110,7 +114,9 @@ pub fn install_llama_server_via_winget() -> LlamaServerWingetInstallResult {
     match out {
         Ok(o) if o.status.success() => LlamaServerWingetInstallResult {
             success: true,
-            message: "Installation winget terminée. Vérifiez que « llama-server » est dans le PATH.".into(),
+            message:
+                "Installation winget terminée. Vérifiez que « llama-server » est dans le PATH."
+                    .into(),
         },
         Ok(o) => {
             let stderr = String::from_utf8_lossy(&o.stderr);

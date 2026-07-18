@@ -5,9 +5,9 @@ use rustymail_domain::{
     OrgV2DecisionKind, OrgV2RecordDecisionResult, OrgV2ScanReport,
 };
 use rustymail_infrastructure::{
-    ai_feature_enabled, enrich_org_report_llm_refs, ignore_mailbox, load_app_prefs, load_accounts,
+    ai_feature_enabled, enrich_org_report_llm_refs, ignore_mailbox, load_accounts, load_app_prefs,
     open_sqlite_migrated_public, org_apply_proposal_with, org_llm_proposals_for_account,
-    org_retag_account, org_resolve_archive_path, org_retag_threads, org_scan_account,
+    org_resolve_archive_path, org_retag_account, org_retag_threads, org_scan_account,
     org_v2_scan_account, post_move_heuristic_refresh, prepare_org_proposal_for_apply,
     record_proposal_decision, resolve_apply_action, unignore_mailbox,
     validate_org_apply_thread_ids, AiFeature,
@@ -131,8 +131,7 @@ fn org_scan_account_compute(
                             report.proposals.extend(llm_cards);
                         }
                         Err(e) => {
-                            llm_status.message =
-                                Some(format!("Analyse IA indisponible : {e}"));
+                            llm_status.message = Some(format!("Analyse IA indisponible : {e}"));
                         }
                     }
                 }
@@ -210,8 +209,7 @@ pub async fn org_apply_proposal_cmd(
     ipc_guard::validate_proposal_id(&proposal_id)?;
     if proposal_id.starts_with("llm-") && payload.proposal_snapshot.is_none() {
         return Err(
-            "proposalSnapshot requis pour une carte IA (relancez l’analyse puis réessayez)."
-                .into(),
+            "proposalSnapshot requis pour une carte IA (relancez l’analyse puis réessayez).".into(),
         );
     }
 

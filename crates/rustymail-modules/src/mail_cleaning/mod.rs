@@ -15,7 +15,7 @@
 //! 3. Garde qualité (masse de texte)
 //! 4. [`generic::finalize_html_for_display`] — prune vide, [`signature_html::fold_signature_tail`], attrs, lisibilité
 //!
-//! Digests tagués `rustymail:amazon-digest` / `rustymail:deblock-digest` : pas de strip agressif en finalize.
+//! Digests tagués `rustymail:amazon-digest` / `rustymail:deblock-digest` / `rustymail:github-digest` : pas de strip agressif en finalize.
 
 mod dom;
 mod error;

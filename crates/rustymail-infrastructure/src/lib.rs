@@ -1,53 +1,53 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use rusqlite::{params, Connection, OptionalExtension};
-use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock};
 use rustymail_application::{message, AppCore};
 use rustymail_domain::{
     Account, MailAuthKind, SecurityMode, ServerSettings, Tag, Thread, ThreadId, ThreadListItem,
 };
 use serde::Serialize;
+use std::collections::HashSet;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
-mod attachment_policy;
-mod draft_revisions;
-mod oauth_mail;
-mod provider_errors;
-mod sqlite_crypto;
-mod prefs_urls;
-mod mail_autoconfig;
-mod tls_policy;
-mod saved_drafts;
-mod imap;
-mod lang_detect;
-mod mail_ops;
-mod newsletter;
-mod address_contacts;
-mod contact_detail;
-mod vcard;
-mod saved_searches;
+mod account_imap_lock;
 mod activity;
+mod address_contacts;
+mod archive_layout;
+mod attachment_policy;
+mod contact_detail;
+mod demo_playground;
+mod draft_revisions;
+mod folder_ops;
+mod imap;
+mod imap_tombstones;
+mod lang_detect;
+mod mail_autoconfig;
+mod mail_ops;
+mod mailbox_local_cache;
+mod newsletter;
+mod oauth_mail;
+mod org_apply;
+mod org_consolidate;
+mod org_mailbox_structure;
+mod org_memory;
+mod org_post_move;
+mod org_retag;
+mod org_scan;
+mod org_v2_scan;
+mod prefs_urls;
+mod provider_errors;
+mod saved_drafts;
+mod saved_searches;
 mod semantic_search;
 mod smtp_send;
 mod split_send;
+mod sqlite_crypto;
 mod sqlite_sent;
-mod threading;
-mod demo_playground;
-mod unsubscribe_detect;
-mod archive_layout;
-mod org_retag;
-mod org_scan;
-mod org_memory;
-mod org_v2_scan;
-mod org_consolidate;
-mod org_apply;
-mod org_mailbox_structure;
-mod org_post_move;
-mod folder_ops;
-mod mailbox_local_cache;
 mod text_sample;
-mod imap_tombstones;
-mod account_imap_lock;
+mod threading;
+mod tls_policy;
+mod unsubscribe_detect;
+mod vcard;
 
 pub const KEYRING_SERVICE: &str = "RustyMail";
 const MAX_ATTACHMENT_DOWNLOAD_BYTES: usize = 75 * 1024 * 1024;
@@ -56,23 +56,25 @@ const MAX_INLINE_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 mod ai_features;
 mod app_prefs;
 mod dictation;
-mod openrouter;
-mod llama_server;
 mod email_util;
 mod hf_download;
-mod local_llm;
+mod llama_server;
 mod llm_singleton;
+mod local_llm;
+mod openrouter;
+pub use address_contacts::{
+    delete_manual_contact, list_address_contacts, parse_header_address_list,
+    reindex_address_contacts, search_address_contacts, search_address_contacts_scoped,
+    upsert_contacts_from_message_row, upsert_manual_contact, AddressContactHit, AddressContactRow,
+    ListAddressContactsResult, ManualContactUpsert,
+};
 pub use ai_features::{ai_feature_enabled, AiFeature};
 pub use app_prefs::{
     load_app_prefs, prefs_path_from_db_dir, save_app_prefs, sync_draft_language_from_mother,
     AiPrefs, AppPrefs, GeneralPrefs, APP_PREFS_FILE,
 };
-pub use address_contacts::{
-    delete_manual_contact, list_address_contacts, parse_header_address_list,
-    reindex_address_contacts, search_address_contacts, search_address_contacts_scoped,
-    upsert_contacts_from_message_row,
-    upsert_manual_contact, AddressContactHit, AddressContactRow, ListAddressContactsResult,
-    ManualContactUpsert,
+pub use attachment_policy::{
+    attachment_needs_explicit_ack, log_attachment_audited, PREFIX_RISK_CONFIRM,
 };
 pub use contact_detail::{
     contact_message_samples, count_address_contacts_scoped, get_address_contact_detail,
@@ -80,47 +82,88 @@ pub use contact_detail::{
     AddressContactListRow, ContactDetailDto, ContactEntitySnippet, ContactThreadSnippet,
     ListAddressContactsScopedResult,
 };
-pub use vcard::{
-    export_address_contacts_vcard, import_address_contacts_vcard, ImportVcardResult,
-};
-pub use attachment_policy::{
-    attachment_needs_explicit_ack, log_attachment_audited, PREFIX_RISK_CONFIRM,
-};
-pub use prefs_urls::{
-    parse_llama_loopback_listen_addr, save_app_prefs_validated, validate_app_prefs_ai_urls,
-    validate_local_companion_base_url, validate_openai_compatible_base_url,
-};
-pub use tls_policy::{effective_allow_invalid_tls, persist_allow_invalid_tls_from_ui_checkbox};
-pub use provider_errors::{oauth_http_error, oauth_redirect_error, redact_sensitive_snippet};
-pub use mail_autoconfig::{discover_mail_servers, DiscoveredMailServers};
-pub use hf_download::{download_hf_file_if_needed, hf_resolve_url};
-pub use email_util::normalize_email;
-pub use local_llm::{
-    build_llm_status, ensure_local_llm_gguf_download, list_cached_gguf_filenames,
-    llm_expected_gguf_path, llm_gguf_cached, llm_gguf_download_cancel_request,
-    llm_gguf_download_cancel_clear, llm_gguf_path_for_runtime, llm_maybe_migrate_gguf_cache,
-    resolved_hf_repo_for_download,
-    llm_repo_cache_dir, LlmStatusPayload,
-};
-pub use llm_singleton::{llm_singleton, LlmSingletonState};
 pub use dictation::{
     decode_audio_base64, dictation_api_key_clear, dictation_api_key_get, dictation_api_key_present,
     dictation_api_key_set, transcribe_and_maybe_translate, transcribe_audio,
     translate_to_draft_language, DICTATION_KEYRING_USERNAME,
 };
-pub use openrouter::{
-    openrouter_api_key_clear, openrouter_api_key_get, openrouter_api_key_present,
-    openrouter_api_key_set, OPENROUTER_KEYRING_USERNAME,
-};
+pub use email_util::normalize_email;
+pub use hf_download::{download_hf_file_if_needed, hf_resolve_url};
 pub use llama_server::{
     llama_server_api_key_clear, llama_server_api_key_get, llama_server_api_key_present,
     llama_server_api_key_set, LLAMA_SERVER_KEYRING_USERNAME,
 };
+pub use llm_singleton::{llm_singleton, LlmSingletonState};
+pub use local_llm::{
+    build_llm_status, ensure_local_llm_gguf_download, list_cached_gguf_filenames,
+    llm_expected_gguf_path, llm_gguf_cached, llm_gguf_download_cancel_clear,
+    llm_gguf_download_cancel_request, llm_gguf_path_for_runtime, llm_maybe_migrate_gguf_cache,
+    llm_repo_cache_dir, resolved_hf_repo_for_download, LlmStatusPayload,
+};
+pub use mail_autoconfig::{discover_mail_servers, DiscoveredMailServers};
+pub use openrouter::{
+    openrouter_api_key_clear, openrouter_api_key_get, openrouter_api_key_present,
+    openrouter_api_key_set, OPENROUTER_KEYRING_USERNAME,
+};
+pub use prefs_urls::{
+    parse_llama_loopback_listen_addr, save_app_prefs_validated, validate_app_prefs_ai_urls,
+    validate_local_companion_base_url, validate_openai_compatible_base_url,
+};
+pub use provider_errors::{oauth_http_error, oauth_redirect_error, redact_sensitive_snippet};
+pub use tls_policy::{effective_allow_invalid_tls, persist_allow_invalid_tls_from_ui_checkbox};
+pub use vcard::{export_address_contacts_vcard, import_address_contacts_vcard, ImportVcardResult};
 
+pub use account_imap_lock::{acquire_account_imap_lock, with_account_imap_lock};
+pub use activity::{
+    activity_card_calibration_stats, list_suggested_saved_views, migrate_activity,
+    purge_activity_events_older_than, record_activity_events, record_message_sent_activity,
+    record_suggestion_decision,
+};
+pub use archive_layout::{archive_mailbox_path, parse_archive_layout, resolve_archive_target};
+pub use folder_ops::{
+    archive_mailbox_threads, delete_imap_mailbox_with_contents, list_mailbox_tree,
+    retag_threads_in_mailboxes, set_mailbox_locked, ArchiveMailboxThreadsOutcome,
+    DeleteMailboxWithContentsOutcome, MailboxTreeReport,
+};
+pub use imap::ops;
 pub use imap::{
     imap_append_sent_copy, list_mailboxes, sync_inbox, sync_mailboxes_single_session,
     ImapIdleCoordinator, ImapPushEvent, ImapSentCopyOutcome, ImapSyncResult, SyncMailboxAlias,
     SyncMailboxesOutcome,
+};
+/// Re-exports for callers that need a lower-level IMAP session or mailbox ops.
+pub use imap::{login_session, login_session_for_account, map_imap_error, ImapSession};
+pub use imap_tombstones::{
+    active_tombstone_uids, filter_tombstoned_uids, record_imap_uid_tombstones,
+};
+pub use mail_ops::{
+    empty_trash_mailbox, is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive,
+    move_thread_to_mailbox, move_thread_to_trash, pick_archive_folder, pick_trash_folder,
+    set_thread_seen, ArchiveDestination, ArchiveMoveResult, ThreadMailboxMoveResult,
+};
+pub use mailbox_local_cache::{
+    purge_mailbox_local_cache, register_mailbox_local_cache, rename_mailbox_local_cache,
+    rename_mailbox_subtree_local_cache, thread_ids_for_mailboxes, MailboxCachePurgeStats,
+    MailboxCacheRenameStats,
+};
+pub use org_apply::{
+    org_apply_proposal_with, org_resolve_archive_path, prepare_org_proposal_for_apply,
+    resolve_apply_action, validate_org_apply_thread_ids,
+};
+pub use org_memory::{
+    clear_mailbox_auto_archive, ignore_mailbox, is_mailbox_auto_archive,
+    list_auto_archive_mailboxes, list_ignored_mailboxes, proposal_scope_fingerprint,
+    record_proposal_decision, set_mailbox_auto_archive, unignore_mailbox,
+};
+pub use org_post_move::{
+    post_move_heuristic_refresh, spawn_post_move_background_sync, PostMoveRefreshOutcome,
+};
+pub use org_retag::{org_retag_account, org_retag_threads};
+pub use org_scan::{enrich_org_report_llm_refs, org_llm_proposals_for_account, org_scan_account};
+pub use org_v2_scan::org_v2_scan_account;
+pub use saved_searches::{
+    delete_saved_search, get_saved_search, list_saved_searches, mark_saved_search_seen,
+    migrate_saved_searches, upsert_saved_search,
 };
 pub use semantic_search::{
     count_threads_matching_query, embedding_plain_for_message, init_semantic_model_dir,
@@ -128,60 +171,15 @@ pub use semantic_search::{
     semantic_model_present, sqlite_search_threads_unified, SemanticEmbeddingCountsSnapshot,
     SemanticReindexStats,
 };
-pub use saved_searches::{
-    delete_saved_search, get_saved_search, list_saved_searches, mark_saved_search_seen,
-    migrate_saved_searches, upsert_saved_search,
-};
-pub use activity::{
-    activity_card_calibration_stats, list_suggested_saved_views, migrate_activity,
-    purge_activity_events_older_than, record_activity_events, record_message_sent_activity,
-    record_suggestion_decision,
-};
-pub use imap::ops;
-/// Re-exports for callers that need a lower-level IMAP session or mailbox ops.
-pub use imap::{login_session, login_session_for_account, map_imap_error, ImapSession};
-pub use mail_ops::{
-    empty_trash_mailbox, is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive,
-    ArchiveMoveResult, ArchiveDestination, ThreadMailboxMoveResult,
-    move_thread_to_mailbox, move_thread_to_trash, pick_archive_folder, pick_trash_folder,
-    set_thread_seen,
-};
-pub use archive_layout::{archive_mailbox_path, parse_archive_layout, resolve_archive_target};
-pub use org_apply::{
-    org_apply_proposal_with, org_resolve_archive_path, prepare_org_proposal_for_apply,
-    resolve_apply_action, validate_org_apply_thread_ids,
-};
-pub use org_post_move::{
-    post_move_heuristic_refresh, spawn_post_move_background_sync, PostMoveRefreshOutcome,
-};
-pub use imap_tombstones::{
-    active_tombstone_uids, filter_tombstoned_uids, record_imap_uid_tombstones,
-};
-pub use account_imap_lock::{acquire_account_imap_lock, with_account_imap_lock};
-pub use org_retag::{org_retag_account, org_retag_threads};
-pub use mailbox_local_cache::{
-    purge_mailbox_local_cache, register_mailbox_local_cache, rename_mailbox_local_cache,
-    rename_mailbox_subtree_local_cache, thread_ids_for_mailboxes, MailboxCachePurgeStats,
-    MailboxCacheRenameStats,
-};
-pub use folder_ops::{
-    archive_mailbox_threads, delete_imap_mailbox_with_contents, list_mailbox_tree,
-    retag_threads_in_mailboxes, set_mailbox_locked, ArchiveMailboxThreadsOutcome,
-    DeleteMailboxWithContentsOutcome, MailboxTreeReport,
-};
-pub use org_scan::{
-    enrich_org_report_llm_refs, org_llm_proposals_for_account, org_scan_account,
-};
-pub use org_memory::{
-    clear_mailbox_auto_archive, ignore_mailbox, is_mailbox_auto_archive,
-    list_auto_archive_mailboxes, list_ignored_mailboxes, proposal_scope_fingerprint,
-    record_proposal_decision, set_mailbox_auto_archive, unignore_mailbox,
-};
-pub use org_v2_scan::org_v2_scan_account;
 
+pub use demo_playground::{
+    sqlite_remove_demo_playground, sqlite_reset_demo_playground, DEMO_PLAYGROUND_ACCOUNT_ID,
+};
 pub use draft_revisions::{
-    sqlite_draft_revision_get, sqlite_draft_revision_list, sqlite_draft_revision_save,
-    DraftRevisionListItem,
+    sqlite_draft_orphan_session_open, sqlite_draft_orphan_sessions_list,
+    sqlite_draft_orphan_sessions_purge_stale, sqlite_draft_revision_get,
+    sqlite_draft_revision_list, sqlite_draft_revision_purge_session, sqlite_draft_revision_save,
+    DraftRevisionListItem, OrphanDraftSessionItem,
 };
 pub use saved_drafts::{
     sqlite_saved_draft_delete, sqlite_saved_draft_list, sqlite_saved_draft_open,
@@ -194,9 +192,6 @@ pub use split_send::{
     DEFAULT_ATTACHMENT_BUDGET_BYTES,
 };
 pub use sqlite_sent::{sqlite_record_sent_message_copy, sqlite_record_sent_starting_thread};
-pub use demo_playground::{
-    sqlite_remove_demo_playground, sqlite_reset_demo_playground, DEMO_PLAYGROUND_ACCOUNT_ID,
-};
 
 pub use newsletter::{
     add_newsletter_rule, annotate_newsletter_thread, host_matches_suffix, list_newsletter_rules,
@@ -206,8 +201,8 @@ pub use newsletter::{
 
 pub use oauth_mail::{
     bind_oauth_tokens_for_account, ensure_valid_access_token, forget_oauth_tokens,
-    init_oauth_tokens_dir, load_oauth_tokens, oauth_google_desktop_login, oauth_microsoft_desktop_login,
-    oauth_imap_username, store_oauth_tokens, MailOAuthProvider, OAuthDesktopLoginOutcome,
+    init_oauth_tokens_dir, load_oauth_tokens, oauth_google_desktop_login, oauth_imap_username,
+    oauth_microsoft_desktop_login, store_oauth_tokens, MailOAuthProvider, OAuthDesktopLoginOutcome,
     StoredMailOAuthTokens,
 };
 
@@ -264,7 +259,8 @@ pub(crate) fn resolve_scoped_mailbox_for_account(
     let mut seen = HashSet::<String>::new();
     let mut candidates: Vec<String> = Vec::new();
 
-    let mut stmt = connection.prepare("SELECT DISTINCT mailbox FROM threads WHERE account_id = ?1")?;
+    let mut stmt =
+        connection.prepare("SELECT DISTINCT mailbox FROM threads WHERE account_id = ?1")?;
     for row in stmt.query_map(params![aid], |r| r.get::<_, String>(0))? {
         let m = row?;
         if seen.insert(m.clone()) {
@@ -302,7 +298,8 @@ pub(crate) fn resolve_scoped_mailbox_from_path(
     requested: &str,
 ) -> Result<String, String> {
     let connection = open_sqlite_migrated(db_path.as_ref()).map_err(|e| e.to_string())?;
-    resolve_scoped_mailbox_for_account(&connection, account_id, requested).map_err(|e| e.to_string())
+    resolve_scoped_mailbox_for_account(&connection, account_id, requested)
+        .map_err(|e| e.to_string())
 }
 
 pub fn sqlite_list_threads_page_scoped(
@@ -364,7 +361,126 @@ pub fn sqlite_list_threads_page_scoped(
         let (id, subject, tags, followed) = row?;
         let thread = build_thread_from_row(&connection, id, subject, tags, followed)?;
         let mut item = thread.list_item(resolved.clone());
-        item.is_newsletter_thread = newsletter::thread_blocks_reply(&thread, &account_emails, &rules);
+        let aid = account_id.trim();
+        if !aid.is_empty() {
+            item.account_id = Some(aid.to_string());
+        }
+        item.is_newsletter_thread =
+            newsletter::thread_blocks_reply(&thread, &account_emails, &rules);
+        out.push(item);
+    }
+    Ok(out)
+}
+
+/// Liste paginée des fils récents des boîtes INBOX-like, **tous comptes** confondus.
+///
+/// Réutilise [`crate::org_scan::is_inbox_like_mailbox`] pour sélectionner les dossiers
+/// (ex. `INBOX`, `…/Inbox`, « Boîte de réception »). Chaque élément a `account_id` renseigné.
+pub fn sqlite_list_threads_page_unified_inbox(
+    db_path: impl AsRef<Path>,
+    limit: usize,
+    offset: usize,
+) -> Result<Vec<ThreadListItem>, rusqlite::Error> {
+    use crate::org_scan::is_inbox_like_mailbox;
+    use std::collections::HashMap;
+
+    let connection = open_sqlite_migrated(db_path.as_ref())?;
+    seed_if_empty(&connection)?;
+    let rules = newsletter::list_newsletter_rules_connection(&connection)?;
+
+    let mut account_email_by_id: HashMap<String, String> = HashMap::new();
+    {
+        let mut stmt = connection.prepare("SELECT id, lower(trim(email)) FROM accounts")?;
+        for row in stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })? {
+            let (id, email) = row?;
+            if !email.is_empty() {
+                account_email_by_id.insert(id, email);
+            }
+        }
+    }
+
+    let mut seen = HashSet::<(String, String)>::new();
+    let mut inbox_pairs: Vec<(String, String)> = Vec::new();
+    {
+        let mut stmt = connection.prepare(
+            "SELECT DISTINCT account_id, mailbox FROM threads
+             UNION
+             SELECT DISTINCT account_id, mailbox FROM messages",
+        )?;
+        for row in stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })? {
+            let (aid, mb) = row?;
+            let aid = aid.trim().to_string();
+            if aid.is_empty() || !is_inbox_like_mailbox(&mb) {
+                continue;
+            }
+            let key = (aid.clone(), mb.trim().to_ascii_lowercase());
+            if seen.insert(key) {
+                inbox_pairs.push((aid, mb));
+            }
+        }
+    }
+
+    if inbox_pairs.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    connection.execute_batch(
+        "CREATE TEMP TABLE IF NOT EXISTS _rm_unified_inbox (
+            account_id TEXT NOT NULL,
+            mailbox TEXT NOT NULL
+        );",
+    )?;
+    connection.execute("DELETE FROM _rm_unified_inbox", [])?;
+    for (aid, mb) in &inbox_pairs {
+        connection.execute(
+            "INSERT INTO _rm_unified_inbox(account_id, mailbox) VALUES (?1, ?2)",
+            params![aid.as_str(), mb.as_str()],
+        )?;
+    }
+
+    let mut statement = connection.prepare(
+        "
+        SELECT id, subject, tags, COALESCE(is_followed, 0), account_id, mailbox FROM threads
+        WHERE trim(account_id) != ''
+          AND EXISTS (
+            SELECT 1 FROM messages m
+            INNER JOIN _rm_unified_inbox u
+              ON u.account_id = m.account_id
+             AND lower(trim(u.mailbox)) = lower(trim(m.mailbox))
+            WHERE m.thread_id = threads.id
+              AND m.account_id = threads.account_id
+          )
+        ORDER BY
+          (SELECT max(received_at) FROM messages WHERE thread_id = threads.id) DESC,
+          id
+        LIMIT ?1 OFFSET ?2
+        ",
+    )?;
+    let mut out = Vec::new();
+    for row in statement.query_map(params![limit as i64, offset as i64], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, i64>(3)? != 0,
+            row.get::<_, String>(4)?,
+            row.get::<_, String>(5)?,
+        ))
+    })? {
+        let (id, subject, tags, followed, aid, mbox) = row?;
+        let thread = build_thread_from_row(&connection, id, subject, tags, followed)?;
+        let mut item = thread.list_item(mbox.trim().to_string());
+        item.account_id = Some(aid.clone());
+        let account_emails = account_email_by_id
+            .get(&aid)
+            .map(|e| vec![e.clone()])
+            .unwrap_or_default();
+        item.is_newsletter_thread =
+            newsletter::thread_blocks_reply(&thread, &account_emails, &rules);
         out.push(item);
     }
     Ok(out)
@@ -418,7 +534,12 @@ pub fn sqlite_list_followed_threads_page(
         let (id, subject, tags, followed, mbox) = row?;
         let thread = build_thread_from_row(&connection, id, subject, tags, followed)?;
         let mut item = thread.list_item(mbox.trim().to_string());
-        item.is_newsletter_thread = newsletter::thread_blocks_reply(&thread, &account_emails, &rules);
+        let aid = account_id.trim();
+        if !aid.is_empty() {
+            item.account_id = Some(aid.to_string());
+        }
+        item.is_newsletter_thread =
+            newsletter::thread_blocks_reply(&thread, &account_emails, &rules);
         out.push(item);
     }
     Ok(out)
@@ -472,6 +593,10 @@ pub fn sqlite_list_threads_page_account(
         let (id, subject, tags, followed, mbox) = row?;
         let thread = build_thread_from_row(&connection, id, subject, tags, followed)?;
         let mut item = thread.list_item(mbox.trim().to_string());
+        let aid = account_id.trim();
+        if !aid.is_empty() {
+            item.account_id = Some(aid.to_string());
+        }
         item.is_newsletter_thread =
             newsletter::thread_blocks_reply(&thread, &account_emails, &rules);
         out.push(item);
@@ -578,7 +703,11 @@ pub fn sqlite_ai_cache_backfill_null_expires(db_path: impl AsRef<Path>) -> Resul
 }
 
 /// Écrit ou remplace une entrée `ai_cache` avec expiration selon le préfixe de clé.
-pub fn sqlite_ai_cache_put(db_path: impl AsRef<Path>, key: &str, payload_json: &str) -> Result<(), String> {
+pub fn sqlite_ai_cache_put(
+    db_path: impl AsRef<Path>,
+    key: &str,
+    payload_json: &str,
+) -> Result<(), String> {
     let connection = open_sqlite_migrated(db_path.as_ref()).map_err(|e| e.to_string())?;
     let k = key.trim();
     if k.is_empty() {
@@ -674,11 +803,7 @@ fn query_folder_stats_on_connection(
         let mailbox: String = row.get(0)?;
         let unread: i64 = row.get(1)?;
         let total: i64 = row.get(2)?;
-        Ok((
-            mailbox,
-            unread.max(0) as usize,
-            total.max(0) as usize,
-        ))
+        Ok((mailbox, unread.max(0) as usize, total.max(0) as usize))
     })?;
     rows.collect()
 }
@@ -801,9 +926,10 @@ pub fn sqlite_mailbox_inbox_filter_counts(
 ) -> Result<MailboxInboxFilterCounts, String> {
     let connection = open_sqlite_migrated(db_path.as_ref()).map_err(|e| e.to_string())?;
     let account_id = account_id.trim();
-    let resolved =
-        resolve_scoped_mailbox_for_account(&connection, account_id, mailbox).map_err(|e| e.to_string())?;
-    let rules = newsletter::list_newsletter_rules_connection(&connection).map_err(|e| e.to_string())?;
+    let resolved = resolve_scoped_mailbox_for_account(&connection, account_id, mailbox)
+        .map_err(|e| e.to_string())?;
+    let rules =
+        newsletter::list_newsletter_rules_connection(&connection).map_err(|e| e.to_string())?;
     let account_email: String = connection
         .query_row(
             "SELECT lower(trim(email)) FROM accounts WHERE id = ?1 LIMIT 1",
@@ -1202,7 +1328,10 @@ pub(crate) fn merge_thread_tag_csv(existing_csv: Option<String>, incoming: &[Tag
         .join(",")
 }
 
-pub(crate) fn upsert_account_row(connection: &Connection, account: &Account) -> Result<(), rusqlite::Error> {
+pub(crate) fn upsert_account_row(
+    connection: &Connection,
+    account: &Account,
+) -> Result<(), rusqlite::Error> {
     connection.execute(
         "
             INSERT INTO accounts (
@@ -1698,7 +1827,8 @@ pub(crate) fn invalidate_imap_mailbox_local_state(
     account_id: &str,
     mailbox: &str,
 ) -> Result<(), String> {
-    let mut connection = open_sqlite_migrated(db_path.as_ref()).map_err(|error| error.to_string())?;
+    let mut connection =
+        open_sqlite_migrated(db_path.as_ref()).map_err(|error| error.to_string())?;
     let mailbox = resolve_scoped_mailbox_for_account(&connection, account_id, mailbox)
         .map_err(|error| error.to_string())?;
     let tx = connection
@@ -1777,12 +1907,7 @@ pub(crate) fn update_message_read_by_imap_uid(
         .execute(
             "UPDATE messages SET is_read = ?1
              WHERE account_id = ?2 AND mailbox = ?3 AND imap_uid = ?4",
-            params![
-                i64::from(is_read),
-                account_id,
-                mailbox,
-                imap_uid as i64
-            ],
+            params![i64::from(is_read), account_id, mailbox, imap_uid as i64],
         )
         .map_err(|error| error.to_string())?;
     Ok(n > 0)
@@ -2502,9 +2627,7 @@ mod imap_uid_validity_tests {
             [],
         )
         .expect("msg");
-        assert!(
-            update_message_read_by_imap_uid(&conn, "a1", "INBOX", 99, true).expect("update")
-        );
+        assert!(update_message_read_by_imap_uid(&conn, "a1", "INBOX", 99, true).expect("update"));
         let read: i64 = conn
             .query_row("SELECT is_read FROM messages WHERE id = 'm1'", [], |row| {
                 row.get(0)
@@ -2539,6 +2662,94 @@ mod search_tags_tests {
         let filters: Vec<String> = tags.iter().map(|t| t.as_filter()).collect();
         assert!(filters.contains(&"kind:inbox".to_string()));
         assert!(filters.contains(&"source:imap".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod unified_inbox_tests {
+    use super::*;
+
+    fn insert_account(conn: &Connection, id: &str, email: &str) {
+        conn.execute(
+            "INSERT INTO accounts (id, display_name, email, imap_host, imap_port, imap_security, imap_allow_invalid_tls, smtp_host, smtp_port, smtp_security, smtp_allow_invalid_tls)
+             VALUES (?1, 'Test', ?2, 'h', 993, 'tls', 0, 'h', 465, 'tls', 0)",
+            params![id, email],
+        )
+        .expect("account");
+    }
+
+    fn insert_thread_msg(
+        conn: &Connection,
+        account_id: &str,
+        thread_id: &str,
+        mailbox: &str,
+        received_at: &str,
+        subject: &str,
+    ) {
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags, is_followed)
+             VALUES (?1, ?2, ?3, ?4, ?5, '', 0)",
+            params![thread_id, account_id, mailbox, format!("root-{thread_id}"), subject],
+        )
+        .expect("thread");
+        conn.execute(
+            "INSERT INTO messages (id, thread_id, account_id, mailbox, imap_uid, sender_name, sender_email, subject, received_at, body, is_read, position)
+             VALUES (?1, ?2, ?3, ?4, 1, 'A', 'a@x.com', ?5, ?6, 'body', 0, 0)",
+            params![
+                format!("msg-{thread_id}"),
+                thread_id,
+                account_id,
+                mailbox,
+                subject,
+                received_at
+            ],
+        )
+        .expect("message");
+    }
+
+    #[test]
+    fn unified_inbox_merges_accounts_excludes_non_inbox_orders_by_activity() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("unified.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        insert_account(&conn, "acc-a", "a@example.com");
+        insert_account(&conn, "acc-b", "b@example.com");
+        insert_thread_msg(
+            &conn,
+            "acc-a",
+            "t-old",
+            "INBOX",
+            "2026-01-01T10:00:00Z",
+            "Older inbox",
+        );
+        insert_thread_msg(
+            &conn,
+            "acc-b",
+            "t-new",
+            "INBOX",
+            "2026-06-01T12:00:00Z",
+            "Newer inbox",
+        );
+        insert_thread_msg(
+            &conn,
+            "acc-a",
+            "t-sent",
+            "Sent",
+            "2026-07-01T12:00:00Z",
+            "Sent only",
+        );
+        drop(conn);
+
+        let page = sqlite_list_threads_page_unified_inbox(&path, 50, 0).expect("list");
+        let ids: Vec<&str> = page.iter().map(|t| t.id.0.as_str()).collect();
+        assert_eq!(ids, vec!["t-new", "t-old"]);
+        assert_eq!(page[0].account_id.as_deref(), Some("acc-b"));
+        assert_eq!(page[1].account_id.as_deref(), Some("acc-a"));
+        assert!(!ids.contains(&"t-sent"));
+
+        let page2 = sqlite_list_threads_page_unified_inbox(&path, 1, 1).expect("page2");
+        assert_eq!(page2.len(), 1);
+        assert_eq!(page2[0].id.0, "t-old");
     }
 }
 
@@ -2583,9 +2794,7 @@ mod ai_cache_tests {
         )
         .expect("backdate");
         assert!(
-            sqlite_ai_cache_get(&path, key)
-                .expect("get")
-                .is_none(),
+            sqlite_ai_cache_get(&path, key).expect("get").is_none(),
             "expired entry hidden from get"
         );
         let purged = sqlite_ai_cache_purge_expired(&path).expect("purge");

@@ -23,6 +23,17 @@ File: [`.github/workflows/release.yml`](../.github/workflows/release.yml)
    - Create GitHub Release with `softprops/action-gh-release@v2`
    - Attach built files; auto-generate release notes
 
+### PR quality gates
+
+File: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+
+Runs on push/PR to `main` / `master`:
+
+- Rust: `cargo fmt --check`, `cargo clippy`, `cargo test --workspace --lib --bins`
+- Frontend: `tsc --noEmit`, `npm test` (Vitest)
+
+Local equivalent: `npm run verify:ci`.
+
 ### Cargo audit
 
 File: [`.github/workflows/cargo-audit.yml`](../.github/workflows/cargo-audit.yml)
@@ -43,8 +54,8 @@ Outputs (Cargo **workspace** → repo-root `target/release/`; fallback `src-taur
 
 ## Versioning
 
-- Package version in `package.json`, `src-tauri/tauri.conf.json`, and workspace `Cargo.toml` (currently `0.1.2`)
-- Tag format: `v0.1.2` (must match release workflow pattern)
+- Package version in `package.json`, `src-tauri/tauri.conf.json`, and workspace `Cargo.toml` (currently `0.1.3`)
+- Tag format: `v0.1.3` (must match release workflow pattern)
 
 ## Pre-release checklist
 

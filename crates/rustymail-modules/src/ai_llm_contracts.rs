@@ -143,7 +143,10 @@ pub fn validate_translation_llm_shape(
     Ok(())
 }
 
-pub fn validate_qa_llm_shape(answer: &str, evidence_message_ids: &[String]) -> Result<(), LlmError> {
+pub fn validate_qa_llm_shape(
+    answer: &str,
+    evidence_message_ids: &[String],
+) -> Result<(), LlmError> {
     if answer.chars().count() > MAX_QA_ANSWER_CHARS {
         return Err(err_msg(format!(
             "Q&R : réponse trop longue (max {MAX_QA_ANSWER_CHARS} caractères)."
@@ -182,7 +185,9 @@ pub fn validate_quick_replies_shape<T>(
     for (i, s) in suggestions.iter().enumerate() {
         let (text, tone, rationale) = fields(s);
         if text.trim().is_empty() || text.chars().count() > MAX_QUICK_REPLY_TEXT_CHARS {
-            return Err(err_msg(format!("Réponses rapides : suggestion {i} invalide.")));
+            return Err(err_msg(format!(
+                "Réponses rapides : suggestion {i} invalide."
+            )));
         }
         if tone.chars().count() > 64 || rationale.chars().count() > 240 {
             return Err(err_msg(format!(
@@ -193,7 +198,11 @@ pub fn validate_quick_replies_shape<T>(
     Ok(())
 }
 
-pub fn validate_contact_profile_shape(summary: &str, topics: &[String], tone: &str) -> Result<(), LlmError> {
+pub fn validate_contact_profile_shape(
+    summary: &str,
+    topics: &[String],
+    tone: &str,
+) -> Result<(), LlmError> {
     if summary.trim().is_empty() || summary.chars().count() > MAX_CONTACT_SUMMARY_CHARS {
         return Err(err_msg("Profil contact : résumé invalide."));
     }
@@ -209,9 +218,7 @@ pub fn validate_contact_profile_shape(summary: &str, topics: &[String], tone: &s
 fn is_valid_search_domain_label(label: &str) -> bool {
     !label.is_empty()
         && label.len() <= 63
-        && label
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+        && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
         && !label.starts_with('-')
         && !label.ends_with('-')
 }
@@ -335,8 +342,14 @@ mod tests {
             normalize_search_nl_sender("  Alice@Example.COM  ").as_deref(),
             Some("alice@example.com")
         );
-        assert_eq!(normalize_search_nl_sender("ionos.fr").as_deref(), Some("ionos.fr"));
-        assert_eq!(normalize_search_nl_sender("@ionos.fr").as_deref(), Some("ionos.fr"));
+        assert_eq!(
+            normalize_search_nl_sender("ionos.fr").as_deref(),
+            Some("ionos.fr")
+        );
+        assert_eq!(
+            normalize_search_nl_sender("@ionos.fr").as_deref(),
+            Some("ionos.fr")
+        );
         assert!(normalize_search_nl_sender("not an email").is_none());
         assert!(normalize_search_nl_sender("a@b").is_none());
         assert_eq!(
@@ -353,10 +366,20 @@ mod tests {
     #[test]
     fn extra_feature_validators_reject_oversized_shapes() {
         assert!(validate_rewrite_llm_shape("").is_err());
-        let replies = vec![("x".repeat(MAX_QUICK_REPLY_TEXT_CHARS + 1), "neutre".to_string(), "r".to_string())];
+        let replies = vec![(
+            "x".repeat(MAX_QUICK_REPLY_TEXT_CHARS + 1),
+            "neutre".to_string(),
+            "r".to_string(),
+        )];
         assert!(validate_quick_replies_shape(&replies, |r| (&r.0, &r.1, &r.2)).is_err());
         assert!(validate_contact_profile_shape("ok", &vec!["x".into(); 20], "neutre").is_err());
-        assert!(validate_search_nl_shape(Some(&"x".repeat(MAX_SEARCH_TEXT_CHARS + 1)), 0, &[], None).is_err());
+        assert!(validate_search_nl_shape(
+            Some(&"x".repeat(MAX_SEARCH_TEXT_CHARS + 1)),
+            0,
+            &[],
+            None
+        )
+        .is_err());
     }
 
     #[test]

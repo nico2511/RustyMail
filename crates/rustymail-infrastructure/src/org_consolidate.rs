@@ -42,11 +42,7 @@ pub fn scan_duplicate_threads(
     let mut by_root: std::collections::HashMap<String, DupGroup> = std::collections::HashMap::new();
     for row in rows.flatten() {
         let root = row.4.clone();
-        let ts = row
-            .5
-            .as_deref()
-            .map(|s| s.to_string())
-            .unwrap_or_default();
+        let ts = row.5.as_deref().map(|s| s.to_string()).unwrap_or_default();
         let ts_key = ts.parse::<i64>().unwrap_or(0);
         by_root
             .entry(root)
@@ -70,11 +66,7 @@ pub fn scan_duplicate_threads(
             duplicate_refs.push(OrgThreadRef {
                 thread_id: m.0.clone(),
                 mailbox: m.1.clone(),
-                subject: format!(
-                    "{} → doublon de {}",
-                    m.2,
-                    canonical.2
-                ),
+                subject: format!("{} → doublon de {}", m.2, canonical.2),
                 ..Default::default()
             });
             if duplicate_refs.len() >= 500 {
@@ -100,7 +92,9 @@ pub fn scan_duplicate_threads(
         kind: OrgProposalKind::DuplicateThreadCrossMailbox,
         section: "consolidate".to_string(),
         title: "Fils dupliqués entre dossiers".to_string(),
-        rationale: "Même conversation présente dans plusieurs dossiers — archiver les copies redondantes.".to_string(),
+        rationale:
+            "Même conversation présente dans plusieurs dossiers — archiver les copies redondantes."
+                .to_string(),
         thread_ids: sample.iter().map(|r| r.thread_id.clone()).collect(),
         thread_refs: sample,
         suggested_action: OrgSuggestedAction::Archive,
@@ -116,15 +110,15 @@ pub fn scan_duplicate_threads(
     }])
 }
 
-fn pick_canonical(members: &[(String, String, String, i64, i64)]) -> &(String, String, String, i64, i64) {
+fn pick_canonical(
+    members: &[(String, String, String, i64, i64)],
+) -> &(String, String, String, i64, i64) {
     members
         .iter()
         .max_by(|a, b| {
             let score_a = canonical_score(a);
             let score_b = canonical_score(b);
-            score_a
-                .cmp(&score_b)
-                .then_with(|| a.4.cmp(&b.4))
+            score_a.cmp(&score_b).then_with(|| a.4.cmp(&b.4))
         })
         .unwrap()
 }

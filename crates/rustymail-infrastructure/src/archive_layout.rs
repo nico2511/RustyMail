@@ -6,12 +6,32 @@ use rustymail_domain::ArchiveLayout;
 pub fn month_label(locale: &str, month: u32) -> String {
     let loc = locale.trim().to_ascii_lowercase();
     let names_fr = [
-        "janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre",
-        "octobre", "novembre", "decembre",
+        "janvier",
+        "fevrier",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "aout",
+        "septembre",
+        "octobre",
+        "novembre",
+        "decembre",
     ];
     let names_en = [
-        "january", "february", "march", "april", "may", "june", "july", "august", "september",
-        "october", "november", "december",
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
     ];
     let idx = month.saturating_sub(1).min(11) as usize;
     if loc.starts_with("fr") {
@@ -29,11 +49,7 @@ pub fn archive_mailbox_path(
     let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(received_at_rfc3339)
         .ok()
         .map(|d| d.with_timezone(&Utc))
-        .or_else(|| {
-            received_at_rfc3339
-                .parse::<DateTime<Utc>>()
-                .ok()
-        })?;
+        .or_else(|| received_at_rfc3339.parse::<DateTime<Utc>>().ok())?;
     let year = dt.format("%Y").to_string();
     let month_num = dt.format("%m").to_string();
     let month_name = month_label(locale, dt.month());

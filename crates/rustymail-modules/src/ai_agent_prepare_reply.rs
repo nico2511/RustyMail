@@ -4,12 +4,12 @@ use std::sync::atomic::AtomicBool;
 
 use serde::{Deserialize, Serialize};
 
+use crate::ai_assist_facts::facts_block_for_draft;
+use crate::ai_assist_thread::facts_support_scheduling;
 use crate::ai_llm_util::{
     budget_report, cancelled_llm_err, gen_params_json_for_prompt, gen_params_text_echo_for_prompt,
     parse_model_json, stream_chunk_or_cancel, truncate_chars,
 };
-use crate::ai_assist_facts::facts_block_for_draft;
-use crate::ai_assist_thread::facts_support_scheduling;
 use rustymail_domain::{AssistFactsSnapshot, AssistUserPrefs};
 use rustymail_llm::{LlmEngine, LlmError};
 
@@ -73,9 +73,7 @@ fn draft_reply_prompts(
     let ctx = truncate_chars(thread_context, 24_000);
     let tone = user_prefs.tone.trim();
     let tone = if tone.is_empty() { "neutre" } else { tone };
-    let facts_hint = prior_facts
-        .map(facts_block_for_draft)
-        .unwrap_or_default();
+    let facts_hint = prior_facts.map(facts_block_for_draft).unwrap_or_default();
     let hint = prior_intent
         .map(|i| {
             format!(
@@ -84,9 +82,7 @@ fn draft_reply_prompts(
             )
         })
         .unwrap_or_else(|| format!("\nPréférence utilisateur : {tone}{facts_hint}"));
-    let intent_needs_scheduling = prior_intent
-        .map(|i| i.needs_scheduling)
-        .unwrap_or(false);
+    let intent_needs_scheduling = prior_intent.map(|i| i.needs_scheduling).unwrap_or(false);
     let scheduling_note = if intent_needs_scheduling && facts_support_scheduling(prior_facts) {
         "\nLe fil demande un rendez-vous : si des créneaux horaires précis seront proposés à l’étape suivante, limite-toi à l’accord de principe (disponibilité générale) sans lister jours/heures dans ce brouillon."
     } else {
@@ -161,11 +157,7 @@ pub fn agent_prepare_reply_step(
     let lang = draft_language.trim();
     let lang = if lang.is_empty() { "fr" } else { lang };
     let tz = user_prefs.timezone.trim();
-    let tz = if tz.is_empty() {
-        "Europe/Paris"
-    } else {
-        tz
-    };
+    let tz = if tz.is_empty() { "Europe/Paris" } else { tz };
     match step {
         AgentPrepareReplyStep::AnalyzeIntent => {
             let system = crate::prompts::system_prompt_for_language("agent_intent", lang);

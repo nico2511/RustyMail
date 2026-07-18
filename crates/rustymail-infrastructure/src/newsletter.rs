@@ -230,7 +230,9 @@ pub fn list_newsletter_rules(db_path: &Path) -> Result<Vec<NewsletterRule>, rusq
 }
 
 /// Liste les règles sans ouvrir une nouvelle connexion (partage avec le chemin liste fils).
-pub fn list_newsletter_rules_connection(connection: &Connection) -> Result<Vec<NewsletterRule>, rusqlite::Error> {
+pub fn list_newsletter_rules_connection(
+    connection: &Connection,
+) -> Result<Vec<NewsletterRule>, rusqlite::Error> {
     let mut statement = connection.prepare(
         "SELECT domain, local_part FROM newsletter_rules ORDER BY lower(domain), lower(local_part)",
     )?;

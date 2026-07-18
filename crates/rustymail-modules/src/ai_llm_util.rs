@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::ai_llm_contracts::untrusted_mail_content_block;
 use rustymail_domain::{AssistLlmTier, TokenBudgetReport};
-use rustymail_llm::{redact_user_content_if_needed, LlmEngine, LlmGenParams, LlmError};
+use rustymail_llm::{redact_user_content_if_needed, LlmEngine, LlmError, LlmGenParams};
 
 /// Contenu mail encadré pour prompt LLM ; redaction PII si le moteur exfiltre vers un tiers (OpenRouter, API distante).
 pub(crate) fn untrusted_mail_for_engine(engine: &LlmEngine, label: &str, content: &str) -> String {
@@ -105,7 +105,9 @@ pub(crate) fn gen_params_json_for_prompt(
     min: u32,
     max: u32,
 ) -> LlmGenParams {
-    gen_params_json(resolve_max_output_tokens(engine, system, user, min, max, 64))
+    gen_params_json(resolve_max_output_tokens(
+        engine, system, user, min, max, 64,
+    ))
 }
 
 pub(crate) fn gen_params_json_for_prompt_with_grammar(
@@ -142,7 +144,9 @@ pub(crate) fn gen_params_text_for_prompt(
     min: u32,
     max: u32,
 ) -> LlmGenParams {
-    gen_params_text(resolve_max_output_tokens(engine, system, user, min, max, 64))
+    gen_params_text(resolve_max_output_tokens(
+        engine, system, user, min, max, 64,
+    ))
 }
 
 pub(crate) fn gen_params_text_echo_for_prompt(
@@ -244,10 +248,7 @@ pub(crate) fn extract_json_candidate(raw: &str) -> String {
     let t = raw.trim();
     if let Some(start_fence) = t.find("```") {
         let after = &t[start_fence + 3..];
-        let after = after
-            .strip_prefix("json")
-            .unwrap_or(after)
-            .trim_start();
+        let after = after.strip_prefix("json").unwrap_or(after).trim_start();
         if let Some(end_fence) = after.find("```") {
             return after[..end_fence].trim().to_string();
         }
@@ -384,13 +385,11 @@ fn parse_json_with_optional_repair<T: DeserializeOwned>(s: &str) -> Result<T, Ll
                 return Ok(v);
             }
             if let Some(dropped) = repair_truncated_json_drop_tail(&normalized) {
-                return serde_json::from_str(&dropped).map_err(|e3| {
-                    LlmError::InvalidJson(format!("{msg} — réparation: {e3}"))
-                });
+                return serde_json::from_str(&dropped)
+                    .map_err(|e3| LlmError::InvalidJson(format!("{msg} — réparation: {e3}")));
             }
-            serde_json::from_str(&repaired).map_err(|e2| {
-                LlmError::InvalidJson(format!("{msg} — réparation: {e2}"))
-            })
+            serde_json::from_str(&repaired)
+                .map_err(|e2| LlmError::InvalidJson(format!("{msg} — réparation: {e2}")))
         }
     }
 }

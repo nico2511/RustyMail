@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 use rusqlite::{params, Connection, OptionalExtension};
-use rustymail_domain::{lexical_search_terms, EntityKind, SearchMode, SearchQuery, Tag, ThreadListItem};
+use rustymail_domain::{
+    lexical_search_terms, EntityKind, SearchMode, SearchQuery, Tag, ThreadListItem,
+};
 
 use crate::{
     build_thread_from_row, list_newsletter_rules_connection, open_sqlite_migrated,
@@ -128,7 +130,8 @@ pub fn semantic_embedding_counts_snapshot(
     }
 
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
-    let resolved = resolve_scoped_mailbox_for_account(&conn, account_id, mailbox).map_err(|e| e.to_string())?;
+    let resolved = resolve_scoped_mailbox_for_account(&conn, account_id, mailbox)
+        .map_err(|e| e.to_string())?;
 
     let embeddings_total_for_account: u64 = conn
         .query_row(
@@ -278,7 +281,8 @@ pub fn reindex_semantic_mailbox(
     }
 
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
-    let resolved = resolve_scoped_mailbox_for_account(&conn, account_id, mailbox).map_err(|e| e.to_string())?;
+    let resolved = resolve_scoped_mailbox_for_account(&conn, account_id, mailbox)
+        .map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
             "
@@ -335,23 +339,20 @@ fn message_involves_contact(m: &rustymail_domain::Message, needle_lc: &str) -> b
     if m.sender.email.to_ascii_lowercase().contains(needle_lc) {
         return true;
     }
-    if m
-        .sender
+    if m.sender
         .name
         .as_deref()
         .is_some_and(|n| n.to_ascii_lowercase().contains(needle_lc))
     {
         return true;
     }
-    if m
-        .recipients
+    if m.recipients
         .iter()
         .any(|r| r.email.to_ascii_lowercase().contains(needle_lc))
     {
         return true;
     }
-    if m
-        .reply_to
+    if m.reply_to
         .iter()
         .any(|r| r.email.to_ascii_lowercase().contains(needle_lc))
     {
@@ -552,10 +553,7 @@ fn tag_matches_query(thread_tag: &Tag, query_tag: &Tag) -> bool {
 }
 
 fn thread_satisfies_tag(thread: &rustymail_domain::Thread, query_tag: &Tag) -> bool {
-    thread
-        .tags
-        .iter()
-        .any(|t| tag_matches_query(t, query_tag))
+    thread.tags.iter().any(|t| tag_matches_query(t, query_tag))
         || thread
             .messages
             .iter()
@@ -660,9 +658,7 @@ pub fn sqlite_search_threads_unified(
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
 
     let scope_resolved: Option<String> = if let Some(mb) = raw_mailbox {
-        Some(
-            resolve_scoped_mailbox_for_account(&conn, account_id, mb).map_err(|e| e.to_string())?,
-        )
+        Some(resolve_scoped_mailbox_for_account(&conn, account_id, mb).map_err(|e| e.to_string())?)
     } else {
         None
     };
@@ -880,13 +876,14 @@ pub fn sqlite_search_threads_unified(
         let Some((id, subject, tags, mailbox, followed)) = row else {
             continue;
         };
-        let thread = build_thread_from_row(&conn, id, subject, tags, followed)
-            .map_err(|e| e.to_string())?;
+        let thread =
+            build_thread_from_row(&conn, id, subject, tags, followed).map_err(|e| e.to_string())?;
         if !matches_thread_filters(&thread, query) {
             continue;
         }
         let mut item = thread.list_item(mailbox.trim().to_string());
-        item.is_newsletter_thread = thread_blocks_reply(&thread, &account_emails, &newsletter_rules);
+        item.is_newsletter_thread =
+            thread_blocks_reply(&thread, &account_emails, &newsletter_rules);
         out.push(item);
     }
 

@@ -27,7 +27,8 @@ pub fn openrouter_api_key_clear() {
     let Ok(_) = keyring::use_native_store(false) else {
         return;
     };
-    let Ok(entry) = keyring_core::Entry::new(crate::KEYRING_SERVICE, OPENROUTER_KEYRING_USERNAME) else {
+    let Ok(entry) = keyring_core::Entry::new(crate::KEYRING_SERVICE, OPENROUTER_KEYRING_USERNAME)
+    else {
         return;
     };
     let _ = entry.delete_credential();

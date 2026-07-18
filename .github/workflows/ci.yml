@@ -1,0 +1,79 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust (fmt · clippy · test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: System deps (SQLCipher / OpenSSL)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+      # Clippy workspace en warn ; domaine déjà strict (-D warnings).
+      - name: cargo clippy (workspace)
+        run: cargo clippy --workspace --all-targets
+
+      - name: cargo clippy (domain -D warnings)
+        run: cargo clippy -p rustymail-domain --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace --lib --bins
+
+  rust-windows:
+    name: Rust smoke (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: cargo test (lib/bins)
+        run: cargo test --workspace --lib --bins
+
+  frontend:
+    name: Frontend (tsc · vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Vitest
+        run: npm test

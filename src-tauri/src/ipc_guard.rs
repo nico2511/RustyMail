@@ -32,11 +32,7 @@ const ACK_DELETE_MAILBOX_WITH_CONTENTS: &str = "delete-mailbox-with-contents";
 const ACK_SEND_DRAFT: &str = "send-draft";
 const ACK_OPEN_ATTACHMENT: &str = "open-attachment";
 const ACK_BULK_TRASH_ORG: &str = "bulk-trash-org";
-const AI_CACHE_KEY_PREFIXES: &[&str] = &[
-    "summary:v2:",
-    "translate:v2:",
-    "contact_profile:v1:",
-];
+const AI_CACHE_KEY_PREFIXES: &[&str] = &["summary:v2:", "translate:v2:", "contact_profile:v1:"];
 
 fn reject_nul(label: &'static str, s: &str) -> Result<(), String> {
     if s.as_bytes().contains(&0) {
@@ -47,7 +43,9 @@ fn reject_nul(label: &'static str, s: &str) -> Result<(), String> {
 
 fn reject_len(label: &'static str, s: &str, max: usize) -> Result<(), String> {
     if s.len() > max {
-        return Err(format!("{label}: valeur trop longue (max {max} caractères)."));
+        return Err(format!(
+            "{label}: valeur trop longue (max {max} caractères)."
+        ));
     }
     Ok(())
 }
@@ -68,7 +66,11 @@ fn validate_nonempty_trimmed(label: &'static str, s: &str, max: usize) -> Result
     Ok(())
 }
 
-fn validate_ack(label: &'static str, got: Option<&str>, expected: &'static str) -> Result<(), String> {
+fn validate_ack(
+    label: &'static str,
+    got: Option<&str>,
+    expected: &'static str,
+) -> Result<(), String> {
     match got.map(str::trim) {
         Some(v) if v == expected => Ok(()),
         _ => Err(format!("{label}: confirmation backend requise.")),
@@ -200,6 +202,20 @@ pub fn validate_contact_email(email: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn validate_newsletter_rule_input(input: &str) -> Result<(), String> {
+    reject_nul("newsletterRule", input)?;
+    reject_len("newsletterRule", input, MAX_EMAIL_LEN)?;
+    let s = input.trim();
+    if s.is_empty() {
+        return Err("newsletterRule: valeur vide.".into());
+    }
+    if s.contains('@') {
+        return validate_contact_email(s);
+    }
+    let domain = s.strip_prefix("*.").unwrap_or(s);
+    validate_domain_label(domain)
+}
+
 pub fn validate_domain_label(domain: &str) -> Result<(), String> {
     validate_nonempty_trimmed("domain", domain, MAX_DOMAIN_LEN)?;
     if domain.trim().contains('@') {
@@ -245,7 +261,9 @@ pub fn validate_ai_cache_key(key: &str) -> Result<(), String> {
 pub fn normalize_page_size(page_size: Option<usize>, default: usize) -> Result<usize, String> {
     let raw = page_size.unwrap_or(default).max(1);
     if raw > MAX_PAGE_SIZE {
-        return Err(format!("pageSize: valeur trop grande (max {MAX_PAGE_SIZE})."));
+        return Err(format!(
+            "pageSize: valeur trop grande (max {MAX_PAGE_SIZE})."
+        ));
     }
     Ok(raw)
 }
@@ -253,7 +271,9 @@ pub fn normalize_page_size(page_size: Option<usize>, default: usize) -> Result<u
 pub fn normalize_page_offset(page_offset: Option<usize>) -> Result<usize, String> {
     let raw = page_offset.unwrap_or(0);
     if raw > MAX_PAGE_OFFSET {
-        return Err(format!("pageOffset: valeur trop grande (max {MAX_PAGE_OFFSET})."));
+        return Err(format!(
+            "pageOffset: valeur trop grande (max {MAX_PAGE_OFFSET})."
+        ));
     }
     Ok(raw)
 }
@@ -261,9 +281,9 @@ pub fn normalize_page_offset(page_offset: Option<usize>) -> Result<usize, String
 pub fn normalize_imap_sync_limit(limit: Option<usize>) -> Result<Option<usize>, String> {
     match limit {
         Some(v) if v == 0 => Ok(Some(1)),
-        Some(v) if v > MAX_IMAP_SYNC_LIMIT => {
-            Err(format!("limit: valeur trop grande (max {MAX_IMAP_SYNC_LIMIT})."))
-        }
+        Some(v) if v > MAX_IMAP_SYNC_LIMIT => Err(format!(
+            "limit: valeur trop grande (max {MAX_IMAP_SYNC_LIMIT})."
+        )),
         other => Ok(other),
     }
 }
@@ -306,7 +326,11 @@ pub fn validate_draft_for_ipc(draft: &Draft) -> Result<(), String> {
     reject_nul("draft.subject", &draft.subject)?;
     reject_len("draft.subject", &draft.subject, MAX_DRAFT_SUBJECT_LEN)?;
     reject_nul("draft.markdownBody", &draft.markdown_body)?;
-    reject_len("draft.markdownBody", &draft.markdown_body, MAX_DRAFT_BODY_LEN)?;
+    reject_len(
+        "draft.markdownBody",
+        &draft.markdown_body,
+        MAX_DRAFT_BODY_LEN,
+    )?;
     if draft.to.len() + draft.cc.len() + draft.bcc.len() > MAX_DRAFT_RECIPIENTS {
         return Err(format!(
             "draft.recipients: trop de destinataires (max {MAX_DRAFT_RECIPIENTS})."
@@ -370,9 +394,8 @@ pub fn validate_search_query(query: &SearchQuery) -> Result<(), String> {
         reject_nul("query.senders", s)?;
         reject_len("query.senders", s, MAX_EMAIL_LEN)
             .map_err(|e| format!("query.senders[{i}]: {e}"))?;
-        rustymail_modules::ai_llm_contracts::normalize_search_nl_sender(s).ok_or_else(|| {
-            format!("query.senders[{i}]: email ou domaine invalide.")
-        })?;
+        rustymail_modules::ai_llm_contracts::normalize_search_nl_sender(s)
+            .ok_or_else(|| format!("query.senders[{i}]: email ou domaine invalide."))?;
     }
     if let Some(lang) = query.language.as_deref() {
         if !lang.trim().is_empty() {
@@ -383,7 +406,10 @@ pub fn validate_search_query(query: &SearchQuery) -> Result<(), String> {
     Ok(())
 }
 
-pub fn validate_message_attachment_ids(message_id: &str, attachment_id: &str) -> Result<(), String> {
+pub fn validate_message_attachment_ids(
+    message_id: &str,
+    attachment_id: &str,
+) -> Result<(), String> {
     validate_message_id(message_id)?;
     validate_nonempty_trimmed("attachmentId", attachment_id, MAX_TOKEN_LEN)
 }
@@ -481,5 +507,4 @@ mod tests {
         assert!(normalize_page_offset(Some(MAX_PAGE_OFFSET + 1)).is_err());
         assert!(normalize_imap_sync_limit(Some(MAX_IMAP_SYNC_LIMIT + 1)).is_err());
     }
-
 }

@@ -5,37 +5,34 @@ use rustymail_domain::{
 };
 use rustymail_infrastructure::SplitSendResult;
 use rustymail_infrastructure::{
-    build_llm_status, decode_audio_base64, dictation_api_key_clear, dictation_api_key_present,
-    dictation_api_key_set, ensure_local_llm_gguf_download, list_cached_gguf_filenames,
-    llm_gguf_download_cancel_clear, llm_gguf_download_cancel_request,
-    llama_server_api_key_clear,
-    llama_server_api_key_present, llama_server_api_key_set, openrouter_api_key_clear,
-    openrouter_api_key_present,
-    openrouter_api_key_set,
-    llm_singleton, load_app_prefs, prefs_path_from_db_dir, peek_attachment_identity,
-    persist_allow_invalid_tls_from_ui_checkbox,
-    attachment_needs_explicit_ack, save_app_prefs_validated,
-    log_attachment_audited, PREFIX_RISK_CONFIRM,
-    transcribe_and_maybe_translate, AppPrefs, DraftRevisionListItem, ImapSyncResult, NewsletterRule,
-    SavedDraftListItem, SavedDraftOpenResult, SemanticReindexStats, SyncMailboxesOutcome,
+    attachment_needs_explicit_ack, build_llm_status, decode_audio_base64, dictation_api_key_clear,
+    dictation_api_key_present, dictation_api_key_set, ensure_local_llm_gguf_download,
+    list_cached_gguf_filenames, llama_server_api_key_clear, llama_server_api_key_present,
+    llama_server_api_key_set, llm_gguf_download_cancel_clear, llm_gguf_download_cancel_request,
+    llm_singleton, load_app_prefs, log_attachment_audited, openrouter_api_key_clear,
+    openrouter_api_key_present, openrouter_api_key_set, peek_attachment_identity,
+    persist_allow_invalid_tls_from_ui_checkbox, prefs_path_from_db_dir, save_app_prefs_validated,
+    transcribe_and_maybe_translate, AppPrefs, DraftRevisionListItem, ImapSyncResult,
+    NewsletterRule, SavedDraftListItem, SavedDraftOpenResult, SemanticReindexStats,
+    SyncMailboxesOutcome, PREFIX_RISK_CONFIRM,
 };
+mod activity_commands;
+mod address_commands;
+mod folder_commands;
+mod imap_push;
 mod ipc_guard;
 mod llama_server_spawn;
-mod address_commands;
+mod llama_winget;
 mod llm_assist;
 mod llm_commands;
 mod llm_stream;
-mod folder_commands;
-mod org_commands;
-mod saved_search_commands;
-mod activity_commands;
-mod imap_push;
-mod rate_guard;
-mod llama_winget;
 mod minilm_download;
 mod model_bootstrap;
-mod whisper_dictation;
+mod org_commands;
+mod rate_guard;
+mod saved_search_commands;
 mod webview_microphone;
+mod whisper_dictation;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -332,11 +329,21 @@ fn list_threads(
     page_offset: Option<usize>,
     followed_only: Option<bool>,
     account_wide: Option<bool>,
+    // When true: INBOX-like across all accounts (ignores accountId/mailbox).
+    unified: Option<bool>,
 ) -> Result<Vec<ThreadListItem>, String> {
     ipc_guard::validate_optional_account_id(account_id.as_deref())?;
     ipc_guard::validate_optional_mailbox(mailbox.as_deref())?;
     let normalized_page_size = ipc_guard::normalize_page_size(page_size, 50)?;
     let normalized_page_offset = ipc_guard::normalize_page_offset(page_offset)?;
+    if unified == Some(true) {
+        return rustymail_infrastructure::sqlite_list_threads_page_unified_inbox(
+            &paths.db_path,
+            normalized_page_size,
+            normalized_page_offset,
+        )
+        .map_err(|e| e.to_string());
+    }
     if followed_only == Some(true) {
         if let Some(a) = account_id.as_deref() {
             let a = a.trim();
@@ -585,17 +592,23 @@ fn prepare_reply_all(
     thread_id: String,
 ) -> Result<Draft, String> {
     assert_reply_allowed_for_thread(&paths, &core, &thread_id)?;
+    let exclude: Vec<String> = rustymail_infrastructure::load_accounts(&paths.db_path)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|a| a.email)
+        .filter(|e| !e.trim().is_empty())
+        .collect();
     if let Some(thread) =
         rustymail_infrastructure::sqlite_open_thread_by_id(&paths.db_path, &thread_id)
             .map_err(|e| e.to_string())?
     {
         let mut temp = AppCore::new(vec![thread]);
         return temp
-            .prepare_reply_all(&ThreadId(thread_id))
+            .prepare_reply_all(&ThreadId(thread_id), &exclude)
             .map_err(|error| error.to_string());
     }
     let mut core = core.lock().map_err(|_| "core lock poisoned".to_string())?;
-    core.prepare_reply_all(&ThreadId(thread_id))
+    core.prepare_reply_all(&ThreadId(thread_id), &exclude)
         .map_err(|error| error.to_string())
 }
 
@@ -606,11 +619,13 @@ fn list_newsletter_rules(paths: State<'_, AppPaths>) -> Result<Vec<NewsletterRul
 
 #[tauri::command]
 fn add_newsletter_rule(paths: State<'_, AppPaths>, input: String) -> Result<(), String> {
+    ipc_guard::validate_newsletter_rule_input(&input)?;
     rustymail_infrastructure::add_newsletter_rule(&paths.db_path, input)
 }
 
 #[tauri::command]
 fn remove_newsletter_rule(paths: State<'_, AppPaths>, input: String) -> Result<(), String> {
+    ipc_guard::validate_newsletter_rule_input(&input)?;
     let rule = rustymail_infrastructure::parse_newsletter_rule_input(&input)?;
     rustymail_infrastructure::remove_newsletter_rule(&paths.db_path, rule.domain, rule.local_part)
 }
@@ -698,6 +713,57 @@ fn draft_revision_restore(
         &paths.db_path,
         account_id.trim(),
         revision_id.trim(),
+    )
+}
+
+#[tauri::command]
+fn draft_revision_purge_session(
+    paths: State<'_, AppPaths>,
+    account_id: String,
+    session_id: String,
+) -> Result<u64, String> {
+    ipc_guard::validate_account_id(&account_id)?;
+    ipc_guard::validate_session_token("sessionId", &session_id)?;
+    rustymail_infrastructure::sqlite_draft_revision_purge_session(
+        &paths.db_path,
+        account_id.trim(),
+        session_id.trim(),
+    )
+}
+
+#[tauri::command]
+fn draft_orphan_sessions_list(
+    paths: State<'_, AppPaths>,
+    account_id: String,
+    limit: Option<u32>,
+) -> Result<Vec<rustymail_infrastructure::OrphanDraftSessionItem>, String> {
+    ipc_guard::validate_account_id(&account_id)?;
+    let lim = limit.unwrap_or(20).max(1).min(50) as usize;
+    // Nettoyage opportuniste des orphelins > 30 jours.
+    let _ = rustymail_infrastructure::sqlite_draft_orphan_sessions_purge_stale(
+        &paths.db_path,
+        account_id.trim(),
+        30,
+    );
+    rustymail_infrastructure::sqlite_draft_orphan_sessions_list(
+        &paths.db_path,
+        account_id.trim(),
+        lim,
+    )
+}
+
+#[tauri::command]
+fn draft_orphan_session_open(
+    paths: State<'_, AppPaths>,
+    account_id: String,
+    session_id: String,
+) -> Result<Draft, String> {
+    ipc_guard::validate_account_id(&account_id)?;
+    ipc_guard::validate_session_token("sessionId", &session_id)?;
+    rustymail_infrastructure::sqlite_draft_orphan_session_open(
+        &paths.db_path,
+        account_id.trim(),
+        session_id.trim(),
     )
 }
 
@@ -953,23 +1019,21 @@ fn download_attachment(
 }
 
 #[tauri::command]
-fn open_attachment(paths: State<'_, AppPaths>, req: OpenAttachmentInvoke) -> Result<String, String> {
+fn open_attachment(
+    paths: State<'_, AppPaths>,
+    req: OpenAttachmentInvoke,
+) -> Result<String, String> {
     ipc_guard::validate_message_attachment_ids(&req.message_id, &req.attachment_id)?;
     ipc_guard::validate_open_attachment_ack(req.open_ack.as_deref())?;
     let mid = req.message_id.trim();
     let aid = req.attachment_id.trim();
-    let (fname, mime) =
-        peek_attachment_identity(&paths.db_path, mid, aid)?;
+    let (fname, mime) = peek_attachment_identity(&paths.db_path, mid, aid)?;
     if let Some(reason) = attachment_needs_explicit_ack(&fname, &mime) {
         if !req.risk_acknowledged {
             return Err(format!("{PREFIX_RISK_CONFIRM}{reason}"));
         }
     }
-    let saved = rustymail_infrastructure::save_attachment_to_downloads(
-        &paths.db_path,
-        mid,
-        aid,
-    )?;
+    let saved = rustymail_infrastructure::save_attachment_to_downloads(&paths.db_path, mid, aid)?;
     log_attachment_audited("attachment_open_executed", &saved);
     rustymail_infrastructure::open_path_in_os(&saved)?;
     Ok(saved)
@@ -1176,14 +1240,18 @@ async fn dictation_test_run(
     paths: State<'_, AppPaths>,
     audio_wav_base64: String,
 ) -> Result<DictationTestRunView, String> {
-    ipc_guard::validate_dictation_payload("", Some(audio_wav_base64.as_str()), "test.wav", "audio/wav")?;
+    ipc_guard::validate_dictation_payload(
+        "",
+        Some(audio_wav_base64.as_str()),
+        "test.wav",
+        "audio/wav",
+    )?;
     let prefs = load_app_prefs(&paths.prefs_path);
     let wav = decode_audio_base64(&audio_wav_base64)?;
     let ai_prefs = prefs.ai.clone();
     let started = std::time::Instant::now();
     let run = tauri::async_runtime::spawn_blocking(move || {
-        let (duration_s, rms) =
-            whisper_dictation::wav_rms_duration(&wav).unwrap_or((0.0, 0.0));
+        let (duration_s, rms) = whisper_dictation::wav_rms_duration(&wav).unwrap_or((0.0, 0.0));
         match whisper_dictation::transcribe_whisper_wav_bytes_typed(&wav, &ai_prefs) {
             Ok(text) => DictationTestRunView {
                 duration_s,
@@ -1249,33 +1317,29 @@ struct LlmPrefetchProgressEvent {
 }
 
 #[tauri::command]
-fn llm_status(paths: State<'_, AppPaths>) -> Result<rustymail_infrastructure::LlmStatusPayload, String> {
+fn llm_status(
+    paths: State<'_, AppPaths>,
+) -> Result<rustymail_infrastructure::LlmStatusPayload, String> {
     let prefs = load_app_prefs(&paths.prefs_path);
     let profile = llm_singleton()
         .lock()
         .map_err(|_| "mutex LLM empoisonné".to_string())?
         .profile
         .clone();
-    let mut status = build_llm_status(
-        &paths.llm_models_dir,
-        &prefs,
-        Some(&profile),
-    );
+    let mut status = build_llm_status(&paths.llm_models_dir, &prefs, Some(&profile));
     status.llama_server_n_ctx = probe_llama_n_ctx_for_status(&prefs);
     Ok(status)
 }
 
 #[tauri::command]
-fn llm_status_refresh_hardware(paths: State<'_, AppPaths>) -> Result<rustymail_infrastructure::LlmStatusPayload, String> {
+fn llm_status_refresh_hardware(
+    paths: State<'_, AppPaths>,
+) -> Result<rustymail_infrastructure::LlmStatusPayload, String> {
     if let Ok(mut g) = llm_singleton().lock() {
         g.refresh();
         let prefs = load_app_prefs(&paths.prefs_path);
         let p = g.profile.clone();
-        let mut status = build_llm_status(
-            &paths.llm_models_dir,
-            &prefs,
-            Some(&p),
-        );
+        let mut status = build_llm_status(&paths.llm_models_dir, &prefs, Some(&p));
         status.llama_server_n_ctx = probe_llama_n_ctx_for_status(&prefs);
         return Ok(status);
     }
@@ -1332,10 +1396,7 @@ async fn prefetch_llm_model(
     app: tauri::AppHandle,
     paths: State<'_, AppPaths>,
 ) -> Result<String, String> {
-    rate_guard::cooldown(
-        "prefetch_llm_model",
-        std::time::Duration::from_secs(5),
-    )?;
+    rate_guard::cooldown("prefetch_llm_model", std::time::Duration::from_secs(5))?;
     llm_gguf_download_cancel_clear();
     let prefs = load_app_prefs(&paths.prefs_path);
     let ai = prefs.ai.clone();
@@ -1362,10 +1423,7 @@ async fn prefetch_llm_model(
             phase: "done".into(),
         },
     );
-    Ok(format!(
-        "GGUF disponible :\n{}",
-        path.display()
-    ))
+    Ok(format!("GGUF disponible :\n{}", path.display()))
 }
 
 /// No-op : hook worker / file IA (phase arrière‑plan).
@@ -1517,6 +1575,21 @@ fn demo_remove_playground_mailbox(
     Ok(msg)
 }
 
+/// Informe la veille IDLE du dossier actuellement affiché (sync Sent/Trash/focus hors INBOX).
+#[tauri::command]
+fn imap_set_focused_mailbox(
+    app: tauri::AppHandle,
+    account_id: String,
+    mailbox: String,
+) -> Result<(), String> {
+    ipc_guard::validate_optional_account_id(Some(account_id.as_str()))?;
+    if !mailbox.trim().is_empty() {
+        ipc_guard::validate_mailbox(&mailbox)?;
+    }
+    imap_push::set_focused_mailbox(&app, account_id.trim(), mailbox.trim());
+    Ok(())
+}
+
 #[tauri::command]
 async fn list_imap_mailboxes(
     paths: State<'_, AppPaths>,
@@ -1560,11 +1633,13 @@ fn mailbox_unread_counts(
     };
     Ok(rows
         .into_iter()
-        .map(|(mailbox, unread_count, total_threads)| MailboxUnreadCount {
-            mailbox,
-            unread_count,
-            total_threads,
-        })
+        .map(
+            |(mailbox, unread_count, total_threads)| MailboxUnreadCount {
+                mailbox,
+                unread_count,
+                total_threads,
+            },
+        )
         .collect())
 }
 
@@ -1986,12 +2061,9 @@ async fn delete_imap_mailbox(
     let mut session = rustymail_infrastructure::login_session_for_account(&account).await?;
     let entries =
         rustymail_infrastructure::ops::list_selectable_mailbox_entries(&mut session).await?;
-    let names = rustymail_infrastructure::ops::resolve_mailbox_imap_command_names(
-        mailbox.trim(),
-        &entries,
-    );
-    rustymail_infrastructure::ops::imap_delete_mailbox_with_fallback(&mut session, &names)
-        .await?;
+    let names =
+        rustymail_infrastructure::ops::resolve_mailbox_imap_command_names(mailbox.trim(), &entries);
+    rustymail_infrastructure::ops::imap_delete_mailbox_with_fallback(&mut session, &names).await?;
     let _ = session.logout().await;
     let cache = rustymail_infrastructure::purge_mailbox_local_cache(
         &paths.db_path,
@@ -2047,11 +2119,9 @@ fn load_developer_dotenv() {
 
 pub fn run() {
     load_developer_dotenv();
-    let _ = env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or(
-            "warn,rustymail::audit=info,rustymail_infrastructure=info,html5ever=error",
-        ),
-    )
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(
+        "warn,rustymail::audit=info,rustymail_infrastructure=info,html5ever=error",
+    ))
     .try_init();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -2074,7 +2144,9 @@ pub fn run() {
             if let Err(e) = rustymail_infrastructure::sqlite_ai_cache_purge_expired(&db_path) {
                 eprintln!("[RustyMail] ai_cache purge: {e}");
             }
-            if let Err(e) = rustymail_infrastructure::sqlite_ai_cache_backfill_null_expires(&db_path) {
+            if let Err(e) =
+                rustymail_infrastructure::sqlite_ai_cache_backfill_null_expires(&db_path)
+            {
                 eprintln!("[RustyMail] ai_cache backfill expires_at: {e}");
             }
             // Ne pas charger tout SQLite en RAM au démarrage (grosse base = IPC bloqué, comptes invisibles).
@@ -2102,20 +2174,20 @@ pub fn run() {
                     p.general.bootstrap_models_completed = true;
                     let _ = save_app_prefs_validated(&prefs_boot, &p);
                 } else {
-                let handle = app.handle().clone();
-                let minilm_dir = minilm_boot;
-                let prefs_path_boot = prefs_boot;
-                std::thread::spawn(move || {
-                    let report = model_bootstrap::bootstrap_small_models(&minilm_dir, |p| {
-                        let _ = handle.emit("model_bootstrap_progress", &p);
+                    let handle = app.handle().clone();
+                    let minilm_dir = minilm_boot;
+                    let prefs_path_boot = prefs_boot;
+                    std::thread::spawn(move || {
+                        let report = model_bootstrap::bootstrap_small_models(&minilm_dir, |p| {
+                            let _ = handle.emit("model_bootstrap_progress", &p);
+                        });
+                        if report.minilm_ok && report.whisper_ok {
+                            let mut p = load_app_prefs(&prefs_path_boot);
+                            p.general.bootstrap_models_completed = true;
+                            let _ = save_app_prefs_validated(&prefs_path_boot, &p);
+                        }
+                        let _ = handle.emit("model_bootstrap_done", &report);
                     });
-                    if report.minilm_ok && report.whisper_ok {
-                        let mut p = load_app_prefs(&prefs_path_boot);
-                        p.general.bootstrap_models_completed = true;
-                        let _ = save_app_prefs_validated(&prefs_path_boot, &p);
-                    }
-                    let _ = handle.emit("model_bootstrap_done", &report);
-                });
                 }
             }
 
@@ -2142,6 +2214,9 @@ pub fn run() {
             draft_revision_save,
             draft_revision_list,
             draft_revision_restore,
+            draft_revision_purge_session,
+            draft_orphan_sessions_list,
+            draft_orphan_session_open,
             saved_draft_list,
             saved_drafts_count,
             saved_draft_upsert,
@@ -2225,6 +2300,7 @@ pub fn run() {
             demo_reset_playground_mailbox,
             demo_remove_playground_mailbox,
             list_imap_mailboxes,
+            imap_set_focused_mailbox,
             mailbox_unread_counts,
             mailbox_inbox_filter_counts,
             sync_inbox,
