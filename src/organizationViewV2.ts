@@ -123,9 +123,12 @@ export function orgV2ProposalBatchCleared(proposal: OrgProposal | undefined): bo
   return (proposal.totalCount ?? 0) === 0 && threadN === 0 && mbN === 0;
 }
 
-export async function orgV2ScanAccount(accountId: string): Promise<OrgV2ScanReport> {
+export async function orgV2ScanAccount(
+  accountId: string,
+  includeLlm = false,
+): Promise<OrgV2ScanReport> {
   return invoke<OrgV2ScanReport>("org_v2_scan_account_cmd", {
-    payload: { accountId },
+    payload: { accountId, includeLlm },
   });
 }
 
@@ -365,13 +368,16 @@ export function renderOrganizationV2View(
       <div class="inbox-appbar-top">
         <div class="inbox-appbar-intro">
           ${navRenderTrailHtml("Organiser V2", escapeHtml, escapeAttr, { navClass: "secondary-view-nav" })}
-          <h1 class="organization-title inbox-mailbox-title">${iconSvg("archive")}<span>Organiser V2</span></h1>
-          <p class="dim organization-lead">Structurer la boîte, réduire le bruit, mémoriser vos décisions. La recherche et les tags restent ailleurs.</p>
+          <h1 class="organization-title inbox-mailbox-title">${iconSvg("archive")}<span>Organiser</span></h1>
+          <p class="dim organization-lead">Nettoyage actionable : inbox ancienne, désinscriptions, doublons, transactionnels. Annulation possible après apply.</p>
         </div>
       </div>
       <div class="organization-toolbar">
         <button type="button" class="primary-button" data-action="org-v2-scan" ${state.scanning ? "disabled" : ""}>
           ${state.scanning ? "Analyse…" : "Analyser"}
+        </button>
+        <button type="button" class="ghost-button" data-action="org-v2-undo" ${state.applying || state.scanning ? "disabled" : ""}>
+          Annuler le dernier lot
         </button>
         ${report ? `<span class="dim"> ${report.proposals.length} action(s) · ${report.stats.threadCount} fils</span>` : ""}
       </div>

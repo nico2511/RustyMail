@@ -1,16 +1,18 @@
 //! IPC centre d'organisation.
 
 use rustymail_domain::{
-    OrgApplyProgress, OrgProposal, OrgScanLlmStatus, OrgScanReport, OrgSuggestedAction,
-    OrgV2DecisionKind, OrgV2RecordDecisionResult, OrgV2ScanReport,
+    ArchiveSpaceStats, OrgApplyPreview, OrgApplyProgress, OrgProposal, OrgScanLlmStatus,
+    OrgScanReport, OrgSuggestedAction, OrgV2DecisionKind, OrgV2RecordDecisionResult,
+    OrgV2ScanReport,
 };
 use rustymail_infrastructure::{
     ai_feature_enabled, enrich_org_report_llm_refs, ignore_mailbox, load_accounts, load_app_prefs,
-    open_sqlite_migrated_public, org_apply_proposal_with, org_llm_proposals_for_account,
-    org_resolve_archive_path, org_retag_account, org_retag_threads, org_scan_account,
+    move_thread_unarchive, open_sqlite_migrated_public, org_apply_proposal_with,
+    org_llm_proposals_for_account, org_preview_proposal, org_resolve_archive_path,
+    org_retag_account, org_retag_threads, org_scan_account, org_undo_last_batch,
     org_v2_scan_account, post_move_heuristic_refresh, prepare_org_proposal_for_apply,
-    record_proposal_decision, resolve_apply_action, unignore_mailbox,
-    validate_org_apply_thread_ids, AiFeature,
+    preview_auto_archive_candidates, record_proposal_decision, resolve_apply_action,
+    run_auto_archive_rules, unignore_mailbox, validate_org_apply_thread_ids, AiFeature,
 };
 use tauri::State;
 
@@ -70,6 +72,40 @@ pub struct OrgArchivePathPayload {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OrgV2ScanPayload {
+    pub account_id: String,
+    #[serde(default)]
+    pub include_llm: bool,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgPreviewPayload {
+    pub account_id: String,
+    pub proposal_id: String,
+    #[serde(default)]
+    pub thread_ids: Option<Vec<String>>,
+    #[serde(default)]
+    pub action_override: Option<String>,
+    #[serde(default)]
+    pub proposal_snapshot: Option<OrgProposal>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgUndoPayload {
+    pub account_id: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnarchivePayload {
+    pub account_id: String,
+    pub thread_id: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoArchivePayload {
     pub account_id: String,
 }
 
@@ -337,9 +373,128 @@ pub async fn org_v2_scan_account_cmd(
     ipc_guard::validate_account_id(&payload.account_id)?;
     let db = paths.db_path.clone();
     let account_id = payload.account_id.trim().to_string();
-    tauri::async_runtime::spawn_blocking(move || org_v2_scan_account(&db, &account_id))
-        .await
-        .map_err(|e| format!("org v2 scan join: {e}"))?
+    let include_llm = payload.include_llm;
+    let paths_clone = std::clone::Clone::clone(&*paths);
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut report = org_v2_scan_account(&db, &account_id)?;
+        if include_llm {
+            // Enrichir avec LLM si gate OK, puis re-filtrer via kinds V2 (LlmCluster inclus).
+            if let Ok(full) = org_scan_account_compute(&paths_clone, &account_id, true) {
+                for p in full.proposals {
+                    if matches!(p.kind, rustymail_domain::OrgProposalKind::LlmCluster)
+                        && !report.proposals.iter().any(|x| x.id == p.id)
+                    {
+                        report.proposals.push(p);
+                    }
+                }
+            }
+        }
+        Ok(report)
+    })
+    .await
+    .map_err(|e| format!("org v2 scan join: {e}"))?
+}
+
+#[tauri::command]
+pub async fn org_preview_proposal_cmd(
+    paths: State<'_, AppPaths>,
+    payload: OrgPreviewPayload,
+) -> Result<OrgApplyPreview, String> {
+    ipc_guard::validate_account_id(&payload.account_id)?;
+    let account_id = payload.account_id.trim().to_string();
+    let proposal_id = payload.proposal_id.trim().to_string();
+    ipc_guard::validate_proposal_id(&proposal_id)?;
+    let paths_clone = std::clone::Clone::clone(&*paths);
+    let snapshot = payload.proposal_snapshot.clone();
+    let proposal = tauri::async_runtime::spawn_blocking(move || {
+        resolve_proposal_for_apply(&paths_clone, &account_id, &proposal_id, snapshot)
+    })
+    .await
+    .map_err(|e| format!("org preview resolve join: {e}"))??;
+    let db = paths.db_path.clone();
+    let aid = payload.account_id.trim().to_string();
+    let thread_ids = payload.thread_ids.clone();
+    let action_override = payload.action_override.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        org_preview_proposal(
+            &db,
+            &aid,
+            &proposal,
+            thread_ids.as_deref(),
+            action_override.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("org preview join: {e}"))?
+}
+
+#[tauri::command]
+pub async fn org_undo_last_cmd(
+    paths: State<'_, AppPaths>,
+    payload: OrgUndoPayload,
+) -> Result<OrgApplyProgress, String> {
+    ipc_guard::validate_account_id(&payload.account_id)?;
+    let db = paths.db_path.clone();
+    let account_id = payload.account_id.trim().to_string();
+    org_undo_last_batch(&db, &account_id).await
+}
+
+#[tauri::command]
+pub async fn move_thread_unarchive_cmd(
+    paths: State<'_, AppPaths>,
+    payload: UnarchivePayload,
+) -> Result<rustymail_infrastructure::ThreadMailboxMoveResult, String> {
+    ipc_guard::validate_account_id(&payload.account_id)?;
+    ipc_guard::validate_thread_id(&payload.thread_id)?;
+    move_thread_unarchive(
+        &paths.db_path,
+        payload.account_id.trim(),
+        payload.thread_id.trim(),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn run_auto_archive_cmd(
+    paths: State<'_, AppPaths>,
+    payload: AutoArchivePayload,
+) -> Result<ArchiveSpaceStats, String> {
+    ipc_guard::validate_account_id(&payload.account_id)?;
+    let prefs = load_app_prefs(&paths.prefs_path);
+    run_auto_archive_rules(&paths.db_path, payload.account_id.trim(), &prefs).await
+}
+
+#[tauri::command]
+pub async fn preview_auto_archive_cmd(
+    paths: State<'_, AppPaths>,
+    payload: AutoArchivePayload,
+) -> Result<ArchiveSpaceStats, String> {
+    ipc_guard::validate_account_id(&payload.account_id)?;
+    let prefs = load_app_prefs(&paths.prefs_path);
+    let db = paths.db_path.clone();
+    let aid = payload.account_id.trim().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        preview_auto_archive_candidates(&db, &aid, &prefs).map(|(_, stats)| stats)
+    })
+    .await
+    .map_err(|e| format!("preview auto archive join: {e}"))?
+}
+
+#[tauri::command]
+pub async fn archive_space_stats_cmd(
+    paths: State<'_, AppPaths>,
+    payload: AutoArchivePayload,
+) -> Result<ArchiveSpaceStats, String> {
+    ipc_guard::validate_account_id(&payload.account_id)?;
+    let prefs = load_app_prefs(&paths.prefs_path);
+    let db = paths.db_path.clone();
+    let aid = payload.account_id.trim().to_string();
+    let root = prefs.general.archive_root.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        rustymail_infrastructure::archive_tree_space_stats(&db, &aid, &root)
+    })
+    .await
+    .map_err(|e| format!("archive space stats join: {e}"))?
 }
 
 #[tauri::command]

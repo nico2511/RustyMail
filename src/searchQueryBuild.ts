@@ -14,6 +14,13 @@ export type SearchQueryPayload = {
   mailbox: string | null;
   mode: "lexical" | "semantic" | "hybrid";
   language: string | null;
+  mailboxPrefix?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  relativeDays?: number | null;
+  hasAttachment?: boolean | null;
+  minSecurityScore?: number | null;
+  hybridLexicalWeight?: number | null;
 };
 
 export type SearchQueryBuildOpts = {
@@ -26,6 +33,18 @@ export type SearchQueryBuildOpts = {
   mailbox: string | null;
   semanticSearchEnabled: boolean;
   semanticModelAvailable: boolean;
+  /** `#last:Nd` */
+  relativeDays?: number | null;
+  /** `#pj` / `has:attachment` */
+  hasAttachment?: boolean | null;
+  /** `#security:N` */
+  minSecurityScore?: number | null;
+  /** Préfixe boîte (`#archive` → `Archive`) */
+  mailboxPrefix?: string | null;
+  /** Prefs `hybridLexicalWeight` (0–1) si mode hybride */
+  hybridLexicalWeight?: number | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
 };
 
 export function buildSearchQueryPayload(opts: SearchQueryBuildOpts): SearchQueryPayload {
@@ -38,14 +57,43 @@ export function buildSearchQueryPayload(opts: SearchQueryBuildOpts): SearchQuery
       mode = opts.searchNlMode;
     }
   }
-  return {
+
+  const mailboxPrefix = opts.mailboxPrefix?.trim() || null;
+  const relativeDays =
+    opts.relativeDays != null && Number.isFinite(opts.relativeDays) && opts.relativeDays > 0
+      ? Math.floor(opts.relativeDays)
+      : null;
+  const minSecurityScore =
+    opts.minSecurityScore != null && Number.isFinite(opts.minSecurityScore)
+      ? opts.minSecurityScore
+      : null;
+  const hybridLexicalWeight =
+    mode === "hybrid" &&
+    opts.hybridLexicalWeight != null &&
+    Number.isFinite(opts.hybridLexicalWeight)
+      ? Math.min(1, Math.max(0, opts.hybridLexicalWeight))
+      : null;
+
+  const payload: SearchQueryPayload = {
     text: opts.search.trim() || null,
     tags: opts.searchTags,
     senders: opts.searchSenders,
     sender: opts.searchSenders[0] ?? null,
     accountId: opts.accountId || null,
-    mailbox: opts.mailbox,
+    mailbox: mailboxPrefix ? null : opts.mailbox,
     mode,
     language: opts.searchLanguageFilter?.trim() || null,
   };
+
+  if (mailboxPrefix) payload.mailboxPrefix = mailboxPrefix;
+  if (opts.dateFrom?.trim()) payload.dateFrom = opts.dateFrom.trim();
+  if (opts.dateTo?.trim()) payload.dateTo = opts.dateTo.trim();
+  if (relativeDays != null) payload.relativeDays = relativeDays;
+  if (opts.hasAttachment === true || opts.hasAttachment === false) {
+    payload.hasAttachment = opts.hasAttachment;
+  }
+  if (minSecurityScore != null) payload.minSecurityScore = minSecurityScore;
+  if (hybridLexicalWeight != null) payload.hybridLexicalWeight = hybridLexicalWeight;
+
+  return payload;
 }

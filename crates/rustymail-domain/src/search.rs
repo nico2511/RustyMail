@@ -275,7 +275,7 @@ pub fn lexical_search_terms(text_lc: &str) -> Vec<String> {
         .collect()
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchQuery {
     pub text: Option<String>,
@@ -289,11 +289,32 @@ pub struct SearchQuery {
     pub account_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mailbox: Option<String>,
+    /// Préfixe de boîte (ex. `Archive`) : inclut tous les dossiers `prefix` et `prefix/...`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mailbox_prefix: Option<String>,
     #[serde(default)]
     pub mode: SearchMode,
     /// ISO 639-1 from `messages.detected_lang`; empty / None = any language.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
+    /// Borne inférieure inclusive (RFC3339) sur `threads.last_activity`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub date_from: Option<String>,
+    /// Borne supérieure inclusive (RFC3339) sur `threads.last_activity`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub date_to: Option<String>,
+    /// Raccourci : filtrer les fils des N derniers jours (écrase date_from relative).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relative_days: Option<i64>,
+    /// `Some(true)` = avec pièce jointe ; `Some(false)` = sans.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has_attachment: Option<bool>,
+    /// Score de sécurité minimum (0–100) si une colonne cache est disponible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_security_score: Option<f32>,
+    /// Pondération lexicale pour le mode hybride (0.0–1.0). Défaut applicatif : 0.55.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hybrid_lexical_weight: Option<f32>,
 }
 
 #[cfg(test)]

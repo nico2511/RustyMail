@@ -25,11 +25,11 @@ After save, sync pulls folders and messages incrementally (UID-based).
 
 Desktop OAuth with **PKCE** and loopback redirect `http://127.0.0.1:<port>`.
 
-- Buttons are **disabled** unless developer env vars are set (see [OAUTH.md](OAUTH.md)).
+- No RustyMail server: the binary talks to Google / Microsoft only.
+- Release builds embed public client credentials at compile time when provided (`.env` or CI secrets); see [OAUTH.md](OAUTH.md).
+- Buttons are **disabled** if those credentials are absent; fallback is IMAP + app password.
 - Tokens stored in keyring (Microsoft may overflow to `oauth_tokens/` JSON files).
 - IMAP/SMTP use **XOAUTH2** after successful login.
-
-End users of **release installers** use password auth unless you distribute OAuth client IDs through your own deployment process (not bundled in the MSI/NSIS).
 
 ## Sync & folders
 

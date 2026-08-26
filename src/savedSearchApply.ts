@@ -90,6 +90,20 @@ export function applySavedSearchToState(
   state.searchLanguageFilter = q.language?.trim() || null;
   state.searchModifiersTouched = Boolean(ui.searchModifiersTouched);
 
+  state.searchRelativeDays =
+    q.relativeDays != null && Number.isFinite(q.relativeDays) && q.relativeDays > 0
+      ? Math.floor(q.relativeDays)
+      : null;
+  state.searchHasAttachment =
+    q.hasAttachment === true || q.hasAttachment === false ? q.hasAttachment : null;
+  state.searchMinSecurityScore =
+    q.minSecurityScore != null && Number.isFinite(q.minSecurityScore)
+      ? q.minSecurityScore
+      : null;
+  const prefix = q.mailboxPrefix?.trim();
+  state.searchMailboxPrefix = prefix || null;
+  if (prefix) state.searchScope = "account";
+
   const dom = ui.newsletterDomain?.trim();
   if (dom) {
     const lp = ui.newsletterLocalPart?.trim() || "*";
@@ -102,7 +116,7 @@ export function buildSavedSearchUpsert(
   name: string,
   query: SearchQueryPayload,
   ui: SavedSearchUiState,
-  opts?: { id?: string; pinned?: boolean; sortOrder?: number },
+  opts?: { id?: string; pinned?: boolean; sortOrder?: number; icon?: string | null; shortcut?: string | null },
 ): SavedSearchUpsert {
   return {
     id: opts?.id ?? null,
@@ -112,5 +126,7 @@ export function buildSavedSearchUpsert(
     uiState: ui,
     pinned: opts?.pinned ?? true,
     sortOrder: opts?.sortOrder ?? null,
+    icon: opts?.icon?.trim() || null,
+    shortcut: opts?.shortcut?.trim() || null,
   };
 }

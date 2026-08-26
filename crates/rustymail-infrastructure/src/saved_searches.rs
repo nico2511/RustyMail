@@ -27,7 +27,10 @@ pub fn migrate_saved_searches(connection: &Connection) -> Result<(), rusqlite::E
         CREATE INDEX IF NOT EXISTS idx_saved_searches_account
             ON saved_searches(account_id, pinned DESC, sort_order ASC, name COLLATE NOCASE);
         ",
-    )
+    )?;
+    let _ = connection.execute("ALTER TABLE saved_searches ADD COLUMN icon TEXT", []);
+    let _ = connection.execute("ALTER TABLE saved_searches ADD COLUMN shortcut TEXT", []);
+    Ok(())
 }
 
 fn now_iso() -> String {
@@ -45,6 +48,8 @@ fn row_to_saved_search(
     last_seen_at: Option<String>,
     created_at: String,
     updated_at: String,
+    icon: Option<String>,
+    shortcut: Option<String>,
 ) -> Result<SavedSearch, String> {
     let query: SearchQuery = serde_json::from_str(&query_json).map_err(|e| e.to_string())?;
     let ui_state = if ui_state_json.trim().is_empty() || ui_state_json.trim() == "{}" {
@@ -60,6 +65,8 @@ fn row_to_saved_search(
         ui_state,
         pinned: pinned != 0,
         sort_order: sort_order as i32,
+        icon: icon.filter(|s| !s.trim().is_empty()),
+        shortcut: shortcut.filter(|s| !s.trim().is_empty()),
         last_seen_at,
         created_at,
         updated_at,
@@ -79,7 +86,7 @@ pub fn list_saved_searches(
     let mut stmt = conn
         .prepare(
             "SELECT id, account_id, name, query_json, ui_state_json, pinned, sort_order,
-                    last_seen_at, created_at, updated_at
+                    last_seen_at, created_at, updated_at, icon, shortcut
              FROM saved_searches WHERE account_id = ?1
              ORDER BY pinned DESC, sort_order ASC, name COLLATE NOCASE",
         )
@@ -97,6 +104,8 @@ pub fn list_saved_searches(
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, String>(8)?,
                 row.get::<_, String>(9)?,
+                row.get::<_, Option<String>>(10)?,
+                row.get::<_, Option<String>>(11)?,
             ))
         })
         .map_err(|e| e.to_string())?;
@@ -113,6 +122,8 @@ pub fn list_saved_searches(
             last_seen_at,
             created_at,
             updated_at,
+            icon,
+            shortcut,
         ) = row.map_err(|e| e.to_string())?;
         let search = row_to_saved_search(
             id,
@@ -125,13 +136,22 @@ pub fn list_saved_searches(
             last_seen_at,
             created_at,
             updated_at,
+            icon,
+            shortcut,
         )?;
-        let new_count = if include_counts {
-            count_new_for_saved_search(db_path, &search)?
+        let (new_count, unread_count) = if include_counts {
+            (
+                count_new_for_saved_search(db_path, &search)?,
+                count_unread_for_saved_search(db_path, &search)?,
+            )
         } else {
-            0
+            (0, 0)
         };
-        out.push(SavedSearchListItem { search, new_count });
+        out.push(SavedSearchListItem {
+            search,
+            new_count,
+            unread_count,
+        });
     }
     Ok(out)
 }
@@ -140,7 +160,7 @@ pub fn get_saved_search(db_path: &Path, account_id: &str, id: &str) -> Result<Sa
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
     let row = conn.query_row(
         "SELECT id, account_id, name, query_json, ui_state_json, pinned, sort_order,
-                last_seen_at, created_at, updated_at
+                last_seen_at, created_at, updated_at, icon, shortcut
          FROM saved_searches WHERE account_id = ?1 AND id = ?2",
         params![account_id.trim(), id.trim()],
         |row| {
@@ -155,6 +175,8 @@ pub fn get_saved_search(db_path: &Path, account_id: &str, id: &str) -> Result<Sa
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, String>(8)?,
                 row.get::<_, String>(9)?,
+                row.get::<_, Option<String>>(10)?,
+                row.get::<_, Option<String>>(11)?,
             ))
         },
     );
@@ -169,6 +191,8 @@ pub fn get_saved_search(db_path: &Path, account_id: &str, id: &str) -> Result<Sa
         last_seen_at,
         created_at,
         updated_at,
+        icon,
+        shortcut,
     ) = row.map_err(|_| format!("Vue introuvable : {id}"))?;
     row_to_saved_search(
         id,
@@ -181,6 +205,8 @@ pub fn get_saved_search(db_path: &Path, account_id: &str, id: &str) -> Result<Sa
         last_seen_at,
         created_at,
         updated_at,
+        icon,
+        shortcut,
     )
 }
 
@@ -207,18 +233,33 @@ pub fn upsert_saved_search(
     let ui_state_json = serde_json::to_string(&input.ui_state).map_err(|e| e.to_string())?;
     let pinned = if input.pinned { 1i64 } else { 0i64 };
     let sort_order = input.sort_order.unwrap_or(0);
+    let icon = input
+        .icon
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    let shortcut = input
+        .shortcut
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
     let now = now_iso();
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT INTO saved_searches (
-            id, account_id, name, query_json, ui_state_json, pinned, sort_order, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            id, account_id, name, query_json, ui_state_json, pinned, sort_order,
+            icon, shortcut, created_at, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
          ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             query_json = excluded.query_json,
             ui_state_json = excluded.ui_state_json,
             pinned = excluded.pinned,
             sort_order = excluded.sort_order,
+            icon = excluded.icon,
+            shortcut = excluded.shortcut,
             updated_at = excluded.updated_at",
         params![
             id,
@@ -228,6 +269,8 @@ pub fn upsert_saved_search(
             ui_state_json,
             pinned,
             sort_order,
+            icon,
+            shortcut,
             now,
             now,
         ],
@@ -289,11 +332,15 @@ pub fn count_new_for_saved_search(db_path: &Path, saved: &SavedSearch) -> Result
     let since = match saved
         .last_seen_at
         .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
+        .and_then(parse_activity_after)
     {
-        None => None,
-        Some(raw) => Some(parse_activity_after(raw).unwrap_or_else(Utc::now)),
+        Some(dt) => Some(dt),
+        None => return Ok(0),
     };
     count_threads_matching_query(db_path, &saved.query, since)
+}
+
+pub fn count_unread_for_saved_search(db_path: &Path, saved: &SavedSearch) -> Result<usize, String> {
+    let items = crate::semantic_search::sqlite_search_threads_unified(db_path, &saved.query)?;
+    Ok(items.iter().filter(|t| t.unread).count())
 }

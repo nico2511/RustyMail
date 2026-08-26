@@ -4,7 +4,10 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use rusqlite::{params, OptionalExtension};
-use rustymail_domain::{Account, OrgApplyProgress, OrgProposal, OrgSuggestedAction};
+use rustymail_domain::{
+    Account, OrgApplyPreview, OrgApplyPreviewItem, OrgApplyProgress, OrgProposal,
+    OrgSuggestedAction,
+};
 
 use crate::imap::ops::{
     find_mailbox_list_entry, imap_delete_mailbox_with_fallback, imap_session_select_variants,
@@ -13,10 +16,14 @@ use crate::imap::ops::{
 };
 use crate::login_session_for_account;
 use crate::mail_ops::{
-    move_thread_to_archive, move_thread_to_mailbox, move_thread_to_trash, pick_trash_folder,
-    set_thread_seen,
+    move_thread_to_archive, move_thread_to_mailbox, move_thread_to_trash, move_thread_unarchive,
+    pick_trash_folder, set_thread_seen,
 };
 use crate::mailbox_local_cache::purge_mailbox_local_cache;
+use crate::org_apply_history::{
+    latest_undoable_batch_id, list_batch_entries, mark_batch_undone, new_batch_id,
+    record_apply_entries,
+};
 use crate::org_retag::org_retag_account;
 use crate::org_scan::{enrich_thread_ref, is_protected_mailbox_for_org_delete};
 use crate::{load_accounts, open_sqlite_migrated};
@@ -280,6 +287,8 @@ pub async fn org_apply_proposal_with(
     let mut errors = Vec::new();
     let mut sync_mailboxes: HashSet<String> = HashSet::new();
     let mut threads_affected: Vec<String> = Vec::new();
+    let mut history_entries: Vec<(String, String, String, Option<String>)> = Vec::new();
+    let batch_id = new_batch_id();
 
     let trash_folder = if matches!(action, OrgSuggestedAction::Trash) {
         list_selectable_mailboxes(&account)
@@ -290,22 +299,30 @@ pub async fn org_apply_proposal_with(
         None
     };
 
+    let archive_dest_hint = if matches!(action, OrgSuggestedAction::Archive) {
+        org_resolve_archive_path(path, ids.first().map(|(t, _)| t.as_str()).unwrap_or(""))
+            .ok()
+    } else {
+        None
+    };
+
     for (tid, mailbox) in ids {
         if tid.starts_with("mailbox:") {
             continue;
         }
+        let from_mb = mailbox.clone();
         let result = match action {
             OrgSuggestedAction::Trash => move_thread_to_trash(path, &account, &mailbox, &tid)
                 .await
                 .map(|out| {
                     sync_mailboxes.insert(out.dest_mailbox.clone());
-                    out.message
+                    (out.message, Some(out.dest_mailbox))
                 }),
             OrgSuggestedAction::Archive => move_thread_to_archive(path, &account, &mailbox, &tid)
                 .await
                 .map(|out| {
-                    sync_mailboxes.insert(out.dest_mailbox);
-                    out.message
+                    sync_mailboxes.insert(out.dest_mailbox.clone());
+                    (out.message, Some(out.dest_mailbox))
                 }),
             OrgSuggestedAction::Move => {
                 let dest = proposal
@@ -316,28 +333,38 @@ pub async fn org_apply_proposal_with(
                     .await
                     .map(|out| {
                         sync_mailboxes.insert(out.dest_mailbox.clone());
-                        out.message
+                        (out.message, Some(out.dest_mailbox))
                     })
             }
-            OrgSuggestedAction::MarkRead => {
-                set_thread_seen(path, &account, &mailbox, &tid, true).await
-            }
-            _ => Ok(String::new()),
+            OrgSuggestedAction::MarkRead => set_thread_seen(path, &account, &mailbox, &tid, true)
+                .await
+                .map(|msg| (msg, None)),
+            _ => Ok((String::new(), None)),
         };
         match result {
-            Ok(msg) => {
+            Ok((_msg, to_mb)) => {
                 done += 1;
                 threads_affected.push(tid.clone());
                 sync_mailboxes.insert(mailbox.clone());
+                let action_str = match action {
+                    OrgSuggestedAction::Trash => "trash",
+                    OrgSuggestedAction::Archive => "archive",
+                    OrgSuggestedAction::Move => "move",
+                    OrgSuggestedAction::MarkRead => "markRead",
+                    _ => "other",
+                };
+                let dest = to_mb.or_else(|| match action {
+                    OrgSuggestedAction::Move => proposal.target_mailbox.clone(),
+                    OrgSuggestedAction::Archive => archive_dest_hint.clone(),
+                    OrgSuggestedAction::Trash => trash_folder.clone(),
+                    _ => None,
+                });
+                history_entries.push((tid.clone(), action_str.to_string(), from_mb, dest));
                 match action {
                     OrgSuggestedAction::Trash => {
-                        let _ = msg;
                         if let Some(ref t) = trash_folder {
                             sync_mailboxes.insert(t.clone());
                         }
-                    }
-                    OrgSuggestedAction::Archive => {
-                        let _ = msg;
                     }
                     OrgSuggestedAction::Move => {
                         if let Some(ref d) = proposal.target_mailbox {
@@ -351,10 +378,145 @@ pub async fn org_apply_proposal_with(
         }
     }
 
+    let _ = record_apply_entries(path, account_id, &batch_id, &history_entries);
+
     Ok(OrgApplyProgress {
         done,
         total,
         message: format!("{done}/{total} fil(s) traités."),
+        errors,
+        mailboxes_to_sync: sync_mailboxes.into_iter().collect(),
+        threads_affected,
+    })
+}
+
+/// Dry-run : liste exacte des moves sans IMAP.
+pub fn org_preview_proposal(
+    path: &Path,
+    _account_id: &str,
+    proposal: &OrgProposal,
+    thread_ids: Option<&[String]>,
+    action_override: Option<&str>,
+) -> Result<OrgApplyPreview, String> {
+    let action = resolve_apply_action(proposal, action_override);
+    let refs: Vec<&rustymail_domain::OrgThreadRef> = if let Some(filter) = thread_ids {
+        proposal
+            .thread_refs
+            .iter()
+            .filter(|r| filter.iter().any(|id| id == &r.thread_id))
+            .collect()
+    } else {
+        proposal.thread_refs.iter().collect()
+    };
+    let archive_hint = if matches!(action, OrgSuggestedAction::Archive) {
+        refs.first()
+            .and_then(|r| org_resolve_archive_path(path, &r.thread_id).ok())
+    } else {
+        None
+    };
+    let mut items = Vec::new();
+    for r in refs {
+        if r.thread_id.starts_with("mailbox:") {
+            continue;
+        }
+        let (action_str, to_mb) = match action {
+            OrgSuggestedAction::Archive => ("archive", archive_hint.clone()),
+            OrgSuggestedAction::Trash => ("trash", Some("Trash".into())),
+            OrgSuggestedAction::Move => ("move", proposal.target_mailbox.clone()),
+            OrgSuggestedAction::MarkRead => ("markRead", None),
+            OrgSuggestedAction::DeleteMailbox => ("deleteMailbox", None),
+            _ => ("other", None),
+        };
+        items.push(OrgApplyPreviewItem {
+            thread_id: r.thread_id.clone(),
+            subject: r.subject.clone(),
+            from_mailbox: r.mailbox.clone(),
+            to_mailbox: to_mb,
+            action: action_str.into(),
+        });
+    }
+    let total_count = items.len();
+    Ok(OrgApplyPreview {
+        proposal_id: proposal.id.clone(),
+        items,
+        total_count,
+    })
+}
+
+/// Annule le dernier lot apply (moves inverses).
+pub async fn org_undo_last_batch(
+    path: &Path,
+    account_id: &str,
+) -> Result<OrgApplyProgress, String> {
+    let Some(batch_id) = latest_undoable_batch_id(path, account_id)? else {
+        return Err("Aucune action Organize à annuler.".into());
+    };
+    let entries = list_batch_entries(path, account_id, &batch_id)?;
+    if entries.is_empty() {
+        return Err("Lot vide.".into());
+    }
+    let accounts = load_accounts(path)?;
+    let account = accounts
+        .into_iter()
+        .find(|a| a.id.0 == account_id)
+        .ok_or_else(|| "Compte introuvable.".to_string())?;
+
+    let mut done = 0usize;
+    let total = entries.len();
+    let mut errors = Vec::new();
+    let mut sync_mailboxes: HashSet<String> = HashSet::new();
+    let mut threads_affected = Vec::new();
+
+    for e in &entries {
+        let result = match e.action.as_str() {
+            "archive" | "move" | "trash" => {
+                let dest = e.from_mailbox.clone();
+                let from = e
+                    .to_mailbox
+                    .clone()
+                    .unwrap_or_else(|| e.from_mailbox.clone());
+                if e.action == "archive"
+                    && dest.eq_ignore_ascii_case("INBOX")
+                    && from.to_ascii_lowercase().contains("archive")
+                {
+                    move_thread_unarchive(path, account_id, &e.thread_id)
+                        .await
+                        .map(|out| {
+                            sync_mailboxes.insert(out.dest_mailbox);
+                        })
+                } else {
+                    move_thread_to_mailbox(path, &account, &from, &e.thread_id, &dest)
+                        .await
+                        .map(|out| {
+                            sync_mailboxes.insert(out.dest_mailbox);
+                        })
+                }
+            }
+            "markRead" => {
+                // Undo mark-read → mark unread
+                set_thread_seen(path, &account, &e.from_mailbox, &e.thread_id, false)
+                    .await
+                    .map(|_| ())
+            }
+            _ => Ok(()),
+        };
+        match result {
+            Ok(()) => {
+                done += 1;
+                threads_affected.push(e.thread_id.clone());
+                sync_mailboxes.insert(e.from_mailbox.clone());
+                if let Some(ref t) = e.to_mailbox {
+                    sync_mailboxes.insert(t.clone());
+                }
+            }
+            Err(err) => errors.push(format!("{}: {err}", e.thread_id)),
+        }
+    }
+    mark_batch_undone(path, account_id, &batch_id)?;
+    Ok(OrgApplyProgress {
+        done,
+        total,
+        message: format!("Annulation : {done}/{total} fil(s)."),
         errors,
         mailboxes_to_sync: sync_mailboxes.into_iter().collect(),
         threads_affected,

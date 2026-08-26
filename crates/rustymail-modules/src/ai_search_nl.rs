@@ -91,6 +91,7 @@ pub fn nl_to_search_query(
         mailbox,
         mode,
         language,
+        ..Default::default()
     })
 }
 

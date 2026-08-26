@@ -21,7 +21,12 @@ use rustymail_llm::LlmEngine;
 use rustymail_modules::ai_org_proposals::org_proposals_with_llm;
 
 const SAMPLE_LIMIT: usize = 500;
-const STALE_INBOX_DAYS: i64 = 90;
+
+fn stale_inbox_days_from_prefs(db_path: &Path) -> i64 {
+    let prefs_path = prefs_path_from_db_dir(db_path.parent().unwrap_or(db_path));
+    let prefs = load_app_prefs(&prefs_path);
+    prefs.general.stale_inbox_days.max(1)
+}
 
 pub fn is_inbox_like_mailbox(name: &str) -> bool {
     let n = name.trim().to_ascii_lowercase();
@@ -293,7 +298,11 @@ pub fn org_scan_account(
     let mut proposals = Vec::new();
     proposals.extend(structure_proposals);
     proposals.extend(scan_unread_outside_inbox(&conn, account_id)?);
-    proposals.extend(scan_stale_inbox_read(&conn, account_id)?);
+    proposals.extend(scan_stale_inbox_read(
+        &conn,
+        account_id,
+        stale_inbox_days_from_prefs(path),
+    )?);
     proposals.extend(scan_unsubscribe(&conn, account_id)?);
     proposals.extend(scan_newsletter_unfiled(&conn, account_id, &rules)?);
     proposals.extend(scan_transactional_notifications(&conn, account_id)?);
@@ -564,8 +573,13 @@ fn scan_unread_outside_inbox(
     )])
 }
 
-fn scan_stale_inbox_read(conn: &Connection, account_id: &str) -> Result<Vec<OrgProposal>, String> {
-    let cutoff = (chrono::Utc::now() - chrono::Duration::days(STALE_INBOX_DAYS))
+fn scan_stale_inbox_read(
+    conn: &Connection,
+    account_id: &str,
+    stale_days: i64,
+) -> Result<Vec<OrgProposal>, String> {
+    let days = stale_days.max(1);
+    let cutoff = (chrono::Utc::now() - chrono::Duration::days(days))
         .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let mut stmt = conn
         .prepare(
@@ -616,14 +630,14 @@ fn scan_stale_inbox_read(conn: &Connection, account_id: &str) -> Result<Vec<OrgP
         OrgProposalKind::StaleInboxRead,
         "range",
         "Inbox : lus et anciens",
-        &format!("Fils lus dans l'Inbox depuis plus de {STALE_INBOX_DAYS} jours, non suivis — candidats à l'archivage."),
+        &format!("Fils lus dans l'Inbox depuis plus de {days} jours, non suivis — candidats à l'archivage."),
         refs,
         OrgSuggestedAction::Archive,
         None,
         vec![
             "inbox".into(),
             "read".into(),
-            format!("older_than_{STALE_INBOX_DAYS}d"),
+            format!("older_than_{days}d"),
             "not_followed".into(),
         ],
     )])

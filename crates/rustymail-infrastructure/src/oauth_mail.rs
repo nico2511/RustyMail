@@ -1,14 +1,17 @@
 //! OAuth2 « Modern Auth » pour IMAP/SMTP (Google + Microsoft) avec PKCE et redirect loopback.
 //!
-//! **Configuration développeur** (obligatoire pour les flux OAuth) :
-//! - `RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID` — client OAuth Google (type **Application de bureau** recommandé).
-//! - `RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET` — secret client du **même** identifiant OAuth (obligatoire pour
-//!   un client **Application Web** ; en pratique aussi requis pour la plupart des clients **Application de bureau**
-//!   actuels). Définir dans `.env` à la racine du dépôt (chargé au démarrage Tauri).
-//! - `RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID` — application Azure « Mobile et applications de bureau » avec redirect loopback.
+//! **Pas de serveur RustyMail** : le navigateur et l’échange de code parlent directement à
+//! Google / Microsoft ; le binaire écoute seulement `http://127.0.0.1:<port>`.
 //!
-//! Les jetons sont stockés sous `oauth:{email}` (trousseau, éventuellement découpé) ou fichier local
-//! si un jeton Microsoft dépasse la limite Windows Credential Manager (~2560 caractères UTF-16).
+//! **Configuration** (clients publics embarqués au build, ou variables d’environnement) :
+//! - `RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID` — client OAuth Google (type **Application de bureau**).
+//! - `RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET` — secret du même client Desktop. Google le traite comme
+//!   **non confidentiel** pour les apps installées (obligatoire à l’échange malgré PKCE).
+//! - `RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID` — application Entra « Mobile et applications de bureau »
+//!   (public client, pas de secret).
+//!
+//! Les jetons utilisateur sont stockés sous `oauth:{email}` (trousseau, éventuellement découpé)
+//! ou fichier local si un jeton Microsoft dépasse la limite Windows Credential Manager (~2560 caractères UTF-16).
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -59,10 +62,10 @@ fn normalize_oauth_env_value(raw: &str) -> String {
 
 fn google_oauth_missing_secret_message() -> String {
     "RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET manquant ou vide. \
-     Copiez le secret client depuis Google Cloud Console → APIs & Services → Credentials → votre client OAuth \
-     (même Client ID que RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID) dans `.env` à la racine du dépôt (voir `.env.example`). \
-     Type recommandé : **Application de bureau** ; si le client est **Application Web**, le secret est obligatoire. \
-     Redémarrez RustyMail après modification du `.env` (ou supprimez une variable Windows vide du même nom)."
+     Pour un client Google **Application de bureau**, ce secret est exigé par l’API token malgré PKCE \
+     (Google le considère non confidentiel pour les apps installées). \
+     Rebuild avec `.env` / secrets CI, ou définissez la variable puis redémarrez RustyMail \
+     (voir `.env.example` et docs/OAUTH.md)."
         .to_string()
 }
 
@@ -1015,7 +1018,7 @@ async fn exchange_google_code(
     code_verifier: &str,
 ) -> Result<serde_json::Value, String> {
     let secret = google_oauth_client_secret_param()?;
-    // Corps explicite : Google rejette l’absence de `client_secret` (et une valeur vide pour les clients « Web »).
+    // Google Desktop : client_secret obligatoire à l’échange malgré PKCE (secret non confidentiel).
     let body = format!(
         "code={}&client_id={}&redirect_uri={}&grant_type=authorization_code&code_verifier={}&client_secret={}",
         urlencoding::encode(code),

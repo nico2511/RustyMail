@@ -31,6 +31,23 @@ export function renderSuggestedViewsCardHtml(
   </div>`;
 }
 
+function savedViewBadgesHtml(item: SavedSearchListItem): string {
+  const unread = item.unreadCount ?? 0;
+  const neu = item.newCount ?? 0;
+  const parts: string[] = [];
+  if (unread > 0) {
+    parts.push(
+      `<span class="saved-view-badge saved-view-badge--unread" aria-label="${unread} non lu${unread === 1 ? "" : "s"}">${unread}</span>`,
+    );
+  }
+  if (neu > 0) {
+    parts.push(
+      `<span class="saved-view-badge" aria-label="${neu} nouveau${neu === 1 ? "" : "x"}">+${neu}</span>`,
+    );
+  }
+  return parts.join("");
+}
+
 export function renderSavedSearchesSidebarHtml(
   items: SavedSearchListItem[],
   activeId: string | null,
@@ -43,15 +60,15 @@ export function renderSavedSearchesSidebarHtml(
   return items
     .map((item) => {
       const active = item.id === activeId;
-      const count = item.newCount ?? 0;
-      const badge =
-        count > 0
-          ? `<span class="saved-view-badge" aria-label="${count} nouveau${count === 1 ? "" : "x"}">+${count}</span>`
-          : "";
+      const badge = savedViewBadgesHtml(item);
       const pin = item.pinned ? `<span class="saved-view-pin dim" aria-hidden="true">★</span>` : "";
+      const icon = (item.icon?.trim() || "Vu").slice(0, 4);
+      const shortcutHint = item.shortcut?.trim()
+        ? ` · ${item.shortcut.trim()}`
+        : "";
       return `<div class="saved-view-row">
-        <button type="button" class="folder-button saved-view-button ${active ? "active" : ""}" data-action="apply-saved-search" data-saved-search-id="${escapeAttr(item.id)}" title="Ouvrir la vue · ${escapeAttr(item.name)}">
-          <span class="folder-icon">Vu</span>
+        <button type="button" class="folder-button saved-view-button ${active ? "active" : ""}" data-action="apply-saved-search" data-saved-search-id="${escapeAttr(item.id)}" title="Ouvrir la vue · ${escapeAttr(item.name)}${escapeAttr(shortcutHint)}">
+          <span class="folder-icon">${escapeHtml(icon)}</span>
           <span class="folder-name">${escapeHtml(item.name)}</span>
           ${pin}${badge}
         </button>

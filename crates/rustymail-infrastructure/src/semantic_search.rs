@@ -307,6 +307,44 @@ pub fn reindex_semantic_mailbox(
     reindex_semantic_for_message_rows(db_path, &rows, enrich_identifiers)
 }
 
+/// Indexe uniquement les messages du compte sans embedding pour le modèle courant.
+pub fn reindex_semantic_missing(
+    db_path: &std::path::Path,
+    account_id: &str,
+    enrich_identifiers: bool,
+) -> Result<SemanticReindexStats, String> {
+    let account_id = account_id.trim();
+    if account_id.is_empty() {
+        return Err("account_id requis".into());
+    }
+    let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "
+            SELECT m.id, m.subject, COALESCE(m.body_plain, m.body) AS bp
+            FROM messages m
+            WHERE m.account_id = ?1
+              AND NOT EXISTS (
+                SELECT 1 FROM message_embeddings e
+                WHERE e.message_id = m.id AND e.model_id = ?2
+              )
+            ORDER BY m.received_at DESC
+            LIMIT 500
+            ",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows: Vec<(String, String, String)> = stmt
+        .query_map(params![account_id, EMBEDDING_MODEL_ID], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    drop(stmt);
+    drop(conn);
+    reindex_semantic_for_message_rows(db_path, &rows, enrich_identifiers)
+}
+
 fn f32_slice_to_blob(v: &[f32]) -> Vec<u8> {
     let mut b = Vec::with_capacity(v.len() * 4);
     for x in v {
@@ -533,7 +571,172 @@ fn lexical_thread_ids_for_like(
     }
 }
 
-/// Correspondance exacte ou préfixe si la valeur se termine par `*` (ex. `source:agents.allianz*`).
+/// Lexical via FTS5 (bm25) ; fallback LIKE si FTS indisponible ou vide.
+/// Retourne (thread_ids ordonnés, scores normalisés 0–1 par thread).
+fn lexical_thread_ids_with_scores(
+    conn: &Connection,
+    account_id: &str,
+    scope_mailbox: Option<&str>,
+    mailbox_prefix: Option<&str>,
+    needle: &str,
+) -> Result<(Vec<String>, HashMap<String, f32>), String> {
+    let tokens = lexical_search_terms(needle);
+    if tokens.is_empty() {
+        return Ok((Vec::new(), HashMap::new()));
+    }
+    let fts_query = tokens
+        .iter()
+        .map(|t| {
+            let esc = t.replace('"', "\"\"");
+            format!("\"{esc}\"")
+        })
+        .collect::<Vec<_>>()
+        .join(" AND ");
+
+    let fts_ok = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='messages_fts'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .map(|n| n > 0)
+        .unwrap_or(false);
+
+    if fts_ok {
+        let mut sql = String::from(
+            "
+            SELECT m.thread_id, MIN(bm25(messages_fts)) AS score
+            FROM messages_fts
+            INNER JOIN messages m ON m.id = messages_fts.message_id
+            WHERE messages_fts MATCH ?1 AND m.account_id = ?2
+            ",
+        );
+        let mut bind_idx = 3i32;
+        if scope_mailbox.is_some() {
+            sql.push_str(&format!(
+                " AND lower(trim(m.mailbox)) = lower(trim(?{bind_idx}))"
+            ));
+            bind_idx += 1;
+        }
+        if mailbox_prefix.is_some() {
+            sql.push_str(&format!(
+                " AND (lower(trim(m.mailbox)) = lower(trim(?{bind_idx}))
+                   OR lower(m.mailbox) LIKE lower(trim(?{bind_idx})) || '/%'
+                   OR lower(m.mailbox) LIKE lower(trim(?{bind_idx})) || '.%')"
+            ));
+        }
+        sql.push_str(" GROUP BY m.thread_id ORDER BY score ASC");
+
+        let mut stmt = match conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => {
+                return lexical_fallback_intersect(conn, account_id, scope_mailbox, &tokens);
+            }
+        };
+
+        let mut pairs: Vec<(String, f64)> = Vec::new();
+        let map_ok = if let (Some(mbox), Some(prefix)) = (scope_mailbox, mailbox_prefix) {
+            let mapped = stmt.query_map(params![fts_query, account_id, mbox, prefix], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            });
+            match mapped {
+                Ok(rows) => {
+                    for r in rows.flatten() {
+                        pairs.push(r);
+                    }
+                    true
+                }
+                Err(_) => false,
+            }
+        } else if let Some(mbox) = scope_mailbox {
+            let mapped = stmt.query_map(params![fts_query, account_id, mbox], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            });
+            match mapped {
+                Ok(rows) => {
+                    for r in rows.flatten() {
+                        pairs.push(r);
+                    }
+                    true
+                }
+                Err(_) => false,
+            }
+        } else if let Some(prefix) = mailbox_prefix {
+            let mapped = stmt.query_map(params![fts_query, account_id, prefix], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            });
+            match mapped {
+                Ok(rows) => {
+                    for r in rows.flatten() {
+                        pairs.push(r);
+                    }
+                    true
+                }
+                Err(_) => false,
+            }
+        } else {
+            let mapped = stmt.query_map(params![fts_query, account_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            });
+            match mapped {
+                Ok(rows) => {
+                    for r in rows.flatten() {
+                        pairs.push(r);
+                    }
+                    true
+                }
+                Err(_) => false,
+            }
+        };
+
+        if map_ok && !pairs.is_empty() {
+            let min_s = pairs.iter().map(|(_, s)| *s).fold(f64::INFINITY, f64::min);
+            let max_s = pairs
+                .iter()
+                .map(|(_, s)| *s)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let span = (max_s - min_s).abs().max(1e-6);
+            let mut scores = HashMap::new();
+            let mut ids = Vec::new();
+            for (tid, s) in pairs {
+                let norm: f32 = 1.0 - ((s - min_s) / span) as f32;
+                scores.insert(tid.clone(), norm.clamp(0.0, 1.0));
+                ids.push(tid);
+            }
+            return Ok((ids, scores));
+        }
+    }
+
+    lexical_fallback_intersect(conn, account_id, scope_mailbox, &tokens)
+}
+
+fn lexical_fallback_intersect(
+    conn: &Connection,
+    account_id: &str,
+    scope_mailbox: Option<&str>,
+    tokens: &[String],
+) -> Result<(Vec<String>, HashMap<String, f32>), String> {
+    let like0 = sql_like_fragment(tokens[0].as_str());
+    let mut ids = lexical_thread_ids_for_like(conn, account_id, scope_mailbox, &like0)?;
+    for tok in tokens.iter().skip(1) {
+        let liken = sql_like_fragment(tok.as_str());
+        let next_ids = lexical_thread_ids_for_like(conn, account_id, scope_mailbox, &liken)?;
+        let allowed: HashSet<String> = next_ids.into_iter().collect();
+        ids.retain(|id| allowed.contains(id));
+        if ids.is_empty() {
+            break;
+        }
+    }
+    let n = ids.len().max(1) as f32;
+    let scores: HashMap<String, f32> = ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| (id.clone(), 1.0 - (i as f32 / n)))
+        .collect();
+    Ok((ids, scores))
+}
+
+/// Correspondance exacte, préfixe `*`, ou hiérarchie parent (`facture` ⊂ `facture/gas`).
 fn tag_matches_query(thread_tag: &Tag, query_tag: &Tag) -> bool {
     if thread_tag.family != query_tag.family {
         return false;
@@ -549,7 +752,13 @@ fn tag_matches_query(thread_tag: &Tag, query_tag: &Tag) -> bool {
             .to_ascii_lowercase()
             .starts_with(&prefix.to_ascii_lowercase());
     }
-    thread_tag.value.eq_ignore_ascii_case(qv)
+    if thread_tag.value.eq_ignore_ascii_case(qv) {
+        return true;
+    }
+    // Hiérarchie : query `parent` matche `parent/child`
+    let tv = thread_tag.value.to_ascii_lowercase();
+    let ql = qv.to_ascii_lowercase();
+    tv.starts_with(&format!("{ql}/"))
 }
 
 fn thread_satisfies_tag(thread: &rustymail_domain::Thread, query_tag: &Tag) -> bool {
@@ -635,10 +844,75 @@ fn matches_thread_filters(thread: &rustymail_domain::Thread, query: &SearchQuery
         }
     }
 
-    query
-        .tags
-        .iter()
-        .all(|tag| thread_satisfies_tag(thread, tag))
+    if let Some(want_att) = query.has_attachment {
+        let has = thread.messages.iter().any(|m| {
+            !m.attachments.is_empty()
+                || m.tags.iter().any(|t| {
+                    matches!(t.family, rustymail_domain::TagFamily::State)
+                        && t.value.eq_ignore_ascii_case("attachment")
+                })
+        }) || thread.tags.iter().any(|t| {
+            matches!(t.family, rustymail_domain::TagFamily::State)
+                && t.value.eq_ignore_ascii_case("attachment")
+        });
+        if has != want_att {
+            return false;
+        }
+    }
+
+    if !query.tags.iter().all(|tag| thread_satisfies_tag(thread, tag)) {
+        return false;
+    }
+
+    true
+}
+
+fn thread_matches_date_and_security(
+    item: &ThreadListItem,
+    query: &SearchQuery,
+    security_score: Option<f32>,
+) -> bool {
+    if let Some(min_sec) = query.min_security_score {
+        match security_score {
+            Some(s) if s >= 0.0 => {
+                if s < min_sec {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+
+    let activity = parse_activity_after(&item.last_activity);
+    if let Some(days) = query.relative_days.filter(|d| *d > 0) {
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
+        match activity {
+            Some(dt) if dt >= cutoff => {}
+            _ => return false,
+        }
+    }
+    if let Some(from) = query.date_from.as_deref().and_then(parse_activity_after) {
+        match activity {
+            Some(dt) if dt >= from => {}
+            _ => return false,
+        }
+    }
+    if let Some(to) = query.date_to.as_deref().and_then(parse_activity_after) {
+        match activity {
+            Some(dt) if dt <= to => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
+fn mailbox_matches_prefix(mailbox: &str, prefix: &str) -> bool {
+    let mb = mailbox.trim().to_ascii_lowercase();
+    let p = prefix.trim().to_ascii_lowercase();
+    if p.is_empty() {
+        return true;
+    }
+    mb == p || mb.starts_with(&format!("{p}/")) || mb.starts_with(&format!("{p}."))
 }
 
 pub fn sqlite_search_threads_unified(
@@ -654,6 +928,11 @@ pub fn sqlite_search_threads_unified(
         return Err("account_id requis pour la recherche SQLite".to_string());
     };
     let raw_mailbox = query.mailbox.as_deref().filter(|s| !s.trim().is_empty());
+    let mailbox_prefix = query
+        .mailbox_prefix
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
 
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
 
@@ -680,24 +959,18 @@ pub fn sqlite_search_threads_unified(
 
     let text_lc = text_for_lexical_semantic(query);
 
+    let mut lexical_scores: HashMap<String, f32> = HashMap::new();
     let mut lexical_thread_ids: Vec<String> = Vec::new();
     if let Some(ref needle) = text_lc {
-        let tokens = lexical_search_terms(needle);
-        if !tokens.is_empty() {
-            let like0 = sql_like_fragment(tokens[0].as_str());
-            lexical_thread_ids =
-                lexical_thread_ids_for_like(&conn, account_id, scope_mailbox, &like0)?;
-            for tok in tokens.iter().skip(1) {
-                let liken = sql_like_fragment(tok.as_str());
-                let next_ids =
-                    lexical_thread_ids_for_like(&conn, account_id, scope_mailbox, &liken)?;
-                let allowed: HashSet<String> = next_ids.into_iter().collect();
-                lexical_thread_ids.retain(|id| allowed.contains(id));
-                if lexical_thread_ids.is_empty() {
-                    break;
-                }
-            }
-        }
+        let (ids, scores) = lexical_thread_ids_with_scores(
+            &conn,
+            account_id,
+            scope_mailbox,
+            mailbox_prefix,
+            needle,
+        )?;
+        lexical_thread_ids = ids;
+        lexical_scores = scores;
     }
 
     let senders = effective_senders(query);
@@ -709,6 +982,7 @@ pub fn sqlite_search_threads_unified(
             } else {
                 let allowed: HashSet<String> = sender_ids.into_iter().collect();
                 lexical_thread_ids.retain(|id| allowed.contains(id));
+                lexical_scores.retain(|id, _| allowed.contains(id));
             }
         } else {
             lexical_thread_ids = sender_ids;
@@ -760,7 +1034,7 @@ pub fn sqlite_search_threads_unified(
                     let mut stmt = conn
                         .prepare(
                             "
-                        SELECT m.thread_id, e.vector, e.dim
+                        SELECT m.thread_id, e.vector, e.dim, m.mailbox
                         FROM message_embeddings e
                         INNER JOIN messages m ON m.id = e.message_id
                         WHERE m.account_id = ?1 AND e.model_id = ?2
@@ -773,11 +1047,17 @@ pub fn sqlite_search_threads_unified(
                                 row.get::<_, String>(0)?,
                                 row.get::<_, Vec<u8>>(1)?,
                                 row.get::<_, i64>(2)?,
+                                row.get::<_, String>(3)?,
                             ))
                         })
                         .map_err(|e| e.to_string())?;
                     for r in rows {
-                        let (thread_id, blob, dim) = r.map_err(|e| e.to_string())?;
+                        let (thread_id, blob, dim, mb) = r.map_err(|e| e.to_string())?;
+                        if let Some(prefix) = mailbox_prefix {
+                            if !mailbox_matches_prefix(&mb, prefix) {
+                                continue;
+                            }
+                        }
                         let dim = dim.max(0) as usize;
                         let Some(mvec) = blob_to_f32_vec(&blob, dim) else {
                             continue;
@@ -792,6 +1072,11 @@ pub fn sqlite_search_threads_unified(
             }
         }
     }
+
+    let hybrid_alpha = query
+        .hybrid_lexical_weight
+        .unwrap_or(0.55)
+        .clamp(0.0, 1.0);
 
     let mut thread_ids: Vec<String> = match query.mode {
         SearchMode::Lexical => lexical_thread_ids,
@@ -810,21 +1095,28 @@ pub fn sqlite_search_threads_unified(
             }
         }
         SearchMode::Hybrid => {
-            if !lexical_thread_ids.is_empty() {
+            // Fusion α·lexical + (1−α)·semantic ; candidats = union des deux.
+            let mut all: HashSet<String> = HashSet::new();
+            all.extend(lexical_thread_ids.iter().cloned());
+            for (tid, s) in &semantic_scores {
+                if *s > 0.12 {
+                    all.insert(tid.clone());
+                }
+            }
+            if all.is_empty() {
                 lexical_thread_ids
             } else {
-                let mut v: Vec<String> = semantic_scores.keys().cloned().collect();
-                v.sort_by(|a, b| {
-                    let sa = semantic_scores.get(a).copied().unwrap_or(0.0);
-                    let sb = semantic_scores.get(b).copied().unwrap_or(0.0);
-                    sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
-                });
-                v.retain(|tid| semantic_scores.get(tid).copied().unwrap_or(0.0) > 0.12);
-                if v.is_empty() {
-                    lexical_thread_ids
-                } else {
-                    v
-                }
+                let mut scored: Vec<(String, f32)> = all
+                    .into_iter()
+                    .map(|tid| {
+                        let lex = lexical_scores.get(&tid).copied().unwrap_or(0.0);
+                        let sem = semantic_scores.get(&tid).copied().unwrap_or(0.0);
+                        let fused = hybrid_alpha * lex + (1.0 - hybrid_alpha) * sem;
+                        (tid, fused)
+                    })
+                    .collect();
+                scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                scored.into_iter().map(|(id, _)| id).collect()
             }
         }
     };
@@ -838,44 +1130,88 @@ pub fn sqlite_search_threads_unified(
             .language
             .as_ref()
             .map_or(false, |s| !s.trim().is_empty());
+    let facets_only = text_lc.is_none()
+        && senders_empty
+        && query.tags.is_empty()
+        && query.language.as_ref().map_or(true, |s| s.trim().is_empty())
+        && (query.has_attachment.is_some()
+            || query.min_security_score.is_some()
+            || query.relative_days.is_some()
+            || query.date_from.is_some()
+            || query.date_to.is_some()
+            || mailbox_prefix.is_some());
     let browse_empty = text_lc.is_none()
         && senders_empty
         && query.tags.is_empty()
         && query
             .language
             .as_ref()
-            .map_or(true, |s| s.trim().is_empty());
+            .map_or(true, |s| s.trim().is_empty())
+        && query.has_attachment.is_none()
+        && query.min_security_score.is_none()
+        && query.relative_days.is_none()
+        && query.date_from.is_none()
+        && query.date_to.is_none()
+        && mailbox_prefix.is_none();
 
     if thread_ids.is_empty()
         && matches!(query.mode, SearchMode::Lexical | SearchMode::Hybrid)
-        && (browse_empty || tags_only || lang_only)
+        && (browse_empty || tags_only || lang_only || facets_only)
     {
         thread_ids = load_thread_ids_in_scope(&conn, account_id, scope_mailbox)?;
     }
 
     let mut out: Vec<ThreadListItem> = Vec::new();
     for tid in thread_ids {
-        let row: Option<(String, String, String, String, bool)> = if let Some(mbox) = scope_mailbox
-        {
-            conn.query_row(
-                "SELECT id, subject, tags, mailbox, COALESCE(is_followed, 0) FROM threads WHERE id = ?1 AND account_id = ?2 AND lower(trim(mailbox)) = lower(trim(?3))",
-                params![tid, account_id, mbox],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get::<_, i64>(4)? != 0)),
-            )
-            .optional()
-            .map_err(|e| e.to_string())?
-        } else {
-            conn.query_row(
-                "SELECT id, subject, tags, mailbox, COALESCE(is_followed, 0) FROM threads WHERE id = ?1 AND account_id = ?2",
-                params![tid, account_id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get::<_, i64>(4)? != 0)),
-            )
-            .optional()
-            .map_err(|e| e.to_string())?
-        };
-        let Some((id, subject, tags, mailbox, followed)) = row else {
+        let row: Option<(String, String, String, String, bool, f32)> =
+            if let Some(mbox) = scope_mailbox {
+                conn.query_row(
+                    "SELECT id, subject, tags, mailbox, COALESCE(is_followed, 0),
+                            COALESCE(security_score, -1)
+                     FROM threads WHERE id = ?1 AND account_id = ?2
+                       AND lower(trim(mailbox)) = lower(trim(?3))",
+                    params![tid, account_id, mbox],
+                    |r| {
+                        Ok((
+                            r.get(0)?,
+                            r.get(1)?,
+                            r.get(2)?,
+                            r.get(3)?,
+                            r.get::<_, i64>(4)? != 0,
+                            r.get::<_, f64>(5)? as f32,
+                        ))
+                    },
+                )
+                .optional()
+                .map_err(|e| e.to_string())?
+            } else {
+                conn.query_row(
+                    "SELECT id, subject, tags, mailbox, COALESCE(is_followed, 0),
+                            COALESCE(security_score, -1)
+                     FROM threads WHERE id = ?1 AND account_id = ?2",
+                    params![tid, account_id],
+                    |r| {
+                        Ok((
+                            r.get(0)?,
+                            r.get(1)?,
+                            r.get(2)?,
+                            r.get(3)?,
+                            r.get::<_, i64>(4)? != 0,
+                            r.get::<_, f64>(5)? as f32,
+                        ))
+                    },
+                )
+                .optional()
+                .map_err(|e| e.to_string())?
+            };
+        let Some((id, subject, tags, mailbox, followed, sec_score)) = row else {
             continue;
         };
+        if let Some(prefix) = mailbox_prefix {
+            if !mailbox_matches_prefix(&mailbox, prefix) {
+                continue;
+            }
+        }
         let thread =
             build_thread_from_row(&conn, id, subject, tags, followed).map_err(|e| e.to_string())?;
         if !matches_thread_filters(&thread, query) {
@@ -884,6 +1220,14 @@ pub fn sqlite_search_threads_unified(
         let mut item = thread.list_item(mailbox.trim().to_string());
         item.is_newsletter_thread =
             thread_blocks_reply(&thread, &account_emails, &newsletter_rules);
+        let sec = if sec_score >= 0.0 {
+            Some(sec_score)
+        } else {
+            None
+        };
+        if !thread_matches_date_and_security(&item, query, sec) {
+            continue;
+        }
         out.push(item);
     }
 
@@ -989,14 +1333,11 @@ mod sender_search_tests {
         );
 
         let query = SearchQuery {
-            text: None,
-            tags: vec![],
             sender: Some("bob@x.com".into()),
             senders: vec!["bob@x.com".into()],
             account_id: Some("a1".into()),
-            mailbox: None,
             mode: SearchMode::Lexical,
-            language: None,
+            ..Default::default()
         };
         let hits = sqlite_search_threads_unified(&path, &query).expect("unified");
         assert_eq!(hits.len(), 2, "both threads involving bob@x.com");
@@ -1042,28 +1383,20 @@ mod sender_search_tests {
         drop(conn);
 
         let query = SearchQuery {
-            text: None,
             tags: vec![Tag::source("agents.allianz.com")],
-            sender: None,
-            senders: vec![],
             account_id: Some("a1".into()),
-            mailbox: None,
             mode: SearchMode::Lexical,
-            language: None,
+            ..Default::default()
         };
         let hits = sqlite_search_threads_unified(&path, &query).expect("tag search");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].id.0, "t1");
 
         let query_wild = SearchQuery {
-            text: None,
             tags: vec![Tag::source("agents.allianz*")],
-            sender: None,
-            senders: vec![],
             account_id: Some("a1".into()),
-            mailbox: None,
             mode: SearchMode::Lexical,
-            language: None,
+            ..Default::default()
         };
         let wild = sqlite_search_threads_unified(&path, &query_wild).expect("wildcard");
         assert_eq!(wild.len(), 1);
@@ -1110,13 +1443,9 @@ mod sender_search_tests {
 
         let query = SearchQuery {
             text: Some("noreply@ionos.fr".into()),
-            tags: vec![],
-            sender: None,
-            senders: vec![],
             account_id: Some("a1".into()),
-            mailbox: None,
             mode: SearchMode::Hybrid,
-            language: None,
+            ..Default::default()
         };
         let hits = sqlite_search_threads_unified(&path, &query).expect("email search");
         assert_eq!(hits.len(), 1);

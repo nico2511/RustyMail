@@ -8,9 +8,9 @@ Before publishing an installable bundle (MSI/NSIS):
 
 ### Secrets & installer
 
-1. No `.env` file or embedded OAuth keys in MSI/NSIS artifacts.
-2. **Release builds:** `dotenv` loaded only in **debug** (`tauri dev`) — not at installed runtime.
-3. Google/Microsoft OAuth buttons disabled when environment variables are absent.
+1. No runtime `.env` in MSI/NSIS artifacts. **Public** desktop OAuth client credentials (Google Desktop ID + non-confidential secret, Microsoft client ID) may be **embedded at build** so OAuth works without a RustyMail server — see [OAUTH.md](OAUTH.md).
+2. **Never** embed user access/refresh tokens. User tokens stay in the OS keyring after interactive login.
+3. Google/Microsoft OAuth buttons disabled when neither build-time embed nor runtime env provides client credentials.
 4. First launch: lightweight HF models (MiniLM + Whisper bootstrap); chat GGUF only if local LLM enabled in Settings.
 
 ### Configuration

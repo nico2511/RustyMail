@@ -8,67 +8,14 @@ use rustymail_domain::{
     TagFamily,
 };
 
-use crate::newsletter::{
-    list_newsletter_rules_connection, matches_newsletter_email, NewsletterRule,
+use crate::mail_classify::{
+    apply_mail_type_tag, classify_mail_type, mail_type_db_value, priority_score_for_thread,
 };
+use crate::newsletter::{list_newsletter_rules_connection, NewsletterRule};
 use crate::{open_sqlite_migrated, parse_tags, text_sample::append_utf8_byte_sample};
 use rustymail_modules::ai_tagging::{infer_content_kind, is_message_content_kind};
 
-const TRANSACTIONAL_RX: &[&str] = &[
-    "facture",
-    "invoice",
-    "reçu",
-    "recu",
-    "échéance",
-    "echeance",
-    "paiement",
-    "payment",
-    "relevé",
-    "releve",
-    "commande",
-    "order",
-    "receipt",
-];
-
-/// Préfixes courants d’expéditeurs transactionnels (partie locale avant `@`).
-const TRANSACTIONAL_LOCAL: &[&str] = &[
-    "noreply",
-    "no-reply",
-    "donotreply",
-    "do-not-reply",
-    "notification",
-    "notifications",
-    "billing",
-    "invoice",
-    "invoices",
-    "orders",
-    "order",
-    "receipt",
-    "receipts",
-    "payment",
-    "payments",
-    "facturation",
-    "accounting",
-    "accounts",
-];
-
-fn local_part_matches_transactional(local: &str) -> bool {
-    TRANSACTIONAL_LOCAL.iter().any(|p| {
-        local == *p
-            || local.starts_with(&format!("{p}."))
-            || local.starts_with(&format!("{p}+"))
-            || local.ends_with(&format!(".{p}"))
-    })
-}
-
-pub fn sender_is_transactional(email: &str, subject: &str) -> bool {
-    let e = email.trim().to_ascii_lowercase();
-    let s = subject.to_ascii_lowercase();
-    let local = e.split('@').next().unwrap_or("");
-    let sender_signal = local_part_matches_transactional(local);
-    let subject_signal = TRANSACTIONAL_RX.iter().any(|k| s.contains(k));
-    sender_signal && subject_signal
-}
+pub use crate::mail_classify::sender_is_transactional;
 
 /// Au moins une pièce jointe enregistrée sur un message du fil.
 pub fn thread_has_attachments(
@@ -138,19 +85,8 @@ pub fn retag_csv_for_thread(
             out.push(t);
         }
     }
-    let is_transactional = sender_is_transactional(sender_email, subject);
-    if matches_newsletter_email(sender_email, rules) && !is_transactional {
-        let t = Tag::kind("newsletter");
-        if !out.contains(&t) {
-            out.push(t);
-        }
-    }
-    if is_transactional {
-        let t = Tag::kind("transactional");
-        if !out.contains(&t) {
-            out.push(t);
-        }
-    }
+    let mail_type = classify_mail_type(sender_email, subject, has_unsubscribe, rules);
+    apply_mail_type_tag(&mut out, mail_type);
     if let Some(kind) = infer_content_kind(subject, body_sample) {
         let t = Tag::kind(kind);
         if !out.contains(&t) {
@@ -197,6 +133,7 @@ fn apply_retag_for_thread(
     let mailbox = effective_thread_mailbox(conn, account_id, thread_id, thread_row_mailbox);
     let (sender, langs, unsub, body_sample) = thread_message_hints(conn, account_id, thread_id)?;
     let has_attachments = thread_has_attachments(conn, account_id, thread_id)?;
+    let mail_type = classify_mail_type(&sender, subject, unsub, rules);
     let new_csv = retag_csv_for_thread(
         &mailbox,
         tags_csv,
@@ -208,16 +145,69 @@ fn apply_retag_for_thread(
         has_attachments,
         rules,
     );
+    let followed: bool = conn
+        .query_row(
+            "SELECT COALESCE(is_followed, 0) FROM threads WHERE id = ?1 AND account_id = ?2",
+            params![thread_id, account_id],
+            |r| r.get::<_, i64>(0).map(|v| v != 0),
+        )
+        .unwrap_or(false);
+    let unread: bool = conn
+        .query_row(
+            "SELECT EXISTS(
+                SELECT 1 FROM messages
+                WHERE thread_id = ?1 AND account_id = ?2 AND COALESCE(is_read, 0) = 0
+             )",
+            params![thread_id, account_id],
+            |r| r.get::<_, i64>(0).map(|v| v != 0),
+        )
+        .unwrap_or(false);
+    let priority = priority_score_for_thread(unread, followed, 0.0, 0.0);
+    let mail_type_s = mail_type_db_value(mail_type);
     let mailbox_changed = mailbox != thread_row_mailbox.trim();
-    if new_csv == tags_csv && !mailbox_changed {
+    let prev_mail_type: Option<String> = conn
+        .query_row(
+            "SELECT mail_type FROM threads WHERE id = ?1 AND account_id = ?2",
+            params![thread_id, account_id],
+            |r| r.get::<_, Option<String>>(0),
+        )
+        .unwrap_or(None);
+    let prev_priority: f64 = conn
+        .query_row(
+            "SELECT COALESCE(priority_score, 0) FROM threads WHERE id = ?1 AND account_id = ?2",
+            params![thread_id, account_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0.0);
+    let classify_changed = prev_mail_type.as_deref() != Some(mail_type_s)
+        || (prev_priority - f64::from(priority.score)).abs() > 0.01;
+    if new_csv == tags_csv && !mailbox_changed && !classify_changed {
         return Ok(false);
     }
     if !dry_run {
-        conn.execute(
-            "UPDATE threads SET tags = ?1, mailbox = ?2 WHERE id = ?3 AND account_id = ?4",
-            params![new_csv, mailbox, thread_id, account_id],
-        )
-        .map_err(|e| e.to_string())?;
+        // Colonnes mail_type / priority_score ajoutées par migrate ; ignore si absentes.
+        let updated = conn.execute(
+            "UPDATE threads SET tags = ?1, mailbox = ?2, mail_type = ?3, priority_score = ?4
+             WHERE id = ?5 AND account_id = ?6",
+            params![
+                new_csv,
+                mailbox,
+                mail_type_s,
+                priority.score,
+                thread_id,
+                account_id
+            ],
+        );
+        match updated {
+            Ok(_) => {}
+            Err(_) => {
+                conn.execute(
+                    "UPDATE threads SET tags = ?1, mailbox = ?2 WHERE id = ?3 AND account_id = ?4",
+                    params![new_csv, mailbox, thread_id, account_id],
+                )
+                .map_err(|e| e.to_string())?;
+            }
+        }
     }
     Ok(true)
 }
@@ -489,6 +479,9 @@ pub fn thread_tags_stale(mailbox: &str, tags_csv: &str) -> bool {
                 && !is_message_content_kind(&t.value)
                 && t.value != "newsletter"
                 && t.value != "transactional"
+                && t.value != "notification"
+                && t.value != "discussion"
+                && t.value != "conversation"
         })
         .collect();
     if kind_mailboxes.len() > 1 {

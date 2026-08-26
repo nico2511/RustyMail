@@ -31,6 +31,7 @@ mod model_bootstrap;
 mod org_commands;
 mod rate_guard;
 mod saved_search_commands;
+mod search_history_commands;
 mod webview_microphone;
 mod whisper_dictation;
 use serde::{Deserialize, Serialize};
@@ -153,8 +154,8 @@ struct OAuthDesktopLoginOutcomeView {
 #[tauri::command]
 async fn oauth_google_desktop_login_cmd() -> Result<OAuthDesktopLoginOutcomeView, String> {
     let cid = std::env::var("RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID").map_err(|_| {
-        "RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID manquant. Définissez la variable (même terminal que `tauri dev`, \
-         redémarrage de Cursor après modification dans Windows, ou fichier `.env` à la racine du dépôt — voir `.env.example`)."
+        "RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID manquant. Rebuild avec `.env` / secrets CI (voir docs/OAUTH.md), \
+         ou définissez la variable puis redémarrez RustyMail."
             .to_string()
     })?;
     // Valide aussi RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET avant d’ouvrir le navigateur.
@@ -170,7 +171,8 @@ async fn oauth_google_desktop_login_cmd() -> Result<OAuthDesktopLoginOutcomeView
 #[tauri::command]
 async fn oauth_microsoft_desktop_login_cmd() -> Result<OAuthDesktopLoginOutcomeView, String> {
     let cid = std::env::var("RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID").map_err(|_| {
-        "RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID manquant. Même remarques que pour Google : terminal, redémarrage Cursor, ou `.env` à la racine du dépôt."
+        "RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID manquant. Rebuild avec `.env` / secrets CI (voir docs/OAUTH.md), \
+         ou définissez la variable puis redémarrez RustyMail."
             .to_string()
     })?;
     let o = rustymail_infrastructure::oauth_microsoft_desktop_login(&cid).await?;
@@ -1079,18 +1081,22 @@ fn set_app_prefs(paths: State<'_, AppPaths>, mut prefs: AppPrefs) -> Result<(), 
     save_app_prefs_validated(&paths.prefs_path, &prefs)
 }
 
-#[tauri::command]
-fn oauth_google_configured() -> bool {
-    std::env::var("RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID")
+fn env_nonempty(key: &str) -> bool {
+    std::env::var(key)
         .map(|s| !s.trim().is_empty())
         .unwrap_or(false)
 }
 
 #[tauri::command]
+fn oauth_google_configured() -> bool {
+    // Google Desktop exige encore client_id + client_secret (secret non confidentiel, embarquable).
+    env_nonempty("RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID")
+        && env_nonempty("RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET")
+}
+
+#[tauri::command]
 fn oauth_microsoft_configured() -> bool {
-    std::env::var("RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID")
-        .map(|s| !s.trim().is_empty())
-        .unwrap_or(false)
+    env_nonempty("RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID")
 }
 
 #[tauri::command]
@@ -2095,13 +2101,13 @@ async fn subscribe_imap_mailbox(
     Ok(format!("Mailbox abonnée: {}", mailbox.trim()))
 }
 
-#[cfg(feature = "embed-dev-oauth")]
 mod oauth_embed {
     include!(concat!(env!("OUT_DIR"), "/oauth_embed.rs"));
 }
 
-/// Charge `.env` à la racine du dépôt (debug) ou les OAuth embarqués au build (`embed-dev-oauth`, release perso).
-fn load_developer_dotenv() {
+/// Charge `.env` en debug, puis injecte les clients OAuth publics embarqués au build
+/// (release : PKCE + loopback sans serveur RustyMail ni `.env` installé).
+fn load_oauth_and_developer_env() {
     #[cfg(debug_assertions)]
     {
         let repo_env = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2113,12 +2119,12 @@ fn load_developer_dotenv() {
         let _ = dotenvy::dotenv();
     }
 
-    #[cfg(feature = "embed-dev-oauth")]
+    // Embarqué au `cargo build` depuis env CI ou `.env` — ne remplace pas une valeur déjà définie.
     oauth_embed::inject_embedded_oauth_env();
 }
 
 pub fn run() {
-    load_developer_dotenv();
+    load_oauth_and_developer_env();
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(
         "warn,rustymail::audit=info,rustymail_infrastructure=info,html5ever=error",
     ))
@@ -2318,6 +2324,8 @@ pub fn run() {
             subscribe_imap_mailbox,
             org_commands::org_scan_account_cmd,
             org_commands::org_apply_proposal_cmd,
+            org_commands::org_preview_proposal_cmd,
+            org_commands::org_undo_last_cmd,
             org_commands::org_retag_account_cmd,
             org_commands::org_retag_threads_cmd,
             org_commands::org_resolve_archive_path_cmd,
@@ -2325,6 +2333,10 @@ pub fn run() {
             org_commands::org_v2_record_decision_cmd,
             org_commands::org_v2_ignore_mailbox_cmd,
             org_commands::org_v2_unignore_mailbox_cmd,
+            org_commands::move_thread_unarchive_cmd,
+            org_commands::run_auto_archive_cmd,
+            org_commands::preview_auto_archive_cmd,
+            org_commands::archive_space_stats_cmd,
             folder_commands::list_mailbox_tree_cmd,
             folder_commands::set_mailbox_locked_cmd,
             folder_commands::archive_mailbox_threads_cmd,
@@ -2336,6 +2348,10 @@ pub fn run() {
             saved_search_commands::get_saved_search_cmd,
             saved_search_commands::mark_saved_search_seen_cmd,
             saved_search_commands::apply_saved_search_cmd,
+            search_history_commands::record_search_history_cmd,
+            search_history_commands::list_search_history_cmd,
+            search_history_commands::clear_search_history_cmd,
+            search_history_commands::reindex_semantic_missing_cmd,
             activity_commands::record_activity_events_cmd,
             activity_commands::list_suggested_saved_views_cmd,
             activity_commands::dismiss_view_suggestion_cmd,

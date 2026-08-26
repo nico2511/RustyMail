@@ -396,14 +396,11 @@ pub fn list_suggested_saved_views(
                 rationale_fr: format_rationale(&eng),
                 suggested_name: name.clone(),
                 query: SearchQuery {
-                    text: None,
-                    tags: vec![],
                     sender: Some(eng.email.clone()),
                     senders: vec![eng.email],
                     account_id: Some(aid.to_string()),
-                    mailbox: None,
                     mode: SearchMode::Lexical,
-                    language: None,
+                    ..Default::default()
                 },
             }
         })

@@ -104,6 +104,36 @@ const PRESET_FILTERS: InboxFilterHit[] = [
     sublabel: "Retirer le filtre de type",
     glyph: "∞",
   },
+  {
+    id: "facet:last7",
+    label: "#last:7d",
+    sublabel: "Messages des 7 derniers jours",
+    glyph: "7",
+  },
+  {
+    id: "facet:last30",
+    label: "#last:30d",
+    sublabel: "Messages des 30 derniers jours",
+    glyph: "30",
+  },
+  {
+    id: "facet:attachment",
+    label: "#pj",
+    sublabel: "Avec pièce jointe",
+    glyph: "PJ",
+  },
+  {
+    id: "facet:security",
+    label: "#security:50",
+    sublabel: "Score de sécurité ≥ 50",
+    glyph: "§",
+  },
+  {
+    id: "facet:archive",
+    label: "#archive",
+    sublabel: "Chercher sous le préfixe Archive",
+    glyph: "Ar",
+  },
 ];
 
 const TAG_FAMILIES = ["source", "kind", "entity", "state"] as const;
@@ -457,6 +487,15 @@ function buildHits(
       p.id === "hint:tag"
     )
       return true;
+    if ((q.startsWith("last") || q === "7d" || q === "30d") && p.id.startsWith("facet:last"))
+      return true;
+    if (
+      (q.startsWith("pj") || q.startsWith("attach") || q.startsWith("piece") || q.startsWith("pièce")) &&
+      p.id === "facet:attachment"
+    )
+      return true;
+    if ((q.startsWith("sec") || q.startsWith("security")) && p.id === "facet:security") return true;
+    if (q.startsWith("arc") && p.id === "facet:archive") return true;
     return false;
   });
 

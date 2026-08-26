@@ -38,6 +38,12 @@ jobs:
         run: npm ci
 
       - name: Build Tauri (Windows)
+        env:
+          # Public desktop OAuth clients — embed at build so installers work offline of any RustyMail server.
+          # Configure these as GitHub Actions repository secrets (optional; buttons disabled if absent).
+          RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID }}
+          RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET }}
+          RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID: ${{ secrets.RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID }}
         run: npm run tauri:build -- --bundles nsis
 
       - name: List build outputs

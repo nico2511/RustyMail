@@ -21,6 +21,10 @@ export type SavedSearch = {
   uiState: SavedSearchUiState;
   pinned: boolean;
   sortOrder: number;
+  /** Glyph / clé d’icône courte (ex. « Vu », « 📥 »). */
+  icon?: string | null;
+  /** Raccourci clavier (`KeyboardEvent.code`, ex. `Digit1`). */
+  shortcut?: string | null;
   lastSeenAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +32,7 @@ export type SavedSearch = {
 
 export type SavedSearchListItem = SavedSearch & {
   newCount?: number;
+  unreadCount?: number;
 };
 
 export type SavedSearchUpsert = {
@@ -38,6 +43,8 @@ export type SavedSearchUpsert = {
   uiState?: SavedSearchUiState;
   pinned?: boolean;
   sortOrder?: number | null;
+  icon?: string | null;
+  shortcut?: string | null;
 };
 
 export async function listSavedSearchesCmd(

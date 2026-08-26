@@ -14,6 +14,7 @@ mod activity;
 mod address_contacts;
 mod archive_layout;
 mod attachment_policy;
+mod auto_archive;
 mod contact_detail;
 mod demo_playground;
 mod draft_revisions;
@@ -22,11 +23,13 @@ mod imap;
 mod imap_tombstones;
 mod lang_detect;
 mod mail_autoconfig;
+mod mail_classify;
 mod mail_ops;
 mod mailbox_local_cache;
 mod newsletter;
 mod oauth_mail;
 mod org_apply;
+mod org_apply_history;
 mod org_consolidate;
 mod org_mailbox_structure;
 mod org_memory;
@@ -38,6 +41,7 @@ mod prefs_urls;
 mod provider_errors;
 mod saved_drafts;
 mod saved_searches;
+mod search_history;
 mod semantic_search;
 mod smtp_send;
 mod split_send;
@@ -120,6 +124,9 @@ pub use activity::{
     record_suggestion_decision,
 };
 pub use archive_layout::{archive_mailbox_path, parse_archive_layout, resolve_archive_target};
+pub use auto_archive::{
+    archive_tree_space_stats, preview_auto_archive_candidates, run_auto_archive_rules,
+};
 pub use folder_ops::{
     archive_mailbox_threads, delete_imap_mailbox_with_contents, list_mailbox_tree,
     retag_threads_in_mailboxes, set_mailbox_locked, ArchiveMailboxThreadsOutcome,
@@ -136,10 +143,15 @@ pub use imap::{login_session, login_session_for_account, map_imap_error, ImapSes
 pub use imap_tombstones::{
     active_tombstone_uids, filter_tombstoned_uids, record_imap_uid_tombstones,
 };
+pub use mail_classify::{
+    apply_mail_type_tag, apply_mail_type_tag_csv, classify_mail_type, mail_type_db_value,
+    priority_score_for_thread, sender_is_noreply_like, sender_is_transactional,
+};
 pub use mail_ops::{
     empty_trash_mailbox, is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive,
-    move_thread_to_mailbox, move_thread_to_trash, pick_archive_folder, pick_trash_folder,
-    set_thread_seen, ArchiveDestination, ArchiveMoveResult, ThreadMailboxMoveResult,
+    move_thread_to_mailbox, move_thread_to_trash, move_thread_unarchive, pick_archive_folder,
+    pick_trash_folder, set_thread_seen, ArchiveDestination, ArchiveMoveResult,
+    ThreadMailboxMoveResult,
 };
 pub use mailbox_local_cache::{
     purge_mailbox_local_cache, register_mailbox_local_cache, rename_mailbox_local_cache,
@@ -147,8 +159,12 @@ pub use mailbox_local_cache::{
     MailboxCacheRenameStats,
 };
 pub use org_apply::{
-    org_apply_proposal_with, org_resolve_archive_path, prepare_org_proposal_for_apply,
-    resolve_apply_action, validate_org_apply_thread_ids,
+    org_apply_proposal_with, org_preview_proposal, org_resolve_archive_path, org_undo_last_batch,
+    prepare_org_proposal_for_apply, resolve_apply_action, validate_org_apply_thread_ids,
+};
+pub use org_apply_history::{
+    latest_undoable_batch_id, list_batch_entries, list_recent_history, mark_batch_undone,
+    new_batch_id, record_apply_entries,
 };
 pub use org_memory::{
     clear_mailbox_auto_archive, ignore_mailbox, is_mailbox_auto_archive,
@@ -165,11 +181,14 @@ pub use saved_searches::{
     delete_saved_search, get_saved_search, list_saved_searches, mark_saved_search_seen,
     migrate_saved_searches, upsert_saved_search,
 };
+pub use search_history::{
+    clear_search_history, list_search_history, record_search_history,
+};
 pub use semantic_search::{
     count_threads_matching_query, embedding_plain_for_message, init_semantic_model_dir,
-    reindex_semantic_account, reindex_semantic_mailbox, semantic_embedding_counts_snapshot,
-    semantic_model_present, sqlite_search_threads_unified, SemanticEmbeddingCountsSnapshot,
-    SemanticReindexStats,
+    reindex_semantic_account, reindex_semantic_mailbox, reindex_semantic_missing,
+    semantic_embedding_counts_snapshot, semantic_model_present, sqlite_search_threads_unified,
+    SemanticEmbeddingCountsSnapshot, SemanticReindexStats,
 };
 
 pub use demo_playground::{
@@ -1307,10 +1326,58 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
     unsubscribe_detect::migrate_message_unsubscribe_urls(connection)?;
     let _ = unsubscribe_detect::migrate_resort_unsubscribe_urls(connection);
     org_memory::migrate_org_memory(connection)?;
+    org_apply_history::migrate_org_apply_history(connection)?;
     saved_searches::migrate_saved_searches(connection)?;
+    search_history::migrate_search_history(connection)?;
     activity::migrate_activity(connection)?;
     imap_tombstones::migrate_imap_tombstones(connection)?;
+    migrate_messages_fts(connection)?;
 
+    Ok(())
+}
+
+fn migrate_messages_fts(connection: &Connection) -> Result<(), rusqlite::Error> {
+    connection.execute_batch(
+        "
+        CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+            message_id UNINDEXED,
+            thread_id UNINDEXED,
+            account_id UNINDEXED,
+            subject,
+            body_text,
+            sender,
+            tokenize = 'unicode61'
+        );
+        ",
+    )?;
+    let count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM messages_fts", [], |r| r.get(0))
+        .unwrap_or(0);
+    if count == 0 {
+        let _ = connection.execute_batch(
+            "
+            INSERT INTO messages_fts(message_id, thread_id, account_id, subject, body_text, sender)
+            SELECT id, thread_id, account_id,
+                   COALESCE(subject, ''),
+                   COALESCE(body_plain, body, ''),
+                   COALESCE(sender_email, '')
+            FROM messages;
+            ",
+        );
+    }
+    // Cache score sécurité sur les fils (0–100, -1 = inconnu).
+    let _ = connection.execute(
+        "ALTER TABLE threads ADD COLUMN security_score REAL NOT NULL DEFAULT -1",
+        [],
+    );
+    let _ = connection.execute(
+        "ALTER TABLE threads ADD COLUMN priority_score REAL NOT NULL DEFAULT 0",
+        [],
+    );
+    let _ = connection.execute(
+        "ALTER TABLE threads ADD COLUMN mail_type TEXT",
+        [],
+    );
     Ok(())
 }
 

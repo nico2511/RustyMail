@@ -181,6 +181,76 @@ pub struct OrgKeywordRule {
     pub target_mailbox: Option<String>,
 }
 
+/// Règle d’archivage automatique (opt-in).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoArchiveRule {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub enabled: bool,
+    /// Âge minimum en jours (None = ignore).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age_days: Option<i64>,
+    /// Tags `family:value` requis (AND).
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Expéditeurs (email ou domaine) — OR.
+    #[serde(default)]
+    pub senders: Vec<String>,
+    /// Uniquement les fils lus.
+    #[serde(default = "default_true")]
+    pub only_read: bool,
+    /// Exclure les fils suivis.
+    #[serde(default = "default_true")]
+    pub exclude_followed: bool,
+}
+
+/// Entrée d’historique d’application Organize (pour undo).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgApplyHistoryEntry {
+    pub id: i64,
+    pub account_id: String,
+    pub batch_id: String,
+    pub thread_id: String,
+    pub action: String,
+    pub from_mailbox: String,
+    pub to_mailbox: Option<String>,
+    pub created_at: String,
+    /// `true` si déjà annulé.
+    #[serde(default)]
+    pub undone: bool,
+}
+
+/// Aperçu dry-run avant apply Organize.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgApplyPreviewItem {
+    pub thread_id: String,
+    pub subject: String,
+    pub from_mailbox: String,
+    pub to_mailbox: Option<String>,
+    pub action: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgApplyPreview {
+    pub proposal_id: String,
+    pub items: Vec<OrgApplyPreviewItem>,
+    pub total_count: usize,
+}
+
+/// Stats d’espace (archivage / nettoyage).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveSpaceStats {
+    pub message_count: usize,
+    pub approx_bytes: u64,
+    pub mailbox_count: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ArchiveLayout {

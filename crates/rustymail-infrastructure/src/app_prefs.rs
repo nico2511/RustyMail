@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-pub use rustymail_domain::OrgKeywordRule;
+pub use rustymail_domain::{AutoArchiveRule, OrgKeywordRule};
 
 pub const APP_PREFS_FILE: &str = "app_prefs.json";
 
@@ -45,6 +45,17 @@ pub struct GeneralPrefs {
     pub archive_root: String,
     #[serde(default)]
     pub org_keyword_rules: Vec<OrgKeywordRule>,
+    /// Âge (jours) pour la carte Organize « inbox stale ».
+    #[serde(default = "default_stale_inbox_days")]
+    pub stale_inbox_days: i64,
+    /// Pondération lexicale mode hybride (0–1).
+    #[serde(default = "default_hybrid_lexical_weight")]
+    pub hybrid_lexical_weight: f32,
+    /// Archivage automatique opt-in.
+    #[serde(default)]
+    pub auto_archive_enabled: bool,
+    #[serde(default)]
+    pub auto_archive_rules: Vec<AutoArchiveRule>,
     /// Dialog d’accueil minimal (winget llama) déjà fermé.
     #[serde(default = "default_first_run_dismissed")]
     pub first_run_dismissed: bool,
@@ -83,6 +94,14 @@ fn default_mother_language() -> String {
     "fr".to_string()
 }
 
+fn default_stale_inbox_days() -> i64 {
+    90
+}
+
+fn default_hybrid_lexical_weight() -> f32 {
+    0.55
+}
+
 impl Default for GeneralPrefs {
     fn default() -> Self {
         Self {
@@ -93,6 +112,10 @@ impl Default for GeneralPrefs {
             archive_layout: default_archive_layout(),
             archive_root: default_archive_root(),
             org_keyword_rules: Vec::new(),
+            stale_inbox_days: default_stale_inbox_days(),
+            hybrid_lexical_weight: default_hybrid_lexical_weight(),
+            auto_archive_enabled: false,
+            auto_archive_rules: Vec::new(),
             first_run_dismissed: default_first_run_dismissed(),
             bootstrap_models_completed: false,
             activity_suggestions_enabled: default_activity_suggestions_enabled(),

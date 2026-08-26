@@ -8,16 +8,20 @@ use crate::open_sqlite_migrated;
 use crate::org_memory::filter_proposals_with_memory;
 use crate::org_scan::org_scan_account;
 
-/// Types de cartes autorisés en V2 (productivité boîte, pas recherche ni tags).
+/// Types de cartes autorisés en Organize v3 (surface unique, mémoire V2).
 const V2_KINDS: &[OrgProposalKind] = &[
     OrgProposalKind::StaleInboxRead,
     OrgProposalKind::UnsubscribeNewsletter,
+    OrgProposalKind::TransactionalNotification,
+    OrgProposalKind::DuplicateThreadCrossMailbox,
+    OrgProposalKind::CustomKeywordCluster,
     OrgProposalKind::EmptyMailbox,
     OrgProposalKind::FlatMailboxTree,
+    OrgProposalKind::LlmCluster,
 ];
 
-const V2_FOCUS_NOTE: &str = "Structure de la boîte, inbox ancienne à archiver, newsletters désinscriptibles, dossiers vides. \
-Les regroupements par expéditeur ou mots-clés relèvent de la recherche. Les tags se mettent à jour au déplacement IMAP.";
+const V2_FOCUS_NOTE: &str = "Inbox ancienne, désinscriptions, transactionnels, doublons cross-folder, \
+    règles mots-clés, dossiers vides. Les propositions IA n’apparaissent que si le LLM est activé.";
 
 fn kind_allowed(kind: OrgProposalKind) -> bool {
     V2_KINDS.contains(&kind)
@@ -49,8 +53,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn v2_excludes_keyword_and_tag_kinds() {
-        assert!(!kind_allowed(OrgProposalKind::CustomKeywordCluster));
+    fn v2_includes_core_organize_kinds() {
+        assert!(kind_allowed(OrgProposalKind::CustomKeywordCluster));
+        assert!(kind_allowed(OrgProposalKind::DuplicateThreadCrossMailbox));
+        assert!(kind_allowed(OrgProposalKind::TransactionalNotification));
         assert!(!kind_allowed(OrgProposalKind::StaleTags));
         assert!(kind_allowed(OrgProposalKind::StaleInboxRead));
     }

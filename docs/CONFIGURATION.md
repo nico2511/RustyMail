@@ -49,16 +49,16 @@ Tauri commands expose paths for support (use carefully in production logs):
 - `app_status` — vault location, capabilities summary
 - `app_paths` — database, prefs, model directories
 
-## Environment variables (developers)
+## Environment variables (OAuth clients)
 
-Used at **Tauri process startup** for OAuth button enablement (not end-user installer config):
+Used at process startup (and optionally **embedded at build** for release binaries — see [OAUTH.md](OAUTH.md)):
 
 | Variable | Purpose |
 | -------- | ------- |
 | `RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID` | Google OAuth desktop client |
-| `RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET` | Matching client secret |
-| `RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID` | Entra app registration |
-| `RUSTYMAIL_OAUTH_LOOPBACK_PORT` | Default `52789` for Microsoft redirect |
+| `RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET` | Google Desktop secret (non-confidential; required by token endpoint) |
+| `RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID` | Entra public client |
+| `RUSTYMAIL_OAUTH_LOOPBACK_PORT` | Default `52789` for redirect |
 | `RUSTYMAIL_OAUTH_ALLOW_EPHEMERAL_PORT` | Dev escape hatch if port busy (`0` recommended) |
 
 Placeholders only in docs — copy [`.env.example`](../.env.example) locally. See [OAUTH.md](OAUTH.md).
@@ -74,4 +74,4 @@ Placeholders only in docs — copy [`.env.example`](../.env.example) locally. Se
 
 - [ACCOUNTS.md](ACCOUNTS.md) — mail account setup
 - [AI_AND_MODELS.md](AI_AND_MODELS.md) — model and feature preferences
-- [SECURITY.md](SECURITY.md) — no secrets in prefs or installers
+- [SECURITY.md](SECURITY.md) — keyring, redaction, release checklist

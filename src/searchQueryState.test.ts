@@ -22,6 +22,10 @@ function emptyStructural(): SearchStructuralState {
     listFilter: "unread",
     searchNlMode: "semantic",
     searchLanguageFilter: "fr",
+    searchRelativeDays: null,
+    searchHasAttachment: null,
+    searchMinSecurityScore: null,
+    searchMailboxPrefix: null,
   };
 }
 
@@ -38,6 +42,10 @@ describe("resetSearchStructuralState", () => {
     expect(s.listFilter).toBe("all");
     expect(s.searchNlMode).toBeNull();
     expect(s.searchLanguageFilter).toBeNull();
+    expect(s.searchRelativeDays).toBeNull();
+    expect(s.searchHasAttachment).toBeNull();
+    expect(s.searchMinSecurityScore).toBeNull();
+    expect(s.searchMailboxPrefix).toBeNull();
   });
 });
 
@@ -110,6 +118,10 @@ describe("hasCommittedSearchCriteria", () => {
       listFilter: "unread",
       searchNlMode: null,
       searchLanguageFilter: null,
+      searchRelativeDays: null,
+      searchHasAttachment: null,
+      searchMinSecurityScore: null,
+      searchMailboxPrefix: null,
     });
     expect(hasCommittedSearchCriteria(s)).toBe(false);
     expect(hasSavableSearchCriteria(s)).toBe(true);

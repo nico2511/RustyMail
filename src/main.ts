@@ -91,6 +91,7 @@ import {
   type SearchStructuralState,
 } from "./searchQueryState";
 import { buildSearchQueryPayload } from "./searchQueryBuild";
+import { recordSearchHistory } from "./searchHistory";
 import {
   applySavedSearchToState,
   buildSavedSearchUiState,
@@ -202,8 +203,10 @@ import {
   optimisticOrgRemoveThreads,
   optimisticPatchOrgReport,
   orgApplyProposal,
+  orgPreviewProposal,
   orgRetagAccount,
   orgScanAccount,
+  orgUndoLast,
   formatOrgApplyImpact,
   renderOrganizationView,
   type OrgProposal,
@@ -736,6 +739,14 @@ type State = {
   searchNlMode: "lexical" | "semantic" | "hybrid" | null;
   /** Filtre langue ISO 639-1 issu de `llm_search_nl`. */
   searchLanguageFilter: string | null;
+  /** `#last:Nd` */
+  searchRelativeDays: number | null;
+  /** `#pj` / `has:attachment` */
+  searchHasAttachment: boolean | null;
+  /** `#security:N` */
+  searchMinSecurityScore: number | null;
+  /** `#archive` → `mailbox_prefix` */
+  searchMailboxPrefix: string | null;
   /** Libellé de l’opération LLM en cours (file unique). */
   llmJobLabel: string | null;
   aiOpen: boolean;
@@ -1652,6 +1663,10 @@ const state: State = {
   searchModifiersTouched: false,
   searchNlMode: null,
   searchLanguageFilter: null,
+  searchRelativeDays: null,
+  searchHasAttachment: null,
+  searchMinSecurityScore: null,
+  searchMailboxPrefix: null,
   searchModalOpen: false,
   settingsAiModal: null,
   aiEngineSettingsTab: "local",
@@ -3731,7 +3746,11 @@ function searchQueryUsesThreadsApi(): boolean {
     state.search.trim() ||
       state.searchSenders.length > 0 ||
       state.searchTags.length > 0 ||
-      state.searchLanguageFilter?.trim()
+      state.searchLanguageFilter?.trim() ||
+      state.searchRelativeDays != null ||
+      state.searchHasAttachment != null ||
+      state.searchMinSecurityScore != null ||
+      state.searchMailboxPrefix?.trim()
   );
 }
 
@@ -4036,6 +4055,10 @@ function draftSearchCriteriaSnapshot(draft = state.searchDraft): SearchCriteriaS
     listFilter: "all",
     searchNlMode: null,
     searchLanguageFilter: null,
+    searchRelativeDays: null,
+    searchHasAttachment: null,
+    searchMinSecurityScore: null,
+    searchMailboxPrefix: null,
   };
   resetSearchStructuralState(scratch);
   const parsed = parseSearchBarDraft(draft.trim(), state.newsletterRules);
@@ -6480,10 +6503,22 @@ async function confirmThenRunOrgV2Apply(
     return;
   }
   if (proposal.applicable === false) return;
-  const impact = formatOrgApplyImpact(proposal, actionOverride);
+  let previewLine = formatOrgApplyImpact(proposal, actionOverride);
+  try {
+    const preview = await orgPreviewProposal(accountId, proposalId, proposal, actionOverride);
+    const sample = preview.items
+      .slice(0, 5)
+      .map((it) => `• ${it.subject || it.threadId} (${it.fromMailbox} → ${it.toMailbox || "—"})`)
+      .join("\n");
+    previewLine = `${preview.totalCount} fil(s) seront traités.\n${sample}${
+      preview.items.length > 5 ? "\n…" : ""
+    }`;
+  } catch {
+    /* garde le résumé impact */
+  }
   const ok = await openConfirmModal({
-    title: "Confirmer l’action",
-    body: `${impact}\n\nAppliquer cette action ?`,
+    title: "Prévisualiser puis appliquer",
+    body: `${previewLine}\n\nAppliquer cette action ?`,
     confirmLabel: "Appliquer",
   });
   if (!ok) return;
@@ -7050,6 +7085,10 @@ async function loadAddressBookSidebarCount(): Promise<void> {
 const SAVED_VIEW_BATCH_MAX = 500;
 
 function buildSearchQueryFromCurrentState() {
+  const archiveRoot = (state.appPrefs.general.archiveRoot ?? "Archive").trim() || "Archive";
+  const mailboxPrefixRaw = state.searchMailboxPrefix?.trim();
+  const mailboxPrefix =
+    mailboxPrefixRaw?.toLowerCase() === "archive" ? archiveRoot : mailboxPrefixRaw || null;
   return buildSearchQueryPayload({
     search: state.search,
     searchTags: state.searchTags,
@@ -7060,6 +7099,11 @@ function buildSearchQueryFromCurrentState() {
     mailbox: searchMailboxForQuery(),
     semanticSearchEnabled: state.appPrefs.ai.semanticSearchEnabled,
     semanticModelAvailable: state.semanticModelAvailable,
+    relativeDays: state.searchRelativeDays,
+    hasAttachment: state.searchHasAttachment,
+    minSecurityScore: state.searchMinSecurityScore,
+    mailboxPrefix,
+    hybridLexicalWeight: state.appPrefs.general.hybridLexicalWeight ?? null,
   });
 }
 
@@ -7174,6 +7218,9 @@ async function saveCurrentSearchView(): Promise<void> {
     toast("Nom de vue invalide.");
     return;
   }
+  const iconRaw = window.prompt("Icône courte (2–4 caractères)", "Vu");
+  if (iconRaw === null) return;
+  const icon = (iconRaw.trim() || "Vu").slice(0, 4);
   const query = buildSearchQueryFromCurrentState();
   const ui = buildSavedSearchUiState({
     listFilter: state.listFilter,
@@ -7184,7 +7231,9 @@ async function saveCurrentSearchView(): Promise<void> {
     searchModifiersTouched: state.searchModifiersTouched,
   });
   try {
-    const saved = await upsertSavedSearchCmd(buildSavedSearchUpsert(accountId, trimmed, query, ui));
+    const saved = await upsertSavedSearchCmd(
+      buildSavedSearchUpsert(accountId, trimmed, query, ui, { icon }),
+    );
     state.activeSavedSearchId = saved.id;
     await markSavedSearchSeenCmd(accountId, saved.id);
     recordActivity({ eventType: "saved_view_created", metaJson: JSON.stringify({ savedSearchId: saved.id }) });
@@ -7691,6 +7740,23 @@ function applyParsedSearchBarToStructural(
   if (parsed.newsletterRule !== undefined) {
     target.searchNewsletterRule = parsed.newsletterRule;
   }
+  if (parsed.relativeDays !== undefined) {
+    target.searchRelativeDays =
+      parsed.relativeDays > 0 ? Math.floor(parsed.relativeDays) : null;
+  }
+  if (parsed.hasAttachment !== undefined) {
+    target.searchHasAttachment = parsed.hasAttachment;
+  }
+  if (parsed.minSecurityScore !== undefined) {
+    target.searchMinSecurityScore = Number.isFinite(parsed.minSecurityScore)
+      ? parsed.minSecurityScore
+      : null;
+  }
+  if (parsed.mailboxPrefix !== undefined) {
+    const prefix = parsed.mailboxPrefix?.trim() || null;
+    target.searchMailboxPrefix = prefix;
+    if (prefix) target.searchScope = "account";
+  }
 }
 
 function applyParsedSearchBarToState(parsed: ReturnType<typeof parseSearchBarDraft>): void {
@@ -7707,7 +7773,11 @@ function hasSearchBarCriteria(): boolean {
       state.searchNewsletterRule ||
       state.searchLanguageFilter?.trim() ||
       state.listFilter !== "all" ||
-      state.searchModifiersTouched
+      state.searchModifiersTouched ||
+      state.searchRelativeDays != null ||
+      state.searchHasAttachment != null ||
+      state.searchMinSecurityScore != null ||
+      state.searchMailboxPrefix?.trim()
   );
 }
 
@@ -7894,6 +7964,10 @@ async function clearSearchAndReloadInbox(): Promise<void> {
   state.searchNewsletterRule = null;
   state.searchScope = "account";
   state.searchModifiersTouched = false;
+  state.searchRelativeDays = null;
+  state.searchHasAttachment = null;
+  state.searchMinSecurityScore = null;
+  state.searchMailboxPrefix = null;
   state.activeSavedSearchId = null;
   resetManualSearchNlFilters();
   await loadMailView(false);
@@ -10203,6 +10277,10 @@ function applySearchQueryFromNl(sq: {
     listFilter: "all",
     searchNlMode: null,
     searchLanguageFilter: null,
+    searchRelativeDays: null,
+    searchHasAttachment: null,
+    searchMinSecurityScore: null,
+    searchMailboxPrefix: null,
   };
   applyNlSearchQueryToState(
     applied,
@@ -10220,6 +10298,10 @@ function applySearchQueryFromNl(sq: {
   state.listFilter = applied.listFilter;
   state.searchNlMode = applied.searchNlMode;
   state.searchLanguageFilter = applied.searchLanguageFilter;
+  state.searchRelativeDays = applied.searchRelativeDays;
+  state.searchHasAttachment = applied.searchHasAttachment;
+  state.searchMinSecurityScore = applied.searchMinSecurityScore;
+  state.searchMailboxPrefix = applied.searchMailboxPrefix;
   state.searchTags = [];
   for (const t of applied.searchTags) mergeSearchBarTag(t);
   const aid = sq.accountId?.trim();
@@ -10841,6 +10923,7 @@ function renderThread() {
               </div>
               <div class="action-bar action-bar--ops" role="toolbar" aria-label="Actions opérationnelles">
                 <button type="button" class="icon-pill" data-action="thread-archive-cur" title="Archiver" aria-label="Archiver">${iconSvg("archive")}</button>
+                <button type="button" class="icon-pill" data-action="thread-unarchive-cur" title="Désarchiver vers Inbox" aria-label="Désarchiver">${iconSvg("move")}</button>
                 ${
                   blockReply
                     ? ""
@@ -11125,6 +11208,7 @@ function renderMailSecurityPop(message: CleanedMessageView, opts?: { compact?: b
       ? ""
       : `<div class="mail-security-panel__actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
           <button type="button" class="ghost-button" data-action="security-move-junk" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${escapeAttr(sourceMb)}">${escapeHtml(t("security.moveJunk"))}</button>
+          <button type="button" class="ghost-button" data-action="security-filter-search" title="Filtrer les mails à score de sécurité élevé">Filtrer #security</button>
           ${
             senderEmail.includes("@")
               ? `<button type="button" class="ghost-button" data-action="security-mark-newsletter" data-sender-email="${escapeAttr(senderEmail)}">${escapeHtml(t("security.markNewsletter"))}</button>`
@@ -11660,6 +11744,20 @@ function renderSettingsGeneralPanel(): string {
         <div class="settings-form-row">
           <label class="compose-field-label" for="prefs-archive-root">Racine IMAP</label>
           <input class="settings-ctl" id="prefs-archive-root" type="text" value="${escapeAttr(state.appPrefs.general.archiveRoot ?? "Archive")}" />
+        </div>
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-stale-inbox-days">Inbox stale (jours)</label>
+          <input class="settings-ctl" id="prefs-stale-inbox-days" type="number" min="1" max="3650" value="${escapeAttr(String(state.appPrefs.general.staleInboxDays ?? 90))}" />
+        </div>
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-hybrid-weight">Poids lexical hybride (0–1)</label>
+          <input class="settings-ctl" id="prefs-hybrid-weight" type="number" min="0" max="1" step="0.05" value="${escapeAttr(String(state.appPrefs.general.hybridLexicalWeight ?? 0.55))}" />
+        </div>
+        <div class="settings-general-option">
+          <label class="settings-checkbox settings-general-option__label">
+            <input type="checkbox" id="prefs-auto-archive-enabled" ${state.appPrefs.general.autoArchiveEnabled ? "checked" : ""} />
+            <span>Archivage automatique (règles opt-in)</span>
+          </label>
         </div>
       </section>
 
@@ -14216,6 +14314,17 @@ async function handleAction(action: string, element?: HTMLElement) {
         state.appPrefs.general.archiveLayout = archLayout?.value?.trim() || "hierarchical";
         const archRoot = document.querySelector<HTMLInputElement>("#prefs-archive-root");
         state.appPrefs.general.archiveRoot = (archRoot?.value ?? "Archive").trim() || "Archive";
+        const staleDays = document.querySelector<HTMLInputElement>("#prefs-stale-inbox-days");
+        const staleN = Number(staleDays?.value ?? 90);
+        state.appPrefs.general.staleInboxDays = Number.isFinite(staleN) ? Math.max(1, Math.floor(staleN)) : 90;
+        const hybridW = document.querySelector<HTMLInputElement>("#prefs-hybrid-weight");
+        const hw = Number(hybridW?.value ?? 0.55);
+        state.appPrefs.general.hybridLexicalWeight = Number.isFinite(hw)
+          ? Math.min(1, Math.max(0, hw))
+          : 0.55;
+        state.appPrefs.general.autoArchiveEnabled = Boolean(
+          document.querySelector<HTMLInputElement>("#prefs-auto-archive-enabled")?.checked,
+        );
         const accSel = document.querySelector<HTMLSelectElement>("#prefs-default-account");
         const accVal = (accSel?.value ?? "").trim();
         if (accVal) state.appPrefs.general.defaultAccountId = accVal;
@@ -15187,6 +15296,13 @@ async function handleAction(action: string, element?: HTMLElement) {
       })();
       break;
     }
+    case "security-filter-search": {
+      state.searchDraft = ((state.searchDraft || "") + " #security:50").trim();
+      state.searchModalOpen = true;
+      toast("Filtre #security:50 ajouté — lancez la recherche.");
+      render();
+      break;
+    }
     case "close-compose":
       void finalizeCloseComposeFromUser();
       break;
@@ -15734,9 +15850,10 @@ async function handleAction(action: string, element?: HTMLElement) {
       const acc = currentAccount();
       if (!acc?.id) return;
       state.organizationV2.scanning = true;
-      state.organizationV2.applyMessage = "Analyse V2…";
+      state.organizationV2.applyMessage = "Analyse…";
       render();
-      void orgV2ScanAccount(acc.id)
+      const includeLlm = Boolean(state.appPrefs.ai.featureOrgProposalsEnabled);
+      void orgV2ScanAccount(acc.id, includeLlm)
         .then((report) => {
           state.organizationV2.report = report;
           state.organizationV2.scanning = false;
@@ -15745,6 +15862,27 @@ async function handleAction(action: string, element?: HTMLElement) {
         })
         .catch((e) => {
           state.organizationV2.scanning = false;
+          state.organizationV2.applyMessage = "";
+          toast(tauriErrorMessage(e));
+          render();
+        });
+      break;
+    }
+    case "org-v2-undo": {
+      const accUndo = currentAccount();
+      if (!accUndo?.id) return;
+      state.organizationV2.applying = true;
+      state.organizationV2.applyMessage = "Annulation…";
+      render();
+      void orgUndoLast(accUndo.id)
+        .then((p) => {
+          state.organizationV2.applying = false;
+          state.organizationV2.applyMessage = p.message || "Lot annulé.";
+          toast(state.organizationV2.applyMessage);
+          render();
+        })
+        .catch((e) => {
+          state.organizationV2.applying = false;
           state.organizationV2.applyMessage = "";
           toast(tauriErrorMessage(e));
           render();
@@ -16372,6 +16510,27 @@ async function handleAction(action: string, element?: HTMLElement) {
     case "thread-archive-cur":
       if (state.selectedThreadId) void onThreadMove("archive", state.selectedThreadId);
       break;
+    case "thread-unarchive-cur": {
+      const tid = state.selectedThreadId?.trim();
+      const acc = currentAccount();
+      if (!tid || !acc?.id) break;
+      if (!isTauriRuntime()) {
+        toast("Désarchivage : disponible dans l’app Tauri.");
+        break;
+      }
+      void (async () => {
+        try {
+          const { moveThreadUnarchive } = await import("./organizationView");
+          const out = await withTimeout(moveThreadUnarchive(acc.id, tid), MAIL_ACTION_TIMEOUT_MS);
+          toast(out.message || "Désarchivé vers Inbox.");
+          await openThread(tid, { skipHistory: true, preserveAi: true });
+          render();
+        } catch (err) {
+          toast(tauriErrorMessage(err));
+        }
+      })();
+      break;
+    }
     case "retag-thread": {
       const tid = element?.dataset.threadId?.trim() || state.selectedThreadId?.trim() || "";
       const accountId = state.selectedAccountId?.trim() || "";
@@ -16827,11 +16986,12 @@ async function searchThreads() {
     restoreSearchInputSelection(selStart, selEnd, gen);
     return;
   }
+  const query = buildSearchQueryFromCurrentState();
   state.threads = filterRecentlyRemovedThreads(
     await safeInvoke<ThreadListItem[]>(
       "search_threads",
       {
-        query: buildSearchQueryFromCurrentState(),
+        query,
       },
       []
     ),
@@ -16839,6 +16999,24 @@ async function searchThreads() {
 
   if (gen !== searchThreadsGeneration) {
     return;
+  }
+
+  // Historique local (cmd Tauri `record_search_history_cmd` — no-op silencieux si absente).
+  if (isTauriRuntime() && hasCommittedSearchCriteria(committedSearchCriteriaSnapshot())) {
+    void recordSearchHistory(
+      accountId,
+      state.searchDraft.trim() || state.search.trim(),
+      JSON.stringify(query),
+    ).catch((e) => {
+      // TODO(backend): enregistrer `record_search_history_cmd` / `list_search_history_cmd` / `clear_search_history_cmd`
+      // invoke shape: recordSearchHistory(accountId, queryText, queryJson)
+      //   → invoke("record_search_history_cmd", { payload: { accountId, queryText, queryJson } })
+      // listSearchHistory(accountId, limit)
+      //   → invoke("list_search_history_cmd", { payload: { accountId, limit } })
+      // clearSearchHistory(accountId)
+      //   → invoke("clear_search_history_cmd", { payload: { accountId } })
+      console.debug("record_search_history_cmd", e);
+    });
   }
 
   render();
@@ -17508,11 +17686,9 @@ async function syncInbox(options?: { background?: boolean; allMailboxes?: boolea
       totalFetched > 0
     ) {
       const uniqueTouched = Array.from(new Set(touched.map((m) => String(m).trim()).filter(Boolean)));
-      for (const mb of uniqueTouched) {
-        void invoke("reindex_semantic_mailbox_cmd", { accountId: account.id, mailbox: mb }).catch(
-          () => {},
-        );
-      }
+      void invoke("reindex_semantic_missing_cmd", {
+        payload: { accountId: account.id },
+      }).catch(() => {});
       if (uniqueTouched.length > 1 && !options?.background) {
         toast(t("toast.semanticIndexing"));
       }
@@ -19297,6 +19473,31 @@ function bindDraftPersistenceFlush() {
 
 function bindKeyboard() {
   document.addEventListener("keydown", (event) => {
+    // Raccourcis vues enregistrées : Alt+Digit1…9
+    if (event.altKey && !event.ctrlKey && !event.metaKey && /^Digit[1-9]$/.test(event.code)) {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        /* allow typing */
+      } else {
+        const code = event.code;
+        const byShortcut = state.savedSearches.find(
+          (s) => (s.shortcut || "").trim() === code,
+        );
+        const idx = Number(code.replace("Digit", "")) - 1;
+        const byIndex = !byShortcut ? state.savedSearches[idx] : undefined;
+        const hit = byShortcut || byIndex;
+        if (hit?.id) {
+          event.preventDefault();
+          void applySavedSearchView(hit.id);
+          return;
+        }
+      }
+    }
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "t") {
       event.preventDefault();
       if (state.searchModalOpen) closeSearchModal();

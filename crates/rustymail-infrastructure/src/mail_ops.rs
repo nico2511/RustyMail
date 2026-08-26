@@ -196,7 +196,8 @@ pub struct ArchiveDestination {
 }
 
 /// Résultat d’un déplacement IMAP (message utilisateur + dossier cible réel sur le serveur).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ArchiveMoveResult {
     pub message: String,
     pub dest_mailbox: String,
@@ -1028,6 +1029,37 @@ pub async fn move_thread_to_mailbox(
         message: format!("{n} message(s) déplacé(s) → {dest_actual}."),
         dest_mailbox: dest_actual,
     })
+}
+
+/// Restaure un fil archivé vers `INBOX` (charge le compte + mailbox courante du fil).
+pub async fn move_thread_unarchive(
+    path: &Path,
+    account_id: &str,
+    thread_id: &str,
+) -> Result<ThreadMailboxMoveResult, String> {
+    let account = crate::load_accounts(path)?
+        .into_iter()
+        .find(|a| a.id.0 == account_id)
+        .ok_or_else(|| format!("Compte introuvable : {account_id}"))?;
+    let conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
+    let mailbox: String = conn
+        .query_row(
+            "SELECT mailbox FROM threads WHERE id = ?1 AND account_id = ?2",
+            params![thread_id, account_id],
+            |r| r.get(0),
+        )
+        .map_err(|_| "Fil introuvable pour ce compte.".to_string())?;
+    let mailbox = mailbox.trim();
+    if mailbox.is_empty() {
+        return Err("Mailbox source vide pour ce fil.".into());
+    }
+    if mailbox.eq_ignore_ascii_case("INBOX") {
+        return Ok(ThreadMailboxMoveResult {
+            message: "Déjà dans la boîte de réception.".into(),
+            dest_mailbox: "INBOX".into(),
+        });
+    }
+    move_thread_to_mailbox(path, &account, mailbox, thread_id, "INBOX").await
 }
 
 fn update_local_is_read(path: &Path, message_ids: &[String], is_read: bool) -> Result<(), String> {

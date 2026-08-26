@@ -284,27 +284,30 @@ export function renderNewAccountOAuthWizardLanding(opts?: {
   const msOk = opts?.microsoftConfigured !== false;
   const oauthHint =
     !googleOk && !msOk ?
-      `<p class="dim account-oauth-wizard__hint">Connexion OAuth non configurée pour cette installation — utilisez <strong>IMAP + mot de passe</strong> ou configurez les variables d’environnement (voir documentation développeur).</p>`
+      `<p class="dim account-oauth-wizard__hint">Connexion OAuth non disponible dans cette build — utilisez <strong>IMAP + mot de passe d’application</strong>, ou reconstruisez avec les clients OAuth (voir documentation).</p>`
     : "";
   return `
     <div class="account-oauth-wizard surface-sm">
       <h2 class="account-oauth-wizard__title">Ajouter un compte</h2>
       <p class="account-oauth-wizard__lead dim">
-        Connectez Google ou Microsoft en un clic. RustyMail détecte les serveurs, enregistre le compte et lance la synchronisation.
+        Continuer avec Google ou Microsoft. RustyMail ouvre votre navigateur (PKCE), récupère le consentement en local, puis enregistre le compte et synchronise.
+      </p>
+      <p class="dim account-oauth-wizard__trust" style="margin:0 0 12px;font-size:12.5px;line-height:1.45">
+        Connexion directe au fournisseur — aucun serveur RustyMail. Les jetons restent dans le trousseau système.
       </p>
       ${oauthHint}
       <div class="account-oauth-wizard__actions">
-        <button type="button" class="primary-button account-oauth-wizard__btn" data-action="oauth-google-connect" ${googleOk ? "" : "disabled title=\"RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID non défini\""}>
-          <span class="account-oauth-wizard__btn-label">Google</span>
+        <button type="button" class="primary-button account-oauth-wizard__btn" data-action="oauth-google-connect" ${googleOk ? "" : "disabled title=\"Client OAuth Google non configuré dans cette build\""}>
+          <span class="account-oauth-wizard__btn-label">Continuer avec Google</span>
           <span class="dim account-oauth-wizard__btn-sub">Gmail · Google Workspace</span>
         </button>
-        <button type="button" class="primary-button account-oauth-wizard__btn" data-action="oauth-microsoft-connect" ${msOk ? "" : "disabled title=\"RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID non défini\""}>
-          <span class="account-oauth-wizard__btn-label">Microsoft</span>
+        <button type="button" class="primary-button account-oauth-wizard__btn" data-action="oauth-microsoft-connect" ${msOk ? "" : "disabled title=\"Client OAuth Microsoft non configuré dans cette build\""}>
+          <span class="account-oauth-wizard__btn-label">Continuer avec Microsoft</span>
           <span class="dim account-oauth-wizard__btn-sub">Outlook · Office 365 · Hotmail</span>
         </button>
       </div>
       <p class="account-oauth-wizard__alt dim">
-        <button type="button" class="link-button" data-action="account-auth-password-mode">Autre fournisseur (IMAP + mot de passe)</button>
+        <button type="button" class="link-button" data-action="account-auth-password-mode">Configurer manuellement (IMAP + mot de passe d’application)</button>
       </p>
     </div>`;
 }

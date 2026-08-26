@@ -174,6 +174,67 @@ export async function orgApplyProposal(
   });
 }
 
+export type OrgApplyPreview = {
+  proposalId: string;
+  items: Array<{
+    threadId: string;
+    subject: string;
+    fromMailbox: string;
+    toMailbox?: string | null;
+    action: string;
+  }>;
+  totalCount: number;
+};
+
+export async function orgPreviewProposal(
+  accountId: string,
+  proposalId: string,
+  proposalSnapshot: OrgProposal,
+  actionOverride?: OrgActionOverride | null,
+  threadIds?: string[] | null,
+): Promise<OrgApplyPreview> {
+  return invoke<OrgApplyPreview>("org_preview_proposal_cmd", {
+    payload: {
+      accountId,
+      proposalId,
+      proposalSnapshot,
+      actionOverride: actionOverride ?? null,
+      threadIds: threadIds ?? null,
+    },
+  });
+}
+
+export async function orgUndoLast(accountId: string): Promise<OrgApplyProgress> {
+  return invoke<OrgApplyProgress>("org_undo_last_cmd", {
+    payload: { accountId },
+  });
+}
+
+export async function moveThreadUnarchive(
+  accountId: string,
+  threadId: string,
+): Promise<{ message: string; destMailbox: string }> {
+  return invoke("move_thread_unarchive_cmd", {
+    payload: { accountId, threadId },
+  });
+}
+
+export async function previewAutoArchive(accountId: string): Promise<{
+  messageCount: number;
+  approxBytes: number;
+  mailboxCount: number;
+}> {
+  return invoke("preview_auto_archive_cmd", { payload: { accountId } });
+}
+
+export async function runAutoArchive(accountId: string): Promise<{
+  messageCount: number;
+  approxBytes: number;
+  mailboxCount: number;
+}> {
+  return invoke("run_auto_archive_cmd", { payload: { accountId } });
+}
+
 export async function orgRetagAccount(
   accountId: string,
   dryRun: boolean,

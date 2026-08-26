@@ -57,4 +57,41 @@ impl Tag {
         };
         format!("{prefix}:{}", self.value)
     }
+
+    /// Chemin hiérarchique (`parent/child/…`) stocké dans `value`.
+    pub fn hierarchy_segments(&self) -> Vec<&str> {
+        self.value
+            .split('/')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    /// Parent hiérarchique (`facture/gas` → `facture`), ou None si feuille plate.
+    pub fn hierarchy_parent(&self) -> Option<&str> {
+        let segs = self.hierarchy_segments();
+        if segs.len() < 2 {
+            return None;
+        }
+        // value avant le dernier segment
+        let last = segs.last()?;
+        let cut = self.value.trim_end_matches(last).trim_end_matches('/');
+        if cut.is_empty() {
+            None
+        } else {
+            Some(cut)
+        }
+    }
+
+    /// Construit un tag hiérarchique `family:parent/child`.
+    pub fn hierarchical(family: TagFamily, path: impl AsRef<str>) -> Self {
+        let value = path
+            .as_ref()
+            .split('/')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("/");
+        Self { family, value }
+    }
 }

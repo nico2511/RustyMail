@@ -15,6 +15,14 @@ export type SearchStructuralState = {
   listFilter: ListFilter;
   searchNlMode: "lexical" | "semantic" | "hybrid" | null;
   searchLanguageFilter: string | null;
+  /** `#last:Nd` */
+  searchRelativeDays: number | null;
+  /** `#pj` / `has:attachment` */
+  searchHasAttachment: boolean | null;
+  /** `#security:N` */
+  searchMinSecurityScore: number | null;
+  /** `#archive` → `mailbox_prefix` */
+  searchMailboxPrefix: string | null;
 };
 
 export function resetSearchStructuralState(s: SearchStructuralState): void {
@@ -27,6 +35,10 @@ export function resetSearchStructuralState(s: SearchStructuralState): void {
   s.listFilter = "all";
   s.searchNlMode = null;
   s.searchLanguageFilter = null;
+  s.searchRelativeDays = null;
+  s.searchHasAttachment = null;
+  s.searchMinSecurityScore = null;
+  s.searchMailboxPrefix = null;
 }
 
 export type NlSearchQueryInput = {
@@ -158,7 +170,11 @@ export function parsedSearchBarHasModifiers(parsed: ParsedSearchBar): boolean {
     parsed.mailboxPath !== undefined ||
     parsed.accountRef !== undefined ||
     parsed.listFilter !== undefined ||
-    parsed.newsletterRule !== undefined
+    parsed.newsletterRule !== undefined ||
+    parsed.relativeDays !== undefined ||
+    parsed.hasAttachment !== undefined ||
+    parsed.minSecurityScore !== undefined ||
+    parsed.mailboxPrefix !== undefined
   );
 }
 
@@ -173,6 +189,10 @@ export type SearchCriteriaSnapshot = {
   newsletterRule: { domain: string; localPart: string } | null;
   searchNlMode: SearchStructuralState["searchNlMode"];
   searchLanguageFilter: string | null;
+  relativeDays: number | null;
+  hasAttachment: boolean | null;
+  minSecurityScore: number | null;
+  mailboxPrefix: string | null;
 };
 
 function tagCompareKey(t: { family: string; value: string }): string {
@@ -229,6 +249,10 @@ export function snapshotFromStructuralState(s: SearchStructuralState): SearchCri
     newsletterRule: rule,
     searchNlMode: s.searchNlMode,
     searchLanguageFilter: s.searchLanguageFilter?.trim() || null,
+    relativeDays: s.searchRelativeDays,
+    hasAttachment: s.searchHasAttachment,
+    minSecurityScore: s.searchMinSecurityScore,
+    mailboxPrefix: s.searchMailboxPrefix?.trim() || null,
   };
 }
 
@@ -243,6 +267,10 @@ export function searchCriteriaSnapshotsEqual(
   if (a.accountId !== b.accountId) return false;
   if (a.searchNlMode !== b.searchNlMode) return false;
   if (a.searchLanguageFilter !== b.searchLanguageFilter) return false;
+  if (a.relativeDays !== b.relativeDays) return false;
+  if (a.hasAttachment !== b.hasAttachment) return false;
+  if (a.minSecurityScore !== b.minSecurityScore) return false;
+  if (a.mailboxPrefix !== b.mailboxPrefix) return false;
   if (newsletterRuleKey(a.newsletterRule) !== newsletterRuleKey(b.newsletterRule)) return false;
   if (a.senders.length !== b.senders.length) return false;
   for (let i = 0; i < a.senders.length; i++) {
@@ -266,7 +294,11 @@ export function hasSavableSearchCriteria(s: SearchCriteriaSnapshot): boolean {
       s.newsletterRule ||
       s.searchLanguageFilter ||
       s.listFilter !== "all" ||
-      s.searchNlMode
+      s.searchNlMode ||
+      s.relativeDays != null ||
+      s.hasAttachment != null ||
+      s.minSecurityScore != null ||
+      s.mailboxPrefix
   );
 }
 
@@ -280,6 +312,10 @@ export function hasCommittedSearchCriteria(s: SearchCriteriaSnapshot): boolean {
       s.tags.length > 0 ||
       s.newsletterRule ||
       s.searchLanguageFilter?.trim() ||
-      s.searchNlMode
+      s.searchNlMode ||
+      s.relativeDays != null ||
+      s.hasAttachment != null ||
+      s.minSecurityScore != null ||
+      s.mailboxPrefix?.trim()
   );
 }

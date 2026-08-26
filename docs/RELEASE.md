@@ -63,9 +63,9 @@ Complete [SECURITY.md](SECURITY.md) release checklist before tagging.
 
 ## First-run behavior in shipped builds
 
-- MiniLM + Whisper bootstrap downloads on first launch (no OAuth env in installer)
+- MiniLM + Whisper bootstrap downloads on first launch
 - Chat GGUF downloads only when user enables local LLM in Settings
-- OAuth requires developer-provided client IDs via `.env` in **dev only** — not bundled
+- OAuth Google/Microsoft works when public client credentials were embedded at build (CI secrets or local `.env`); otherwise password auth only — see [OAUTH.md](OAUTH.md)
 
 ## Related
 

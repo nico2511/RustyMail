@@ -6,6 +6,17 @@ export type OrgKeywordRule = {
   targetMailbox?: string | null;
 };
 
+export type AutoArchiveRule = {
+  id: string;
+  label: string;
+  enabled?: boolean;
+  ageDays?: number | null;
+  tags?: string[];
+  senders?: string[];
+  onlyRead?: boolean;
+  excludeFollowed?: boolean;
+};
+
 export type AppPrefsGeneral = {
   motherLanguage: string;
   /** Dialog d’accueil minimal fermé. */
@@ -21,6 +32,13 @@ export type AppPrefsGeneral = {
   archiveLayout?: string;
   archiveRoot?: string;
   orgKeywordRules?: OrgKeywordRule[];
+  /** Âge (jours) inbox stale Organize. */
+  staleInboxDays?: number;
+  /** Pondération lexicale recherche hybride (0–1). */
+  hybridLexicalWeight?: number;
+  /** Archivage auto opt-in. */
+  autoArchiveEnabled?: boolean;
+  autoArchiveRules?: AutoArchiveRule[];
   /** Suggestions de vues basées sur l'activité locale (on-device). */
   activitySuggestionsEnabled?: boolean;
 };
@@ -118,6 +136,10 @@ export function defaultAppPrefs(): AppPrefs {
       archiveLayout: "hierarchical",
       archiveRoot: "Archive",
       orgKeywordRules: [],
+      staleInboxDays: 90,
+      hybridLexicalWeight: 0.55,
+      autoArchiveEnabled: false,
+      autoArchiveRules: [],
       activitySuggestionsEnabled: true,
     },
     ai: {

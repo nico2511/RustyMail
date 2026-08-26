@@ -13,8 +13,8 @@ RustyMail (formerly planned as “RustMaily”) is a **readability-first, local-
 
 - Replacing webmail for every power-user workflow on day one
 - Embedding llama.cpp inside the desktop binary (generative AI uses **HTTP** to llama-server or OpenRouter)
-- Shipping OAuth secrets or `.env` files in installers
-
+- Shipping a RustyMail OAuth **backend** or bundling a runtime `.env` in installers
+- Treating Google Desktop `client_secret` as a confidential server secret (Google documents it as non-confidential for installed apps; still required for token exchange with PKCE)
 ## Core experience
 
 | Area | Direction |
@@ -23,7 +23,7 @@ RustyMail (formerly planned as “RustMaily”) is a **readability-first, local-
 | Writing | Markdown composer, reply/reply-all/forward, dictation, optional AI rewrite |
 | Organization | Tags, facets, archive layouts, organization center with batch actions |
 | Search | Lexical, semantic (MiniLM), hybrid, optional natural-language query via LLM |
-| Accounts | Multi-account IMAP/SMTP, OAuth Google/Microsoft when env vars are set |
+| Accounts | Multi-account IMAP/SMTP; OAuth Google/Microsoft via PKCE + loopback when clients are embedded or set in env |
 
 ## Version history (summary)
 

@@ -20,7 +20,7 @@ RustyMail is a **local-first desktop mail client**: **IMAP** sync, **SMTP** send
 | Multiple accounts | List, create, edit, delete; active account in UI |
 | Manual IMAP/SMTP | Hosts, ports, TLS modes, invalid cert option (debug only) |
 | Server discovery | `discover_mail_servers` helper |
-| Desktop OAuth | Google and Microsoft flows when env vars set |
+| Desktop OAuth | Google and Microsoft PKCE + loopback when clients embedded or set in env |
 | Secrets | Passwords and API keys in **OS keyring** |
 | Demo fallback | `seeded_app_core` if SQLite fails to init (non-production) |
 

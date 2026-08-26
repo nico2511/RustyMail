@@ -18,6 +18,14 @@ export type ParsedSearchBar = {
   tags: SearchBarTag[];
   listFilter?: "all" | "unread" | "starred" | "focused" | "auto";
   newsletterRule?: NewsletterRuleRef | null;
+  /** `#last:Nd` — filtrer les N derniers jours. */
+  relativeDays?: number;
+  /** `#pj` / `has:attachment` — avec pièce jointe. */
+  hasAttachment?: boolean;
+  /** `#security:N` / `#security:>=N` — score minimum. */
+  minSecurityScore?: number;
+  /** `#archive` → préfixe boîte (hint pour `mailbox_prefix`). */
+  mailboxPrefix?: string | null;
 };
 
 const RX_SCOPE_ACCOUNT = /#compte(?::([^\s#]+))?\b/gi;
@@ -50,6 +58,15 @@ const TAG_SHORTCUTS: Array<{ rx: RegExp; tag: SearchBarTag }> = [
     tag: { family: "state", value: "attachment" },
   },
 ];
+
+/** `has:attachment` (sans `#`) — même sémantique que `#pj`. */
+const RX_HAS_ATTACHMENT = /has:attachment\b/gi;
+/** `#last:7d` / `#last:30d` / `#last:Nd`. */
+const RX_LAST_DAYS = /#last:(\d+)d\b/gi;
+/** `#security:50` ou `#security:>=50`. */
+const RX_SECURITY_SCORE = /#security:(?:>=)?(\d+(?:\.\d+)?)\b/gi;
+/** `#archive` → préfixe Archive. */
+const RX_ARCHIVE = /#archive\b/gi;
 
 /** Test booléen sans effet de bord `lastIndex` (évite les faux négatifs avec flag `g`). */
 function regexHasMatch(rx: RegExp, s: string): boolean {
@@ -125,6 +142,33 @@ export function parseSearchBarDraft(draft: string, newsletterRules: NewsletterRu
     }
   }
 
+  RX_LAST_DAYS.lastIndex = 0;
+  {
+    const lastDaysRx = new RegExp(RX_LAST_DAYS.source, "gi");
+    let lastDays: RegExpExecArray | null;
+    while ((lastDays = lastDaysRx.exec(rest)) !== null) {
+      const n = Number.parseInt(lastDays[1] ?? "", 10);
+      if (Number.isFinite(n) && n > 0) out.relativeDays = n;
+    }
+    if (out.relativeDays !== undefined) rest = stripToken(rest, RX_LAST_DAYS);
+  }
+
+  RX_SECURITY_SCORE.lastIndex = 0;
+  {
+    const secRx = new RegExp(RX_SECURITY_SCORE.source, "gi");
+    let sec: RegExpExecArray | null;
+    while ((sec = secRx.exec(rest)) !== null) {
+      const n = Number.parseFloat(sec[1] ?? "");
+      if (Number.isFinite(n)) out.minSecurityScore = n;
+    }
+    if (out.minSecurityScore !== undefined) rest = stripToken(rest, RX_SECURITY_SCORE);
+  }
+
+  if (regexHasMatch(RX_ARCHIVE, rest)) {
+    out.mailboxPrefix = "Archive";
+    rest = stripToken(rest, RX_ARCHIVE);
+  }
+
   RX_TAG.lastIndex = 0;
   while ((m = RX_TAG.exec(rest)) !== null) {
     mergeTag(out.tags, tagFromParts(m[1], m[2]));
@@ -134,8 +178,16 @@ export function parseSearchBarDraft(draft: string, newsletterRules: NewsletterRu
   for (const { rx, tag } of TAG_SHORTCUTS) {
     if (regexHasMatch(rx, rest)) {
       mergeTag(out.tags, tag);
+      if (tag.family === "state" && tag.value === "attachment") {
+        out.hasAttachment = true;
+      }
       rest = stripToken(rest, rx);
     }
+  }
+
+  if (regexHasMatch(RX_HAS_ATTACHMENT, rest)) {
+    out.hasAttachment = true;
+    rest = stripToken(rest, RX_HAS_ATTACHMENT);
   }
 
   let ruleMatch: RegExpExecArray | null;
