@@ -175,12 +175,21 @@ import {
 } from "./mail/searchBarUi";
 import {
   applySavedSearchView,
+  acceptSuggestedSavedView,
   deleteSavedSearchView,
+  dismissSuggestedSavedView,
   markActiveSavedSearchSeen,
   refreshSavedSearches,
+  refreshSuggestedSavedViews,
   registerSavedSearchViewsDeps,
   saveCurrentSearchView,
 } from "./mail/savedSearchViews";
+import {
+  bulkArchiveSearchViewThreads,
+  bulkMarkReadSearchViewThreads,
+  registerSearchViewBatchDeps,
+  runFluxAffinerFromSearchView,
+} from "./mail/searchViewBatch";
 import { searchThreads } from "./mail/searchThreadsRun";
 import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
@@ -207,7 +216,6 @@ import {
 import { formatNewsletterRuleInput } from "./lib/newsletterRuleFormat";
 import { formatAttachmentSizeKb } from "./lib/attachmentSize";
 import { settingsExplainHtml } from "./lib/settingsExplainHtml";
-import { SAVED_VIEW_BATCH_MAX } from "./lib/savedViewBatch";
 import { tagToSearchDraft, threadTagsForModal } from "./lib/threadTagsModal";
 import { registerRenderDeps } from "./ui/render/renderDeps";
 import {
@@ -291,29 +299,14 @@ import {
   type SearchStructuralState,
 } from "../searchQueryState";
 
-import { buildSearchQueryPayload } from "../searchQueryBuild";
-
 import { recordSearchHistory } from "../searchHistory";
 
-import {
-  buildSavedSearchUiState,
-  buildSavedSearchUpsert,
-} from "../savedSearchApply";
-
-import {
-  markSavedSearchSeenCmd,
-  upsertSavedSearchCmd,
-  type SavedSearchListItem,
-} from "../savedSearches";
+import type { SavedSearchListItem } from "../savedSearches";
 
 import {
   clearSuggestionShownKeys,
-  dismissViewSuggestionCmd,
   flushActivityQueue,
-  listSuggestedSavedViewsCmd,
-  markSuggestionShownOnce,
   recordActivity,
-  recordActivityImmediate,
   setActivityAccountId,
   setActivityRecordingEnabled,
   type SuggestedSavedView,
@@ -589,35 +582,6 @@ function startThreadActivityOpen(threadId: string): void {
   });
 }
 
-async function refreshSuggestedSavedViews(): Promise<void> {
-  if (!isTauriRuntime() || !activityTrackingEnabled()) {
-    state.suggestedSavedViews = [];
-    clearSuggestionShownKeys();
-    return;
-  }
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId) {
-    state.suggestedSavedViews = [];
-    clearSuggestionShownKeys();
-    return;
-  }
-  try {
-    state.suggestedSavedViews = await listSuggestedSavedViewsCmd(accountId);
-    for (const s of state.suggestedSavedViews) {
-      markSuggestionShownOnce(`${accountId}:${s.senderEmail}`, () => {
-        recordActivity({
-          eventType: "suggestion_shown",
-          senderEmail: s.senderEmail,
-          metaJson: JSON.stringify({ cardKind: "saved_view" }),
-        });
-      });
-    }
-  } catch (e) {
-    console.warn("list_suggested_saved_views", e);
-    state.suggestedSavedViews = [];
-  }
-}
-
 function recordSearchCommittedActivity(): void {
   if (!activityTrackingEnabled()) return;
   recordActivity({
@@ -628,72 +592,6 @@ function recordSearchCommittedActivity(): void {
       senders: state.searchSenders,
     }),
   });
-}
-
-async function acceptSuggestedSavedView(senderEmail: string): Promise<void> {
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId) return;
-  const item = state.suggestedSavedViews.find(
-    (s) => s.senderEmail.toLowerCase() === senderEmail.trim().toLowerCase(),
-  );
-  if (!item) return;
-  recordActivityImmediate({
-    eventType: "suggestion_clicked",
-    senderEmail: item.senderEmail,
-    metaJson: JSON.stringify({ cardKind: "saved_view", action: "accept" }),
-  });
-  const query = buildSearchQueryPayload({
-    search: `@${item.senderEmail}`,
-    searchTags: [],
-    searchSenders: [item.senderEmail],
-    searchNlMode: null,
-    searchLanguageFilter: null,
-    accountId,
-    mailbox: null,
-    semanticSearchEnabled: Boolean(state.appPrefs.ai?.semanticSearchEnabled),
-    semanticModelAvailable: Boolean(state.semanticModelAvailable),
-  });
-  const ui = buildSavedSearchUiState({
-    listFilter: "all",
-    searchScope: "account",
-    searchNlMode: null,
-    searchDraft: `@${item.senderEmail}`,
-    searchNewsletterRule: null,
-    searchModifiersTouched: true,
-  });
-  try {
-    const saved = await upsertSavedSearchCmd(
-      buildSavedSearchUpsert(accountId, item.suggestedName, query, ui),
-    );
-    await dismissViewSuggestionCmd(accountId, item.senderEmail, "accepted");
-    state.activeSavedSearchId = saved.id;
-    toast(`Vue « ${item.suggestedName} » enregistrée.`);
-    await refreshSavedSearches(true);
-    await refreshSuggestedSavedViews();
-    render();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-}
-
-async function dismissSuggestedSavedView(
-  senderEmail: string,
-  decision: "dismiss" | "snooze",
-): Promise<void> {
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId) return;
-  recordActivityImmediate({
-    eventType: "suggestion_clicked",
-    senderEmail,
-    metaJson: JSON.stringify({ cardKind: "saved_view", action: decision }),
-  });
-  try {
-    await dismissViewSuggestionCmd(accountId, senderEmail, decision);
-    await refreshSuggestedSavedViews();
-    render();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
 }
 
 function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
@@ -4229,270 +4127,6 @@ async function loadAddressBookSidebarCount(): Promise<void> {
     state.addressBookSidebarCount = Math.max(0, Math.floor(Number(n)) || 0);
   } catch {
     state.addressBookSidebarCount = null;
-  }
-}
-
-function searchViewBatchThreads(): ThreadListItem[] {
-  return threadsVisibleInList().slice(0, SAVED_VIEW_BATCH_MAX);
-}
-
-async function bulkMarkReadSearchViewThreads(): Promise<void> {
-  if (!isTauriRuntime()) {
-    toast("Marquer lus : IMAP requiert l’app Tauri.");
-    return;
-  }
-  if (!isSearchActive() && !state.activeSavedSearchId) {
-    toast("Actions lot : ouvrez une recherche ou une vue enregistrée.");
-    return;
-  }
-  const account = currentAccount();
-  if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
-    return;
-  }
-  const visible = searchViewBatchThreads();
-  if (!visible.length) {
-    toast("Aucune conversation dans cette vue.");
-    return;
-  }
-  const ok = await openConfirmModal({
-    title: "Marquer comme lus ?",
-    body: `Marquer comme lus jusqu’à ${visible.length} conversation(s) affichée(s) (plafond ${SAVED_VIEW_BATCH_MAX}).`,
-    confirmLabel: "Marquer lus",
-  });
-  if (!ok) return;
-  recordActivity({
-    eventType: "bulk_mark_read",
-    metaJson: JSON.stringify({ count: visible.length }),
-  });
-  const unreadTargets = visible.filter((t) => t.unread);
-  let done = 0;
-  const errors: string[] = [];
-  const total = unreadTargets.length;
-  if (total > 0) upsertStatusBarJob({ id: "bulk-mark-read", label: "Marquage lu (lot)", done: 0, total }, true);
-  try {
-    for (let i = 0; i < unreadTargets.length; i++) {
-      const t = unreadTargets[i]!;
-      const tid = String(t.id);
-      try {
-        const mailbox = sourceMailboxForThread(tid);
-        await withTimeout(
-          invoke<string>("thread_mark_read", { accountId: account.id, mailbox, threadId: tid }),
-          MAIL_ACTION_TIMEOUT_MS,
-        );
-        t.unread = false;
-        done++;
-      } catch (err) {
-        errors.push(tauriErrorMessage(err));
-      }
-      upsertStatusBarJob({ id: "bulk-mark-read", label: "Marquage lu (lot)", done: i + 1, total });
-    }
-  } finally {
-    clearStatusBarJob("bulk-mark-read");
-  }
-  if (errors.length) toast(`Marquage partiel : ${errors[0]}`);
-  else toast(done ? `${done} conversation(s) marquée(s) lue(s).` : "Aucun fil non lu dans la sélection.");
-  render();
-}
-
-async function bulkArchiveSearchViewThreads(): Promise<void> {
-  if (!isTauriRuntime()) {
-    toast("Archivage : IMAP requiert l’app Tauri.");
-    return;
-  }
-  if (!isSearchActive() && !state.activeSavedSearchId) {
-    toast("Actions lot : ouvrez une recherche ou une vue enregistrée.");
-    return;
-  }
-  const account = currentAccount();
-  if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
-    return;
-  }
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast("Archivage : actions IMAP uniquement.");
-    return;
-  }
-  const visible = searchViewBatchThreads();
-  if (!visible.length) {
-    toast("Aucune conversation dans cette vue.");
-    return;
-  }
-  const ok = await openConfirmModal({
-    title: "Archiver le lot ?",
-    body: `Archiver jusqu’à ${visible.length} conversation(s) (plafond ${SAVED_VIEW_BATCH_MAX}).`,
-    confirmLabel: "Archiver",
-  });
-  if (!ok) return;
-  recordActivity({
-    eventType: "bulk_archive",
-    metaJson: JSON.stringify({ count: visible.length }),
-  });
-  const prevThreads = state.threads;
-  const ids = new Set(visible.map((t) => String(t.id)));
-  markThreadsRecentlyRemoved(ids);
-  state.threads = state.threads.filter((t) => !ids.has(String(t.id)));
-  if (state.view === "thread" && state.selectedThreadId && ids.has(String(state.selectedThreadId))) {
-    state.view = "list";
-    state.selectedThread = undefined;
-    state.selectedThreadId = undefined;
-  }
-  render();
-  let moved = 0;
-  const errors: string[] = [];
-  const idList = [...ids];
-  const total = idList.length;
-  upsertStatusBarJob({ id: "bulk-archive", label: "Archivage (lot)", done: 0, total }, true);
-  try {
-    for (let i = 0; i < idList.length; i++) {
-      const tid = idList[i]!;
-      try {
-        const mailbox = sourceMailboxForThread(tid);
-        await withTimeout(
-          invoke<string>("move_thread_archive", { accountId: account.id, mailbox, threadId: tid }),
-          MAIL_ACTION_TIMEOUT_MS,
-        );
-        moved++;
-      } catch (err) {
-        errors.push(tauriErrorMessage(err));
-      }
-      upsertStatusBarJob({ id: "bulk-archive", label: "Archivage (lot)", done: i + 1, total });
-    }
-  } finally {
-    clearStatusBarJob("bulk-archive");
-  }
-  if (errors.length) {
-    clearThreadsRecentlyRemoved(ids);
-    state.threads = prevThreads;
-    toast(`Archivage partiel : ${errors[0]}`);
-    render();
-    return;
-  }
-  toast(`${moved} conversation(s) archivée(s).`);
-  await searchThreads();
-}
-
-async function runFluxAffinerFromSearchView(): Promise<void> {
-  if (!isTauriRuntime()) {
-    toast("Affiner : disponible dans l’app Tauri.");
-    return;
-  }
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureOrgProposalsEnabled")) {
-    toast("Activez « Propositions Organiser (LLM) » dans Paramètres → IA.");
-    return;
-  }
-  const account = currentAccount();
-  if (!account?.id) {
-    toast("Compte requis.");
-    return;
-  }
-  const visible = searchViewBatchThreads().slice(0, 50);
-  if (visible.length < 5) {
-    toast("Affiner : au moins 5 fils visibles requis.");
-    return;
-  }
-  const viewLabel =
-    activeSavedSearchItem()?.name?.trim() ||
-    state.search.trim() ||
-    "Recherche";
-  const samples = visible.map((t) => ({
-    subject: t.subject,
-    sender: t.participants[0] ?? "",
-    mailbox: t.mailbox ?? state.selectedMailbox ?? "INBOX",
-  }));
-  try {
-    const result = await withLlmQueue("Affiner le flux", async (signal) => {
-      if (signal.aborted) throw new Error("Annulé");
-      return withTimeout(
-        invoke<FluxAffinerResult>("llm_affiner_flux_cmd", {
-          payload: {
-            accountId: account.id,
-            viewLabel,
-            samples,
-            existingMailboxes: state.mailboxes,
-          },
-        }),
-        LLM_INVOKE_TIMEOUT_MS,
-      );
-    });
-    if (!result) return;
-    const pct = Math.round(Math.max(0, Math.min(1, result.confidence)) * 100);
-    const ok = await openConfirmModal({
-      title: "Affiner — dossier suggéré",
-      body: `« ${result.folderTitle} » (${pct} % de confiance)\n\n${result.rationale}\n\nCréer ce dossier IMAP et y déplacer ${visible.length} fil(s) ?`,
-      confirmLabel: "Créer et déplacer",
-    });
-    if (!ok) return;
-    const mailbox = result.folderTitle.trim();
-    const total = visible.length;
-    setSearchViewBatchJob({ phase: "create", done: 0, total: 1, target: mailbox });
-    toast(`Création du dossier « ${mailbox} »…`, 4500);
-    await withTimeout(
-      invoke<string>("create_imap_mailbox", { accountId: account.id, mailbox }),
-      MAIL_ACTION_TIMEOUT_MS,
-    );
-    setSearchViewBatchJob({ phase: "move", done: 0, total, target: mailbox });
-    toast(`Déplacement de ${total} fil(s) vers « ${mailbox} »…`, 5000);
-    const ids = new Set(visible.map((t) => String(t.id)));
-    let moved = 0;
-    const errors: string[] = [];
-    for (const t of visible) {
-      const tid = String(t.id);
-      const src = (t.mailbox?.trim() || sourceMailboxForThread(tid)).trim() || "INBOX";
-      try {
-        await withTimeout(
-          invoke<string>("move_thread_mailbox", {
-            accountId: account.id,
-            mailbox: src,
-            threadId: tid,
-            destMailbox: mailbox,
-          }),
-          MAIL_ACTION_TIMEOUT_MS,
-        );
-        moved++;
-        setSearchViewBatchJob({ phase: "move", done: moved, total, target: mailbox });
-      } catch (err) {
-        errors.push(tauriErrorMessage(err));
-      }
-    }
-    setSearchViewBatchJob(null, false);
-    if (moved > 0) {
-      state.threads = state.threads.filter((row) => !ids.has(String(row.id)));
-      if (state.view === "thread" && state.selectedThreadId && ids.has(String(state.selectedThreadId))) {
-        state.view = "list";
-        state.selectedThread = undefined;
-        state.selectedThreadId = undefined;
-      }
-    }
-    if (errors.length && moved === 0) {
-      toast(`Déplacement échoué : ${errors[0]}`, 10_000);
-    } else if (errors.length) {
-      toast(`${moved}/${total} fil(s) déplacé(s) vers « ${mailbox} » · ${errors.length} échec(s).`, 10_000);
-    } else {
-      toast(`${moved} fil(s) déplacé(s) vers « ${mailbox} ».`, 10_000);
-    }
-    state.syncMessage = moved > 0 ? `${moved} déplacé(s) → ${mailbox}` : "";
-    if (moved > 0) {
-      recordActivity({
-        eventType: "affiner_applied",
-        metaJson: JSON.stringify({ mailbox, moved, total }),
-      });
-    }
-    await refreshMailboxesAfterImapChange();
-    if (moved > 0) await searchThreads();
-    else render();
-    if (state.syncMessage) {
-      window.setTimeout(() => {
-        if (state.syncMessage === `${moved} déplacé(s) → ${mailbox}`) {
-          state.syncMessage = "";
-          render();
-        }
-      }, 3500);
-    }
-  } catch (e) {
-    setSearchViewBatchJob(null, false);
-    const msg = tauriErrorMessage(e);
-    if (!msg.toLowerCase().includes("annul")) toast(msg);
   }
 }
 
@@ -10213,11 +9847,8 @@ registerWireEventsBridge({
   resolveSrcForMailImageLightbox,
   loadComposeMarkdownIntoEditor,
   schedulePersistAiPrefsFromDom,
-  bulkMarkReadSearchViewThreads,
   finalizeSettingsAiModalClose,
   finalizeCloseComposeFromUser,
-  bulkArchiveSearchViewThreads,
-  runFluxAffinerFromSearchView,
   setComposeFromTextareaValue,
   paintLlmPrefetchProgressDom,
   loadThreadsForSearchContext,
@@ -10232,7 +9863,6 @@ registerWireEventsBridge({
   defaultListFilterFromPrefs,
   ensureValidSelectedMailbox,
   normalizeNlRuleInvokeInput,
-  refreshSuggestedSavedViews,
   discardCurrentDraftSession,
   leaveComposeViewAfterClose,
   mediaBlobToWav16kMonoPcm16,
@@ -10243,7 +9873,6 @@ registerWireEventsBridge({
   paintStatusBarProgressDom,
   clearThreadAiSummaryState,
   wireComposeRecipientChips,
-  dismissSuggestedSavedView,
   dismissOrphanDraftSession,
   navigateToBreadcrumbIndex,
   refreshOrganizationReport,
@@ -10252,7 +9881,6 @@ registerWireEventsBridge({
   discoverMailServersAction,
   normalizeMailHrefForOpen,
   wireAtAutocompleteFields,
-  acceptSuggestedSavedView,
   resumeOrphanDraftSession,
   onOrgV2UnignoreMailboxUi,
   confirmThenRunOrgV2Apply,
@@ -10523,8 +10151,19 @@ registerSearchBarUiDeps({
 
 registerSavedSearchViewsDeps({
   canSaveSearchView,
-  refreshSuggestedSavedViews,
   resolveSearchMailboxPath,
+  activityTrackingEnabled,
+});
+
+registerSearchViewBatchDeps({
+  threadsVisibleInList,
+  sourceMailboxForThread,
+  upsertStatusBarJob,
+  clearStatusBarJob,
+  withLlmQueue,
+  activeSavedSearchItem,
+  refreshMailboxesAfterImapChange,
+  setSearchViewBatchJob,
 });
 
 initMailboxDigest({

@@ -69,6 +69,11 @@ import {
   applySavedSearchView,
   deleteSavedSearchView,
   markActiveSavedSearchSeen,
+  acceptSuggestedSavedView,
+  dismissSuggestedSavedView,
+  bulkMarkReadSearchViewThreads,
+  bulkArchiveSearchViewThreads,
+  runFluxAffinerFromSearchView,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -325,30 +330,30 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     }
     case "search-view-mark-read":
-      void (app()["bulkMarkReadSearchViewThreads"] as (...a: unknown[]) => unknown)();
+      void bulkMarkReadSearchViewThreads();
       return true;
     case "search-view-archive":
-      void (app()["bulkArchiveSearchViewThreads"] as (...a: unknown[]) => unknown)();
+      void bulkArchiveSearchViewThreads();
       return true;
     case "search-view-open-organizer":
       void (app()["openOrganizationV2View"] as (...a: unknown[]) => unknown)();
       return true;
     case "search-view-affiner":
-      void (app()["runFluxAffinerFromSearchView"] as (...a: unknown[]) => unknown)();
+      void runFluxAffinerFromSearchView();
       return true;
     case "accept-view-suggestion": {
       const email = element?.dataset.senderEmail?.trim();
-      if (email) void (app()["acceptSuggestedSavedView"] as (...a: unknown[]) => unknown)(email);
+      if (email) void acceptSuggestedSavedView(email);
       return true;
     }
     case "dismiss-view-suggestion": {
       const email = element?.dataset.senderEmail?.trim();
-      if (email) void (app()["dismissSuggestedSavedView"] as (...a: unknown[]) => unknown)(email, "dismiss");
+      if (email) void dismissSuggestedSavedView(email, "dismiss");
       return true;
     }
     case "snooze-view-suggestion": {
       const email = element?.dataset.senderEmail?.trim();
-      if (email) void (app()["dismissSuggestedSavedView"] as (...a: unknown[]) => unknown)(email, "snooze");
+      if (email) void dismissSuggestedSavedView(email, "snooze");
       return true;
     }
     case "saved-search-mark-seen":

@@ -1,4 +1,12 @@
-import { recordActivity } from "../../activity";
+import {
+  clearSuggestionShownKeys,
+  dismissViewSuggestionCmd,
+  listSuggestedSavedViewsCmd,
+  markSuggestionShownOnce,
+  recordActivity,
+  recordActivityImmediate,
+} from "../../activity";
+import { buildSearchQueryPayload } from "../../searchQueryBuild";
 import { applySavedSearchToState, buildSavedSearchUiState, buildSavedSearchUpsert } from "../../savedSearchApply";
 import {
   applySavedSearchCmd,
@@ -36,8 +44,8 @@ import { searchThreads } from "./searchThreadsRun";
 
 export type SavedSearchViewsDeps = {
   canSaveSearchView: () => boolean;
-  refreshSuggestedSavedViews: () => Promise<void>;
   resolveSearchMailboxPath: (requested: string) => string | null;
+  activityTrackingEnabled: () => boolean;
 };
 
 let savedSearchViewsDeps: SavedSearchViewsDeps | null = null;
@@ -191,7 +199,103 @@ export async function saveCurrentSearchView(): Promise<void> {
     recordActivity({ eventType: "saved_view_created", metaJson: JSON.stringify({ savedSearchId: saved.id }) });
     toast(`Vue « ${trimmed} » enregistrée — surveillance à jour.`);
     await refreshSavedSearches(true);
-    await d.refreshSuggestedSavedViews();
+    await refreshSuggestedSavedViews();
+    render();
+  } catch (e) {
+    toast(tauriErrorMessage(e));
+  }
+}
+
+export async function refreshSuggestedSavedViews(): Promise<void> {
+  const d = deps();
+  if (!isTauriRuntime() || !d.activityTrackingEnabled()) {
+    state.suggestedSavedViews = [];
+    clearSuggestionShownKeys();
+    return;
+  }
+  const accountId = currentAccount()?.id?.trim();
+  if (!accountId) {
+    state.suggestedSavedViews = [];
+    clearSuggestionShownKeys();
+    return;
+  }
+  try {
+    state.suggestedSavedViews = await listSuggestedSavedViewsCmd(accountId);
+    for (const s of state.suggestedSavedViews) {
+      markSuggestionShownOnce(`${accountId}:${s.senderEmail}`, () => {
+        recordActivity({
+          eventType: "suggestion_shown",
+          senderEmail: s.senderEmail,
+          metaJson: JSON.stringify({ cardKind: "saved_view" }),
+        });
+      });
+    }
+  } catch (e) {
+    console.warn("list_suggested_saved_views", e);
+    state.suggestedSavedViews = [];
+  }
+}
+
+export async function acceptSuggestedSavedView(senderEmail: string): Promise<void> {
+  const accountId = currentAccount()?.id?.trim();
+  if (!accountId) return;
+  const item = state.suggestedSavedViews.find(
+    (s) => s.senderEmail.toLowerCase() === senderEmail.trim().toLowerCase(),
+  );
+  if (!item) return;
+  recordActivityImmediate({
+    eventType: "suggestion_clicked",
+    senderEmail: item.senderEmail,
+    metaJson: JSON.stringify({ cardKind: "saved_view", action: "accept" }),
+  });
+  const query = buildSearchQueryPayload({
+    search: `@${item.senderEmail}`,
+    searchTags: [],
+    searchSenders: [item.senderEmail],
+    searchNlMode: null,
+    searchLanguageFilter: null,
+    accountId,
+    mailbox: null,
+    semanticSearchEnabled: Boolean(state.appPrefs.ai?.semanticSearchEnabled),
+    semanticModelAvailable: Boolean(state.semanticModelAvailable),
+  });
+  const ui = buildSavedSearchUiState({
+    listFilter: "all",
+    searchScope: "account",
+    searchNlMode: null,
+    searchDraft: `@${item.senderEmail}`,
+    searchNewsletterRule: null,
+    searchModifiersTouched: true,
+  });
+  try {
+    const saved = await upsertSavedSearchCmd(
+      buildSavedSearchUpsert(accountId, item.suggestedName, query, ui),
+    );
+    await dismissViewSuggestionCmd(accountId, item.senderEmail, "accepted");
+    state.activeSavedSearchId = saved.id;
+    toast(`Vue « ${item.suggestedName} » enregistrée.`);
+    await refreshSavedSearches(true);
+    await refreshSuggestedSavedViews();
+    render();
+  } catch (e) {
+    toast(tauriErrorMessage(e));
+  }
+}
+
+export async function dismissSuggestedSavedView(
+  senderEmail: string,
+  decision: "dismiss" | "snooze",
+): Promise<void> {
+  const accountId = currentAccount()?.id?.trim();
+  if (!accountId) return;
+  recordActivityImmediate({
+    eventType: "suggestion_clicked",
+    senderEmail,
+    metaJson: JSON.stringify({ cardKind: "saved_view", action: decision }),
+  });
+  try {
+    await dismissViewSuggestionCmd(accountId, senderEmail, decision);
+    await refreshSuggestedSavedViews();
     render();
   } catch (e) {
     toast(tauriErrorMessage(e));
@@ -225,7 +329,7 @@ export async function applySavedSearchView(id: string): Promise<void> {
     await searchThreads();
     recordActivity({ eventType: "saved_view_applied", metaJson: JSON.stringify({ savedSearchId: saved.id }) });
     await refreshSavedSearches(true);
-    await d.refreshSuggestedSavedViews();
+    await refreshSuggestedSavedViews();
     render();
   } catch (e) {
     toast(tauriErrorMessage(e));

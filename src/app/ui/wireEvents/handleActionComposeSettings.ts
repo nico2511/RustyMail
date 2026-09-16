@@ -65,6 +65,7 @@ import {
   setAddressBookEditEmail,
   addressBookRowsCache,
   isSearchActive,
+  refreshSuggestedSavedViews,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -293,7 +294,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           state.suggestedSavedViews = [];
           clearSuggestionShownKeys();
         } else {
-          void (app()["refreshSuggestedSavedViews"] as (...a: unknown[]) => unknown)().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+          void refreshSuggestedSavedViews().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
         }
         const lfSel = document.querySelector<HTMLSelectElement>("#prefs-default-list-filter");
         const lfRaw = lfSel?.value?.trim() ?? "all";

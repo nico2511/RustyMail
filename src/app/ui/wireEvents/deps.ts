@@ -105,11 +105,19 @@ export {
   syncSearchBarChrome,
 } from "../mail/searchBarUi";
 export {
+  acceptSuggestedSavedView,
   applySavedSearchView,
   deleteSavedSearchView,
+  dismissSuggestedSavedView,
   markActiveSavedSearchSeen,
+  refreshSuggestedSavedViews,
   saveCurrentSearchView,
 } from "../mail/savedSearchViews";
+export {
+  bulkArchiveSearchViewThreads,
+  bulkMarkReadSearchViewThreads,
+  runFluxAffinerFromSearchView,
+} from "../mail/searchViewBatch";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";
