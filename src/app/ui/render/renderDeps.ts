@@ -1,10 +1,12 @@
 import type { Account } from "../../../accountSetup";
 import type {
   CleanedMessageView,
+  Draft,
   MailSecurityFinding,
   MailSecuritySignals,
   MailUnsubscribeLink,
   MessageViewMode,
+  MicDictationTarget,
   NewsletterRuleRow,
   Tag,
   ThreadListItem,
@@ -94,6 +96,16 @@ export type RenderDeps = {
   dayKey: (date: Date) => string;
   unsubscribeHrefScore: (hrefRaw: string) => number;
   isSecurityLlmAugmentPending: (messageId: string) => boolean;
+  draftHasRecipientsExtra: (draft?: Draft) => boolean;
+  attachmentPathsJoinedForHiddenField: (paths: string[]) => string;
+  composeKindTitle: (kind?: Draft["kind"]) => string;
+  composeMicButtonTitle: () => string;
+  micAriaLabel: (target?: MicDictationTarget) => string;
+  formatDraftRevisionStamp: (iso: string) => string;
+  sanitizeEmailHtml: (
+    input: string,
+    opts?: { allowRemoteImages?: boolean; relocateUnsubscribe?: boolean; stripOutlookNoise?: boolean },
+  ) => { html: string; unsubscribeLinks: MailUnsubscribeLink[] };
 };
 
 let deps: RenderDeps | null = null;
