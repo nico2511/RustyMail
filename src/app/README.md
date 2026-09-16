@@ -38,6 +38,7 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` + génération annulation |
 | `app/mail/fetchOpenThread.ts` | `fetchOpenThreadOrNotify()` (invoke `open_thread`) |
 | `app/mail/openThreadView.ts` | `openThread()` + marquer lu / résumé auto à l’ouverture (`registerOpenThreadDeps()`) |
+| `app/mail/searchCommitQuery.ts` | Engagement barre recherche (`commitSearchQuery`, effacement, NL) + `registerSearchCommitDeps()` |
 | `app/mail/mailListView.ts` | Chargement liste (`loadMailView`, compteurs, filtres) + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
@@ -79,7 +80,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Extraire la recherche engagée (`commitSearchQuery`, barre…) et autres handlers pont restants
+1. Extraire d’autres handlers pont (`isSearchActive`, navigation, compose…) hors de `application.ts`
 2. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
 
 `npm run verify:ts` · `npm test`

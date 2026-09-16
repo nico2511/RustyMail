@@ -71,6 +71,7 @@ import {
 import { state } from "../state";
 import { threadIdsMatch } from "../lib/threadIdsMatch";
 import { openThread } from "../mail/openThreadView";
+import { commitSearchQuery } from "../mail/searchCommitQuery";
 import { app } from "./wireEventsBridge";
 export function wireEvents() {
   const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
@@ -622,14 +623,14 @@ export function wireEvents() {
         if (event.key !== "Enter") return;
         if (isHashAutocompletePanelOpen() || isAtAutocompletePanelOpen()) return;
         event.preventDefault();
-        (app()["commitSearchQuery"] as (...a: unknown[]) => unknown)({ fromModal });
+        commitSearchQuery({ fromModal });
       },
       { signal: composeSig }
     );
     searchInputEl.addEventListener(
       "search",
       () => {
-        (app()["commitSearchQuery"] as (...a: unknown[]) => unknown)({ fromModal });
+        commitSearchQuery({ fromModal });
       },
       { signal: composeSig }
     );

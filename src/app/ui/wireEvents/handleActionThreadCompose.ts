@@ -60,6 +60,7 @@ import {
   setSkipAccountIdentityCaptureOnce,
   setAddressBookEditEmail,
   addressBookRowsCache,
+  commitSearchQuery,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -600,7 +601,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       (app()["closeSearchModal"] as (...a: unknown[]) => unknown)();
       return true;
     case "search-modal-commit":
-      (app()["commitSearchQuery"] as (...a: unknown[]) => unknown)({ fromModal: true });
+      commitSearchQuery({ fromModal: true });
       return true;
     case "search-nl-assist":
       void (app()["searchNlAssist"] as (...a: unknown[]) => unknown)();

@@ -143,6 +143,18 @@ import {
 import { fetchOpenThreadOrNotify } from "./mail/fetchOpenThread";
 import { openThread, registerOpenThreadDeps } from "./mail/openThreadView";
 import {
+  applyParsedSearchBarToState,
+  applyParsedSearchBarToStructural,
+  applySearchBarQuery,
+  applySearchQueryFromNl,
+  hasSearchBarCriteria,
+  mergeSearchBarTag,
+  registerSearchCommitDeps,
+  resetManualSearchNlFilters,
+  resetSearchStructuralModifiers,
+  toastSearchBarResult,
+} from "./mail/searchCommitQuery";
+import {
   buildSearchQueryFromCurrentState,
   registerSearchQueryContext,
   searchAccountIdForQuery,
@@ -248,9 +260,7 @@ import { isAtAutocompletePanelOpen } from "../atAutocomplete";
 import { parseSearchBarDraft } from "../searchBarParse";
 
 import {
-  applyNlSearchQueryToState,
   extractNlSearchFallbackText,
-  parsedSearchBarHasModifiers,
   hasCommittedSearchCriteria,
   hasSavableSearchCriteria,
   resetSearchStructuralState,
@@ -2294,15 +2304,6 @@ function tagFamilyForInvoke(family: string): Tag["family"] {
   return "Entity";
 }
 
-function mergeSearchBarTag(raw: { family: string; value: string }): void {
-  const value = raw.value.trim();
-  if (!value) return;
-  const family = tagFamilyForInvoke(raw.family);
-  const key = `${family}:${value}`.toLowerCase();
-  if (state.searchTags.some((t) => `${t.family}:${t.value}`.toLowerCase() === key)) return;
-  state.searchTags.push({ family, value });
-}
-
 function addSearchSender(email: string): void {
   const c = canonicalEmailForNlMatch(email) ?? email.trim().toLowerCase();
   if (!c) return;
@@ -2469,13 +2470,6 @@ function closeSearchModal(): void {
   if (!state.searchModalOpen) return;
   state.searchModalOpen = false;
   render();
-}
-
-function activeSearchInputElement(): HTMLInputElement | null {
-  if (state.searchModalOpen) {
-    return document.querySelector<HTMLInputElement>("#search-modal-input");
-  }
-  return document.querySelector<HTMLInputElement>("#search-input");
 }
 
 async function loadThreadsForSearchContext(append = false): Promise<void> {
@@ -4872,137 +4866,6 @@ function threadMatchesNewsletterRule(thread: ThreadListItem, rule: NewsletterRul
   return false;
 }
 
-function mergeSearchBarTagOnTarget(
-  target: SearchStructuralState & { searchTags: Tag[] },
-  raw: { family: string; value: string }
-): void {
-  const value = raw.value.trim();
-  if (!value) return;
-  const family = tagFamilyForInvoke(raw.family);
-  const key = `${family}:${value}`.toLowerCase();
-  if (target.searchTags.some((t) => `${t.family}:${t.value}`.toLowerCase() === key)) return;
-  target.searchTags.push({ family, value });
-}
-
-function addSearchSenderOnTarget(target: SearchStructuralState, email: string): void {
-  const c = canonicalEmailForNlMatch(email) ?? email.trim().toLowerCase();
-  if (!c) return;
-  if (!target.searchSenders.some((s) => s.toLowerCase() === c)) target.searchSenders.push(c);
-}
-
-function applyParsedSearchBarToStructural(
-  target: SearchStructuralState & { searchTags: Tag[] },
-  parsed: ReturnType<typeof parseSearchBarDraft>
-): void {
-  target.search = parsed.text;
-  if (parsed.scope !== undefined) target.searchScope = parsed.scope;
-  if (parsed.mailboxPath !== undefined) {
-    const raw = parsed.mailboxPath?.trim() || null;
-    target.searchMailboxPath = raw ? resolveSearchMailboxPath(raw) : null;
-    if (target.searchMailboxPath) target.searchScope = "mailbox";
-  }
-  if (parsed.accountRef !== undefined) {
-    const id = parsed.accountRef?.trim() ? resolveAccountIdFromRef(parsed.accountRef) : null;
-    target.searchAccountOverrideId = id;
-    if (id && target === state) {
-      state.selectedAccountId = id;
-      target.searchScope = "account";
-    } else if (id) {
-      target.searchScope = "account";
-    } else if (!parsed.accountRef?.trim()) {
-      target.searchAccountOverrideId = null;
-    }
-  }
-  for (const s of parsed.senders) addSearchSenderOnTarget(target, s);
-  for (const t of parsed.tags) mergeSearchBarTagOnTarget(target, t);
-  if (parsed.listFilter !== undefined) {
-    target.listFilter = parsed.listFilter;
-    if (parsed.listFilter === "all") target.searchNewsletterRule = null;
-  }
-  if (parsed.newsletterRule !== undefined) {
-    target.searchNewsletterRule = parsed.newsletterRule;
-  }
-  if (parsed.relativeDays !== undefined) {
-    target.searchRelativeDays =
-      parsed.relativeDays > 0 ? Math.floor(parsed.relativeDays) : null;
-  }
-  if (parsed.hasAttachment !== undefined) {
-    target.searchHasAttachment = parsed.hasAttachment;
-  }
-  if (parsed.minSecurityScore !== undefined) {
-    target.searchMinSecurityScore = Number.isFinite(parsed.minSecurityScore)
-      ? parsed.minSecurityScore
-      : null;
-  }
-  if (parsed.mailboxPrefix !== undefined) {
-    const prefix = parsed.mailboxPrefix?.trim() || null;
-    target.searchMailboxPrefix = prefix;
-    if (prefix) target.searchScope = "account";
-  }
-}
-
-function applyParsedSearchBarToState(parsed: ReturnType<typeof parseSearchBarDraft>): void {
-  applyParsedSearchBarToStructural(state, parsed);
-}
-
-function hasSearchBarCriteria(): boolean {
-  return Boolean(
-    state.search.trim() ||
-      state.searchSenders.length > 0 ||
-      state.searchMailboxPath?.trim() ||
-      state.searchAccountOverrideId?.trim() ||
-      state.searchTags.length > 0 ||
-      state.searchNewsletterRule ||
-      state.searchLanguageFilter?.trim() ||
-      state.listFilter !== "all" ||
-      state.searchModifiersTouched ||
-      state.searchRelativeDays != null ||
-      state.searchHasAttachment != null ||
-      state.searchMinSecurityScore != null ||
-      state.searchMailboxPrefix?.trim()
-  );
-}
-
-function toastSearchBarResult(): void {
-  const n = threadsVisibleInList().length;
-  const mbTarget = searchMailboxForQuery();
-  const scope =
-    state.searchScope === "account" && !mbTarget
-      ? " · tout le compte"
-      : ` · ${threadMailboxListLabel(mbTarget ?? (state.selectedMailbox || "INBOX")).full}`;
-  const parts: string[] = [];
-  if (state.searchSenders.length) parts.push(`de: ${state.searchSenders.join(", ")}`);
-  if (state.searchMailboxPath?.trim()) parts.push(`dossier: ${state.searchMailboxPath}`);
-  if (state.searchTags.length) parts.push(`${state.searchTags.length} tag(s)`);
-  if (state.search.trim()) parts.push(`« ${state.search.trim()} »`);
-  if (state.searchNewsletterRule) parts.push(formatNewsletterRuleInput(state.searchNewsletterRule));
-  if (state.listFilter === "auto") parts.push("auto");
-  else if (state.listFilter === "focused") parts.push("priorité");
-  else if (state.listFilter === "unread") parts.push("non lus");
-  else if (state.listFilter === "starred") parts.push("suivis");
-  const hint = parts.length ? parts.join(" · ") : "tous les messages";
-  if (n === 0) {
-    const scopeHint =
-      state.searchScope === "mailbox"
-        ? " Essayez #compte dans la barre si les messages sont dans un autre dossier."
-        : "";
-    toast(`Aucun résultat (${hint})${scope}.${scopeHint}`);
-  }
-  else toast(`${n} conversation${n === 1 ? "" : "s"} · ${hint}${scope}.`);
-}
-
-async function applySearchBarQuery(): Promise<void> {
-  if (searchQueryUsesThreadsApi()) {
-    await searchThreads();
-    return;
-  }
-  if (isSearchActive()) {
-    await loadThreadsForSearchContext(false);
-    return;
-  }
-  await loadMailView(false);
-}
-
 function applyHashAutocompleteHitToState(hit: InboxFilterHit): void {
   state.searchModifiersTouched = true;
   const searchIn = document.querySelector<HTMLInputElement>("#search-input");
@@ -5125,35 +4988,6 @@ function searchDraftDiffersFromCommitted(): boolean {
     draftSearchCriteriaSnapshot(),
     committedSearchCriteriaSnapshot()
   );
-}
-
-function resetManualSearchNlFilters(): void {
-  state.searchNlMode = null;
-  state.searchLanguageFilter = null;
-}
-
-function resetSearchStructuralModifiers(): void {
-  resetSearchStructuralState(state);
-}
-
-async function clearSearchAndReloadInbox(): Promise<void> {
-  state.search = "";
-  state.searchDraft = "";
-  state.searchSenders = [];
-  state.searchMailboxPath = null;
-  state.searchAccountOverrideId = null;
-  state.searchTags = [];
-  state.searchNewsletterRule = null;
-  state.searchScope = "account";
-  state.searchModifiersTouched = false;
-  state.searchRelativeDays = null;
-  state.searchHasAttachment = null;
-  state.searchMinSecurityScore = null;
-  state.searchMailboxPrefix = null;
-  state.activeSavedSearchId = null;
-  resetManualSearchNlFilters();
-  await loadMailView(false);
-  render();
 }
 
 function threadsVisibleInList(): ThreadListItem[] {
@@ -6444,197 +6278,6 @@ function cancelLlmQueueJob(): void {
   cancelActiveLlmStreamJob();
   abortIdleAiCachePrefetchInFlight();
   llmQueueAbort?.abort();
-}
-
-function commitSearchQuery(opts?: { fromModal?: boolean }): void {
-  const input = activeSearchInputElement();
-  const raw = (input?.value ?? state.searchDraft).trim();
-  const parsed = parseSearchBarDraft(raw, state.newsletterRules);
-  resetSearchStructuralModifiers();
-  applyParsedSearchBarToState(parsed);
-  state.searchDraft = raw;
-  state.searchModifiersTouched = false;
-  document.querySelectorAll<HTMLInputElement>("#search-input, #search-modal-input").forEach((el) => {
-    el.value = raw;
-  });
-  const closeModal = opts?.fromModal ?? state.searchModalOpen;
-  if (!hasSearchBarCriteria()) {
-    if (closeModal) state.searchModalOpen = false;
-    void clearSearchAndReloadInbox();
-    return;
-  }
-  const plainTextOnly =
-    !parsedSearchBarHasModifiers(parsed) &&
-    state.search.trim().split(/\s+/).filter((w) => w.length > 0).length >= 3 &&
-    isAiFeatureEnabled(state.appPrefs.ai, "featureSearchNlEnabled") &&
-    isTauriRuntime();
-
-  if (plainTextOnly) {
-    const accountId = state.selectedAccountId?.trim();
-    const phrase = state.searchDraft.trim();
-    if (!accountId || !phrase) {
-      void applySearchBarQuery().then(() => {
-        toastSearchBarResult();
-        if (closeModal) state.searchModalOpen = false;
-        if (state.view === "thread") clearThreadAiSummaryState();
-        if (state.view !== "list") state.view = "list";
-        render();
-      });
-      return;
-    }
-    void (async () => {
-      const ran = await withLlmQueue("Recherche NL", async (signal) => {
-        if (signal.aborted) return;
-        let sq:
-          | {
-              text?: string | null;
-              sender?: string | null;
-              senders?: string[];
-              tags?: Tag[];
-              mode?: string | null;
-              accountId?: string | null;
-              mailbox?: string | null;
-              language?: string | null;
-            }
-          | null = null;
-        try {
-          sq = await withTimeout(
-            invoke<{
-              text?: string | null;
-              sender?: string | null;
-              senders?: string[];
-              tags?: Tag[];
-              mode?: string | null;
-              accountId?: string | null;
-              mailbox?: string | null;
-              language?: string | null;
-            }>("llm_search_nl", { accountId, phrase }),
-            LLM_INVOKE_TIMEOUT_MS
-          );
-        } catch (err) {
-          console.error("llm_search_nl from search bar", err);
-        }
-        if (signal.aborted) return;
-        if (sq) {
-          applySearchQueryFromNl(sq);
-          if (!state.search.trim() && !state.searchSenders.length && !state.searchTags.length && phrase) {
-            const fb = extractNlSearchFallbackText(phrase);
-            if (fb) {
-              state.search = fb;
-              state.searchDraft = fb;
-              state.searchNlMode = "lexical";
-            }
-          }
-        } else {
-          const fb = extractNlSearchFallbackText(phrase);
-          if (fb) {
-            state.search = fb;
-            state.searchDraft = fb;
-            state.searchNlMode = "lexical";
-          } else {
-            state.search = phrase;
-            state.searchDraft = phrase;
-            state.searchNlMode = null;
-          }
-        }
-        if (
-          !state.search.trim() &&
-          !state.searchSenders.length &&
-          !state.searchTags.length &&
-          !state.searchLanguageFilter?.trim()
-        ) {
-          toast(
-            "Recherche NL : aucun critère exploitable. Reformulez avec des mots-clés (ex. facture, Amazon) ou un expéditeur."
-          );
-          return;
-        }
-        await searchThreads();
-        const n = threadsVisibleInList().length;
-        const bits = [
-          n === 0 ? "aucun résultat" : `${n} fil${n === 1 ? "" : "s"}`,
-          state.searchNlMode ? `mode ${state.searchNlMode}` : null,
-          state.searchLanguageFilter ? `langue ${state.searchLanguageFilter.toUpperCase()}` : null,
-        ].filter(Boolean);
-        const scope =
-          state.searchScope === "account"
-            ? " (compte entier)"
-            : effectiveSearchMailboxPath()
-              ? " (dossier précis)"
-              : "";
-        toast(`Recherche NL : ${bits.join(" · ")}${scope}.`);
-        recordSearchCommittedActivity();
-      });
-      if (!ran) return;
-      if (closeModal) state.searchModalOpen = false;
-      if (state.view === "thread") clearThreadAiSummaryState();
-      if (state.view !== "list") state.view = "list";
-      render();
-    })();
-  } else {
-    void applySearchBarQuery().then(() => {
-      toastSearchBarResult();
-      recordSearchCommittedActivity();
-      if (closeModal) state.searchModalOpen = false;
-      if (state.view === "thread") clearThreadAiSummaryState();
-      if (state.view !== "list") state.view = "list";
-      render();
-    });
-  }
-}
-
-function applySearchQueryFromNl(sq: {
-  text?: string | null;
-  sender?: string | null;
-  senders?: string[];
-  tags?: Tag[];
-  mode?: string | null;
-  language?: string | null;
-  mailbox?: string | null;
-  accountId?: string | null;
-}): void {
-  const applied: SearchStructuralState = {
-    search: "",
-    searchSenders: [],
-    searchTags: [],
-    searchMailboxPath: null,
-    searchAccountOverrideId: null,
-    searchNewsletterRule: null,
-    searchScope: "account",
-    listFilter: "all",
-    searchNlMode: null,
-    searchLanguageFilter: null,
-    searchRelativeDays: null,
-    searchHasAttachment: null,
-    searchMinSecurityScore: null,
-    searchMailboxPrefix: null,
-  };
-  applyNlSearchQueryToState(
-    applied,
-    sq,
-    (raw) => canonicalEmailForNlMatch(raw) ?? (raw.trim().toLowerCase() || null),
-    (id) => state.accounts.some((a) => a.id === id)
-  );
-  state.search = applied.search;
-  state.searchDraft = applied.search;
-  state.searchSenders = applied.searchSenders;
-  state.searchMailboxPath = applied.searchMailboxPath;
-  state.searchAccountOverrideId = applied.searchAccountOverrideId;
-  state.searchNewsletterRule = applied.searchNewsletterRule as typeof state.searchNewsletterRule;
-  state.searchScope = applied.searchScope;
-  state.listFilter = applied.listFilter;
-  state.searchNlMode = applied.searchNlMode;
-  state.searchLanguageFilter = applied.searchLanguageFilter;
-  state.searchRelativeDays = applied.searchRelativeDays;
-  state.searchHasAttachment = applied.searchHasAttachment;
-  state.searchMinSecurityScore = applied.searchMinSecurityScore;
-  state.searchMailboxPrefix = applied.searchMailboxPrefix;
-  state.searchTags = [];
-  for (const t of applied.searchTags) mergeSearchBarTag(t);
-  const aid = sq.accountId?.trim();
-  if (aid && state.accounts.some((a) => a.id === aid)) {
-    state.selectedAccountId = aid;
-  }
-  state.searchModifiersTouched = true;
 }
 
 function scrollToThreadMessage(messageId: string): void {
@@ -10901,7 +10544,6 @@ registerWireEventsBridge({
   defaultListFilterFromPrefs,
   ensureValidSelectedMailbox,
   normalizeNlRuleInvokeInput,
-  resetManualSearchNlFilters,
   refreshSuggestedSavedViews,
   discardCurrentDraftSession,
   leaveComposeViewAfterClose,
@@ -10918,7 +10560,6 @@ registerWireEventsBridge({
   navigateToBreadcrumbIndex,
   refreshOrganizationReport,
   markActiveSavedSearchSeen,
-  clearSearchAndReloadInbox,
   agentRefreshPlanFromDraft,
   agentPrepareReplyContinue,
   discoverMailServersAction,
@@ -10988,7 +10629,6 @@ registerWireEventsBridge({
   cycleComposeLayout,
   clearDraftSession,
   cancelLlmQueueJob,
-  commitSearchQuery,
   confirmMoveDialog,
   enterComposeView,
   readNlButtonRule,
@@ -11182,6 +10822,23 @@ registerOpenThreadDeps({
   setAutoThreadSummaryDoneFor: (threadId) => {
     autoThreadSummaryDoneFor = threadId;
   },
+});
+
+registerSearchCommitDeps({
+  loadMailView,
+  loadThreadsForSearchContext,
+  isSearchActive,
+  searchQueryUsesThreadsApi,
+  threadsVisibleInList,
+  searchMailboxForQuery,
+  effectiveSearchMailboxPath,
+  clearThreadAiSummaryState,
+  withLlmQueue,
+  recordSearchCommittedActivity,
+  resolveSearchMailboxPath,
+  resolveAccountIdFromRef,
+  tagFamilyForInvoke,
+  canonicalEmailForNlMatch,
 });
 
 initMailboxDigest({

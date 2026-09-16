@@ -92,6 +92,11 @@ export { applyListFilter, loadMailView, loadMailboxUnread } from "../mail/mailLi
 export { searchThreads } from "../mail/searchThreadsRun";
 export { fetchOpenThreadOrNotify } from "../mail/fetchOpenThread";
 export { openThread } from "../mail/openThreadView";
+export {
+  clearSearchAndReloadInbox,
+  commitSearchQuery,
+  resetManualSearchNlFilters,
+} from "../mail/searchCommitQuery";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";
