@@ -17,7 +17,11 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 
 | Dossier | Contenu |
 | ------- | ------- |
+| `app/lib/tauriCommand.ts` | `withTimeout`, `tauriErrorMessage`, `safeInvoke` |
 | `app/lib/toast.ts` | Notifications toast |
+| `app/lib/appUiConstants.ts` | Constantes UI (filtres liste, prompt compte par défaut, vue message) |
+| `app/account/discoveredServerSnap.ts` | Snapshot serveurs IMAP/SMTP découverts (formulaire compte) |
+| `app/account/accountWizardState.ts` | État assistant OAuth / nouveau compte |
 | `app/lib/domForm.ts` | Lecture champs formulaire DOM |
 | `app/lib/textFormat.ts` | Liens / texte IA |
 | `app/lib/tags.ts` | `initials`, tags bruit |
@@ -65,7 +69,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Réduire le pont **`registerWireEventsBridge()`** (handlers → modules métier exportés)
+1. Extraire des handlers métier (`openThread`, `loadMailView`, recherche…) hors de `application.ts`
 2. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
 
 `npm run verify:ts` · `npm test`

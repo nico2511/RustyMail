@@ -9,10 +9,23 @@ export {
   serverFieldSelectors,
   serverSidesFromPreset,
 } from "../../accountSetup";
+export {
+  clearAccountOAuthWizard,
+  resetNewAccountSetupState,
+} from "../../account/accountWizardState";
+export {
+  clearDiscoveredServerSnap,
+  setDiscoveredServersFormSnap,
+} from "../../account/discoveredServerSnap";
 export { isAtAutocompletePanelOpen } from "../../atAutocomplete";
 export { isHashAutocompletePanelOpen } from "../../hashAutocomplete";
 export { isAiFeatureEnabled, setAllAiFeatures } from "../../aiFeatures";
-export { captureAiPrefsFieldsFromDom, syncLlmEnginePrefsToDom } from "../../aiPrefsPersist";
+export {
+  captureAiFeatureTogglesFromDom,
+  captureAiPrefsFieldsFromDom,
+  persistAiFeaturePrefs,
+  syncLlmEnginePrefsToDom,
+} from "../../aiPrefsPersist";
 export { defaultEnabledSkillIds, type AssistMode, type AssistSkillId } from "../../assistAgent";
 export {
   contactsListHasMore,
@@ -25,6 +38,12 @@ export {
   setContactsKeywordDraft,
 } from "../../contactsView";
 export { setLocale, t } from "../../i18n";
+export {
+  DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
+  ENABLE_CLEAN_MESSAGE_VIEW,
+  LIST_FILTER_VALUES,
+} from "../../lib/appUiConstants";
+export { safeInvoke, tauriErrorMessage, withTimeout } from "../../lib/tauriCommand";
 export {
   isSavedDraftsVirtualMailbox,
   mailboxKind,
@@ -69,6 +88,7 @@ export {
 } from "../modals/promptConfirm";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
+export { callApp } from "./callApp";
 export type {
   Draft,
   OAuthDesktopLoginOutcome,
@@ -87,21 +107,3 @@ export function setAddressBookEditEmail(value: string | null): void {
 export function addressBookRowsCache(): unknown[] {
   return (app()["addressBookRowsCache"] as () => unknown[])();
 }
-
-export async function safeInvoke<T>(
-  command: string,
-  args: Record<string, unknown> | undefined,
-  fallback: T,
-  timeoutMs?: number,
-): Promise<T> {
-  return (app()["safeInvoke"] as (...a: unknown[]) => Promise<T>)(command, args, fallback, timeoutMs);
-}
-
-export const DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY = (): string =>
-  app()["DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY"] as string;
-
-export const LIST_FILTER_VALUES = (): State["listFilter"][] =>
-  app()["LIST_FILTER_VALUES"] as State["listFilter"][];
-
-export const ENABLE_CLEAN_MESSAGE_VIEW = (): boolean =>
-  Boolean(app()["ENABLE_CLEAN_MESSAGE_VIEW"]);

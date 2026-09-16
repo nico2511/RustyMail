@@ -51,6 +51,8 @@ import {
   orgScanAccount,
   orgRetagAccount,
   safeInvoke,
+  withTimeout,
+  tauriErrorMessage,
   setSkipAccountIdentityCaptureOnce,
   setAddressBookEditEmail,
   addressBookRowsCache,
@@ -150,7 +152,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           await loadContactDetail(acc.id, email);
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -214,7 +216,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           });
           toast(`Carnet exporté : ${path}`);
         } catch (e) {
-          const msg = (app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e);
+          const msg = tauriErrorMessage(e);
           if (!msg.toLowerCase().includes("annul")) toast(msg);
         }
       })();
@@ -238,7 +240,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
             `Import : ${res.imported} contact(s), ${res.skippedDuplicates} ignoré(s)${errN ? `, ${errN} erreur(s)` : ""}.`
           );
         } catch (e) {
-          const msg = (app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e);
+          const msg = tauriErrorMessage(e);
           if (!msg.toLowerCase().includes("annul")) toast(msg);
         }
       })();
@@ -489,12 +491,12 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       void (async () => {
         try {
           const { moveThreadUnarchive } = await import("../../organizationView");
-          const out = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(moveThreadUnarchive(acc.id, tid), MAIL_ACTION_TIMEOUT_MS);
+          const out = await withTimeout(moveThreadUnarchive(acc.id, tid), MAIL_ACTION_TIMEOUT_MS);
           toast(out.message || "Désarchivé vers Inbox.");
           await (app()["openThread"] as (...a: unknown[]) => unknown)(tid, { skipHistory: true, preserveAi: true });
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (err) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(err));
+          toast(tauriErrorMessage(err));
         }
       })();
       return true;
@@ -509,7 +511,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       }
       void (async () => {
         try {
-          const n = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(
+          const n = await withTimeout(
             invoke<number>("org_retag_threads_cmd", {
               payload: { accountId, threadIds: [tid] },
             }),
@@ -519,7 +521,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           await (app()["openThread"] as (...a: unknown[]) => unknown)(tid, { skipHistory: true, preserveAi: true });
         } catch (err) {
           console.error("org_retag_threads_cmd", err);
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(err));
+          toast(tauriErrorMessage(err));
         }
       })();
       return true;
@@ -608,7 +610,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("saved_draft_delete", { accountId, savedDraftId: sid }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("saved_draft_delete", { accountId, savedDraftId: sid }), MAIL_ACTION_TIMEOUT_MS);
           toast("Brouillon retiré de la liste.");
           await (app()["loadMailView"] as (...a: unknown[]) => unknown)(false);
           await (app()["refreshSavedDraftsMailboxCount"] as (...a: unknown[]) => unknown)();
@@ -616,7 +618,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           state.selectedThread = undefined;
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
           (app()["render"] as (...a: unknown[]) => unknown)();
         }
       })();

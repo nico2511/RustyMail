@@ -109,6 +109,22 @@ import {
   AI_CACHE_PROMPT_REVISION,
 } from "./core/timeouts";
 import { isTauriRuntime } from "./lib/tauriRuntime";
+import { safeInvoke, tauriErrorMessage, withTimeout } from "./lib/tauriCommand";
+import {
+  DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
+  ENABLE_CLEAN_MESSAGE_VIEW,
+  LIST_FILTER_VALUES,
+  defaultListFilterFromRaw,
+} from "./lib/appUiConstants";
+import {
+  clearDiscoveredServerSnap,
+  getDiscoveredServersFormSnap,
+  setDiscoveredServersFormSnap,
+} from "./account/discoveredServerSnap";
+import {
+  clearAccountOAuthWizard,
+  resetNewAccountSetupState,
+} from "./account/accountWizardState";
 import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
   cancelMailboxDigestLiveDebounce,
@@ -276,7 +292,7 @@ import {
   type SettingsAiPanelDeps,
 } from "../settingsAiPanel";
 
-import { captureAiPrefsFieldsFromDom, syncLlmEnginePrefsToDom } from "../aiPrefsPersist";
+import { captureAiPrefsFieldsFromDom, syncLlmEnginePrefsToDom, captureAiFeatureTogglesFromDom, persistAiFeaturePrefs } from "../aiPrefsPersist";
 
 import {
   getAssistSkillUi,
@@ -426,8 +442,6 @@ let senderBatchSummarizeAbort: AbortController | null = null;
 
 let senderBatchSummarizeActive = false;
 
-const ENABLE_CLEAN_MESSAGE_VIEW = true;
-
 const ATTACH_PATH_FIELD_SEP = "\u001f";
 
 function attachmentPathsJoinedForHiddenField(paths: string[]): string {
@@ -451,20 +465,6 @@ function draftPayloadForRust(d: Draft): Draft {
     attachmentPaths,
     threadId: d.threadId ?? null,
   };
-}
-
-function captureAiFeatureTogglesFromDom(root: ParentNode = document): void {
-  root.querySelectorAll<HTMLInputElement>("[data-ai-feature]").forEach((el) => {
-    const key = el.dataset.aiFeature as AiFeatureKey | undefined;
-    if (!key) return;
-    state.appPrefs.ai[key] = el.checked;
-  });
-}
-
-async function persistAiFeaturePrefs(): Promise<void> {
-  if (!isTauriRuntime()) return;
-  state.appPrefs.ai = normalizeAiPrefsMerged(state.appPrefs.ai);
-  await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
 }
 
 async function rewriteDictatedSegmentWithTone(raw: string): Promise<string> {
@@ -663,29 +663,7 @@ let subscribedModelBootstrapProgress = false;
 
 let skipAccountIdentityCaptureOnce = false;
 
-let discoveredServersFormSnap: { imap: Account["imap"]; smtp: Account["smtp"] } | null = null;
-
 let accountsFormIdentityScratch: { displayName: string; email: string } | undefined;
-
-function clearDiscoveredServerSnap() {
-  discoveredServersFormSnap = null;
-}
-
-function clearAccountOAuthWizard() {
-  state.accountOAuthWizardPhase = null;
-  state.accountOAuthWizardMessage = "";
-  state.accountOAuthWizardError = null;
-  state.accountOAuthWizardRetry = null;
-}
-
-function resetNewAccountSetupState() {
-  clearAccountOAuthWizard();
-  state.accountPasswordSetupExpanded = false;
-  state.accountFormAuthKind = "password";
-  state.oauthLockedEmail = null;
-  state.accountFormOAuthPrefill = null;
-  state.accountServersPanelOpen = false;
-}
 
 function readSidebarCollapsedPreference(): boolean {
   try {
@@ -1979,11 +1957,8 @@ function sidebarFolderNamesForCounts(): string[] {
   return names;
 }
 
-const LIST_FILTER_VALUES: State["listFilter"][] = ["all", "unread", "starred", "focused", "auto"];
-
 function defaultListFilterFromPrefs(): State["listFilter"] {
-  const raw = state.appPrefs.general.defaultListFilter;
-  return LIST_FILTER_VALUES.includes(raw as State["listFilter"]) ? (raw as State["listFilter"]) : "all";
+  return defaultListFilterFromRaw(state.appPrefs.general.defaultListFilter);
 }
 
 async function loadInboxFilterCounts(): Promise<void> {
@@ -2013,8 +1988,6 @@ async function loadInboxFilterCounts(): Promise<void> {
     state.inboxFilterCounts = null;
   }
 }
-
-const DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY = "rustymail.dismissDefaultAccountPrompt";
 
 function defaultAccountIdFromPrefs(): string | undefined {
   const id = (state.appPrefs.general.defaultAccountId ?? "").trim();
@@ -2300,15 +2273,6 @@ function syncAllAccountMailboxesRequested(options?: { allMailboxes?: boolean }):
   );
 }
 
-async function safeInvoke<T>(command: string, args: Record<string, unknown> | undefined, fallback: T, timeoutMs: number = DEFAULT_INVOKE_TIMEOUT_MS): Promise<T> {
-  try {
-    return await withTimeout(invoke<T>(command, args), timeoutMs);
-  } catch (error) {
-    console.error(`Tauri command failed: ${command}`, error);
-    return fallback;
-  }
-}
-
 async function loadAccountsFromBackend(options?: { silent?: boolean; timeoutMs?: number }): Promise<boolean> {
   state.accountsLoadError = "";
   if (!isTauriRuntime()) {
@@ -2339,22 +2303,6 @@ async function loadAccountsFromBackend(options?: { silent?: boolean; timeoutMs?:
     }
     return false;
   }
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error("Tauri command timeout")), timeoutMs);
-    promise.then(
-      (value) => {
-        window.clearTimeout(timeout);
-        resolve(value);
-      },
-      (error) => {
-        window.clearTimeout(timeout);
-        reject(error);
-      }
-    );
-  });
 }
 
 function folderManagerPanelMailbox(): string | null {
@@ -3541,19 +3489,6 @@ async function onThreadToggleFollow(threadId: string) {
     console.error("thread_toggle_follow", err);
     toast(tauriErrorMessage(err));
     render();
-  }
-}
-
-function tauriErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error && typeof (error as { message: unknown }).message === "string") {
-    return (error as { message: string }).message;
-  }
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
   }
 }
 
@@ -7448,14 +7383,14 @@ function settingsDraftProfile(): Account | undefined {
 function mergedProfileForAccountsForm(): Account | undefined {
   const base = settingsDraftProfile();
   const scratch = state.accountFormOAuthPrefill ?? accountsFormIdentityScratch;
-  if (!discoveredServersFormSnap || accountFieldTouched.serverFields) {
+  if (!getDiscoveredServersFormSnap() || accountFieldTouched.serverFields) {
     return base;
   }
 
   const displayName = scratch?.displayName?.trim() ?? base?.displayName ?? "";
   const email = scratch?.email?.trim() ?? base?.email ?? "";
-  const snapImap = discoveredServersFormSnap!.imap;
-  const snapSmtp = discoveredServersFormSnap!.smtp;
+  const snapImap = getDiscoveredServersFormSnap()!.imap;
+  const snapSmtp = getDiscoveredServersFormSnap()!.smtp;
   if (base) {
     return { ...base, imap: snapImap, smtp: snapSmtp };
   }
@@ -8806,7 +8741,7 @@ async function finishOAuthNewAccountAfterLogin(
   try {
     setOAuthWizardPhase("discover", `Détection des serveurs pour ${email.trim()}…`);
     const { snap, sourceLabel } = await discoverServersSnapForEmail(email.trim(), authKind);
-    discoveredServersFormSnap = snap;
+    setDiscoveredServersFormSnap(snap);
     state.accountMessage = sourceLabel;
 
     setOAuthWizardPhase("save", "Enregistrement du compte (SQLite + trousseau)…");
@@ -8885,7 +8820,7 @@ async function discoverMailServersAction(): Promise<void> {
   if (!isTauriRuntime()) {
     const preset = applyDomainPresetIfSafe(emailRaw, {
       onApplied(domain, p) {
-        discoveredServersFormSnap = serverSidesFromPreset(p);
+        setDiscoveredServersFormSnap(serverSidesFromPreset(p));
         state.accountMessage = `Préréglage local (${domain}) — lancez RustyMail en mode bureau pour ISPDB, .well-known et autoconfig.`;
         accountFieldTouched.serverFields = false;
         state.accountServersPanelOpen = true;
@@ -8904,7 +8839,7 @@ async function discoverMailServersAction(): Promise<void> {
       invoke<DiscoverMailServersResult>("discover_mail_servers", { email: emailRaw }),
       ACCOUNT_INVOKE_TIMEOUT_MS,
     );
-    discoveredServersFormSnap = serverSidesFromDiscovery(raw);
+    setDiscoveredServersFormSnap(serverSidesFromDiscovery(raw));
     accountFieldTouched.serverFields = false;
     state.accountMessage = raw.sourceLabel;
     state.accountServersPanelOpen = true;
@@ -8914,7 +8849,7 @@ async function discoverMailServersAction(): Promise<void> {
     toast(text);
     const preset = applyDomainPresetIfSafe(emailRaw, {
       onApplied(domain, p) {
-        discoveredServersFormSnap = serverSidesFromPreset(p);
+        setDiscoveredServersFormSnap(serverSidesFromPreset(p));
         state.accountMessage = `Préréglage local (${domain}) après échec : ${text}`;
         accountFieldTouched.serverFields = false;
         render();
@@ -11481,15 +11416,6 @@ const composeInteractionsAbortRef = {
   },
 };
 
-const discoveredServersFormSnapRef = {
-  get current() {
-    return discoveredServersFormSnap;
-  },
-  set current(v: typeof discoveredServersFormSnap) {
-    discoveredServersFormSnap = v;
-  },
-};
-
 const skipAccountIdentityCaptureOnceRef = {
   get current() {
     return skipAccountIdentityCaptureOnce;
@@ -11516,7 +11442,6 @@ registerWireEventsBridge({
   refreshSettingsPathsFromBackend,
   computeDraftDiffAgainstRevision,
   finishOAuthNewAccountAfterLogin,
-  captureAiFeatureTogglesFromDom,
   refreshSavedDraftsMailboxCount,
   refreshSemanticEmbeddingCounts,
   resolveSrcForMailImageLightbox,
@@ -11548,8 +11473,6 @@ registerWireEventsBridge({
   mediaBlobToWav16kMonoPcm16,
   openEnginesAiSettingsModal,
   confirmAndExecuteSplitSend,
-  clearDiscoveredServerSnap,
-  resetNewAccountSetupState,
   scheduleDraftRevisionSave,
   micPermissionErrorMessage,
   paintStatusBarProgressDom,
@@ -11573,7 +11496,6 @@ registerWireEventsBridge({
   refreshFolderManagerTree,
   openExternalFromMailHref,
   llmQuickRepliesComposeUi,
-  clearAccountOAuthWizard,
   pickImapMailboxFallback,
   applyContextSliderIndex,
   launchContactMailSearch,
@@ -11601,7 +11523,6 @@ registerWireEventsBridge({
   pickImgSrcForLightbox,
   scrollToThreadMessage,
   schedulePreviewUpdate,
-  persistAiFeaturePrefs,
   refreshDraftRevisions,
   openFolderManagerView,
   openContactDetailView,
@@ -11632,7 +11553,6 @@ registerWireEventsBridge({
   onAttachmentAction,
   cycleComposeLayout,
   clearDraftSession,
-  tauriErrorMessage,
   cancelLlmQueueJob,
   commitSearchQuery,
   loadMailboxUnread,
@@ -11678,7 +11598,6 @@ registerWireEventsBridge({
   onThreadMove,
   onThreadSeen,
   prepareReply,
-  withTimeout,
   runOrgApply,
   saveAccount,
   openThread,
@@ -11687,12 +11606,7 @@ registerWireEventsBridge({
   micAction,
   render,
   goBack,
-  safeInvoke,
-  DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
-  LIST_FILTER_VALUES,
-  ENABLE_CLEAN_MESSAGE_VIEW,
   addressBookRowsCache: () => addressBookRowsCache,
-  discoveredServersFormSnapRef,
   skipAccountIdentityCaptureOnceRef,
   addressBookEditEmailRef,
   AI_PREFS_IMMEDIATE_CHECKBOX_IDS,

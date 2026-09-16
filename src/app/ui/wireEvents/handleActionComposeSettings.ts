@@ -50,6 +50,11 @@ import {
   orgUndoLast,
   orgScanAccount,
   orgRetagAccount,
+  clearDiscoveredServerSnap,
+  resetNewAccountSetupState,
+  clearAccountOAuthWizard,
+  withTimeout,
+  tauriErrorMessage,
   safeInvoke,
   setSkipAccountIdentityCaptureOnce,
   setAddressBookEditEmail,
@@ -144,7 +149,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         if (state.view !== "settings") {
           state.view = "settings";
           state.aiOpen = false;
-          (app()["clearDiscoveredServerSnap"] as (...a: unknown[]) => unknown)();
+          clearDiscoveredServerSnap();
           state.settingsSelectedAccountId =
             state.selectedAccountId && state.accounts.some((a) => a.id === state.selectedAccountId)
               ? state.selectedAccountId
@@ -214,7 +219,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             state.promptCatalogLoadError = "";
           } catch (e) {
             state.promptCatalog = null;
-            state.promptCatalogLoadError = (app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e);
+            state.promptCatalogLoadError = tauriErrorMessage(e);
           }
           (app()["render"] as (...a: unknown[]) => unknown)();
         })();
@@ -242,7 +247,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           toast("Compte par défaut enregistré.");
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -309,10 +314,10 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         if (accVal) state.appPrefs.general.defaultAccountId = accVal;
         else delete state.appPrefs.general.defaultAccountId;
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
           toast(t("toast.prefsSaved"));
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         if (accVal && state.view === "list") {
           await (app()["switchActiveAccount"] as (...a: unknown[]) => unknown)(accVal);
@@ -379,9 +384,9 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         await (app()["autoDetectLlamaServerBinary"] as (...a: unknown[]) => unknown)({ silent: true, persist: false });
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
           return;
         }
         await (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false);
@@ -404,9 +409,9 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       void (async () => {
         if (mode === "local" || mode === "hybrid") {
           try {
-            await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
+            await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
           } catch (e) {
-            toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+            toast(tauriErrorMessage(e));
             return;
           }
         }
@@ -429,7 +434,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           await invoke("cancel_prefetch_llm_model", {});
           toast("Téléchargement du modèle annulé.");
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -450,10 +455,10 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       toast("Téléchargement du modèle en arrière-plan — vous pouvez continuer à utiliser l’app.");
       void (async () => {
         try {
-          const msg = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke<string>("prefetch_llm_model", {}), 1_800_000);
+          const msg = await withTimeout(invoke<string>("prefetch_llm_model", {}), 1_800_000);
           toast(msg || "Fichier modèle prêt.");
         } catch (e) {
-          const msg = (app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e);
+          const msg = tauriErrorMessage(e);
           if (!/annulé/i.test(msg)) toast(msg);
         } finally {
           state.llmPrefetchInFlight = false;
@@ -476,15 +481,15 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         toast("Téléchargement all-MiniLM-L6-v2 (ONNX + tokenizer)…");
         try {
-          const msg = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke<string>("prefetch_semantic_minilm_model", {}), 900_000);
+          const msg = await withTimeout(invoke<string>("prefetch_semantic_minilm_model", {}), 900_000);
           toast(msg);
           try {
-            state.semanticModelAvailable = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke<boolean>("semantic_model_available", {}), MAIL_ACTION_TIMEOUT_MS);
+            state.semanticModelAvailable = await withTimeout(invoke<boolean>("semantic_model_available", {}), MAIL_ACTION_TIMEOUT_MS);
           } catch {
             state.semanticModelAvailable = false;
           }
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -511,7 +516,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           toast("Réindexation sémantique (tout le compte, dossiers présents localement)…");
-          const stats = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(
+          const stats = await withTimeout(
             invoke<{ indexed: number; skipped: number; errors: number }>("reindex_semantic_account_cmd", {
               accountId: aid,
             }),
@@ -521,7 +526,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           await (app()["searchThreads"] as (...a: unknown[]) => unknown)();
           await (app()["refreshSemanticEmbeddingCounts"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -538,10 +543,10 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
           toast("Téléchargement du GGML Whisper (HF) selon tes réglages…");
         try {
-          const msg = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke<string>("prefetch_whisper_dictation_model", {}), 900_000);
+          const msg = await withTimeout(invoke<string>("prefetch_whisper_dictation_model", {}), 900_000);
           toast(msg);
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -582,7 +587,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           const wavBytes = await (app()["mediaBlobToWav16kMonoPcm16"] as (...a: unknown[]) => unknown)(blob);
           const audioWavBase64 = (app()["bytesToBase64"] as (...a: unknown[]) => unknown)(wavBytes);
           toast("Test micro : transcription…");
-          const res = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(
+          const res = await withTimeout(
             invoke<{ durationS: number; rms: number; elapsedMs: number; text?: string | null; error?: { kind: string; seconds?: number; rms?: number; message?: string } | null }>(
               "dictation_test_run",
               { audioWavBase64 }
@@ -631,8 +636,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_openrouter_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_dictation_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("set_openrouter_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("set_dictation_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
           state.openrouterApiKeySet = true;
           state.dictationApiKeySet = true;
           if (inp) inp.value = "";
@@ -641,7 +646,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
           });
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -653,8 +658,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("clear_openrouter_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("clear_dictation_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("clear_openrouter_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("clear_dictation_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
           state.openrouterApiKeySet = false;
           state.dictationApiKeySet = false;
           toast("Clé cloud supprimée.");
@@ -662,7 +667,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
           });
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -680,12 +685,12 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_dictation_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("set_dictation_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
           state.dictationApiKeySet = true;
           if (inp) inp.value = "";
           toast("Clé API enregistrée dans le trousseau.");
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -698,11 +703,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("clear_dictation_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("clear_dictation_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
           state.dictationApiKeySet = false;
           toast("Clé API supprimée du trousseau.");
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -721,13 +726,13 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_openrouter_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("set_openrouter_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
           state.openrouterApiKeySet = true;
           if (inp) inp.value = "";
           toast("Clé OpenRouter enregistrée dans le trousseau.");
           void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -740,12 +745,12 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("clear_openrouter_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("clear_openrouter_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
           state.openrouterApiKeySet = false;
           toast("Clé OpenRouter supprimée du trousseau.");
           void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -764,13 +769,13 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_llama_server_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("set_llama_server_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
           state.llamaServerApiKeySet = true;
           if (inp) inp.value = "";
           toast("Clé llama-server enregistrée dans le trousseau.");
           void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -783,12 +788,12 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("clear_llama_server_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("clear_llama_server_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
           state.llamaServerApiKeySet = false;
           toast("Clé llama-server supprimée du trousseau.");
           void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -814,7 +819,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             toast("llama-server introuvable (PATH et winget).");
           }
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -838,7 +843,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
           }
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -851,7 +856,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          const picked = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(
+          const picked = await withTimeout(
             invoke<string | null>("pick_llama_server_binary_path", {}),
             MAIL_ACTION_TIMEOUT_MS
           );
@@ -860,11 +865,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             return;
           }
           state.appPrefs.ai.llamaServerBinaryPath = picked.trim();
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
           toast("Chemin llama-server enregistré.");
           void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -882,14 +887,14 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("add_newsletter_rule", { input: raw }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("add_newsletter_rule", { input: raw }), MAIL_ACTION_TIMEOUT_MS);
           await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
           const inp = document.querySelector<HTMLInputElement>("#newsletter-domain-input");
           if (inp) inp.value = "";
           toast("Règle enregistrée.");
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (error) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(error));
+          toast(tauriErrorMessage(error));
         }
       })();
       return true;
@@ -906,12 +911,12 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
           await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
           toast("Règle supprimée.");
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (error) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(error));
+          toast(tauriErrorMessage(error));
         }
       })();
       return true;
@@ -933,7 +938,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("add_newsletter_rule", { input: rule }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("add_newsletter_rule", { input: rule }), MAIL_ACTION_TIMEOUT_MS);
           await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
           if (state.selectedThreadId) {
             const tid = state.selectedThreadId;
@@ -943,7 +948,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           toast(`Règle ajoutée : ${rule}`);
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (error) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(error));
+          toast(tauriErrorMessage(error));
         }
       })();
       return true;
@@ -960,7 +965,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
           await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
           if (state.selectedThreadId) {
             const tid = state.selectedThreadId;
@@ -970,7 +975,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           toast(`Règle retirée : ${dom}`);
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (error) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(error));
+          toast(tauriErrorMessage(error));
         }
       })();
       return true;
@@ -979,22 +984,22 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       const id = element?.dataset.accountId?.trim();
       if (!id) return true;
       setSkipAccountIdentityCaptureOnce(true);
-      (app()["clearDiscoveredServerSnap"] as (...a: unknown[]) => unknown)();
+      clearDiscoveredServerSnap();
       state.settingsSelectedAccountId = id;
       accountFieldTouched.serverFields = false;
       state.accountServersPanelOpen = true;
       state.oauthLockedEmail = null;
       state.accountFormOAuthPrefill = null;
-      (app()["resetNewAccountSetupState"] as (...a: unknown[]) => unknown)();
+      resetNewAccountSetupState();
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
     }
     case "settings-new-account":
       setSkipAccountIdentityCaptureOnce(true);
-      (app()["clearDiscoveredServerSnap"] as (...a: unknown[]) => unknown)();
+      clearDiscoveredServerSnap();
       state.settingsSelectedAccountId = "new";
       accountFieldTouched.serverFields = false;
-      (app()["resetNewAccountSetupState"] as (...a: unknown[]) => unknown)();
+      resetNewAccountSetupState();
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
     case "discover-mail-servers":
@@ -1011,7 +1016,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          const o = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(
+          const o = await withTimeout(
             invoke<OAuthDesktopLoginOutcome>("oauth_google_desktop_login_cmd", {}),
             OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
           );
@@ -1024,7 +1029,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           setSkipAccountIdentityCaptureOnce(true);
           await (app()["finishOAuthNewAccountAfterLogin"] as (...a: unknown[]) => unknown)("oauthGoogle", email, (o.displayName ?? "").trim());
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -1036,7 +1041,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          const o = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(
+          const o = await withTimeout(
             invoke<OAuthDesktopLoginOutcome>("oauth_microsoft_desktop_login_cmd", {}),
             OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
           );
@@ -1049,13 +1054,13 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           setSkipAccountIdentityCaptureOnce(true);
           await (app()["finishOAuthNewAccountAfterLogin"] as (...a: unknown[]) => unknown)("oauthMicrosoft", email, (o.displayName ?? "").trim());
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
     }
     case "account-auth-password-mode":
-      (app()["clearAccountOAuthWizard"] as (...a: unknown[]) => unknown)();
+      clearAccountOAuthWizard();
       state.accountPasswordSetupExpanded = true;
       state.accountFormAuthKind = "password";
       state.oauthLockedEmail = null;
@@ -1066,7 +1071,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
     case "oauth-wizard-retry": {
       const retry = state.accountOAuthWizardRetry;
       if (!retry || (retry.authKind !== "oauthGoogle" && retry.authKind !== "oauthMicrosoft")) return true;
-      (app()["clearAccountOAuthWizard"] as (...a: unknown[]) => unknown)();
+      clearAccountOAuthWizard();
       void (app()["finishOAuthNewAccountAfterLogin"] as (...a: unknown[]) => unknown)(retry.authKind, retry.email, retry.displayName);
       return true;
     }

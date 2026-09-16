@@ -12,7 +12,9 @@ import {
 import { isAtAutocompletePanelOpen } from "../../atAutocomplete";
 import { isHashAutocompletePanelOpen } from "../../hashAutocomplete";
 import { isAiFeatureEnabled, setAllAiFeatures } from "../../aiFeatures";
-import { captureAiPrefsFieldsFromDom, syncLlmEnginePrefsToDom } from "../../aiPrefsPersist";
+import { captureAiFeatureTogglesFromDom, captureAiPrefsFieldsFromDom, persistAiFeaturePrefs, syncLlmEnginePrefsToDom } from "../../aiPrefsPersist";
+import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
+import { setDiscoveredServersFormSnap } from "../account/discoveredServerSnap";
 import { defaultEnabledSkillIds } from "../../assistAgent";
 import {
   contactsListHasMore,
@@ -88,13 +90,13 @@ export function wireEvents() {
     el.addEventListener(
       "change",
       () => {
-        (app()["captureAiFeatureTogglesFromDom"] as (...a: unknown[]) => unknown)();
+        captureAiFeatureTogglesFromDom();
         state.appPrefs.ai = normalizeAiPrefsMerged(state.appPrefs.ai);
         void (async () => {
           try {
-            await (app()["persistAiFeaturePrefs"] as (...a: unknown[]) => unknown)();
+            await persistAiFeaturePrefs();
           } catch (e) {
-            toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+            toast(tauriErrorMessage(e));
           }
         })();
       },
@@ -297,13 +299,13 @@ export function wireEvents() {
         if (!isTauriRuntime()) return;
         void (async () => {
           try {
-            await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
+            await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
             toast(next ? "Override CPU autorisé (llama-server)." : "Override CPU désactivé.");
             void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
               if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
             });
           } catch (e) {
-            toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+            toast(tauriErrorMessage(e));
           }
         })();
       },
@@ -320,13 +322,13 @@ export function wireEvents() {
         if (!isTauriRuntime()) return;
         void (async () => {
           try {
-            await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
+            await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
             toast(next ? "Lancement llama-server par l’app activé." : "Lancement llama-server par l’app désactivé.");
             void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
               if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
             });
           } catch (e) {
-            toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+            toast(tauriErrorMessage(e));
           }
         })();
       },
@@ -337,10 +339,10 @@ export function wireEvents() {
     if (!isTauriRuntime()) return;
     void (async () => {
       try {
-        await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
+        await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
         toast("Réglage IA enregistré.");
       } catch (e) {
-        toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+        toast(tauriErrorMessage(e));
       }
     })();
   };
@@ -730,7 +732,7 @@ export function wireEvents() {
     const value = (event.currentTarget as HTMLInputElement).value;
     applyDomainPresetIfSafe(value, {
       onApplied(domain, preset) {
-        (app()["discoveredServersFormSnapRef"] as { current: unknown }).current = serverSidesFromPreset(preset);
+        setDiscoveredServersFormSnap(serverSidesFromPreset(preset));
         state.accountMessage = `Préréglage local pour « ${domain} ».`;
         accountFieldTouched.serverFields = false;
         (app()["render"] as (...a: unknown[]) => unknown)();

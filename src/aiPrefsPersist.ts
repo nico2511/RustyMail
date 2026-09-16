@@ -1,6 +1,11 @@
 /** Lecture DOM → `AppPrefs.ai` (paramètres IA). */
 
+import { invoke } from "@tauri-apps/api/core";
 import type { AiFeatureKey } from "./aiFeatures";
+import { state } from "./app/state";
+import { MAIL_ACTION_TIMEOUT_MS } from "./app/core/timeouts";
+import { isTauriRuntime } from "./app/lib/tauriRuntime";
+import { withTimeout } from "./app/lib/tauriCommand";
 import {
   defaultAppPrefs,
   normalizeAiPrefsMerged,
@@ -174,4 +179,18 @@ export function captureAiPrefsFieldsFromDom(target: AppPrefs): void {
 
   target.ai.threadLayout = "reading";
   target.ai = normalizeAiPrefsMerged(target.ai);
+}
+
+export function captureAiFeatureTogglesFromDom(root: ParentNode = document): void {
+  root.querySelectorAll<HTMLInputElement>("[data-ai-feature]").forEach((el) => {
+    const key = el.dataset.aiFeature as AiFeatureKey | undefined;
+    if (!key) return;
+    state.appPrefs.ai[key] = el.checked;
+  });
+}
+
+export async function persistAiFeaturePrefs(): Promise<void> {
+  if (!isTauriRuntime()) return;
+  state.appPrefs.ai = normalizeAiPrefsMerged(state.appPrefs.ai);
+  await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
 }

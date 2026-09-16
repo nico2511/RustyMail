@@ -51,6 +51,8 @@ import {
   orgScanAccount,
   orgRetagAccount,
   safeInvoke,
+  withTimeout,
+  tauriErrorMessage,
   setSkipAccountIdentityCaptureOnce,
   setAddressBookEditEmail,
   addressBookRowsCache,
@@ -104,7 +106,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           await (app()["persistAiFeaturePrefs"] as (...a: unknown[]) => unknown)();
           toast("Toutes les fonctionnalités IA activées.");
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -117,7 +119,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           await (app()["persistAiFeaturePrefs"] as (...a: unknown[]) => unknown)();
           toast("Toutes les fonctionnalités IA désactivées.");
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
       })();
@@ -175,7 +177,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
     case "toggle-message-view":
-      if (!ENABLE_CLEAN_MESSAGE_VIEW()) return true;
+      if (!ENABLE_CLEAN_MESSAGE_VIEW) return true;
       state.messageViewMode = state.messageViewMode === "clean" ? "original" : "clean";
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
@@ -221,12 +223,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       if (!email.includes("@") || !isTauriRuntime()) return true;
       void (async () => {
         try {
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(invoke("add_newsletter_rule", { input: email }), MAIL_ACTION_TIMEOUT_MS);
+          await withTimeout(invoke("add_newsletter_rule", { input: email }), MAIL_ACTION_TIMEOUT_MS);
           await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
           toast(t("toast.newsletterRuleAdded"));
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -245,7 +247,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         if (!account?.id) return;
         try {
           markThreadsRecentlyRemoved([tid]);
-          await (app()["withTimeout"] as (...a: unknown[]) => unknown)(
+          await withTimeout(
             invoke<string>("move_thread_mailbox", {
               accountId: account.id,
               mailbox: source,
@@ -265,7 +267,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
           clearThreadsRecentlyRemoved([tid]);
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -362,7 +364,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         if (!ok) return;
         try {
           const wasHistoriqueLayout = state.composeLayout === "historique";
-          const restored = await (app()["withTimeout"] as (...a: unknown[]) => unknown)(
+          const restored = await withTimeout(
             invoke<Draft | null>("draft_revision_restore", { accountId, revisionId }),
             MAIL_ACTION_TIMEOUT_MS
           );
@@ -386,7 +388,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           (app()["scheduleDraftRevisionSave"] as (...a: unknown[]) => unknown)(450);
         } catch (error) {
           console.error("draft_revision_restore", error);
-          toast(`Restauration impossible: ${(app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(error)}`);
+          toast(`Restauration impossible: ${tauriErrorMessage(error)}`);
         }
       })();
       return true;
@@ -502,7 +504,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         (app()["render"] as (...a: unknown[]) => unknown)();
       } catch (e) {
         console.error("demo_reset_playground_mailbox", e);
-        toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+        toast(tauriErrorMessage(e));
       }
       return true;
     }
@@ -543,7 +545,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         (app()["render"] as (...a: unknown[]) => unknown)();
       } catch (e) {
         console.error("demo_remove_playground_mailbox", e);
-        toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+        toast(tauriErrorMessage(e));
       }
       return true;
     }
@@ -635,7 +637,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           await (app()["loadAddressBookSidebarCount"] as (...a: unknown[]) => unknown)();
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -666,7 +668,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           toast("Contact enregistré.");
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -682,7 +684,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           toast("Contact supprimé.");
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -706,7 +708,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           await (app()["refreshAddressBookList"] as (...a: unknown[]) => unknown)();
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (e) {
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
         }
       })();
       return true;

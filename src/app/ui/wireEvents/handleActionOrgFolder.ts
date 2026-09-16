@@ -51,6 +51,8 @@ import {
   orgScanAccount,
   orgRetagAccount,
   safeInvoke,
+  withTimeout,
+  tauriErrorMessage,
   setSkipAccountIdentityCaptureOnce,
   setAddressBookEditEmail,
   addressBookRowsCache,
@@ -160,7 +162,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
           if (state.folderManager.report) state.folderManager.report.lockedMailboxes = list;
           (app()["render"] as (...a: unknown[]) => unknown)();
         })
-        .catch((e) => toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e)));
+        .catch((e) => toast(tauriErrorMessage(e)));
       return true;
     }
     case "fm-toggle-node": {
@@ -194,7 +196,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         .catch((e) => {
           state.organizationV2.scanning = false;
           state.organizationV2.applyMessage = "";
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
           (app()["render"] as (...a: unknown[]) => unknown)();
         });
       return true;
@@ -215,7 +217,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         .catch((e) => {
           state.organizationV2.applying = false;
           state.organizationV2.applyMessage = "";
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
           (app()["render"] as (...a: unknown[]) => unknown)();
         });
       return true;
@@ -324,7 +326,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         .catch((e) => {
           state.organization.scanning = false;
           state.organization.applyMessage = "";
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
           (app()["render"] as (...a: unknown[]) => unknown)();
         });
       return true;
@@ -426,7 +428,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         .catch((e) => {
           state.organization.applying = false;
           state.organization.applyMessage = "";
-          toast((app()["tauriErrorMessage"] as (...a: unknown[]) => unknown)(e));
+          toast(tauriErrorMessage(e));
           (app()["render"] as (...a: unknown[]) => unknown)();
         });
       return true;
