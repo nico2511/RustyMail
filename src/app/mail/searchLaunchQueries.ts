@@ -6,6 +6,7 @@ import { isSavedDraftsVirtualMailbox, threadMailboxListLabel } from "../../mailb
 import type { State, Tag } from "../types";
 import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { tagToSearchDraft } from "../lib/threadTagsModal";
+import { tagFamilyForInvoke } from "../lib/tagFamilyForInvoke";
 import { currentAccount } from "../core/accountContext";
 import { safeInvoke, tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
@@ -28,7 +29,6 @@ export type SearchLaunchDeps = {
   resolveSearchMailboxPath: (requested: string) => string | null;
   ensureValidSelectedMailbox: () => void;
   refreshSearchTagCatalog: () => Promise<void>;
-  tagFamilyForInvoke: (family: string) => Tag["family"];
 };
 
 let searchLaunchDeps: SearchLaunchDeps | null = null;
@@ -76,7 +76,7 @@ export function launchTagMailSearch(tag: Tag): void {
 }
 
 export function launchTagMailSearchFromRawFamily(family: string, value: string): void {
-  launchTagMailSearch({ family: launchDeps().tagFamilyForInvoke(family), value });
+  launchTagMailSearch({ family: tagFamilyForInvoke(family), value });
 }
 
 export function launchContactMailSearch(opts: {

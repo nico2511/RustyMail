@@ -206,8 +206,16 @@ import {
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
-  registerSearchTagCatalogDeps,
 } from "./mail/searchTagCatalog";
+import {
+  activeSavedSearchItem,
+  canSaveSearchView,
+  canSaveSearchViewInModal,
+  inboxSearchContextActive,
+  registerSearchViewContextDeps,
+  searchViewCanAffinerFlux,
+  searchViewCanOpenOrganizer,
+} from "./mail/searchViewContext";
 import {
   registerSearchAtAutocompleteWireDeps,
 } from "./mail/searchAtAutocompleteWire";
@@ -2175,14 +2183,6 @@ function mailboxPathPrefixForCreate(): string {
   return m.endsWith("/") ? m : `${m}/`;
 }
 
-function tagFamilyForInvoke(family: string): Tag["family"] {
-  const f = family.trim().toLowerCase();
-  if (f === "source") return "Source";
-  if (f === "kind") return "Kind";
-  if (f === "state") return "State";
-  return "Entity";
-}
-
 function addSearchSender(email: string): void {
   const c = canonicalEmailForNlMatch(email) ?? email.trim().toLowerCase();
   if (!c) return;
@@ -2200,54 +2200,6 @@ function resolveAccountIdFromRef(ref: string): string | null {
       (a.displayName ?? "").toLowerCase().includes(q)
   );
   return hit?.id ?? null;
-}
-
-function canSaveSearchView(): boolean {
-  if (!isTauriRuntime() || !searchAccountIdForQuery()) return false;
-  if (state.activeSavedSearchId) return true;
-  return hasCommittedSearchCriteria(committedSearchCriteriaSnapshot());
-}
-
-function canSaveSearchViewInModal(): boolean {
-  if (!isTauriRuntime() || !searchAccountIdForQuery()) return false;
-  if (canSaveSearchView()) return true;
-  return hasCommittedSearchCriteria(draftSearchCriteriaSnapshot());
-}
-
-function inboxSearchContextActive(): boolean {
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) return false;
-  if (state.view === "folderManager" && folderManagerBrowsingPanel()) return false;
-  if (state.activeSavedSearchId) return true;
-  return hasCommittedSearchCriteria(committedSearchCriteriaSnapshot());
-}
-
-function activeSavedSearchItem(): SavedSearchListItem | undefined {
-  const id = state.activeSavedSearchId;
-  if (!id) return undefined;
-  return state.savedSearches.find((s) => s.id === id);
-}
-
-function searchViewTargetsInbox(): boolean {
-  const mb = (searchMailboxForQuery() ?? state.selectedMailbox ?? "INBOX").trim();
-  const u = mb.toUpperCase();
-  return u === "INBOX" || u.endsWith(".INBOX");
-}
-
-function searchViewCanOpenOrganizer(): boolean {
-  return (
-    inboxSearchContextActive() &&
-    searchViewTargetsInbox() &&
-    threadsVisibleInList().length >= 15
-  );
-}
-
-function searchViewCanAffinerFlux(): boolean {
-  return (
-    isTauriRuntime() &&
-    inboxSearchContextActive() &&
-    isAiFeatureEnabled(state.appPrefs.ai, "featureOrgProposalsEnabled") &&
-    threadsVisibleInList().length >= 5
-  );
 }
 
 async function loadThreadsForSearchContext(append = false): Promise<void> {
@@ -9395,7 +9347,6 @@ registerWireEventsBridge({
   mailboxManageAction,
   orgV2SnoozeProposal,
   applyMarkdownAction,
-  tagFamilyForInvoke,
   stopAgentTelemetry,
   onAttachmentAction,
   cycleComposeLayout,
@@ -9600,7 +9551,6 @@ registerSearchCommitDeps({
   recordSearchCommittedActivity,
   resolveSearchMailboxPath,
   resolveAccountIdFromRef,
-  tagFamilyForInvoke,
   canonicalEmailForNlMatch,
 });
 
@@ -9610,9 +9560,12 @@ registerSearchBarUiDeps({
 });
 
 registerSavedSearchViewsDeps({
-  canSaveSearchView,
   resolveSearchMailboxPath,
   activityTrackingEnabled,
+});
+
+registerSearchViewContextDeps({
+  threadsVisibleInList,
 });
 
 registerSearchViewBatchDeps({
@@ -9631,10 +9584,7 @@ registerSearchLaunchDeps({
   resolveSearchMailboxPath,
   ensureValidSelectedMailbox,
   refreshSearchTagCatalog,
-  tagFamilyForInvoke,
 });
-
-registerSearchTagCatalogDeps({ tagFamilyForInvoke });
 
 registerBulkTrashListDeps({
   threadsVisibleInList,

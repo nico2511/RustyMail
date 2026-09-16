@@ -40,10 +40,10 @@ import {
   committedSearchCriteriaSnapshot,
   searchAccountIdForQuery,
 } from "./searchQueryContext";
+import { canSaveSearchView } from "./searchViewContext";
 import { searchThreads } from "./searchThreadsRun";
 
 export type SavedSearchViewsDeps = {
-  canSaveSearchView: () => boolean;
   resolveSearchMailboxPath: (requested: string) => string | null;
   activityTrackingEnabled: () => boolean;
 };
@@ -166,7 +166,7 @@ export async function saveCurrentSearchView(): Promise<void> {
     return;
   }
   syncCommitSearchDraftForSave();
-  if (!d.canSaveSearchView()) {
+  if (!canSaveSearchView()) {
     toast("Lancez d’abord la recherche (Entrée), puis enregistrez la vue.");
     return;
   }

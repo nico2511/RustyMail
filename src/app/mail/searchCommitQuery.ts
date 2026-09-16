@@ -15,6 +15,7 @@ import {
 import type { Tag, ThreadListItem } from "../types";
 import { LLM_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { formatNewsletterRuleInput } from "../lib/newsletterRuleFormat";
+import { tagFamilyForInvoke } from "../lib/tagFamilyForInvoke";
 import { withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
@@ -39,7 +40,6 @@ export type SearchCommitDeps = {
   recordSearchCommittedActivity: () => void;
   resolveSearchMailboxPath: (requested: string) => string | null;
   resolveAccountIdFromRef: (ref: string) => string | null;
-  tagFamilyForInvoke: (family: string) => Tag["family"];
   canonicalEmailForNlMatch: (raw: string) => string | null;
 };
 
@@ -61,7 +61,7 @@ function mergeSearchBarTagOnTarget(
   const d = deps();
   const value = raw.value.trim();
   if (!value) return;
-  const family = d.tagFamilyForInvoke(raw.family);
+  const family = tagFamilyForInvoke(raw.family);
   const key = `${family}:${value}`.toLowerCase();
   if (target.searchTags.some((t) => `${t.family}:${t.value}`.toLowerCase() === key)) return;
   target.searchTags.push({ family, value });
