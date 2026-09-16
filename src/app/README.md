@@ -40,6 +40,7 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/openThreadView.ts` | `openThread()` + `registerOpenThreadDeps()` |
 | `app/mail/searchCommitQuery.ts` | `commitSearchQuery`, barre, NL + `registerSearchCommitDeps()` |
 | `app/mail/searchBarUi.ts` | Modale recherche, `syncSearchBarChrome` |
+| `app/mail/savedSearchViews.ts` | Vues enregistrées (CRUD, marquer vu) + `registerSavedSearchViewsDeps()` |
 | `app/mail/mailListView.ts` | `loadMailView` + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
