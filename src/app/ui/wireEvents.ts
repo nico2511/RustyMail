@@ -69,7 +69,8 @@ import {
   openConfirmModal,
 } from "../modals/promptConfirm";
 import { state } from "../state";
-import { threadIdsMatch } from "./lib/threadIdsMatch";
+import { threadIdsMatch } from "../lib/threadIdsMatch";
+import { openThread } from "../mail/openThreadView";
 import { app } from "./wireEventsBridge";
 export function wireEvents() {
   const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
@@ -421,13 +422,13 @@ export function wireEvents() {
       const preserveAi = Boolean(
         state.aiOutput?.trim() && threadIdsMatch(state.aiThreadScope, tid)
       );
-      void (app()["openThread"] as (...a: unknown[]) => unknown)(tid, { preserveAi });
+      void openThread(tid, { preserveAi });
     });
   });
   document.querySelectorAll<HTMLButtonElement>(".digest-open-thread[data-thread-id]").forEach((element) => {
     element.addEventListener("click", (e) => {
       e.preventDefault();
-      void (app()["openThread"] as (...a: unknown[]) => unknown)(element.dataset.threadId ?? "");
+      void openThread(element.dataset.threadId ?? "");
     });
   });
   document.querySelectorAll<HTMLButtonElement>("[data-mv=trash][data-thread-id]").forEach((el) => {

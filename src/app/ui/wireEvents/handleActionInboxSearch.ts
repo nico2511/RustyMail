@@ -61,6 +61,7 @@ import {
   setSkipAccountIdentityCaptureOnce,
   setAddressBookEditEmail,
   addressBookRowsCache,
+  openThread,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -107,7 +108,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     }
     case "contacts-open-thread": {
       const tid = element?.dataset.threadId?.trim();
-      if (tid) void (app()["openThread"] as (...a: unknown[]) => unknown)(tid);
+      if (tid) void openThread(tid);
       return true;
     }
     case "contacts-compose": {
@@ -498,7 +499,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           const { moveThreadUnarchive } = await import("../../organizationView");
           const out = await withTimeout(moveThreadUnarchive(acc.id, tid), MAIL_ACTION_TIMEOUT_MS);
           toast(out.message || "Désarchivé vers Inbox.");
-          await (app()["openThread"] as (...a: unknown[]) => unknown)(tid, { skipHistory: true, preserveAi: true });
+          await openThread(tid, { skipHistory: true, preserveAi: true });
           (app()["render"] as (...a: unknown[]) => unknown)();
         } catch (err) {
           toast(tauriErrorMessage(err));
@@ -523,7 +524,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
             MAIL_ACTION_TIMEOUT_MS
           );
           toast(n > 0 ? "Tags mis à jour." : "Tags déjà à jour.");
-          await (app()["openThread"] as (...a: unknown[]) => unknown)(tid, { skipHistory: true, preserveAi: true });
+          await openThread(tid, { skipHistory: true, preserveAi: true });
         } catch (err) {
           console.error("org_retag_threads_cmd", err);
           toast(tauriErrorMessage(err));

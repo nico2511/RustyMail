@@ -141,6 +141,7 @@ import {
   reloadCurrentThreadList,
 } from "./mail/mailListView";
 import { fetchOpenThreadOrNotify } from "./mail/fetchOpenThread";
+import { openThread, registerOpenThreadDeps } from "./mail/openThreadView";
 import {
   buildSearchQueryFromCurrentState,
   registerSearchQueryContext,
@@ -8005,111 +8006,6 @@ async function openSavedDraftById(savedDraftId: string) {
   }
 }
 
-async function markOpenedThreadReadIfUnread(threadId: string): Promise<void> {
-  if (savedDraftIdFromThreadId(threadId)) return;
-  if (!isTauriRuntime()) return;
-  const unread = Boolean(state.selectedThread?.unread);
-  if (!unread) return;
-  const account = currentAccount();
-  const accountId = account?.id?.trim();
-  if (!accountId) return;
-  try {
-    const mailbox = sourceMailboxForThread(threadId);
-    await withTimeout(invoke<string>("thread_mark_read", { accountId, mailbox, threadId }), MAIL_ACTION_TIMEOUT_MS);
-    if (state.selectedThread) state.selectedThread = { ...state.selectedThread, unread: false };
-    const ti = state.threads.findIndex((t) => String(t.id) === String(threadId));
-    if (ti >= 0) {
-      state.threads[ti] = { ...state.threads[ti], unread: false };
-    }
-    await loadMailboxUnread();
-  } catch (e) {
-    console.warn("thread_mark_read (ouverture)", e);
-  }
-}
-
-async function openThread(
-  threadId: string,
-  opts?: { preserveAi?: boolean; skipHistory?: boolean }
-) {
-  invalidateIdleAiCachePrefetch();
-  const savedId = savedDraftIdFromThreadId(threadId);
-  if (savedId) {
-    await openSavedDraftById(savedId);
-    return;
-  }
-  const tid = threadId.trim();
-  if (isUnifiedInboxMailbox(state.selectedMailbox)) {
-    const row = state.threads.find((t) => String(t.id) === tid);
-    const aid = row?.accountId?.trim();
-    if (aid && state.accounts.some((a) => a.id === aid) && state.selectedAccountId !== aid) {
-      state.selectedAccountId = aid;
-    }
-  }
-  if (!opts?.skipHistory) beginNavigation("thread");
-  const prev = state.selectedThreadId;
-  const keepAi =
-    opts?.preserveAi &&
-    threadAiSummaryScoped() &&
-    threadIdsMatch(state.aiThreadScope, tid);
-  if (String(prev) !== String(tid)) {
-    state.threadQuickReplyOpen = false;
-    state.threadTagsModalOpen = false;
-    if (!keepAi) {
-      clearThreadAiSummaryState();
-      state.messageTranslations = {};
-      state.messageTranslationBusy = {};
-    }
-  }
-  state.selectedThreadId = tid;
-  const opened = await fetchOpenThreadOrNotify(tid);
-  if (!opened) {
-    if (!opts?.skipHistory) navPop();
-    state.selectedThread = undefined;
-    state.view = "list";
-    render();
-    return;
-  }
-  state.selectedThread = opened;
-  if (threadIsAutoMail(opened, tid)) {
-    state.quickReplySuggestions = [];
-    if (state.agentSession?.threadId === tid) {
-      void stopAgentTelemetry();
-      state.agentSession = null;
-    }
-  }
-  if (state.aiOutput?.trim() && threadIdsMatch(state.aiThreadScope, tid)) {
-    state.aiThreadScope = String(tid);
-  }
-  await markOpenedThreadReadIfUnread(tid);
-  await loadNewsletterRules();
-  state.view = "thread";
-  startThreadActivityOpen(tid);
-  if (isTauriRuntime()) void invoke("ai_user_activity_ping").catch(() => {});
-  const hyd = state.selectedThread?.messages ?? [];
-  if (isTauriRuntime() && hyd.length) void hydrateMessageTranslationsFromCacheForThread(hyd);
-  for (const m of hyd) scheduleSecurityLlmAugment(m);
-  void maybeAutoSummarizeThreadOnOpen(tid, opened);
-  render();
-}
-
-async function maybeAutoSummarizeThreadOnOpen(
-  threadId: string,
-  thread: { messages?: Array<{ messageId?: string }> }
-): Promise<void> {
-  const ai = state.appPrefs.ai as AppPrefsAi & {
-    featureAutoThreadSummaryEnabled?: boolean;
-    autoThreadSummaryMinMessages?: number;
-  };
-  if (!ai.featureAutoThreadSummaryEnabled) return;
-  if (senderBatchSummarizeActive) return;
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")) return;
-  const min = ai.autoThreadSummaryMinMessages ?? 6;
-  if ((thread.messages?.length ?? 0) < min) return;
-  if (autoThreadSummaryDoneFor === threadId) return;
-  autoThreadSummaryDoneFor = threadId;
-  await summarizeThread();
-}
-
 async function deleteSettingsAccount() {
   if (!isTauriRuntime()) {
     toast("La suppression du compte requiert l’app Tauri (npm run tauri:dev).");
@@ -11132,7 +11028,6 @@ registerWireEventsBridge({
   prepareReply,
   runOrgApply,
   saveAccount,
-  openThread,
   syncInbox,
   sendDraft,
   micAction,
@@ -11267,6 +11162,27 @@ registerMailListDeps({
 
 registerSearchQueryContext({ effectiveSearchMailboxPath });
 registerSearchThreadsRunDeps({ committedSearchCriteriaSnapshot });
+
+registerOpenThreadDeps({
+  openSavedDraftById,
+  beginNavigation,
+  navPop,
+  threadAiSummaryScoped,
+  clearThreadAiSummaryState,
+  threadIsAutoMail,
+  stopAgentTelemetry,
+  loadNewsletterRules,
+  startThreadActivityOpen,
+  hydrateMessageTranslationsFromCacheForThread,
+  scheduleSecurityLlmAugment,
+  summarizeThread,
+  sourceMailboxForThread,
+  isSenderBatchSummarizeActive: () => senderBatchSummarizeActive,
+  getAutoThreadSummaryDoneFor: () => autoThreadSummaryDoneFor,
+  setAutoThreadSummaryDoneFor: (threadId) => {
+    autoThreadSummaryDoneFor = threadId;
+  },
+});
 
 initMailboxDigest({
   withTimeout,
