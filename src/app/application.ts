@@ -125,6 +125,21 @@ import {
   clearAccountOAuthWizard,
   resetNewAccountSetupState,
 } from "./account/accountWizardState";
+import { currentAccount } from "./core/accountContext";
+import { threadIdsMatch } from "./lib/threadIdsMatch";
+import { mailboxLogicalPathKey } from "./mail/mailboxPathKeys";
+import {
+  folderManagerPanelMailbox,
+  listMailboxForPanel,
+  listThreadsPayload,
+} from "./mail/mailboxPanelContext";
+import {
+  applyListFilter,
+  loadMailView,
+  loadMailboxUnread,
+  registerMailListDeps,
+  reloadCurrentThreadList,
+} from "./mail/mailListView";
 import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
   cancelMailboxDigestLiveDebounce,
@@ -1907,86 +1922,8 @@ function resolveSearchMailboxPath(requested: string): string | null {
   return q;
 }
 
-function mailboxLogicalPathKeySegments(name: string): string[] {
-  const normalized = String(name ?? "").normalize("NFC");
-  const segs: string[] = [];
-  for (const part of normalized.split(/[/.]/g)) {
-    const t = part.trim();
-    if (t) segs.push(t.toLowerCase());
-  }
-  if (segs[0] === "inbox") segs.shift();
-  return segs;
-}
-
-function mailboxLogicalPathKey(name: string): string {
-  return mailboxLogicalPathKeySegments(name).join("\0");
-}
-
-function mergeMailboxFolderStatsForUi(
-  sidebarMailboxes: string[],
-  rows: MailboxFolderStatsRow[]
-): { unread: Record<string, number>; total: Record<string, number> } {
-  const unread: Record<string, number> = {};
-  const total: Record<string, number> = {};
-  for (const mb of sidebarMailboxes) {
-    const nk = mb.normalize("NFC");
-    const exact = rows.find((r) => r.mailbox.normalize("NFC") === nk);
-    if (exact) {
-      unread[mb] = Math.max(0, Math.floor(Number(exact.unreadCount)) || 0);
-      total[mb] = Math.max(0, Math.floor(Number(exact.totalThreads)) || 0);
-      continue;
-    }
-    const k = mailboxLogicalPathKey(mb);
-    const logicalMatches = rows.filter((r) => mailboxLogicalPathKey(r.mailbox) === k);
-    if (logicalMatches.length === 1) {
-      unread[mb] = Math.max(0, Math.floor(Number(logicalMatches[0].unreadCount)) || 0);
-      total[mb] = Math.max(0, Math.floor(Number(logicalMatches[0].totalThreads)) || 0);
-    }
-  }
-  return { unread, total };
-}
-
-function sidebarFolderNamesForCounts(): string[] {
-  const folders = state.mailboxes.length ? state.mailboxes : ["INBOX"];
-  const system = pickSystemMailboxes(folders);
-  const names = system.map((x) => x.name);
-  const sel = state.selectedMailbox?.trim();
-  if (sel && !isSavedDraftsVirtualMailbox(sel) && !names.includes(sel)) {
-    names.push(sel);
-  }
-  return names;
-}
-
 function defaultListFilterFromPrefs(): State["listFilter"] {
   return defaultListFilterFromRaw(state.appPrefs.general.defaultListFilter);
-}
-
-async function loadInboxFilterCounts(): Promise<void> {
-  const account = currentAccount();
-  const mb = state.view === "folderManager" ? folderManagerPanelMailbox() : state.selectedMailbox;
-  if (!account?.id || !mb || isSavedDraftsVirtualMailbox(mb) || !isTauriRuntime()) {
-    state.inboxFilterCounts = null;
-    return;
-  }
-  try {
-    const fc = await withTimeout(
-      invoke<InboxFilterCounts>("mailbox_inbox_filter_counts", {
-        accountId: account.id,
-        mailbox: mb,
-      }),
-      BOOT_INVOKE_TIMEOUT_MS
-    );
-    state.inboxFilterCounts = {
-      all: Math.max(0, Math.floor(Number(fc.all)) || 0),
-      unread: Math.max(0, Math.floor(Number(fc.unread)) || 0),
-      starred: Math.max(0, Math.floor(Number(fc.starred)) || 0),
-      focused: Math.max(0, Math.floor(Number(fc.focused)) || 0),
-      auto: Math.max(0, Math.floor(Number(fc.auto)) || 0),
-    };
-  } catch (e) {
-    console.warn("mailbox_inbox_filter_counts", e);
-    state.inboxFilterCounts = null;
-  }
 }
 
 function defaultAccountIdFromPrefs(): string | undefined {
@@ -2305,37 +2242,12 @@ async function loadAccountsFromBackend(options?: { silent?: boolean; timeoutMs?:
   }
 }
 
-function folderManagerPanelMailbox(): string | null {
-  if (state.view !== "folderManager") return null;
-  const mb = state.folderManager.selectedMailbox?.trim();
-  return mb || null;
-}
-
 function folderManagerBrowsingPanel(): boolean {
   return Boolean(folderManagerPanelMailbox()) && !isSearchActive();
 }
 
-function listMailboxForPanel(): string {
-  return folderManagerPanelMailbox() ?? state.selectedMailbox?.trim() ?? "INBOX";
-}
-
 function resetFolderManagerPanelSearchState(): void {
   state.listFilter = defaultListFilterFromPrefs();
-}
-
-function listThreadsPayload(): { accountId: string; mailbox: string } | undefined {
-  const account = currentAccount();
-  if (!account) return undefined;
-  if (state.view === "folderManager") {
-    const mb = state.folderManager.selectedMailbox?.trim();
-    if (!mb) return undefined;
-    return { accountId: account.id, mailbox: mb };
-  }
-  return { accountId: account.id, mailbox: state.selectedMailbox || "INBOX" };
-}
-
-function currentAccount(): Account | undefined {
-  return state.accounts.find((a) => a.id === state.selectedAccountId) ?? state.accounts[0];
 }
 
 function mailboxPathPrefixForCreate(): string {
@@ -2639,228 +2551,6 @@ async function loadThreadsForSearchContext(append = false): Promise<void> {
   }
   scheduleMailboxDigestRefresh();
   scheduleIdleAiCachePrefetch();
-}
-
-async function reloadCurrentThreadList(append = false): Promise<void> {
-  if (isSavedDraftsVirtualMailbox(listMailboxForPanel())) {
-    await loadMailView(append);
-    return;
-  }
-  if (searchQueryUsesThreadsApi()) {
-    await searchThreads();
-    return;
-  }
-  if (usesSearchContextLoader() || isSearchActive()) {
-    await loadThreadsForSearchContext(append);
-    return;
-  }
-  await loadMailView(append);
-}
-
-async function applyListFilter(next: typeof state.listFilter): Promise<void> {
-  state.listFilter = next;
-  state.searchNewsletterRule = null;
-  if (state.view !== "folderManager") {
-    state.searchScope = "mailbox";
-  }
-  const mb = listMailboxForPanel();
-  if (state.view === "folderManager" && !folderManagerPanelMailbox()) {
-    render();
-    return;
-  }
-  if (!isSavedDraftsVirtualMailbox(mb) && isTauriRuntime()) {
-    if (isSearchActive()) {
-      await searchThreads();
-    } else {
-      await loadMailView(false);
-    }
-    void loadInboxFilterCounts();
-  }
-  render();
-}
-
-async function loadMailView(append: boolean = false) {
-  if (!append) invalidateIdleAiCachePrefetch();
-  if (isUnifiedInboxMailbox(state.selectedMailbox)) {
-    if (!isTauriRuntime() || state.accounts.length === 0) {
-      if (!append) {
-        state.threads = [];
-        state.threadOffset = 0;
-        state.hasMoreThreads = false;
-      }
-      return;
-    }
-    let page: ThreadListItem[];
-    try {
-      page = await withTimeout(
-        invoke<ThreadListItem[]>("list_threads", {
-          unified: true,
-          pageSize: state.threadPageSize,
-          pageOffset: append ? state.threadOffset : 0,
-          followedOnly: state.listFilter === "starred",
-        }),
-        BOOT_INVOKE_TIMEOUT_MS,
-      );
-      state.mailListError = "";
-    } catch (error) {
-      const detail = tauriErrorMessage(error);
-      console.error("list_threads (unified)", error);
-      state.mailListError = `Boîte unifiée : ${detail}`;
-      if (!append) {
-        state.threads = [];
-        state.threadOffset = 0;
-        state.hasMoreThreads = false;
-      }
-      return;
-    }
-    if (append) applyServerThreadPage(page, true);
-    else applyServerThreadPage(page, false);
-    state.threadOffset = state.threads.length;
-    state.hasMoreThreads = page.length >= state.threadPageSize;
-    if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
-      state.selectedThreadId = state.threads[0]?.id;
-      state.selectedThread = undefined;
-    }
-    scheduleMailboxDigestRefresh();
-    scheduleIdleAiCachePrefetch();
-    return;
-  }
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    if (append) return;
-    const account = currentAccount();
-    if (!account || !isTauriRuntime()) {
-      state.threads = [];
-      state.threadOffset = 0;
-      state.hasMoreThreads = false;
-      state.selectedThreadId = undefined;
-      state.selectedThread = undefined;
-      return;
-    }
-    try {
-      const rows = await withTimeout(
-        invoke<SavedDraftListItem[]>("saved_draft_list", { accountId: account.id, limit: 200 }),
-        BOOT_INVOKE_TIMEOUT_MS
-      );
-      const mapped: ThreadListItem[] = rows.map((r) => ({
-        id: `${SAVED_DRAFT_THREAD_PREFIX}${r.id}`,
-        subject: r.title || "Sans objet",
-        preview: "",
-        participants: ["Brouillon"],
-        lastActivity: r.updatedAt,
-        messageCount: 0,
-        unread: false,
-        followed: false,
-        pinned: false,
-        tags: [],
-        mailbox: LOCAL_SAVED_DRAFTS_MAILBOX,
-        savedRevisionCount: Math.max(0, Number(r.revisionCount) || 0),
-        savedCreatedAt: r.createdAt,
-      }));
-      state.threads = mapped;
-      state.threadOffset = mapped.length;
-      state.hasMoreThreads = false;
-      if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
-        state.selectedThreadId = state.threads[0]?.id;
-        state.selectedThread = undefined;
-      }
-    } catch (error) {
-      console.error("saved_draft_list", error);
-      toast(`Liste des brouillons : ${tauriErrorMessage(error)}`);
-      state.threads = [];
-      state.threadOffset = 0;
-      state.hasMoreThreads = false;
-    }
-    return;
-  }
-
-  const base = listThreadsPayload();
-  if (!base) {
-    if (!append) {
-      state.threads = [];
-      state.threadOffset = 0;
-      state.hasMoreThreads = false;
-    }
-    return;
-  }
-  const payload = {
-    ...base,
-    pageSize: state.threadPageSize,
-    pageOffset: append ? state.threadOffset : 0,
-    /** Fils suivis : requête SQLite dédiée (tous dossiers), pas seulement la page du dossier courant. */
-    followedOnly: state.listFilter === "starred"
-  };
-  let page: ThreadListItem[];
-  if (!isTauriRuntime()) {
-    state.mailListError =
-      state.mailListError ||
-      "Mode navigateur : les boîtes mail se chargent dans l’application Tauri (`npm run tauri:dev`).";
-    page = [];
-  } else {
-    try {
-      page = await withTimeout(invoke<ThreadListItem[]>("list_threads", payload), BOOT_INVOKE_TIMEOUT_MS);
-      state.mailListError = "";
-    } catch (error) {
-      const detail = tauriErrorMessage(error);
-      console.error("list_threads", error);
-      state.mailListError = `Impossible de charger les conversations : ${detail}`;
-      toast(state.mailListError);
-      if (append) return;
-      state.threads = [];
-      state.threadOffset = 0;
-      state.hasMoreThreads = false;
-      if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
-        state.selectedThreadId = state.threads[0]?.id;
-        state.selectedThread = undefined;
-      }
-      return;
-    }
-  }
-  if (append) {
-    applyServerThreadPage(page, true);
-  } else {
-    applyServerThreadPage(page, false);
-  }
-  state.threadOffset = state.threads.length;
-  state.hasMoreThreads = page.length >= state.threadPageSize;
-  if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
-    state.selectedThreadId = state.threads[0]?.id;
-    state.selectedThread = undefined;
-  }
-  scheduleMailboxDigestRefresh();
-  scheduleIdleAiCachePrefetch();
-  void loadInboxFilterCounts().then(() => render());
-}
-
-async function loadMailboxUnread() {
-  const account = currentAccount();
-  if (!account) {
-    state.mailboxUnread = {};
-    state.mailboxTotal = {};
-    return;
-  }
-  const folderList = sidebarFolderNamesForCounts();
-  let rows: MailboxFolderStatsRow[] = [];
-  try {
-    rows = await withTimeout(
-      invoke<MailboxFolderStatsRow[]>("mailbox_unread_counts", {
-        accountId: account.id,
-        mailboxes: folderList,
-      }),
-      BOOT_INVOKE_TIMEOUT_MS
-    );
-  } catch (error) {
-    console.warn("mailbox_unread_counts (sidebar)", error);
-    rows = await safeInvoke<MailboxFolderStatsRow[]>(
-      "mailbox_unread_counts",
-      { accountId: account.id },
-      [],
-      BOOT_INVOKE_TIMEOUT_MS
-    );
-  }
-  const { unread, total } = mergeMailboxFolderStatsForUi(folderList, rows);
-  state.mailboxUnread = unread;
-  state.mailboxTotal = total;
-  void loadInboxFilterCounts();
 }
 
 async function refreshLlmRuntimeStatus(forceHardwareRescan?: boolean): Promise<void> {
@@ -7483,12 +7173,6 @@ function buildSettingsAiPanelDeps(): SettingsAiPanelDeps {
   };
 }
 
-function threadIdsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
-  const x = a == null ? "" : String(a).trim();
-  const y = b == null ? "" : String(b).trim();
-  return Boolean(x && y && x === y);
-}
-
 function clearThreadAiSummaryState(): void {
   state.aiOutput = "";
   state.aiThreadScope = null;
@@ -11555,7 +11239,6 @@ registerWireEventsBridge({
   clearDraftSession,
   cancelLlmQueueJob,
   commitSearchQuery,
-  loadMailboxUnread,
   confirmMoveDialog,
   enterComposeView,
   readNlButtonRule,
@@ -11573,16 +11256,13 @@ registerWireEventsBridge({
   composeAiGrammar,
   navigateToInbox,
   openSearchModal,
-  applyListFilter,
   fmSelectMailbox,
   fmCreateMailbox,
   pickAttachments,
   prepareReplyAll,
   summarizeThread,
-  currentAccount,
   openMoveDialog,
   isSearchActive,
-  threadIdsMatch,
   onThreadMoveTo,
   sendQuickReply,
   prepareForward,
@@ -11594,7 +11274,6 @@ registerWireEventsBridge({
   fmSyncMailbox,
   searchThreads,
   llmQaThreadUi,
-  loadMailView,
   onThreadMove,
   onThreadSeen,
   prepareReply,
@@ -11723,6 +11402,14 @@ registerRenderDeps({
   agentOfferSlotsStep,
   shouldOfferThreadTranslate,
   sortUnsubscribeLinks,
+});
+
+registerMailListDeps({
+  isSearchActive,
+  searchQueryUsesThreadsApi,
+  usesSearchContextLoader,
+  searchThreads,
+  loadThreadsForSearchContext,
 });
 
 initMailboxDigest({

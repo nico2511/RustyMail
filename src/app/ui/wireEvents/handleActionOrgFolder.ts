@@ -1,6 +1,10 @@
 // @ts-nocheck
 import {
   app,
+  currentAccount,
+  loadMailView,
+  applyListFilter,
+  threadIdsMatch,
   state,
   toast,
   invoke,
@@ -153,7 +157,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       void (app()["fmConfirmDeleteMailbox"] as (...a: unknown[]) => unknown)();
       return true;
     case "fm-toggle-lock": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const mb = element?.dataset.mailbox?.trim();
       if (!acc?.id || !mb) return true;
       const locked = element?.dataset.locked === "1";
@@ -180,7 +184,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       return true;
     }
     case "org-v2-scan": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (!acc?.id) return true;
       state.organizationV2.scanning = true;
       state.organizationV2.applyMessage = "Analyse…";
@@ -202,7 +206,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       return true;
     }
     case "org-v2-undo": {
-      const accUndo = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const accUndo = currentAccount();
       if (!accUndo?.id) return true;
       state.organizationV2.applying = true;
       state.organizationV2.applyMessage = "Annulation…";
@@ -233,7 +237,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       return true;
     }
     case "org-v2-apply": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const proposalId = element?.dataset.proposalId?.trim();
       if (!acc?.id || !proposalId) return true;
       if (element?.dataset.trash === "1") {
@@ -271,7 +275,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
     case "org-v2-trash-confirm": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const pid = state.organizationV2.pendingTrashProposalId;
       if (!acc?.id || !pid) return true;
       const override = state.organizationV2.pendingTrashActionOverride;
@@ -293,7 +297,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
     case "org-v2-delete-mailbox-confirm": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const pid = state.organizationV2.pendingDeleteMailboxProposalId;
       if (!acc?.id || !pid) return true;
       state.organizationV2.deleteMailboxConfirmOpen = false;
@@ -311,7 +315,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
     case "org-v2-unignore-mailbox":
       return true;
     case "org-scan": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (!acc?.id) return true;
       state.organization.scanning = true;
       state.organization.applyMessage = "Analyse de la boîte (structure, propositions)…";
@@ -340,7 +344,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
     case "org-delete-mailbox-one":
       return true;
     case "org-apply-trash": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const proposalId = element?.dataset.proposalId?.trim();
       if (!acc?.id || !proposalId) return true;
       state.organization.trashConfirmOpen = true;
@@ -350,14 +354,14 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       return true;
     }
     case "org-apply-archive": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const proposalId = element?.dataset.proposalId?.trim();
       if (!acc?.id || !proposalId) return true;
       void (app()["confirmThenRunOrgApply"] as (...a: unknown[]) => unknown)(acc.id, proposalId, undefined, "archive");
       return true;
     }
     case "org-apply": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const proposalId = element?.dataset.proposalId?.trim();
       if (!acc?.id || !proposalId) return true;
       const isTrash = element?.dataset.trash === "1";
@@ -384,7 +388,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
     case "org-trash-confirm": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const pid = state.organization.pendingTrashProposalId;
       if (!acc?.id || !pid) return true;
       const override = state.organization.pendingTrashActionOverride;
@@ -401,7 +405,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
     case "org-delete-mailbox-confirm": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const pid = state.organization.pendingDeleteMailboxProposalId;
       if (!acc?.id || !pid) return true;
       state.organization.deleteMailboxConfirmOpen = false;
@@ -411,7 +415,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       return true;
     }
     case "org-retag-all": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (!acc?.id) return true;
       state.organization.applying = true;
       state.organization.applyMessage = "Normalisation des tags en cours…";

@@ -69,6 +69,7 @@ import {
   openConfirmModal,
 } from "../modals/promptConfirm";
 import { state } from "../state";
+import { threadIdsMatch } from "./lib/threadIdsMatch";
 import { app } from "./wireEventsBridge";
 export function wireEvents() {
   const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
@@ -418,7 +419,7 @@ export function wireEvents() {
     element.addEventListener("click", () => {
       const tid = element.dataset.threadId ?? "";
       const preserveAi = Boolean(
-        state.aiOutput?.trim() && (app()["threadIdsMatch"] as (...a: unknown[]) => unknown)(state.aiThreadScope, tid)
+        state.aiOutput?.trim() && threadIdsMatch(state.aiThreadScope, tid)
       );
       void (app()["openThread"] as (...a: unknown[]) => unknown)(tid, { preserveAi });
     });

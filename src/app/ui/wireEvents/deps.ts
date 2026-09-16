@@ -86,6 +86,9 @@ export {
   finishTextPromptModal,
   openConfirmModal,
 } from "../modals/promptConfirm";
+export { currentAccount } from "../core/accountContext";
+export { threadIdsMatch } from "../lib/threadIdsMatch";
+export { applyListFilter, loadMailView, loadMailboxUnread } from "../mail/mailListView";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";

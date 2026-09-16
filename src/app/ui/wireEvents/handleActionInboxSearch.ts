@@ -1,6 +1,10 @@
 // @ts-nocheck
 import {
   app,
+  currentAccount,
+  loadMailView,
+  applyListFilter,
+  threadIdsMatch,
   state,
   toast,
   invoke,
@@ -82,7 +86,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       (app()["navigateToInbox"] as (...a: unknown[]) => unknown)();
       return true;
     case "contacts-refresh-list": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (acc?.id) {
         void loadContactsList(acc.id, { reset: true })
           .then(() => (app()["loadAddressBookSidebarCount"] as (...a: unknown[]) => unknown)())
@@ -91,7 +95,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     }
     case "contacts-load-more": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (acc?.id) void loadContactsList(acc.id).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
       return true;
     }
@@ -134,7 +138,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     }
     case "contacts-toggle-fav": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const email = element?.dataset.email?.trim() || state.selectedContactEmail;
       const d = getContactDetail();
       if (!acc?.id || !email || !d) return true;
@@ -162,7 +166,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
         toast("Activez « Profil IA contact » dans les réglages IA.");
         return true;
       }
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       const email = element?.dataset.email?.trim() || state.selectedContactEmail;
       if (!acc?.id || !email) return true;
       void (async () => {
@@ -204,7 +208,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     }
     case "address-book-export-vcard": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (!acc?.id) {
         toast("Sélectionnez un compte.");
         return true;
@@ -223,7 +227,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     }
     case "address-book-import-vcard": {
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (!acc?.id) {
         toast("Sélectionnez un compte.");
         return true;
@@ -343,7 +347,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     case "load-more":
       if ((app()["usesSearchContextLoader"] as (...a: unknown[]) => unknown)()) await (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(true);
-      else await (app()["loadMailView"] as (...a: unknown[]) => unknown)(true);
+      else await loadMailView(true);
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
     case "clear-search-text":
@@ -445,19 +449,19 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       }
       return true;
     case "list-filter-all":
-      void (app()["applyListFilter"] as (...a: unknown[]) => unknown)("all");
+      void applyListFilter("all");
       return true;
     case "list-filter-unread":
-      void (app()["applyListFilter"] as (...a: unknown[]) => unknown)("unread");
+      void applyListFilter("unread");
       return true;
     case "list-filter-starred":
-      void (app()["applyListFilter"] as (...a: unknown[]) => unknown)("starred");
+      void applyListFilter("starred");
       return true;
     case "list-filter-focused":
-      void (app()["applyListFilter"] as (...a: unknown[]) => unknown)("focused");
+      void applyListFilter("focused");
       return true;
     case "list-filter-auto":
-      void (app()["applyListFilter"] as (...a: unknown[]) => unknown)("auto");
+      void applyListFilter("auto");
       return true;
     case "clear-mailbox-digest":
     case "dismiss-mailbox-digest":
@@ -482,7 +486,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     case "thread-unarchive-cur": {
       const tid = state.selectedThreadId?.trim();
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (!tid || !acc?.id) return true;
       if (!isTauriRuntime()) {
         toast("Désarchivage : disponible dans l’app Tauri.");
@@ -604,7 +608,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           confirmLabel: "Retirer",
         });
         if (!ok) return;
-        const accountId = (app()["currentAccount"] as (...a: unknown[]) => unknown)()?.id?.trim();
+        const accountId = currentAccount()?.id?.trim();
         if (!accountId) {
           toast("Aucun compte actif.");
           return;
@@ -612,7 +616,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
         try {
           await withTimeout(invoke("saved_draft_delete", { accountId, savedDraftId: sid }), MAIL_ACTION_TIMEOUT_MS);
           toast("Brouillon retiré de la liste.");
-          await (app()["loadMailView"] as (...a: unknown[]) => unknown)(false);
+          await loadMailView(false);
           await (app()["refreshSavedDraftsMailboxCount"] as (...a: unknown[]) => unknown)();
           state.selectedThreadId = state.threads[0]?.id;
           state.selectedThread = undefined;

@@ -1,6 +1,10 @@
 // @ts-nocheck
 import {
   app,
+  currentAccount,
+  loadMailView,
+  applyListFilter,
+  threadIdsMatch,
   state,
   toast,
   invoke,
@@ -121,14 +125,14 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       if (ok) {
         state.mailboxes = await safeInvoke<string[]>(
           "list_imap_mailboxes",
-          { accountId: (app()["currentAccount"] as (...a: unknown[]) => unknown)()?.id ?? null },
+          { accountId: currentAccount()?.id ?? null },
           [],
           BOOT_INVOKE_TIMEOUT_MS
         );
         (app()["ensureValidSelectedMailbox"] as (...a: unknown[]) => unknown)();
-        await (app()["loadMailView"] as (...a: unknown[]) => unknown)(false);
+        await loadMailView(false);
         await (app()["loadMailboxUnread"] as (...a: unknown[]) => unknown)();
-        toast(`Compte chargé : ${(app()["currentAccount"] as (...a: unknown[]) => unknown)()?.email ?? ""}`);
+        toast(`Compte chargé : ${currentAccount()?.email ?? ""}`);
       }
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
@@ -328,7 +332,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           !(app()["isSearchActive"] as (...a: unknown[]) => unknown)() &&
           state.listFilter !== (app()["defaultListFilterFromPrefs"] as (...a: unknown[]) => unknown)()
         ) {
-          await (app()["applyListFilter"] as (...a: unknown[]) => unknown)((app()["defaultListFilterFromPrefs"] as (...a: unknown[]) => unknown)());
+          await applyListFilter((app()["defaultListFilterFromPrefs"] as (...a: unknown[]) => unknown)());
         } else {
           (app()["render"] as (...a: unknown[]) => unknown)();
         }
@@ -505,7 +509,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           toast("Une réindexation vient d’être demandée — patiente quelques secondes.");
           return;
         }
-        const aid = state.selectedAccountId?.trim() || (app()["currentAccount"] as (...a: unknown[]) => unknown)()?.id?.trim();
+        const aid = state.selectedAccountId?.trim() || currentAccount()?.id?.trim();
         if (!aid) {
           toast("Sélectionne un compte actif avant de réindexer.");
           return;

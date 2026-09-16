@@ -1,6 +1,10 @@
 // @ts-nocheck
 import {
   app,
+  currentAccount,
+  loadMailView,
+  applyListFilter,
+  threadIdsMatch,
   state,
   toast,
   invoke,
@@ -243,7 +247,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           toast(t("toast.junkFolderMissing"));
           return;
         }
-        const account = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+        const account = currentAccount();
         if (!account?.id) return;
         try {
           markThreadsRecentlyRemoved([tid]);
@@ -353,7 +357,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "restore-draft-revision": {
       if (!isTauriRuntime()) return true;
       const revisionId = element?.dataset.revisionId?.trim() ?? "";
-      const accountId = (app()["currentAccount"] as (...a: unknown[]) => unknown)()?.id?.trim() ?? "";
+      const accountId = currentAccount()?.id?.trim() ?? "";
       if (!revisionId || !accountId) return true;
       void (async () => {
         const ok = await openConfirmModal({
@@ -498,7 +502,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           state.selectedAccountId = DEMO;
           state.view = "list";
           state.selectedMailbox = "INBOX";
-          await (app()["loadMailView"] as (...a: unknown[]) => unknown)(false);
+          await loadMailView(false);
           await (app()["loadMailboxUnread"] as (...a: unknown[]) => unknown)();
         }
         (app()["render"] as (...a: unknown[]) => unknown)();
@@ -536,7 +540,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         if (state.accounts.length > 0 && state.selectedAccountId) {
           state.view = "list";
           state.selectedMailbox = "INBOX";
-          await (app()["loadMailView"] as (...a: unknown[]) => unknown)(false);
+          await loadMailView(false);
           await (app()["loadMailboxUnread"] as (...a: unknown[]) => unknown)();
         } else {
           state.view = "settings";
@@ -623,7 +627,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "reindex-address-book": {
       void (async () => {
-        const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+        const acc = currentAccount();
         if (!acc?.id || !isTauriRuntime()) {
           toast("Réindexation : compte ou Tauri requis.");
           return;
@@ -653,7 +657,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "address-book-save": {
       void (async () => {
-        const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+        const acc = currentAccount();
         if (!acc?.id || !isTauriRuntime()) return;
         const email = document.querySelector<HTMLInputElement>("#ab-edit-email")?.value?.trim() ?? "";
         const displayName = document.querySelector<HTMLInputElement>("#ab-edit-name")?.value?.trim() ?? "";
@@ -675,7 +679,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     }
     case "address-book-delete": {
       void (async () => {
-        const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+        const acc = currentAccount();
         const email = element?.dataset.email?.trim();
         if (!acc?.id || !email) return;
         try {
@@ -691,7 +695,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     }
     case "address-book-toggle-fav": {
       void (async () => {
-        const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+        const acc = currentAccount();
         const email = element?.dataset.email?.trim();
         const row = addressBookRowsCache().find((r) => r.email === email);
         if (!acc?.id || !email || !row) return;
