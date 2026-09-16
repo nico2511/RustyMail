@@ -71,6 +71,7 @@ import {
 import { state } from "../state";
 import { threadIdsMatch } from "../lib/threadIdsMatch";
 import { openThread } from "../mail/openThreadView";
+import { onThreadMove, onThreadMoveTo } from "../mail/threadListActions";
 import { commitSearchQuery } from "../mail/searchCommitQuery";
 import { syncSearchBarChrome } from "../mail/searchBarUi";
 import { refreshSearchTagCatalog } from "../mail/searchTagCatalog";
@@ -438,13 +439,13 @@ export function wireEvents() {
   document.querySelectorAll<HTMLButtonElement>("[data-mv=trash][data-thread-id]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      void (app()["onThreadMove"] as (...a: unknown[]) => unknown)("trash", el.dataset.threadId ?? "", el.dataset.sourceMailbox);
+      void onThreadMove("trash", el.dataset.threadId ?? "", el.dataset.sourceMailbox);
     });
   });
   document.querySelectorAll<HTMLButtonElement>("[data-mv=archive][data-thread-id]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      void (app()["onThreadMove"] as (...a: unknown[]) => unknown)("archive", el.dataset.threadId ?? "", el.dataset.sourceMailbox);
+      void onThreadMove("archive", el.dataset.threadId ?? "", el.dataset.sourceMailbox);
     });
   });
   document.querySelectorAll<HTMLButtonElement>('[data-action="org-delete-mailbox-one"]').forEach((el) => {
@@ -505,7 +506,7 @@ export function wireEvents() {
       const tid = el.dataset.threadId ?? "";
       if (!dest || !tid) return;
       el.value = "";
-      void (app()["onThreadMoveTo"] as (...a: unknown[]) => unknown)(tid, dest);
+      void onThreadMoveTo(tid, dest);
     });
   });
   document.querySelector<HTMLSelectElement>("#move-target-select")?.addEventListener("change", (event) => {

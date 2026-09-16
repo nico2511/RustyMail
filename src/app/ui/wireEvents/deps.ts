@@ -92,6 +92,14 @@ export { applyListFilter, loadMailView, loadMailboxUnread, loadThreadsForSearchC
 export { render } from "../dispatch";
 export { goBack, navigateToInbox } from "../mail/appNavActions";
 export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
+export {
+  confirmMoveDialog,
+  onThreadMove,
+  onThreadMoveTo,
+  onThreadSeen,
+  onThreadToggleFollow,
+  openMoveDialog,
+} from "../mail/threadListActions";
 export { searchThreads } from "../mail/searchThreadsRun";
 export { fetchOpenThreadOrNotify } from "../mail/fetchOpenThread";
 export { openThread } from "../mail/openThreadView";

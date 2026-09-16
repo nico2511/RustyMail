@@ -83,6 +83,11 @@ import {
   goBack,
   navigateToInbox,
   onEmptyTrashMailbox,
+  onThreadMove,
+  onThreadSeen,
+  onThreadToggleFollow,
+  openMoveDialog,
+  confirmMoveDialog,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -502,10 +507,10 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     }
     case "thread-trash-cur":
-      if (state.selectedThreadId) void (app()["onThreadMove"] as (...a: unknown[]) => unknown)("trash", state.selectedThreadId);
+      if (state.selectedThreadId) void onThreadMove("trash", state.selectedThreadId);
       return true;
     case "thread-archive-cur":
-      if (state.selectedThreadId) void (app()["onThreadMove"] as (...a: unknown[]) => unknown)("archive", state.selectedThreadId);
+      if (state.selectedThreadId) void onThreadMove("archive", state.selectedThreadId);
       return true;
     case "thread-unarchive-cur": {
       const tid = state.selectedThreadId?.trim();
@@ -557,13 +562,13 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       const tid = element?.dataset.threadId?.trim() ?? "";
       if (!tid) return true;
       const row = state.threads.find((t) => String(t.id) === tid);
-      void (app()["onThreadSeen"] as (...a: unknown[]) => unknown)(row?.unread ? "read" : "unread", tid);
+      void onThreadSeen(row?.unread ? "read" : "unread", tid);
       return true;
     }
     case "toggle-thread-follow": {
       const tid = element?.dataset.threadId?.trim() ?? "";
       if (!tid) return true;
-      void (app()["onThreadToggleFollow"] as (...a: unknown[]) => unknown)(tid);
+      void onThreadToggleFollow(tid);
       return true;
     }
     case "toggle-thread-seen-cur": {
@@ -571,11 +576,11 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       if (!tid) return true;
       const row = state.threads.find((t) => String(t.id) === tid);
       const unreadNow = Boolean(row?.unread ?? state.selectedThread?.unread);
-      void (app()["onThreadSeen"] as (...a: unknown[]) => unknown)(unreadNow ? "read" : "unread", tid);
+      void onThreadSeen(unreadNow ? "read" : "unread", tid);
       return true;
     }
     case "thread-move-cur":
-      if (state.selectedThreadId) (app()["openMoveDialog"] as (...a: unknown[]) => unknown)(state.selectedThreadId);
+      if (state.selectedThreadId) openMoveDialog(state.selectedThreadId);
       return true;
     case "close-move":
       state.moveOpen = false;
@@ -583,7 +588,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       render();
       return true;
     case "confirm-move":
-      await (app()["confirmMoveDialog"] as (...a: unknown[]) => unknown)();
+      await confirmMoveDialog();
       return true;
     case "open-mailbox-manage":
       state.mailboxManageOpen = true;
