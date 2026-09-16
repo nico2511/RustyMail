@@ -278,6 +278,7 @@ import {
 import { renderComposer } from "./ui/render/composerRender";
 import { renderOrgThreadSampleRow } from "./ui/render/orgSampleRowRender";
 import { registerWireEventsBridge } from "./ui/wireEventsBridge";
+import { registerAppWireFacades } from "./ui/wireEvents/appWireFacades";
 import { wireEvents, handleAction } from "./ui/wireEvents";
 import { renderAiPanel } from "./ui/render/aiPanelRender";
 import { renderSettings, renderSettingsAiModal } from "./ui/render/settingsRender";
@@ -9298,6 +9299,26 @@ registerMailboxManageActionDeps({
 });
 
 registerSyncInboxActionDeps({ syncInbox });
+
+registerAppWireFacades({
+  enterComposeView,
+  startNewDraftSession,
+  syncPreviewOpenFromComposeLayout,
+  openContactDetailView,
+  openOrganizationV2View,
+  loadAddressBookSidebarCount,
+  refreshAddressBookList,
+  agentPrepareReplyStart,
+  agentPrepareReplyContinue,
+  stopAgentTelemetry,
+  agentInsertDraftIntoCompose,
+  summarizeSenderThreadsLight,
+  llmQuickRepliesComposeUi,
+  micAction,
+  saveAccount,
+  saveDraftToSavedListNow,
+  refreshSavedDraftsMailboxCount,
+});
 
 initMailboxDigest({
   withTimeout,

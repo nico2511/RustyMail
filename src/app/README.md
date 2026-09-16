@@ -82,7 +82,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
 | `wireEvents/handleAction*.ts` | `handleAction()` découpé (settings, thread/compose, org/dossiers, inbox/recherche) |
-| `wireEvents/deps.ts` | Imports partagés + accès pont (refs compte, carnet, etc.) |
+| `wireEvents/appWireFacades.ts` | Facades vers handlers restés dans `application.ts` (compose, agents, carnet…) |
 | `wireEventsBridge.ts` | Registre runtime des handlers laissés dans `application.ts` |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |

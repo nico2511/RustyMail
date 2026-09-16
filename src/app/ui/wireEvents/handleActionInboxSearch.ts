@@ -1,6 +1,5 @@
 // @ts-nocheck
 import {
-  app,
   currentAccount,
   loadMailView,
   searchThreads,
@@ -90,6 +89,23 @@ import {
   confirmMoveDialog,
   syncInbox,
   mailboxManageAction,
+  agentPrepareReplyStart,
+  agentPrepareReplyContinue,
+  stopAgentTelemetry,
+  agentInsertDraftIntoCompose,
+  summarizeSenderThreadsLight,
+  llmQuickRepliesComposeUi,
+  micAction,
+  saveAccount,
+  enterComposeView,
+  startNewDraftSession,
+  syncPreviewOpenFromComposeLayout,
+  openContactDetailView,
+  openOrganizationV2View,
+  loadAddressBookSidebarCount,
+  refreshAddressBookList,
+  saveDraftToSavedListNow,
+  refreshSavedDraftsMailboxCount,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -119,7 +135,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       const acc = currentAccount();
       if (acc?.id) {
         void loadContactsList(acc.id, { reset: true })
-          .then(() => (app()["loadAddressBookSidebarCount"] as (...a: unknown[]) => unknown)())
+          .then(() => loadAddressBookSidebarCount())
           .then(() => render());
       }
       return true;
@@ -131,7 +147,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     }
     case "contacts-open-detail": {
       const email = element?.dataset.email?.trim();
-      if (email) void (app()["openContactDetailView"] as (...a: unknown[]) => unknown)(email);
+      if (email) void openContactDetailView(email);
       return true;
     }
     case "contacts-open-thread": {
@@ -143,8 +159,8 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       const d = getContactDetail();
       const to = d?.email || state.selectedContactEmail;
       if (!to) return true;
-      (app()["enterComposeView"] as (...a: unknown[]) => unknown)();
-      (app()["startNewDraftSession"] as (...a: unknown[]) => unknown)();
+      enterComposeView();
+      startNewDraftSession();
       state.draft = {
         id: "draft-local",
         kind: "New",
@@ -162,7 +178,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       state.composeBody = "";
       state.composeCanonicalBody = "";
       state.composeLayout = "split";
-      (app()["syncPreviewOpenFromComposeLayout"] as (...a: unknown[]) => unknown)();
+      syncPreviewOpenFromComposeLayout();
       state.preview = undefined;
       render();
       return true;
@@ -268,7 +284,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
             "import_address_contacts_vcard_cmd",
             { payload: { accountId: acc.id, merge: true } }
           );
-          await (app()["refreshAddressBookList"] as (...a: unknown[]) => unknown)();
+          await refreshAddressBookList();
           const errN = res.errors?.length ?? 0;
           toast(
             `Import : ${res.imported} contact(s), ${res.skippedDuplicates} ignoré(s)${errN ? `, ${errN} erreur(s)` : ""}.`
@@ -281,44 +297,44 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     }
     case "agent-prepare-start":
-      void (app()["agentPrepareReplyStart"] as (...a: unknown[]) => unknown)();
+      void agentPrepareReplyStart();
       return true;
     case "agent-prepare-continue":
-      void (app()["agentPrepareReplyContinue"] as (...a: unknown[]) => unknown)();
+      void agentPrepareReplyContinue();
       return true;
     case "agent-prepare-cancel":
-      void (app()["stopAgentTelemetry"] as (...a: unknown[]) => unknown)().then(() => {
+      void stopAgentTelemetry().then(() => {
         state.agentSession = null;
         render();
       });
       return true;
     case "agent-insert-compose":
-      void (app()["agentInsertDraftIntoCompose"] as (...a: unknown[]) => unknown)();
+      void agentInsertDraftIntoCompose();
       return true;
     case "agent-append-slot": {
       const slot = element?.dataset.slot?.trim();
-      if (slot) void (app()["agentInsertDraftIntoCompose"] as (...a: unknown[]) => unknown)(slot);
+      if (slot) void agentInsertDraftIntoCompose(slot);
       return true;
     }
     case "agent-append-all-slots": {
       const s = state.agentSession;
-      if (s?.slots.length) void (app()["agentInsertDraftIntoCompose"] as (...a: unknown[]) => unknown)(s.slots.join("\n"));
+      if (s?.slots.length) void agentInsertDraftIntoCompose(s.slots.join("\n"));
       return true;
     }
     case "summarize-sender-threads":
-      void (app()["summarizeSenderThreadsLight"] as (...a: unknown[]) => unknown)();
+      void summarizeSenderThreadsLight();
       return true;
     case "llm-quick-replies-compose":
-      void (app()["llmQuickRepliesComposeUi"] as (...a: unknown[]) => unknown)();
+      void llmQuickRepliesComposeUi();
       return true;
     case "mic":
-      await (app()["micAction"] as (...a: unknown[]) => unknown)({ target: "compose" });
+      await micAction({ target: "compose" });
       return true;
     case "mic-thread-qa":
-      await (app()["micAction"] as (...a: unknown[]) => unknown)({ target: "thread-qa" });
+      await micAction({ target: "thread-qa" });
       return true;
     case "save-account":
-      await (app()["saveAccount"] as (...a: unknown[]) => unknown)();
+      await saveAccount();
       return true;
     case "sync-inbox":
       void syncInbox({ background: state.view === "thread" });
@@ -352,7 +368,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       void bulkArchiveSearchViewThreads();
       return true;
     case "search-view-open-organizer":
-      void (app()["openOrganizationV2View"] as (...a: unknown[]) => unknown)();
+      void openOrganizationV2View();
       return true;
     case "search-view-affiner":
       void runFluxAffinerFromSearchView();
@@ -622,7 +638,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           toast("Aucun contenu à enregistrer.");
           return;
         }
-        await (app()["saveDraftToSavedListNow"] as (...a: unknown[]) => unknown)();
+        await saveDraftToSavedListNow();
       })();
       return true;
     }
@@ -647,7 +663,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           await withTimeout(invoke("saved_draft_delete", { accountId, savedDraftId: sid }), MAIL_ACTION_TIMEOUT_MS);
           toast("Brouillon retiré de la liste.");
           await loadMailView(false);
-          await (app()["refreshSavedDraftsMailboxCount"] as (...a: unknown[]) => unknown)();
+          await refreshSavedDraftsMailboxCount();
           state.selectedThreadId = state.threads[0]?.id;
           state.selectedThread = undefined;
           render();

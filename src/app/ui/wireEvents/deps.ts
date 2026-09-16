@@ -142,6 +142,25 @@ export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";
+export {
+  agentInsertDraftIntoCompose,
+  agentPrepareReplyContinue,
+  agentPrepareReplyStart,
+  enterComposeView,
+  llmQuickRepliesComposeUi,
+  loadAddressBookSidebarCount,
+  micAction,
+  openContactDetailView,
+  openOrganizationV2View,
+  refreshAddressBookList,
+  refreshSavedDraftsMailboxCount,
+  saveAccount,
+  saveDraftToSavedListNow,
+  startNewDraftSession,
+  stopAgentTelemetry,
+  summarizeSenderThreadsLight,
+  syncPreviewOpenFromComposeLayout,
+} from "./appWireFacades";
 export type {
   Draft,
   OAuthDesktopLoginOutcome,
