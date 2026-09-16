@@ -96,6 +96,42 @@ import {
 import { utf8StringToBase64, base64ToUtf8String, mailHtmlMountAttrs, flattenNestedParagraphInDocument, base64ToImageBlob } from "./lib/htmlMessage";
 
 import { composeRewriteStyleFromTone, toneLabelsFr, tones } from "./core/composeTone";
+import {
+  DEFAULT_INVOKE_TIMEOUT_MS,
+  BOOT_INVOKE_TIMEOUT_MS,
+  ACCOUNTS_BOOT_TIMEOUT_MS,
+  ACCOUNT_INVOKE_TIMEOUT_MS,
+  OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
+  OAUTH_LOOPBACK_DEFAULT_PORT,
+  SYNC_INVOKE_TIMEOUT_MS,
+  MAIL_ACTION_TIMEOUT_MS,
+  LLM_INVOKE_TIMEOUT_MS,
+  AI_CACHE_PROMPT_REVISION,
+} from "./core/timeouts";
+import { isTauriRuntime } from "./lib/tauriRuntime";
+import { renderBriefMailItemCard, renderBriefMailViewShell } from "./ui/briefMailShell";
+import {
+  cancelMailboxDigestLiveDebounce,
+  dismissMailboxDigestPanel,
+  enqueueMailboxDigestRefreshWhenIdle,
+  fetchMailboxDigestRefresh,
+  initMailboxDigest,
+  mailboxDigestPanelEligible,
+  mailboxDigestSlotInList,
+  openMailboxDigestPanel,
+  renderMailboxDigestTriggerButton,
+  resetMailboxDigestForNavigation,
+  scheduleMailboxDigestRefresh,
+  syncMailboxDigestPanelWithFeaturePref,
+  buildMailboxBriefGateBannerHtml,
+  isMailboxDigestFeatureEnabled,
+} from "./mail/mailboxDigest";
+import {
+  abortIdleAiCachePrefetchInFlight,
+  initIdleAiCachePrefetch,
+  invalidateIdleAiCachePrefetch,
+  scheduleIdleAiCachePrefetch,
+} from "./mail/idleAiCachePrefetch";
 import "../styles.css";
 
 import { escapeAttr, escapeHtml } from "../ui/sanitize";
@@ -574,393 +610,10 @@ async function dismissSuggestedSavedView(
   }
 }
 
-let mailboxDigestRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-
-let mailboxDigestIdleHandle: number | null = null;
-
-let mailboxDigestRequestGen = 0;
-
-let idleAiCachePrefetchGen = 0;
-
-let idleAiCachePrefetchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-let idleAiCachePrefetchIdleHandle: number | null = null;
-
-let idlePrefetchAbort: AbortController | null = null;
-
 function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
   const { threads, threadOffsetReset } = mergeServerThreadPage(state.threads, page, append);
   state.threads = threads;
   if (threadOffsetReset) state.threadOffset = 0;
-}
-
-function cancelMailboxDigestIdleHandle(): void {
-  if (mailboxDigestIdleHandle === null) return;
-  if (typeof window.cancelIdleCallback === "function") {
-    window.cancelIdleCallback(mailboxDigestIdleHandle);
-  } else {
-    window.clearTimeout(mailboxDigestIdleHandle);
-  }
-  mailboxDigestIdleHandle = null;
-}
-
-function cancelMailboxDigestLiveDebounce(): void {
-  if (mailboxDigestRefreshTimer !== null) {
-    window.clearTimeout(mailboxDigestRefreshTimer);
-    mailboxDigestRefreshTimer = null;
-  }
-  cancelMailboxDigestIdleHandle();
-}
-
-function enqueueMailboxDigestRefreshWhenIdle(immediate: boolean): void {
-  if (!isMailboxDigestFeatureEnabled()) return;
-  if (!state.mailboxDigestPanelOpen) return;
-  cancelMailboxDigestIdleHandle();
-  const run = () => {
-    mailboxDigestIdleHandle = null;
-    void fetchMailboxDigestRefresh();
-  };
-  if (immediate) {
-    mailboxDigestIdleHandle = window.setTimeout(run, 0) as unknown as number;
-    return;
-  }
-  if (typeof window.requestIdleCallback === "function") {
-    mailboxDigestIdleHandle = window.requestIdleCallback(run, {
-      timeout: MAILBOX_DIGEST_IDLE_CALLBACK_TIMEOUT_MS,
-    });
-  } else {
-    mailboxDigestIdleHandle = window.setTimeout(run, 220) as unknown as number;
-  }
-}
-
-function scheduleMailboxDigestRefresh(): void {
-  if (!isTauriRuntime()) return;
-  if (!isMailboxDigestFeatureEnabled()) return;
-  if (!state.mailboxDigestPanelOpen) return;
-  if (state.view !== "list") return;
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox ?? "")) return;
-  const accountId = currentAccount()?.id?.trim();
-  const mailbox = state.selectedMailbox || "INBOX";
-  if (!accountId) return;
-  if (mailboxDigestRefreshTimer !== null) {
-    window.clearTimeout(mailboxDigestRefreshTimer);
-  }
-  mailboxDigestRefreshTimer = window.setTimeout(() => {
-    mailboxDigestRefreshTimer = null;
-    enqueueMailboxDigestRefreshWhenIdle(false);
-  }, MAILBOX_DIGEST_DEBOUNCE_MS);
-}
-
-function cancelIdleAiCachePrefetchTimersOnly(): void {
-  if (idleAiCachePrefetchDebounceTimer !== null) {
-    window.clearTimeout(idleAiCachePrefetchDebounceTimer);
-    idleAiCachePrefetchDebounceTimer = null;
-  }
-  if (idleAiCachePrefetchIdleHandle !== null) {
-    if (typeof window.cancelIdleCallback === "function") {
-      window.cancelIdleCallback(idleAiCachePrefetchIdleHandle);
-    } else {
-      window.clearTimeout(idleAiCachePrefetchIdleHandle);
-    }
-    idleAiCachePrefetchIdleHandle = null;
-  }
-}
-
-function invalidateIdleAiCachePrefetch(): void {
-  idlePrefetchAbort?.abort();
-  idlePrefetchAbort = null;
-  idleAiCachePrefetchGen += 1;
-  cancelIdleAiCachePrefetchTimersOnly();
-}
-
-function scheduleIdleAiCachePrefetch(): void {
-  if (!isTauriRuntime()) return;
-  if (!state.appPrefs.ai.aiBackgroundIdleLlmCachePrefetch) return;
-  if (state.view !== "list") return;
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox ?? "")) return;
-  if (!currentAccount()?.id?.trim()) return;
-  cancelIdleAiCachePrefetchTimersOnly();
-  const gen = idleAiCachePrefetchGen;
-  idleAiCachePrefetchDebounceTimer = window.setTimeout(() => {
-    idleAiCachePrefetchDebounceTimer = null;
-    if (gen !== idleAiCachePrefetchGen) return;
-    const run = () => {
-      idleAiCachePrefetchIdleHandle = null;
-      if (gen !== idleAiCachePrefetchGen) return;
-      void runIdleAiCachePrefetchPass(gen);
-    };
-    if (typeof window.requestIdleCallback === "function") {
-      idleAiCachePrefetchIdleHandle = window.requestIdleCallback(run, {
-        timeout: IDLE_AI_CACHE_IDLE_CALLBACK_TIMEOUT_MS,
-      });
-    } else {
-      idleAiCachePrefetchIdleHandle = window.setTimeout(run, 400) as unknown as number;
-    }
-  }, IDLE_AI_CACHE_PREFETCH_DEBOUNCE_MS);
-}
-
-async function pickThreadIdsForIdleAiCachePrefetch(max: number): Promise<string[]> {
-  const wantSum = isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled");
-  const wantTr = isAiFeatureEnabled(state.appPrefs.ai, "featureThreadTranslateEnabled");
-  if (!wantSum && !wantTr) return [];
-  const seg = await aiCacheKeySegment();
-  const lang = state.appPrefs.general.motherLanguage?.trim() || "fr";
-  const sorted = [...state.threads].sort((a, b) => {
-    const ua = a.unread ? 1 : 0;
-    const ub = b.unread ? 1 : 0;
-    if (ua !== ub) return ub - ua;
-    return String(b.lastActivity ?? "").localeCompare(String(a.lastActivity ?? ""));
-  });
-  const out: string[] = [];
-  for (const t of sorted) {
-    if (out.length >= max) break;
-    const tid = String(t.id ?? "").trim();
-    if (!tid || tid.startsWith(SAVED_DRAFT_THREAD_PREFIX)) continue;
-    if (threadIsAutoMail(t, tid)) continue;
-    let needs = false;
-    if (wantSum) {
-      const ck = `summary:v2:${seg}:p${AI_CACHE_PROMPT_REVISION}:${tid}`;
-      const c = await invokeAiCacheGet(ck, {
-        timeoutMs: BOOT_INVOKE_TIMEOUT_MS,
-        withTimeout,
-      });
-      if (!c?.trim()) needs = true;
-    }
-    if (!needs && wantTr) {
-      const mother = normalizeIso639Primary(lang);
-      const threadLang = langFromKindTags(t.tags ?? []);
-      if (!(threadLang && threadLang === mother)) {
-        const ck = `translate:v2:${seg}:p${AI_CACHE_PROMPT_REVISION}:thread:${tid}:${lang}`;
-        const c = await invokeAiCacheGet(ck, {
-          timeoutMs: BOOT_INVOKE_TIMEOUT_MS,
-          withTimeout,
-        });
-        if (!c?.trim()) needs = true;
-      }
-    }
-    if (needs) out.push(tid);
-  }
-  return out;
-}
-
-async function threadSummaryCacheMissingForPrefetch(threadId: string, seg: string): Promise<boolean> {
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")) return false;
-  const ck = `summary:v2:${seg}:p${AI_CACHE_PROMPT_REVISION}:${threadId}`;
-  const c = await invokeAiCacheGet(ck, {
-    timeoutMs: BOOT_INVOKE_TIMEOUT_MS,
-    withTimeout,
-  });
-  return !c?.trim();
-}
-
-async function threadTranslateCacheMissingForPrefetch(threadId: string, seg: string): Promise<boolean> {
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadTranslateEnabled")) return false;
-  const lang = state.appPrefs.general.motherLanguage?.trim() || "fr";
-  const ck = `translate:v2:${seg}:p${AI_CACHE_PROMPT_REVISION}:thread:${threadId}:${lang}`;
-  const c = await invokeAiCacheGet(ck, {
-    timeoutMs: BOOT_INVOKE_TIMEOUT_MS,
-    withTimeout,
-  });
-  return !c?.trim();
-}
-
-async function runIdleAiCachePrefetchPass(startGen: number): Promise<void> {
-  if (startGen !== idleAiCachePrefetchGen) return;
-  if (!state.appPrefs.ai.aiBackgroundIdleLlmCachePrefetch) return;
-  if (!isTauriRuntime()) return;
-  if (state.view !== "list") return;
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox ?? "")) return;
-  if (!currentAccount()?.id?.trim()) return;
-  if (state.llmJobLabel) return;
-  if (state.mailboxDigestRefreshing) return;
-  if (state.syncInProgress) return;
-  if (state.micState !== "idle") return;
-  if (state.idleAiCachePrefetchBusy) return;
-  await refreshLlmRuntimeStatus();
-  if (startGen !== idleAiCachePrefetchGen) return;
-  if (!state.llmRuntimeStatus?.llmGateOpen) return;
-  const seg = await aiCacheKeySegment();
-  if (startGen !== idleAiCachePrefetchGen) return;
-  const candidates = await pickThreadIdsForIdleAiCachePrefetch(IDLE_AI_CACHE_PREFETCH_MAX_THREADS);
-  if (!candidates.length) return;
-  const ac = new AbortController();
-  idlePrefetchAbort = ac;
-  state.idleAiCachePrefetchBusy = true;
-  render();
-  try {
-    for (const tid of candidates) {
-      if (startGen !== idleAiCachePrefetchGen) {
-        ac.abort();
-        break;
-      }
-      if (state.llmJobLabel || state.view !== "list") break;
-      if (state.mailboxDigestRefreshing || state.syncInProgress) break;
-      if (await threadSummaryCacheMissingForPrefetch(tid, seg)) {
-        const sum = await summarizeThreadCore(tid, ac.signal, {
-          prefetchOnly: true,
-          toastOnDone: false,
-          toastOnCache: false,
-        });
-        if (sum.status === "cancelled" || startGen !== idleAiCachePrefetchGen) break;
-      }
-      if (startGen !== idleAiCachePrefetchGen) {
-        ac.abort();
-        break;
-      }
-      if (state.llmJobLabel || state.view !== "list") break;
-      const listRow = state.threads.find((row) => String(row.id) === tid);
-      const mother = normalizeIso639Primary(state.appPrefs.general.motherLanguage?.trim() || "fr");
-      const threadLang = listRow ? langFromKindTags(listRow.tags ?? []) : null;
-      const skipTranslatePrefetch = Boolean(threadLang && threadLang === mother);
-      if (!skipTranslatePrefetch && (await threadTranslateCacheMissingForPrefetch(tid, seg))) {
-        const tr = await translateThreadCore(tid, ac.signal, { prefetchOnly: true });
-        if (tr.status === "cancelled" || startGen !== idleAiCachePrefetchGen) break;
-      }
-    }
-  } catch (e) {
-    console.warn("idle_ai_cache_prefetch", e);
-  } finally {
-    if (idlePrefetchAbort === ac) idlePrefetchAbort = null;
-    state.idleAiCachePrefetchBusy = false;
-    render();
-  }
-}
-
-function isMailboxDigestFeatureEnabled(): boolean {
-  return isAiFeatureEnabled(state.appPrefs.ai, "featureInboxDigestEnabled");
-}
-
-function syncMailboxDigestPanelWithFeaturePref(): void {
-  if (isMailboxDigestFeatureEnabled()) return;
-  if (
-    !state.mailboxDigestPanelOpen &&
-    !state.mailboxDigestRefreshing &&
-    !state.mailboxDigestLive &&
-    !state.mailboxActionBrief &&
-    !state.mailboxBriefBannerHtml.trim()
-  ) {
-    return;
-  }
-  cancelMailboxDigestLiveDebounce();
-  mailboxDigestRequestGen++;
-  state.mailboxDigestPanelOpen = false;
-  state.mailboxDigestLive = false;
-  state.mailboxDigestRefreshing = false;
-  state.mailboxActionBrief = null;
-  state.mailboxBriefBannerHtml = "";
-}
-
-function dismissMailboxDigestPanel(): void {
-  cancelMailboxDigestLiveDebounce();
-  mailboxDigestRequestGen++;
-  state.mailboxDigestPanelOpen = false;
-  state.mailboxDigestLive = false;
-  state.mailboxDigestRefreshing = false;
-  state.mailboxActionBrief = null;
-  state.mailboxBriefBannerHtml = "";
-  state.aiOpen = false;
-  render();
-}
-
-function openMailboxDigestPanel(refresh = true): void {
-  if (!isMailboxDigestFeatureEnabled()) return;
-  if (!mailboxDigestPanelEligible()) return;
-  state.mailboxDigestPanelOpen = true;
-  render();
-  if (!refresh) return;
-  cancelMailboxDigestLiveDebounce();
-  void enqueueMailboxDigestRefreshWhenIdle(true);
-}
-
-function buildMailboxBriefGateBannerHtml(): string {
-  const hint = state.llmRuntimeStatus?.llmGateHint?.trim();
-  const detail =
-    hint ||
-    "Activez OpenRouter (clé + modèle) ou llama-server (URL + modèle, ou lancement auto avec GGUF) dans Paramètres → IA & dictée.";
-  const escaped = escapeHtml(detail);
-  const inner = renderBriefMailItemCard(
-    `<p class="thread-zen-par">Aucun moteur IA n’est prêt pour générer le brief.</p>
-    <p class="thread-zen-par dim">${escaped}</p>
-    <p class="thread-zen-par dim">Ouvrez <strong>Paramètres → IA & dictée</strong>, puis cliquez <strong>Rafraîchir</strong>.</p>`
-  );
-  return renderBriefMailViewShell(inner, { kicker: "Brief indisponible" });
-}
-
-function buildMailboxBriefErrorBannerHtml(detail: string): string {
-  const raw = detail.replace(/\s+/g, " ").trim();
-  const jsonLike =
-    /json invalide|eof while parsing|expected value|trailing characters/i.test(raw);
-  const text = jsonLike
-    ? `La réponse du modèle était incomplète ou mal formée (souvent une limite de longueur). Essayez le mode Quick, puis Rafraîchir.`
-    : raw.slice(0, 400);
-  const inner = renderBriefMailItemCard(
-    `<p class="thread-zen-par"><strong>Brief indisponible</strong></p>
-    <p class="thread-zen-par dim">${escapeHtml(text)}</p>
-    <p class="thread-zen-par dim">Cliquez <strong>Rafraîchir</strong> pour relancer.</p>`
-  );
-  return renderBriefMailViewShell(inner, { kicker: "Brief indisponible" });
-}
-
-async function fetchMailboxDigestRefresh(): Promise<void> {
-  if (!isTauriRuntime()) return;
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureInboxDigestEnabled")) return;
-  if (!state.mailboxDigestPanelOpen) return;
-  if (state.view !== "list") return;
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox ?? "")) return;
-  const accountId = currentAccount()?.id?.trim();
-  const mailbox = state.selectedMailbox || "INBOX";
-  if (!accountId) return;
-  const key = `${accountId}|${mailbox}`;
-  const gen = ++mailboxDigestRequestGen;
-  state.mailboxDigestRefreshing = true;
-  state.mailboxDigestKey = key;
-  state.mailboxDigestLive = true;
-  render();
-  if (!state.llmRuntimeStatus) {
-    await refreshLlmRuntimeStatus();
-  }
-  if (!state.llmRuntimeStatus?.llmGateOpen) {
-    if (gen !== mailboxDigestRequestGen) return;
-    state.mailboxActionBrief = null;
-    state.mailboxBriefBannerHtml = buildMailboxBriefGateBannerHtml();
-    state.mailboxDigestKey = key;
-    state.mailboxDigestRefreshing = false;
-    render();
-    return;
-  }
-  try {
-    const brief = await withTimeout(
-      invoke<ActionBriefResult>("llm_inbox_digest", {
-        accountId,
-        mailbox,
-        mode: state.mailboxBriefMode,
-      }),
-      LLM_INVOKE_TIMEOUT_MS
-    );
-    if (gen !== mailboxDigestRequestGen) return;
-    state.mailboxActionBrief = brief;
-    state.mailboxBriefBannerHtml = "";
-    state.mailboxDigestKey = key;
-  } catch (error) {
-    if (gen !== mailboxDigestRequestGen) return;
-    const detail = tauriErrorMessage(error).replace(/\s+/g, " ").trim().slice(0, 400);
-    const gateLike =
-      /moteur ia/i.test(detail) ||
-      /openrouter/i.test(detail) ||
-      /llama-server/i.test(detail) ||
-      /fonctionnalité ia est désactivée/i.test(detail);
-    state.mailboxActionBrief = null;
-    state.mailboxBriefBannerHtml = gateLike
-      ? buildMailboxBriefGateBannerHtml()
-      : buildMailboxBriefErrorBannerHtml(detail);
-    state.mailboxDigestKey = key;
-    console.warn("llm_inbox_digest", error);
-  } finally {
-    if (gen === mailboxDigestRequestGen) {
-      state.mailboxDigestRefreshing = false;
-      render();
-    }
-  }
 }
 
 let llmIdlePrefetchAfterBootScheduled = false;
@@ -1846,18 +1499,6 @@ function markdownInsertCodeOrFence(textarea: HTMLTextAreaElement, start: number,
   }
 }
 
-const DEFAULT_INVOKE_TIMEOUT_MS = 2500;
-
-const BOOT_INVOKE_TIMEOUT_MS = 15_000;
-
-const ACCOUNTS_BOOT_TIMEOUT_MS = 45_000;
-
-const ACCOUNT_INVOKE_TIMEOUT_MS = 30_000;
-
-const OAUTH_DESKTOP_LOGIN_TIMEOUT_MS = 900_000;
-
-const OAUTH_LOOPBACK_DEFAULT_PORT = 52_789;
-
 function warnOAuthEphemeralRedirect(outcome: OAuthDesktopLoginOutcome): void {
   if (!outcome.ephemeralRedirect) return;
   const uri = (outcome.redirectUri ?? "").trim();
@@ -1868,24 +1509,6 @@ function warnOAuthEphemeralRedirect(outcome: OAuthDesktopLoginOutcome): void {
     18_000,
   );
 }
-
-const SYNC_INVOKE_TIMEOUT_MS = 120_000;
-
-const MAIL_ACTION_TIMEOUT_MS = 90_000;
-
-const LLM_INVOKE_TIMEOUT_MS = 200_000;
-
-const AI_CACHE_PROMPT_REVISION = 6;
-
-const MAILBOX_DIGEST_DEBOUNCE_MS = 2400;
-
-const MAILBOX_DIGEST_IDLE_CALLBACK_TIMEOUT_MS = 4500;
-
-const IDLE_AI_CACHE_PREFETCH_DEBOUNCE_MS = 9000;
-
-const IDLE_AI_CACHE_PREFETCH_MAX_THREADS = 3;
-
-const IDLE_AI_CACHE_IDLE_CALLBACK_TIMEOUT_MS = 12_000;
 
 function navMailboxSegment(mailbox?: string): string {
   const { label } = threadMailboxListLabel(mailbox ?? state.selectedMailbox);
@@ -2216,11 +1839,6 @@ function cleanThreadListPreview(raw: string): string {
   return s;
 }
 
-function isTauriRuntime(): boolean {
-  // Tauri v2 typically exposes `__TAURI__` (not always `__TAURI_INTERNALS__`).
-  return "__TAURI__" in window || "__TAURI_INTERNALS__" in window;
-}
-
 async function aiCacheKeySegment(): Promise<string> {
   if (!isTauriRuntime()) return "none";
   try {
@@ -2441,14 +2059,7 @@ async function switchActiveAccount(accountId: string): Promise<void> {
   state.searchNewsletterRule = null;
   state.searchModifiersTouched = false;
   state.activeSavedSearchId = null;
-  state.activeSavedSearchId = null;
-  mailboxDigestRequestGen++;
-  state.mailboxBriefBannerHtml = "";
-  state.mailboxActionBrief = null;
-  state.mailboxDigestKey = "";
-  state.mailboxDigestLive = false;
-  state.mailboxDigestRefreshing = false;
-  cancelMailboxDigestLiveDebounce();
+  resetMailboxDigestForNavigation();
   state.listFilter = defaultListFilterFromPrefs();
   await loadMailView(false);
   cancelMailboxDigestLiveDebounce();
@@ -3480,13 +3091,7 @@ async function switchMailbox(nextMailbox: string) {
   exitSearchModeForMailboxBrowse();
   state.searchScope = "mailbox";
   state.listFilter = defaultListFilterFromPrefs();
-  mailboxDigestRequestGen++;
-  state.mailboxBriefBannerHtml = "";
-  state.mailboxActionBrief = null;
-  state.mailboxDigestKey = "";
-  state.mailboxDigestLive = false;
-  state.mailboxDigestRefreshing = false;
-  cancelMailboxDigestLiveDebounce();
+  resetMailboxDigestForNavigation();
   invalidateIdleAiCachePrefetch();
   await loadMailView(false);
   cancelMailboxDigestLiveDebounce();
@@ -4263,28 +3868,8 @@ export async function boot() {
   }
 }
 
-boot();
-
-window.addEventListener(
-  "load",
-  () => window.setTimeout(() => void bindTauriNativeFileDropAsync(), 0),
-  { once: true }
-);
-
 function threadReadingIsSimpleLayout(): boolean {
   return true;
-}
-
-function mailboxDigestPanelEligible(): boolean {
-  if (state.view !== "list") return false;
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox ?? "")) return false;
-  if (!isTauriRuntime()) return false;
-  return Boolean(currentAccount()?.id?.trim());
-}
-
-function mailboxDigestSlotInList(): boolean {
-  if (!isMailboxDigestFeatureEnabled()) return false;
-  return state.mailboxDigestPanelOpen && mailboxDigestPanelEligible();
 }
 
 function aiSidePanelExpandedForShell(): boolean {
@@ -7395,7 +6980,7 @@ async function withLlmQueue<T>(
     toast(`IA occupée (${state.llmJobLabel}). Annulez ou attendez la fin.`);
     return null;
   }
-  idlePrefetchAbort?.abort();
+  abortIdleAiCachePrefetchInFlight();
   const ac = new AbortController();
   llmQueueAbort = ac;
   state.llmJobLabel = label;
@@ -7411,7 +6996,7 @@ async function withLlmQueue<T>(
 
 function cancelLlmQueueJob(): void {
   cancelActiveLlmStreamJob();
-  idlePrefetchAbort?.abort();
+  abortIdleAiCachePrefetchInFlight();
   llmQueueAbort?.abort();
 }
 
@@ -15565,20 +15150,6 @@ function renderSearchModal(): string {
   `;
 }
 
-function renderMailboxDigestTriggerButton(extraClass = ""): string {
-  if (!isMailboxDigestFeatureEnabled()) return "";
-  if (!mailboxDigestPanelEligible()) return "";
-  const open = mailboxDigestSlotInList();
-  const busy = state.mailboxDigestRefreshing && open;
-  const title = open ? "Fermer le brief d’action du dossier" : "Ouvrir le brief d’action IA du dossier";
-  const cls = ["ghost-button", "status-bar-digest-trigger", extraClass, open ? "is-active" : ""]
-    .filter(Boolean)
-    .join(" ");
-  return `<button type="button" class="${cls}" data-action="toggle-mailbox-digest-panel" aria-expanded="${open ? "true" : "false"}" title="${escapeAttr(title)}">${
-    busy ? `<span class="mini-sync"><span class="spinner" aria-hidden="true"></span><span>Brief</span></span>` : "Brief"
-  }</button>`;
-}
-
 function render() {
   syncMailboxDigestPanelWithFeaturePref();
   accountsFormIdentityScratch = undefined;
@@ -16955,22 +16526,6 @@ function renderThreadMessageAttachmentSection(message: CleanedMessageView): stri
     return `<details class="thread-attachments-fold"><summary class="thread-attachments-fold__sum">${escapeHtml(`Pièces jointes (${n})`)}</summary>${framed}</details>`;
   }
   return framed;
-}
-
-function renderBriefMailViewShell(bodyHtml: string, opts?: { kicker?: string }): string {
-  const kicker = opts?.kicker?.trim();
-  const top =
-    kicker ?
-      `<div class="thread-zen-top">
-        <span class="thread-zen-brand" aria-hidden="true">${iconSvg("spark")}</span>
-        <span class="thread-kicker thread-kicker-strong">${escapeHtml(kicker)}</span>
-      </div>`
-    : "";
-  return `<aside class="thread-zen surface-sm inbox-brief-mail" aria-label="Brief du dossier">${top}<div class="thread-zen-body">${bodyHtml}</div></aside>`;
-}
-
-function renderBriefMailItemCard(inner: string): string {
-  return `<div class="thread-msg-card inbox-brief-item-card">${inner}</div>`;
 }
 
 function renderActionBriefHtml(b: ActionBriefResult): string {
@@ -18652,3 +18207,22 @@ function renderAiPanel() {
 }
 
 registerRender(render);
+
+initMailboxDigest({
+  withTimeout,
+  currentAccount,
+  refreshLlmRuntimeStatus,
+  tauriErrorMessage,
+});
+
+initIdleAiCachePrefetch({
+  withTimeout,
+  currentAccount,
+  aiCacheKeySegment,
+  refreshLlmRuntimeStatus,
+  threadIsAutoMail,
+  langFromKindTags,
+  normalizeIso639Primary,
+  summarizeThreadCore,
+  translateThreadCore,
+});

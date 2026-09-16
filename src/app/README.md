@@ -25,15 +25,18 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/lib/htmlMessage.ts` | Base64 / montage HTML mail |
 | `app/modals/promptConfirm.ts` | Modales prompt + confirm |
 | `app/core/composeTone.ts` | Tons compositeur |
+| `app/core/timeouts.ts` | Constantes délais Tauri / debounces IA & digest |
+| `app/lib/tauriRuntime.ts` | Détection runtime Tauri |
+| `app/ui/briefMailShell.ts` | Coquille HTML brief dossier |
+| `app/mail/mailboxDigest.ts` | Brief d’action dossier (debounce, fetch, bouton toolbar) |
+| `app/mail/idleAiCachePrefetch.ts` | Préchargement cache LLM au idle |
 
-Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.mjs`.
+Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.mjs`, `tools/degrade-extract-batch3.mjs`.
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Constantes timeouts → `app/core/timeouts.ts`
-2. Digest dossier → `app/mail/mailboxDigest.ts`
-3. **`render*.ts`** → plusieurs fichiers sous `app/ui/render/` avec pont `renderDeps` (registre rempli par `application.ts`) — évite les imports circulaires
-4. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
+1. **`render*.ts`** → plusieurs fichiers sous `app/ui/render/` avec pont `renderDeps` (registre rempli par `application.ts`) — évite les imports circulaires
+2. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
 
 ## Tests
 

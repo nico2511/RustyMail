@@ -1,0 +1,31 @@
+/** Délais d’appel Tauri / debounces UI (centralisés pour le dégraissage de application.ts). */
+
+export const DEFAULT_INVOKE_TIMEOUT_MS = 2500;
+
+export const BOOT_INVOKE_TIMEOUT_MS = 15_000;
+
+export const ACCOUNTS_BOOT_TIMEOUT_MS = 45_000;
+
+export const ACCOUNT_INVOKE_TIMEOUT_MS = 30_000;
+
+export const OAUTH_DESKTOP_LOGIN_TIMEOUT_MS = 900_000;
+
+export const OAUTH_LOOPBACK_DEFAULT_PORT = 52_789;
+
+export const SYNC_INVOKE_TIMEOUT_MS = 120_000;
+
+export const MAIL_ACTION_TIMEOUT_MS = 90_000;
+
+export const LLM_INVOKE_TIMEOUT_MS = 200_000;
+
+export const AI_CACHE_PROMPT_REVISION = 6;
+
+export const MAILBOX_DIGEST_DEBOUNCE_MS = 2400;
+
+export const MAILBOX_DIGEST_IDLE_CALLBACK_TIMEOUT_MS = 4500;
+
+export const IDLE_AI_CACHE_PREFETCH_DEBOUNCE_MS = 9000;
+
+export const IDLE_AI_CACHE_PREFETCH_MAX_THREADS = 3;
+
+export const IDLE_AI_CACHE_IDLE_CALLBACK_TIMEOUT_MS = 12_000;
