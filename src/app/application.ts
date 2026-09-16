@@ -109,7 +109,7 @@ import {
   AI_CACHE_PROMPT_REVISION,
 } from "./core/timeouts";
 import { isTauriRuntime } from "./lib/tauriRuntime";
-import { renderBriefMailItemCard, renderBriefMailViewShell } from "./ui/briefMailShell";
+import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
   cancelMailboxDigestLiveDebounce,
   dismissMailboxDigestPanel,
@@ -132,6 +132,21 @@ import {
   invalidateIdleAiCachePrefetch,
   scheduleIdleAiCachePrefetch,
 } from "./mail/idleAiCachePrefetch";
+import { truncateSearchBadgeLabel } from "./lib/searchBadgeLabel";
+import { tagToSearchDraft, threadTagsForModal } from "./lib/threadTagsModal";
+import { registerRenderDeps } from "./ui/render/renderDeps";
+import {
+  renderAccountsRecoveryBanner,
+  renderDefaultAccountPromptBanner,
+  renderFolderSidebarCountPill,
+  renderInboxChipBadge,
+  renderViewNavTrail,
+} from "./ui/render/listChrome";
+import { renderSearchBadgeChip } from "./ui/render/searchBadgeChip";
+import { renderActionBriefHtml } from "./ui/render/actionBriefHtml";
+import {
+  renderThreadTagsDialog,
+} from "./ui/render/threadTagsRender";
 import "../styles.css";
 
 import { escapeAttr, escapeHtml } from "../ui/sanitize";
@@ -2498,12 +2513,6 @@ function searchScopeLabel(): string {
   return "Tout le compte";
 }
 
-function truncateSearchBadgeLabel(text: string, max = 26): string {
-  const t = text.trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1)}…`;
-}
-
 function searchScopeBadgeShort(): string {
   if (state.searchScope === "account") return "Compte";
   const mb = state.selectedMailbox || "INBOX";
@@ -3875,44 +3884,6 @@ function threadReadingIsSimpleLayout(): boolean {
 function aiSidePanelExpandedForShell(): boolean {
   if (state.view === "contacts" || state.view === "contact") return false;
   return state.aiOpen || mailboxDigestSlotInList();
-}
-
-function threadTagsForModal(tags: Tag[]): Tag[] {
-  const dedup = new Map<string, Tag>();
-  for (const tag of tags) {
-    if (!tag?.value) continue;
-    if (isNoisyTag(tag)) continue;
-    dedup.set(`${tag.family}:${tag.value}`, tag);
-  }
-  return [...dedup.values()].sort((a, b) => {
-    const familyRank = (f: Tag["family"]) => {
-      if (f === "Kind") return 0;
-      if (f === "Source") return 1;
-      if (f === "State") return 2;
-      return 3;
-    };
-    const dr = familyRank(a.family) - familyRank(b.family);
-    if (dr !== 0) return dr;
-    return a.value.localeCompare(b.value, undefined, { sensitivity: "base" });
-  });
-}
-
-function threadTagFamilyLabel(family: Tag["family"]): string {
-  if (family === "Kind") return "Type";
-  if (family === "Source") return "Source";
-  if (family === "State") return "État";
-  return "Entité";
-}
-
-function tagToSearchDraft(tag: Tag): string | null {
-  const fam = String(tag.family).toLowerCase();
-  const val = tag.value.trim();
-  if (!val) return null;
-  if (fam === "source" && val.toLowerCase() === "imap") return null;
-  if (fam === "source" || fam === "kind" || fam === "state" || fam === "entity") {
-    return `#${fam}:${val}`;
-  }
-  return null;
 }
 
 function launchTagMailSearch(tag: Tag): void {
@@ -7387,18 +7358,6 @@ function zenSummaryHtmlFragments(text: string): string {
   }
   closeList();
   return chunks.join("") || `<p class="thread-zen-par">${escapeHtml(text)}</p>`;
-}
-
-function briefEvidenceButtons(links: ActionBriefEvidenceLink[]): string {
-  if (!links?.length) return "";
-  return links
-    .map((L) => {
-      const tid = String(L.threadId || "").trim();
-      if (!tid) return "";
-      const lab = L.label?.trim() || "Ouvrir le fil";
-      return `<div class="inbox-brief-evidence"><button type="button" class="ghost-button digest-open-thread" data-thread-id="${escapeAttr(tid)}">${escapeHtml(lab)}</button></div>`;
-    })
-    .join("");
 }
 
 function formatAttachmentSizeKb(sizeBytes: number): string {
@@ -14784,109 +14743,6 @@ function renderAiFeatureTogglesHtml(layout: "settings" | "compact" = "compact"):
   ).join("");
 }
 
-function renderViewNavTrail(actionsHtml?: string): string {
-  const seg = navCurrentBreadcrumbSegment();
-  if (!seg) return "";
-  return navRenderTrailHtml(seg, escapeHtml, escapeAttr, actionsHtml ? { actionsHtml } : {});
-}
-
-function renderInboxChipBadge(count: number): string {
-  const n = Math.max(0, Math.floor(Number(count)) || 0);
-  if (n <= 0) return "";
-  return ` <span class="inbox-chip-badge">${n}</span>`;
-}
-
-function renderFolderSidebarCountPill(mb: string): string {
-  const u = state.mailboxUnread[mb] ?? 0;
-  const t = state.mailboxTotal[mb] ?? 0;
-  if (t <= 0 && u <= 0) return "";
-  const title =
-    u > 0
-      ? `${t} conversation${t === 1 ? "" : "s"} · ${u} non lu${u === 1 ? "" : "s"}`
-      : `${t} conversation${t === 1 ? "" : "s"} en cache`;
-  return `<span class="folder-count folder-count-wrap" title="${escapeAttr(title)}"><span class="folder-count-num">${t}</span>${
-    u > 0 ? `<span class="folder-count-unread" aria-label="${u} non lu${u === 1 ? "" : "s"}">${u}</span>` : ""
-  }</span>`;
-}
-
-function renderDefaultAccountPromptBanner(): string {
-  if (!shouldShowDefaultAccountPrompt()) return "";
-  const prefId = defaultAccountIdFromPrefs();
-  const opts = state.accounts
-    .map((a) => {
-      const label = (a.displayName || a.email || a.id).trim();
-      const selected = prefId === a.id || (!prefId && a.id === state.selectedAccountId);
-      return `<option value="${escapeAttr(a.id)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
-    })
-    .join("");
-  return `
-    <div class="inbox-brief-banner inbox-brief-banner--hint default-account-prompt" role="region" aria-label="Compte par défaut au démarrage">
-      <div class="inbox-brief-banner__title">Compte à l’ouverture</div>
-      <div class="inbox-brief-banner__text">
-        <p>Vous avez <strong>${state.accounts.length} comptes</strong>. Choisissez celui ouvert par défaut au démarrage de RustyMail.</p>
-        <div class="default-account-prompt__row">
-          <select class="settings-ctl settings-ctl-select default-account-prompt__select" id="default-account-prompt-select" aria-label="Compte par défaut">
-            ${opts}
-          </select>
-          <button type="button" class="primary-button" data-action="save-default-account-prompt">Enregistrer</button>
-          <button type="button" class="ghost-button" data-action="dismiss-default-account-prompt">Plus tard</button>
-          <button type="button" class="ghost-button" data-action="open-settings-default-account">Paramètres</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-function renderAccountsRecoveryBanner(): string {
-  if (state.accounts.length > 0) return "";
-  const dbPath = state.lastAppPaths?.dbPath?.trim();
-  const detail =
-    state.accountsLoadError ||
-    (isTauriRuntime() ?
-      "Aucun compte dans la base locale — vos mails en cache peuvent être sur un autre fichier SQLite (voir Paramètres → Stockage)."
-    : "Ouvrez RustyMail en mode Tauri (npm run tauri:dev), pas seulement le serveur Vite dans le navigateur.");
-  return `
-    <div class="accounts-recovery-banner surface-sm" role="alert">
-      <strong>Compte introuvable</strong>
-      <p class="dim" style="margin:8px 0 0;line-height:1.5;font-size:13px">${escapeHtml(detail)}</p>
-      ${
-        dbPath
-          ? `<p class="dim" style="margin:8px 0 0;font-size:12px;word-break:break-all">Base : ${escapeHtml(dbPath)}</p>`
-          : ""
-      }
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
-        <button type="button" class="primary-button" data-action="settings">Paramètres → Comptes</button>
-        <button type="button" class="ghost-button" data-action="reload-accounts">Réessayer le chargement</button>
-        ${
-          isTauriRuntime()
-            ? `<button type="button" class="ghost-button" data-action="settings-tab" data-settings-tab="storage">Chemins disque</button>`
-            : ""
-        }
-      </div>
-    </div>`;
-}
-
-function renderSearchBadgeChip(opts: {
-  kind: string;
-  label: string;
-  title: string;
-  action: string;
-  dismissible?: boolean;
-  dataEmail?: string;
-  dataTag?: string;
-}): string {
-  const dismissible = opts.dismissible !== false;
-  const suffix = dismissible
-    ? `<span class="search-badge__x" aria-hidden="true">×</span>`
-    : `<span class="search-badge__hint" aria-hidden="true">↕</span>`;
-  const extra = [
-    opts.dataEmail ? `data-email="${escapeAttr(opts.dataEmail)}"` : "",
-    opts.dataTag ? `data-tag="${escapeAttr(opts.dataTag)}"` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  return `<button type="button" class="search-badge search-badge--${opts.kind}" role="listitem" data-action="${escapeAttr(opts.action)}" ${extra} title="${escapeAttr(opts.title)}"><span class="search-badge__label">${escapeHtml(opts.label)}</span>${suffix}</button>`;
-}
-
 function renderSearchBadgesHtml(): string {
   const parts: string[] = [];
 
@@ -15465,87 +15321,6 @@ function renderMoveDialog() {
         <div class="modal-footer">
           <button class="ghost-button" data-action="close-move">Annuler</button>
           <button class="primary-button" data-action="confirm-move" style="padding:9px 14px"${noTargets ? " disabled" : ""}>Déplacer</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderThreadTagChip(tag: Tag): string {
-  const label = formatTag(tag);
-  const draft = tagToSearchDraft(tag);
-  if (!draft) {
-    return `<span class="thread-tag-chip">${escapeHtml(label)}</span>`;
-  }
-  const fam = String(tag.family).toLowerCase();
-  return `<button type="button" class="thread-tag-chip thread-tag-chip--search" data-action="search-from-tag" data-tag-family="${escapeAttr(fam)}" data-tag-value="${escapeAttr(tag.value)}" title="Rechercher · ${escapeAttr(label)}">${escapeHtml(label)}</button>`;
-}
-
-function renderThreadTagsChipsHtml(tags: Tag[]): string {
-  if (!tags.length) return `<p class="dim thread-tags-empty">Aucun tag.</p>`;
-  const byFamily = new Map<Tag["family"], Tag[]>();
-  for (const tag of tags) {
-    const list = byFamily.get(tag.family) ?? [];
-    list.push(tag);
-    byFamily.set(tag.family, list);
-  }
-  const order: Tag["family"][] = ["Kind", "Source", "State", "Entity"];
-  return order
-    .filter((family) => byFamily.has(family))
-    .map((family) => {
-      const chips = (byFamily.get(family) ?? [])
-        .map((tag) => renderThreadTagChip(tag))
-        .join("");
-      return `<section class="thread-tags-group" aria-label="${escapeAttr(threadTagFamilyLabel(family))}">
-        <p class="thread-tags-group-kicker dim">${escapeHtml(threadTagFamilyLabel(family))}</p>
-        <div class="thread-tags-group-chips">${chips}</div>
-      </section>`;
-    })
-    .join("");
-}
-
-function renderThreadTagsDialog(): string {
-  if (!state.threadTagsModalOpen || state.view !== "thread" || !state.selectedThread) return "";
-  const thread = state.selectedThread;
-  const threadTags = threadTagsForModal(thread.tags ?? []);
-  const msgs = sortMessagesByReceivedDescending(thread.messages ?? []);
-  const perMessageHtml = msgs
-    .map((message, i) => {
-      const tags = threadTagsForModal(message.tags ?? []);
-      if (!tags.length) return "";
-      const label = normalizeThreadSenderLabel(message.sender) || `Message ${i + 1}`;
-      const when = formatThreadReadingWhen(message.receivedAt);
-      return `<section class="thread-tags-msg-block" aria-label="Tags message ${i + 1}">
-        <p class="thread-tags-msg-kicker dim">${escapeHtml(label)}${when ? ` · ${escapeHtml(when)}` : ""}</p>
-        ${renderThreadTagsChipsHtml(tags)}
-      </section>`;
-    })
-    .filter(Boolean)
-    .join("");
-  const nThread = threadTags.length;
-  const nMsg = msgs.reduce((s, m) => s + threadTagsForModal(m.tags ?? []).length, 0);
-  const countHint =
-    nThread + nMsg === 0 ? "Aucun tag indexé"
-    : nMsg > 0 ? `${nThread} sur le fil · tags par message ci-dessous`
-    : `${nThread} tag${nThread === 1 ? "" : "s"}`;
-  return `
-    <div class="modal-backdrop" data-action="close-thread-tags">
-      <div class="modal surface-elevated thread-tags-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="thread-tags-title">
-        <div class="modal-header">
-          <strong id="thread-tags-title">Tags du fil</strong>
-          <button type="button" class="icon-pill" data-action="close-thread-tags" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <p class="thread-tags-subtitle dim">${escapeHtml(thread.subject)} · ${escapeHtml(countHint)}</p>
-        <div class="modal-body thread-tags-body">
-          <section class="thread-tags-section" aria-label="Tags du fil">
-            <p class="thread-tags-section-kicker">Fil</p>
-            ${renderThreadTagsChipsHtml(threadTags)}
-          </section>
-          ${perMessageHtml ? `<section class="thread-tags-section" aria-label="Tags par message"><p class="thread-tags-section-kicker">Par message</p>${perMessageHtml}</section>` : ""}
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="ghost-button" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}">Recalculer les tags</button>
-          <button type="button" class="ghost-button" data-action="close-thread-tags">Fermer</button>
         </div>
       </div>
     </div>
@@ -16526,97 +16301,6 @@ function renderThreadMessageAttachmentSection(message: CleanedMessageView): stri
     return `<details class="thread-attachments-fold"><summary class="thread-attachments-fold__sum">${escapeHtml(`Pièces jointes (${n})`)}</summary>${framed}</details>`;
   }
   return framed;
-}
-
-function renderActionBriefHtml(b: ActionBriefResult): string {
-  const confPct = Math.max(0, Math.min(100, Math.round(Number(b.confidence ?? 0) * 100)));
-  const bucket = escapeHtml(String(b.priorityBucket ?? "—"));
-  const mode = escapeHtml(String(b.mode ?? ""));
-  const verif = b.verificationRecommended
-    ? `<p class="thread-zen-par dim" role="status">Vérification recommandée</p>`
-    : "";
-  const skills =
-    b.executedSkills && b.executedSkills.length ?
-      `<p class="thread-zen-par dim inbox-brief-skills">Pipeline : ${escapeHtml(b.executedSkills.join(" → "))}</p>`
-    : "";
-
-  const sec = (title: string, inner: string) =>
-    `<section class="inbox-brief-section"><div class="thread-kicker">${escapeHtml(title)}</div>${inner}</section>`;
-
-  const changesBody =
-    (b.changes || [])
-      .map((c) => {
-        const ev = briefEvidenceButtons(c.evidenceLinks || []);
-        return renderBriefMailItemCard(
-          `<p class="thread-zen-par">${escapeHtml(c.summary || "")}</p>${ev}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const decisionsBody =
-    [...(b.decisions || [])]
-      .sort((a, d) => Number(a.rank) - Number(d.rank))
-      .map((d) => {
-        const opts = (d.optionsHint || [])
-          .map((o) => `<li>${escapeHtml(o)}</li>`)
-          .join("");
-        const optsHtml = opts ? `<ul class="thread-zen-list">${opts}</ul>` : "";
-        return renderBriefMailItemCard(
-          `<p class="thread-zen-par dim">#${escapeHtml(String(d.rank))}</p>
-          <p class="thread-zen-par"><strong>${escapeHtml(d.title)}</strong></p>
-          ${d.impact ? `<p class="thread-zen-par dim">${escapeHtml(d.impact)}</p>` : ""}
-          ${optsHtml}${briefEvidenceButtons(d.evidenceLinks || [])}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const actionsBody =
-    [...(b.recommendedActions || [])]
-      .sort((a, x) => Number(a.rank) - Number(x.rank))
-      .map((a) => {
-        const due = a.suggestedDue ? `<span class="dim"> · ${escapeHtml(a.suggestedDue)}</span>` : "";
-        const pr = a.priority ? `<span class="label inbox-brief-prio">${escapeHtml(a.priority)}</span> ` : "";
-        return renderBriefMailItemCard(
-          `${pr}<p class="thread-zen-par">${escapeHtml(a.action)}</p>
-          <p class="thread-zen-par dim">${escapeHtml(a.suggestedOwner || "")}${due}</p>
-          ${briefEvidenceButtons(a.evidenceLinks || [])}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const risksBody =
-    (b.risks || [])
-      .map((r) => {
-        const sev = r.severity ? ` <span class="dim">(${escapeHtml(r.severity)})</span>` : "";
-        return renderBriefMailItemCard(
-          `<p class="thread-zen-par"><strong>${escapeHtml(r.label)}</strong>${sev}</p>
-          ${r.detail ? `<p class="thread-zen-par dim">${escapeHtml(r.detail)}</p>` : ""}
-          ${briefEvidenceButtons(r.evidenceLinks || [])}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const ambBody =
-    (b.ambiguities || [])
-      .map((a) => {
-        return renderBriefMailItemCard(
-          `<p class="thread-zen-par"><strong>${escapeHtml(a.question)}</strong></p>
-          ${a.whyItMatters ? `<p class="thread-zen-par dim">${escapeHtml(a.whyItMatters)}</p>` : ""}
-          ${briefEvidenceButtons(a.evidenceLinks || [])}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const inner = `
-    <p class="thread-zen-par dim inbox-brief-meta">Confiance ${confPct}% · priorité <strong>${bucket}</strong>${mode ? ` · mode ${mode}` : ""}</p>
-    ${verif}
-    ${sec("Ce qui change", changesBody)}
-    ${sec("Décisions", decisionsBody)}
-    ${sec("Actions recommandées", actionsBody)}
-    ${sec("Risques & engagements", risksBody)}
-    ${sec("Ambiguïtés", ambBody)}
-    ${skills}`;
-  return renderBriefMailViewShell(inner, { kicker: "Brief d’action" });
 }
 
 function renderThread() {
@@ -18207,6 +17891,15 @@ function renderAiPanel() {
 }
 
 registerRender(render);
+
+registerRenderDeps({
+  navCurrentBreadcrumbSegment,
+  shouldShowDefaultAccountPrompt,
+  defaultAccountIdFromPrefs,
+  normalizeThreadSenderLabel,
+  formatThreadReadingWhen,
+  sortMessagesByReceivedDescending,
+});
 
 initMailboxDigest({
   withTimeout,
