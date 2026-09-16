@@ -173,6 +173,14 @@ import {
   registerSearchBarUiDeps,
   syncSearchBarChrome,
 } from "./mail/searchBarUi";
+import {
+  applySavedSearchView,
+  deleteSavedSearchView,
+  markActiveSavedSearchSeen,
+  refreshSavedSearches,
+  registerSavedSearchViewsDeps,
+  saveCurrentSearchView,
+} from "./mail/savedSearchViews";
 import { searchThreads } from "./mail/searchThreadsRun";
 import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
@@ -288,15 +296,11 @@ import { buildSearchQueryPayload } from "../searchQueryBuild";
 import { recordSearchHistory } from "../searchHistory";
 
 import {
-  applySavedSearchToState,
   buildSavedSearchUiState,
   buildSavedSearchUpsert,
 } from "../savedSearchApply";
 
 import {
-  applySavedSearchCmd,
-  deleteSavedSearchCmd,
-  listSavedSearchesCmd,
   markSavedSearchSeenCmd,
   upsertSavedSearchCmd,
   type SavedSearchListItem,
@@ -2363,13 +2367,6 @@ function searchViewCanAffinerFlux(): boolean {
   );
 }
 
-function patchSavedSearchNewCount(id: string, count: number, lastSeenAt?: string): void {
-  const seen = lastSeenAt ?? new Date().toISOString();
-  state.savedSearches = state.savedSearches.map((s) =>
-    s.id === id ? { ...s, newCount: count, lastSeenAt: seen } : s,
-  );
-}
-
 async function loadThreadsForSearchContext(append = false): Promise<void> {
   if (isSavedDraftsVirtualMailbox(listMailboxForPanel())) {
     await loadMailView(append);
@@ -4232,200 +4229,6 @@ async function loadAddressBookSidebarCount(): Promise<void> {
     state.addressBookSidebarCount = Math.max(0, Math.floor(Number(n)) || 0);
   } catch {
     state.addressBookSidebarCount = null;
-  }
-}
-
-function syncCommitSearchDraftForSave(): void {
-  if (!searchDraftDiffersFromCommitted()) return;
-  const draftSnap = draftSearchCriteriaSnapshot();
-  if (!hasSavableSearchCriteria(draftSnap)) return;
-  if (searchCriteriaSnapshotsEqual(draftSnap, committedSearchCriteriaSnapshot())) return;
-  const raw = state.searchDraft.trim();
-  const parsed = parseSearchBarDraft(raw, state.newsletterRules);
-  resetSearchStructuralModifiers();
-  applyParsedSearchBarToState(parsed);
-  state.search = parsed.text;
-  state.searchModifiersTouched = false;
-}
-
-function suggestSavedSearchName(): string {
-  if (state.searchTags.length === 1) {
-    const t = state.searchTags[0]!;
-    return `#${String(t.family).toLowerCase()}:${t.value}`.slice(0, 100);
-  }
-  if (state.searchSenders.length === 1) return state.searchSenders[0]!.slice(0, 100);
-  const q = state.search.trim();
-  if (q) return q.slice(0, 100);
-  if (state.searchNewsletterRule) return formatNewsletterRuleInput(state.searchNewsletterRule).slice(0, 100);
-  return "Ma vue";
-}
-
-function findNewsletterRuleByParts(domain: string, localPart: string | null): NewsletterRuleRow | null {
-  const dom = domain.trim().toLowerCase();
-  if (!dom) return null;
-  const lp = (localPart?.trim() || "*").toLowerCase();
-  const hit = state.newsletterRules.find(
-    (r) => r.domain.toLowerCase() === dom && (r.localPart ?? "*").toLowerCase() === lp,
-  );
-  if (hit) return hit;
-  return { domain: dom, localPart: lp };
-}
-
-async function refreshSavedSearches(includeCounts = true): Promise<void> {
-  if (!isTauriRuntime()) {
-    state.savedSearches = [];
-    return;
-  }
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId) {
-    state.savedSearches = [];
-    state.activeSavedSearchId = null;
-    return;
-  }
-  try {
-    state.savedSearches = await listSavedSearchesCmd(accountId, includeCounts);
-    if (state.activeSavedSearchId && !state.savedSearches.some((s) => s.id === state.activeSavedSearchId)) {
-      state.activeSavedSearchId = null;
-    }
-  } catch (e) {
-    console.warn("list_saved_searches", e);
-  }
-}
-
-async function markActiveSavedSearchSeen(options?: { toast?: boolean }): Promise<boolean> {
-  const accountId = currentAccount()?.id?.trim();
-  const sid = state.activeSavedSearchId;
-  if (!accountId || !sid) {
-    if (options?.toast !== false) toast("Aucune vue active à marquer.");
-    return false;
-  }
-  if (state.savedSearchMarkingSeenId === sid) return false;
-  state.savedSearchMarkingSeenId = sid;
-  try {
-    patchSavedSearchNewCount(sid, 0);
-    render();
-    const updated = await markSavedSearchSeenCmd(accountId, sid);
-    patchSavedSearchNewCount(sid, 0, updated.lastSeenAt ?? undefined);
-    recordActivity({ eventType: "saved_view_seen", metaJson: JSON.stringify({ savedSearchId: sid }) });
-    await refreshSavedSearches(true);
-    const row = state.savedSearches.find((s) => s.id === sid);
-    if (row && (row.newCount ?? 0) > 0) patchSavedSearchNewCount(sid, 0, updated.lastSeenAt ?? undefined);
-    if (options?.toast) toast("Vue marquée à jour.");
-    render();
-    return true;
-  } catch (e) {
-    await refreshSavedSearches(true);
-    render();
-    toast(tauriErrorMessage(e));
-    return false;
-  } finally {
-    state.savedSearchMarkingSeenId = null;
-  }
-}
-
-async function saveCurrentSearchView(): Promise<void> {
-  if (!isTauriRuntime()) {
-    toast("Vues enregistrées : disponible dans l’app Tauri.");
-    return;
-  }
-  const accountId = searchAccountIdForQuery();
-  if (!accountId) {
-    toast("Choisissez un compte avant d’enregistrer une vue.");
-    return;
-  }
-  syncCommitSearchDraftForSave();
-  if (!canSaveSearchView()) {
-    toast("Lancez d’abord la recherche (Entrée), puis enregistrez la vue.");
-    return;
-  }
-  const defaultName = suggestSavedSearchName();
-  const name = window.prompt("Nom de la vue enregistrée", defaultName);
-  if (name === null) return;
-  const trimmed = name.trim();
-  if (!trimmed) {
-    toast("Nom de vue invalide.");
-    return;
-  }
-  const iconRaw = window.prompt("Icône courte (2–4 caractères)", "Vu");
-  if (iconRaw === null) return;
-  const icon = (iconRaw.trim() || "Vu").slice(0, 4);
-  const query = buildSearchQueryFromCurrentState();
-  const ui = buildSavedSearchUiState({
-    listFilter: state.listFilter,
-    searchScope: state.searchScope,
-    searchNlMode: state.searchNlMode,
-    searchDraft: state.searchDraft,
-    searchNewsletterRule: state.searchNewsletterRule,
-    searchModifiersTouched: state.searchModifiersTouched,
-  });
-  try {
-    const saved = await upsertSavedSearchCmd(
-      buildSavedSearchUpsert(accountId, trimmed, query, ui, { icon }),
-    );
-    state.activeSavedSearchId = saved.id;
-    await markSavedSearchSeenCmd(accountId, saved.id);
-    recordActivity({ eventType: "saved_view_created", metaJson: JSON.stringify({ savedSearchId: saved.id }) });
-    toast(`Vue « ${trimmed} » enregistrée — surveillance à jour.`);
-    await refreshSavedSearches(true);
-    await refreshSuggestedSavedViews();
-    render();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-}
-
-async function applySavedSearchView(id: string): Promise<void> {
-  if (!isTauriRuntime()) return;
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId) {
-    toast("Compte requis pour ouvrir une vue.");
-    return;
-  }
-  try {
-    const saved = await applySavedSearchCmd(accountId, id);
-    state.activeSavedSearchId = saved.id;
-    state.view = "list";
-    state.selectedContactEmail = undefined;
-    await markSavedSearchSeenCmd(accountId, saved.id);
-    applySavedSearchToState(saved, state, {
-      findNewsletterRule: findNewsletterRuleByParts,
-      resolveMailboxPath: resolveSearchMailboxPath,
-    });
-    if (saved.query.accountId?.trim()) {
-      state.selectedAccountId = saved.query.accountId.trim();
-    }
-    document.querySelectorAll<HTMLInputElement>("#search-input, #search-modal-input").forEach((el) => {
-      el.value = state.searchDraft;
-    });
-    await searchThreads();
-    recordActivity({ eventType: "saved_view_applied", metaJson: JSON.stringify({ savedSearchId: saved.id }) });
-    await refreshSavedSearches(true);
-    await refreshSuggestedSavedViews();
-    render();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-}
-
-async function deleteSavedSearchView(id: string): Promise<void> {
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId || !id.trim()) return;
-  const item = state.savedSearches.find((s) => s.id === id);
-  const ok = await openConfirmModal({
-    title: "Supprimer la vue ?",
-    body: item ? `« ${item.name} » sera retirée de la sidebar.` : "Cette vue sera supprimée.",
-    danger: true,
-    confirmLabel: "Supprimer",
-  });
-  if (!ok) return;
-  try {
-    await deleteSavedSearchCmd(accountId, id);
-    if (state.activeSavedSearchId === id) state.activeSavedSearchId = null;
-    toast("Vue supprimée.");
-    await refreshSavedSearches(true);
-    render();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
   }
 }
 
@@ -10444,7 +10247,6 @@ registerWireEventsBridge({
   dismissOrphanDraftSession,
   navigateToBreadcrumbIndex,
   refreshOrganizationReport,
-  markActiveSavedSearchSeen,
   agentRefreshPlanFromDraft,
   agentPrepareReplyContinue,
   discoverMailServersAction,
@@ -10486,8 +10288,6 @@ registerWireEventsBridge({
   refreshDraftRevisions,
   openFolderManagerView,
   openContactDetailView,
-  saveCurrentSearchView,
-  deleteSavedSearchView,
   onOrgDeleteMailboxOne,
   persistAiPrefsFromDom,
   deleteSettingsAccount,
@@ -10498,7 +10298,6 @@ registerWireEventsBridge({
   onThreadToggleFollow,
   openOrganizationView,
   orgV2DismissProposal,
-  applySavedSearchView,
   llmTranslateThreadUi,
   launchTagMailSearch,
   switchActiveAccount,
@@ -10720,6 +10519,12 @@ registerSearchCommitDeps({
 registerSearchBarUiDeps({
   refreshSearchTagCatalog,
   searchDraftDiffersFromCommitted,
+});
+
+registerSavedSearchViewsDeps({
+  canSaveSearchView,
+  refreshSuggestedSavedViews,
+  resolveSearchMailboxPath,
 });
 
 initMailboxDigest({

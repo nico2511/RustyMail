@@ -65,6 +65,10 @@ import {
   clearSearchAndReloadInbox,
   resetManualSearchNlFilters,
   isSearchActive,
+  saveCurrentSearchView,
+  applySavedSearchView,
+  deleteSavedSearchView,
+  markActiveSavedSearchSeen,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -305,19 +309,19 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       void (app()["bulkTrashVisibleThreads"] as (...a: unknown[]) => unknown)();
       return true;
     case "save-saved-search":
-      void (app()["saveCurrentSearchView"] as (...a: unknown[]) => unknown)();
+      void saveCurrentSearchView();
       return true;
     case "clear-search-exit":
       void clearSearchAndReloadInbox();
       return true;
     case "apply-saved-search": {
       const sid = element?.dataset.savedSearchId?.trim();
-      if (sid) void (app()["applySavedSearchView"] as (...a: unknown[]) => unknown)(sid);
+      if (sid) void applySavedSearchView(sid);
       return true;
     }
     case "delete-saved-search": {
       const sid = element?.dataset.savedSearchId?.trim();
-      if (sid) void (app()["deleteSavedSearchView"] as (...a: unknown[]) => unknown)(sid);
+      if (sid) void deleteSavedSearchView(sid);
       return true;
     }
     case "search-view-mark-read":
@@ -348,7 +352,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     }
     case "saved-search-mark-seen":
-      void (app()["markActiveSavedSearchSeen"] as (...a: unknown[]) => unknown)({ toast: true });
+      void markActiveSavedSearchSeen({ toast: true });
       return true;
     case "load-more":
       if ((app()["usesSearchContextLoader"] as (...a: unknown[]) => unknown)()) await (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(true);

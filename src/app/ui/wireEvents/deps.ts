@@ -104,6 +104,12 @@ export {
   openSearchModal,
   syncSearchBarChrome,
 } from "../mail/searchBarUi";
+export {
+  applySavedSearchView,
+  deleteSavedSearchView,
+  markActiveSavedSearchSeen,
+  saveCurrentSearchView,
+} from "../mail/savedSearchViews";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";
