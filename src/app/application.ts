@@ -9285,6 +9285,7 @@ registerEmptyTrashMailboxDeps({
 registerAppNavActionsDeps({
   goBack,
   navigateToInbox,
+  navigateToBreadcrumbIndex,
 });
 
 registerThreadListActionsDeps({

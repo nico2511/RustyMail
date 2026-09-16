@@ -3,6 +3,7 @@ import type { NavigateOpts } from "../types";
 export type AppNavActionsDeps = {
   goBack: () => Promise<void>;
   navigateToInbox: (opts?: NavigateOpts) => void;
+  navigateToBreadcrumbIndex: (stackIndex: number) => Promise<void>;
 };
 
 let appNavActionsDeps: AppNavActionsDeps | null = null;
@@ -22,4 +23,8 @@ export function goBack(): Promise<void> {
 
 export function navigateToInbox(opts?: NavigateOpts): void {
   navActionsDeps().navigateToInbox(opts);
+}
+
+export function navigateToBreadcrumbIndex(stackIndex: number): Promise<void> {
+  return navActionsDeps().navigateToBreadcrumbIndex(stackIndex);
 }

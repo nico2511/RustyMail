@@ -1,8 +1,20 @@
 // @ts-nocheck
+import { callApp } from "./callApp";
 import {
-  app,
   currentAccount,
   loadMailView,
+  loadMailboxUnread,
+  render,
+  goBack,
+  navigateToInbox,
+  navigateToBreadcrumbIndex,
+  persistAiFeaturePrefs,
+  enterComposeView,
+  startNewDraftSession,
+  syncPreviewOpenFromComposeLayout,
+  refreshAddressBookList,
+  loadAddressBookSidebarCount,
+  saveDraftToSavedListNow,
   applyListFilter,
   threadIdsMatch,
   state,
@@ -81,25 +93,25 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
   switch (action) {
     case "back":
     case "nav-back":
-      void (app()["goBack"] as (...a: unknown[]) => unknown)();
+      void goBack();
       return true;
     case "nav-crumb": {
       const raw = element?.dataset.navIndex ?? "";
       const idx = Number.parseInt(raw, 10);
       if (Number.isNaN(idx)) return true;
-      void (app()["navigateToBreadcrumbIndex"] as (...a: unknown[]) => unknown)(idx);
+      void navigateToBreadcrumbIndex(idx);
       return true;
     }
     case "nav-inbox":
-      (app()["navigateToInbox"] as (...a: unknown[]) => unknown)();
+      navigateToInbox();
       return true;
     case "toggle-ai-quick-panel":
       state.aiQuickPanelOpen = !state.aiQuickPanelOpen;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "toggle-thread-quick-reply": {
       state.threadQuickReplyOpen = !state.threadQuickReplyOpen;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       if (state.threadQuickReplyOpen) {
         window.setTimeout(() => {
           document.querySelector<HTMLInputElement>("[data-quick-reply]")?.focus();
@@ -112,12 +124,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       state.appPrefs.ai = normalizeAiPrefsMerged(state.appPrefs.ai);
       void (async () => {
         try {
-          await (app()["persistAiFeaturePrefs"] as (...a: unknown[]) => unknown)();
+          await persistAiFeaturePrefs();
           toast("Toutes les fonctionnalités IA activées.");
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     case "ai-features-all-off":
@@ -125,12 +137,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       state.appPrefs.ai = normalizeAiPrefsMerged(state.appPrefs.ai);
       void (async () => {
         try {
-          await (app()["persistAiFeaturePrefs"] as (...a: unknown[]) => unknown)();
+          await persistAiFeaturePrefs();
           toast("Toutes les fonctionnalités IA désactivées.");
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     case "toggle-ai": {
@@ -140,7 +152,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       }
       if (state.aiOpen) state.aiOpen = false;
       else if (state.view === "thread" || state.view === "list") state.aiOpen = true;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "open-quote-fold": {
@@ -156,22 +168,22 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         blocks: merged,
         foldedLines: raw.length
       };
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "close-quote-fold":
       state.quoteFoldModal = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "open-thread-tags":
       if (state.view === "thread" && state.selectedThread) {
         state.threadTagsModalOpen = !state.threadTagsModalOpen;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       }
       return true;
     case "close-thread-tags":
       state.threadTagsModalOpen = false;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "search-from-tag": {
       const family = element?.dataset.tagFamily?.trim();
@@ -183,12 +195,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "close-image-modal":
       if (state.imageModal?.revokeObjectUrl) URL.revokeObjectURL(state.imageModal.revokeObjectUrl);
       state.imageModal = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "toggle-message-view":
       if (!ENABLE_CLEAN_MESSAGE_VIEW) return true;
       state.messageViewMode = state.messageViewMode === "clean" ? "original" : "clean";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "reply":
       await (app()["prepareReply"] as (...a: unknown[]) => unknown)();
@@ -235,7 +247,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           await withTimeout(invoke("add_newsletter_rule", { input: email }), MAIL_ACTION_TIMEOUT_MS);
           await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
           toast(t("toast.newsletterRuleAdded"));
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -272,8 +284,8 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
             state.selectedThread = undefined;
             state.view = "list";
           }
-          await (app()["loadMailboxUnread"] as (...a: unknown[]) => unknown)();
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          await loadMailboxUnread();
+          render();
         } catch (e) {
           clearThreadsRecentlyRemoved([tid]);
           toast(tauriErrorMessage(e));
@@ -285,7 +297,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       state.searchDraft = ((state.searchDraft || "") + " #security:50").trim();
       state.searchModalOpen = true;
       toast("Filtre #security:50 ajouté — lancez la recherche.");
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "close-compose":
@@ -293,12 +305,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "close-close-compose-modal":
       state.closeComposeModal = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "close-compose-without-saving":
       void (async () => {
         state.closeComposeModal = null;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
         await (app()["discardCurrentDraftSession"] as (...a: unknown[]) => unknown)();
         await (app()["leaveComposeViewAfterClose"] as (...a: unknown[]) => unknown)();
       })();
@@ -306,7 +318,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "save-and-close-compose": {
       void (async () => {
         state.closeComposeModal = null;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
         const ok = await (app()["saveDraftToSavedListNow"] as (...a: unknown[]) => unknown)({ silentToast: true });
         if (ok) {
           toast("Conservé dans « Sauvés », compositeur fermé.");
@@ -318,7 +330,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     }
     case "close-resume-draft-modal":
       state.resumeDraftModal = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "resume-orphan-draft": {
       const sid = element?.dataset.sessionId ?? "";
@@ -334,7 +346,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       if (state.view === "compose") return true;
       state.sidebarCollapsed = !state.sidebarCollapsed;
       (app()["writeSidebarCollapsedPreference"] as (...a: unknown[]) => unknown)(state.sidebarCollapsed);
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "leave-saved-drafts-mailbox":
       void (async () => {
@@ -347,7 +359,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "toggle-draft-versions-expanded":
       if (!isTauriRuntime()) return true;
       state.draftVersionsListExpanded = !state.draftVersionsListExpanded;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "compare-draft-revision": {
       const revisionId = element?.dataset.revisionId?.trim() ?? "";
@@ -357,7 +369,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     }
     case "toggle-draft-compare-view":
       state.draftDiffView = state.draftDiffView === "preview" ? "diff" : "preview";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "restore-draft-revision": {
       if (!isTauriRuntime()) return true;
@@ -383,11 +395,11 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           }
           state.draft = restored;
           (app()["loadComposeMarkdownIntoEditor"] as (...a: unknown[]) => unknown)(restored.markdownBody);
-          (app()["enterComposeView"] as (...a: unknown[]) => unknown)({ skipHistory: true });
+          enterComposeView({ skipHistory: true });
           state.composeLayout = wasHistoriqueLayout ? "historique" : "split";
-          (app()["syncPreviewOpenFromComposeLayout"] as (...a: unknown[]) => unknown)();
+          syncPreviewOpenFromComposeLayout();
           (app()["resetMarkdownEditorHistory"] as (...a: unknown[]) => unknown)();
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
           if (wasHistoriqueLayout) {
             void (app()["refreshDraftRevisions"] as (...a: unknown[]) => unknown)(60);
             void (app()["computeDraftDiffAgainstRevision"] as (...a: unknown[]) => unknown)(revisionId);
@@ -410,8 +422,8 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       if (raw !== "split" && raw !== "write" && raw !== "preview" && raw !== "historique") return true;
       if (raw === "historique" && !isTauriRuntime()) return true;
       state.composeLayout = raw;
-      (app()["syncPreviewOpenFromComposeLayout"] as (...a: unknown[]) => unknown)();
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      syncPreviewOpenFromComposeLayout();
+      render();
       if (raw === "historique") void (app()["refreshDraftRevisions"] as (...a: unknown[]) => unknown)(60);
       if (state.composeLayout !== "write" && state.composeLayout !== "historique") {
         window.setTimeout(() => void (app()["computePreview"] as (...a: unknown[]) => unknown)(), 0);
@@ -420,12 +432,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     }
     case "toggle-compose-advanced":
       state.composeAdvancedOpen = !state.composeAdvancedOpen;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "toggle-compose-cc-bcc": {
       if ((app()["draftHasRecipientsExtra"] as (...a: unknown[]) => unknown)(state.draft)) return true;
       state.composeCcBccOpen = !state.composeCcBccOpen;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "send":
@@ -434,7 +446,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "cancel-split-send":
       state.splitSendConfirm = null;
       state.composeMessage = "";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "confirm-split-send":
       void (app()["confirmAndExecuteSplitSend"] as (...a: unknown[]) => unknown)();
@@ -469,7 +481,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         if (ta) ta.value = state.composeBody;
         void (app()["computePreview"] as (...a: unknown[]) => unknown)();
         toast("Texte inséré dans le compositeur.");
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       } else {
         await (app()["prepareReply"] as (...a: unknown[]) => unknown)();
       }
@@ -508,9 +520,9 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           state.view = "list";
           state.selectedMailbox = "INBOX";
           await loadMailView(false);
-          await (app()["loadMailboxUnread"] as (...a: unknown[]) => unknown)();
+          await loadMailboxUnread();
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       } catch (e) {
         console.error("demo_reset_playground_mailbox", e);
         toast(tauriErrorMessage(e));
@@ -546,12 +558,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
           state.view = "list";
           state.selectedMailbox = "INBOX";
           await loadMailView(false);
-          await (app()["loadMailboxUnread"] as (...a: unknown[]) => unknown)();
+          await loadMailboxUnread();
         } else {
           state.view = "settings";
           state.settingsTab = "accounts";
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       } catch (e) {
         console.error("demo_remove_playground_mailbox", e);
         toast(tauriErrorMessage(e));
@@ -578,7 +590,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "compose-grammar-dismiss":
       state.composeGrammarSuggestions = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "compose-grammar-apply": {
       const gi = Number(element?.dataset.grammarI ?? "");
@@ -595,7 +607,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       if (ta) ta.value = next;
       void (app()["computePreview"] as (...a: unknown[]) => unknown)();
       toast("Remplacement appliqué (première occurrence).");
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "open-search-modal":
@@ -620,7 +632,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "llm-qa-clear":
       state.threadQaAnswer = null;
       state.threadQaStreamText = "";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "qa-open-message": {
       const mid = element?.dataset.msgId?.trim();
@@ -628,7 +640,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     }
     case "address-book-refresh":
-      void (app()["refreshAddressBookList"] as (...a: unknown[]) => unknown)().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+      void refreshAddressBookList().then(() => render());
       return true;
     case "reindex-address-book": {
       void (async () => {
@@ -642,9 +654,9 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
             accountId: acc.id,
           });
           toast(`Carnet réindexé (${res?.messagesProcessed ?? 0} messages traités).`);
-          await (app()["refreshAddressBookList"] as (...a: unknown[]) => unknown)();
-          await (app()["loadAddressBookSidebarCount"] as (...a: unknown[]) => unknown)();
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          await refreshAddressBookList();
+          await loadAddressBookSidebarCount();
+          render();
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -653,12 +665,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     }
     case "address-book-edit": {
       setAddressBookEditEmail(element?.dataset.email?.trim() ?? null);
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "address-book-cancel-edit":
       setAddressBookEditEmail(null);
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "address-book-save": {
       void (async () => {
@@ -673,9 +685,9 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
             payload: { accountId: acc.id, email, displayName, notes, isFavorite },
           });
           setAddressBookEditEmail(null);
-          await (app()["refreshAddressBookList"] as (...a: unknown[]) => unknown)();
+          await refreshAddressBookList();
           toast("Contact enregistré.");
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -689,9 +701,9 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         if (!acc?.id || !email) return;
         try {
           await invoke<boolean>("delete_manual_contact_cmd", { accountId: acc.id, email });
-          await (app()["refreshAddressBookList"] as (...a: unknown[]) => unknown)();
+          await refreshAddressBookList();
           toast("Contact supprimé.");
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -714,8 +726,8 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
               isFavorite: !row.isFavorite,
             },
           });
-          await (app()["refreshAddressBookList"] as (...a: unknown[]) => unknown)();
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          await refreshAddressBookList();
+          render();
         } catch (e) {
           toast(tauriErrorMessage(e));
         }

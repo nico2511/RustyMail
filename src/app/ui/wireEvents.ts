@@ -76,6 +76,7 @@ import { commitSearchQuery } from "../mail/searchCommitQuery";
 import { syncSearchBarChrome } from "../mail/searchBarUi";
 import { refreshSearchTagCatalog } from "../mail/searchTagCatalog";
 import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
+import { render } from "../dispatch";
 import { app } from "./wireEventsBridge";
 export function wireEvents() {
   const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
@@ -142,7 +143,7 @@ export function wireEvents() {
             raw === "cloud" || raw === "local_http" ? raw : "whisper_cpp";
           captureAiPrefsFieldsFromDom(state.appPrefs);
           (app()["schedulePersistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ skipDomCapture: true });
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
           return;
         }
         if (id === "prefs-openrouter-model-preset" && t instanceof HTMLSelectElement) {
@@ -227,7 +228,7 @@ export function wireEvents() {
       if (!acc?.id) return;
       if (contactsSearchDebounce) clearTimeout(contactsSearchDebounce);
       contactsSearchDebounce = window.setTimeout(() => {
-        void loadContactsList(acc.id!, { reset: true, query: q }).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        void loadContactsList(acc.id!, { reset: true, query: q }).then(() => render());
       }, 280);
     },
     { signal: composeSig }
@@ -243,7 +244,7 @@ export function wireEvents() {
       if (!nearBottom) return;
       const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
       if (!acc?.id) return;
-      void loadContactsList(acc.id).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+      void loadContactsList(acc.id).then(() => render());
     },
     { signal: composeSig, passive: true }
   );
@@ -272,7 +273,7 @@ export function wireEvents() {
         if (!set.has("analyzeIntent")) set.add("analyzeIntent");
         if (!set.has("draftReply")) set.add("draftReply");
         s.enabledSkills = [...set];
-        void (app()["agentRefreshPlanFromDraft"] as (...a: unknown[]) => unknown)().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        void (app()["agentRefreshPlanFromDraft"] as (...a: unknown[]) => unknown)().then(() => render());
         return;
       }
       if (t?.dataset.action === "mailbox-brief-mode") {
@@ -282,7 +283,7 @@ export function wireEvents() {
         if (mailboxDigestSlotInList()) {
           void enqueueMailboxDigestRefreshWhenIdle(true);
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
         return;
       }
       if (t?.dataset.action !== "agent-set-mode") return;
@@ -291,7 +292,7 @@ export function wireEvents() {
       if (!s || s.busy) return;
       s.assistMode = mode;
       s.enabledSkills = defaultEnabledSkillIds(mode);
-      void (app()["agentRefreshPlanFromDraft"] as (...a: unknown[]) => unknown)().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+      void (app()["agentRefreshPlanFromDraft"] as (...a: unknown[]) => unknown)().then(() => render());
     },
     { signal: composeSig },
   );
@@ -309,7 +310,7 @@ export function wireEvents() {
             await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
             toast(next ? "Override CPU autorisé (llama-server)." : "Override CPU désactivé.");
             void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
-              if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
+              if (state.settingsAiModal === "engines") render();
             });
           } catch (e) {
             toast(tauriErrorMessage(e));
@@ -332,7 +333,7 @@ export function wireEvents() {
             await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
             toast(next ? "Lancement llama-server par l’app activé." : "Lancement llama-server par l’app désactivé.");
             void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
-              if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
+              if (state.settingsAiModal === "engines") render();
             });
           } catch (e) {
             toast(tauriErrorMessage(e));
@@ -569,7 +570,7 @@ export function wireEvents() {
   document.querySelectorAll<HTMLButtonElement>("[data-tone]").forEach((button) => {
     button.addEventListener("click", () => {
       state.tone = (button.dataset.tone as Tone) ?? state.tone;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
     });
   });
 
@@ -595,7 +596,7 @@ export function wireEvents() {
       const alt = (img.getAttribute("alt") || "").trim();
       void (app()["resolveSrcForMailImageLightbox"] as (...a: unknown[]) => unknown)(src, null).then((resolved) => {
         state.imageModal = { src: resolved.src, alt, revokeObjectUrl: resolved.revokeObjectUrl ?? null };
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       });
     },
     { signal: composeSig }
@@ -643,7 +644,7 @@ export function wireEvents() {
     void (async () => {
       const id = (event.currentTarget as HTMLSelectElement).value || state.accounts[0]?.id || "";
       await (app()["switchActiveAccount"] as (...a: unknown[]) => unknown)(id);
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
     })();
   });
   document.querySelector<HTMLTextAreaElement>("#compose-body")?.addEventListener(
@@ -742,7 +743,7 @@ export function wireEvents() {
         setDiscoveredServersFormSnap(serverSidesFromPreset(preset));
         state.accountMessage = `Préréglage local pour « ${domain} ».`;
         accountFieldTouched.serverFields = false;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       },
     });
   });

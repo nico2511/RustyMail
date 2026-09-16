@@ -90,7 +90,7 @@ export { currentAccount } from "../core/accountContext";
 export { threadIdsMatch } from "../lib/threadIdsMatch";
 export { applyListFilter, loadMailView, loadMailboxUnread, loadThreadsForSearchContext } from "../mail/mailListView";
 export { render } from "../dispatch";
-export { goBack, navigateToInbox } from "../mail/appNavActions";
+export { goBack, navigateToInbox, navigateToBreadcrumbIndex } from "../mail/appNavActions";
 export { syncInbox } from "../mail/syncInboxAction";
 export { mailboxManageAction } from "../mail/mailboxManageAction";
 export {
