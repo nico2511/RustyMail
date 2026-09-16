@@ -1,4 +1,3 @@
-import type { SearchCriteriaSnapshot } from "../../searchQueryState";
 import { filterRecentlyRemovedThreads } from "../../recentlyRemovedThreads";
 import { recordSearchHistory } from "../../searchHistory";
 import { hasCommittedSearchCriteria } from "../../searchQueryState";
@@ -8,23 +7,17 @@ import { render } from "../dispatch";
 import { safeInvoke } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { loadMailView } from "./mailListView";
-import { buildSearchQueryFromCurrentState, searchAccountIdForQuery } from "./searchQueryContext";
+import {
+  buildSearchQueryFromCurrentState,
+  committedSearchCriteriaSnapshot,
+  searchAccountIdForQuery,
+} from "./searchQueryContext";
 import { state } from "../state";
 
 let searchThreadsGeneration = 0;
 
 export function getSearchThreadsGeneration(): number {
   return searchThreadsGeneration;
-}
-
-export type SearchThreadsRunDeps = {
-  committedSearchCriteriaSnapshot: () => SearchCriteriaSnapshot;
-};
-
-let searchRunDeps: SearchThreadsRunDeps | null = null;
-
-export function registerSearchThreadsRunDeps(deps: SearchThreadsRunDeps): void {
-  searchRunDeps = deps;
 }
 
 function restoreSearchInputSelection(selStart: number, selEnd: number, genAtCapture: number) {
@@ -102,7 +95,7 @@ export async function searchThreads(): Promise<void> {
     return;
   }
 
-  if (isTauriRuntime() && searchRunDeps && hasCommittedSearchCriteria(searchRunDeps.committedSearchCriteriaSnapshot())) {
+  if (isTauriRuntime() && hasCommittedSearchCriteria(committedSearchCriteriaSnapshot())) {
     void recordSearchHistory(
       accountId,
       state.searchDraft.trim() || state.search.trim(),

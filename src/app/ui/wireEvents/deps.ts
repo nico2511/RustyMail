@@ -96,7 +96,14 @@ export {
   clearSearchAndReloadInbox,
   commitSearchQuery,
   resetManualSearchNlFilters,
+  searchDraftDiffersFromCommitted,
 } from "../mail/searchCommitQuery";
+export { isSearchActive } from "../mail/searchQueryContext";
+export {
+  closeSearchModal,
+  openSearchModal,
+  syncSearchBarChrome,
+} from "../mail/searchBarUi";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";

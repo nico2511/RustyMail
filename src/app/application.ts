@@ -147,19 +147,33 @@ import {
   applyParsedSearchBarToStructural,
   applySearchBarQuery,
   applySearchQueryFromNl,
+  draftSearchCriteriaSnapshot,
   hasSearchBarCriteria,
   mergeSearchBarTag,
   registerSearchCommitDeps,
   resetManualSearchNlFilters,
   resetSearchStructuralModifiers,
+  searchDraftDiffersFromCommitted,
   toastSearchBarResult,
 } from "./mail/searchCommitQuery";
 import {
   buildSearchQueryFromCurrentState,
+  committedSearchCriteriaSnapshot,
+  effectiveSearchMailboxPath,
+  isSearchActive,
   registerSearchQueryContext,
   searchAccountIdForQuery,
+  searchMailboxForQuery,
+  searchQueryMailboxForList,
+  searchQueryUsesThreadsApi,
 } from "./mail/searchQueryContext";
-import { registerSearchThreadsRunDeps, searchThreads } from "./mail/searchThreadsRun";
+import {
+  closeSearchModal,
+  openSearchModal,
+  registerSearchBarUiDeps,
+  syncSearchBarChrome,
+} from "./mail/searchBarUi";
+import { searchThreads } from "./mail/searchThreadsRun";
 import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
   cancelMailboxDigestLiveDebounce,
@@ -212,7 +226,6 @@ import {
 } from "./ui/render/statusFooterRender";
 import { renderActionBriefHtml } from "./ui/render/actionBriefHtml";
 import {
-  renderSearchBadgesHtml,
   renderSearchModal,
 } from "./ui/render/searchRender";
 import {
@@ -2254,48 +2267,6 @@ function mailboxPathPrefixForCreate(): string {
   return m.endsWith("/") ? m : `${m}/`;
 }
 
-function effectiveSearchMailboxPath(): string | null {
-  const parsed = parseSearchBarDraft(state.searchDraft, state.newsletterRules);
-  const fromDraft = parsed.mailboxPath?.trim();
-  if (fromDraft && !isSavedDraftsVirtualMailbox(fromDraft)) {
-    return resolveSearchMailboxPath(fromDraft);
-  }
-  const committed = state.searchMailboxPath?.trim();
-  if (committed && !isSavedDraftsVirtualMailbox(committed)) return committed;
-  return null;
-}
-
-function searchQueryUsesThreadsApi(): boolean {
-  return Boolean(
-    state.search.trim() ||
-      state.searchSenders.length > 0 ||
-      state.searchTags.length > 0 ||
-      state.searchLanguageFilter?.trim() ||
-      state.searchRelativeDays != null ||
-      state.searchHasAttachment != null ||
-      state.searchMinSecurityScore != null ||
-      state.searchMailboxPrefix?.trim()
-  );
-}
-
-function searchQueryMailboxForList(): string {
-  const explicit = searchMailboxForQuery();
-  if (explicit) return explicit;
-  const panelMb = folderManagerPanelMailbox();
-  if (panelMb) return panelMb;
-  return state.selectedMailbox?.trim() || "INBOX";
-}
-
-function searchMailboxForQuery(): string | null {
-  const explicit = effectiveSearchMailboxPath();
-  if (explicit) return explicit;
-  if (state.searchScope === "mailbox") {
-    const m = (folderManagerPanelMailbox() ?? state.selectedMailbox)?.trim();
-    return m && !isSavedDraftsVirtualMailbox(m) ? m : "INBOX";
-  }
-  return null;
-}
-
 function tagFamilyForInvoke(family: string): Tag["family"] {
   const f = family.trim().toLowerCase();
   if (f === "source") return "Source";
@@ -2344,33 +2315,6 @@ async function refreshSearchTagCatalog(): Promise<void> {
   }
 }
 
-function committedSearchCriteriaSnapshot(): SearchCriteriaSnapshot {
-  return snapshotFromStructuralState(state);
-}
-
-function draftSearchCriteriaSnapshot(draft = state.searchDraft): SearchCriteriaSnapshot {
-  const scratch: SearchStructuralState & { searchTags: Tag[] } = {
-    search: "",
-    searchSenders: [],
-    searchTags: [],
-    searchMailboxPath: null,
-    searchAccountOverrideId: null,
-    searchNewsletterRule: null,
-    searchScope: "account",
-    listFilter: "all",
-    searchNlMode: null,
-    searchLanguageFilter: null,
-    searchRelativeDays: null,
-    searchHasAttachment: null,
-    searchMinSecurityScore: null,
-    searchMailboxPrefix: null,
-  };
-  resetSearchStructuralState(scratch);
-  const parsed = parseSearchBarDraft(draft.trim(), state.newsletterRules);
-  applyParsedSearchBarToStructural(scratch, parsed);
-  return snapshotFromStructuralState(scratch);
-}
-
 function canSaveSearchView(): boolean {
   if (!isTauriRuntime() || !searchAccountIdForQuery()) return false;
   if (state.activeSavedSearchId) return true;
@@ -2381,40 +2325,6 @@ function canSaveSearchViewInModal(): boolean {
   if (!isTauriRuntime() || !searchAccountIdForQuery()) return false;
   if (canSaveSearchView()) return true;
   return hasCommittedSearchCriteria(draftSearchCriteriaSnapshot());
-}
-
-function syncSearchBarChrome(): void {
-  const html = renderSearchBadgesHtml();
-  const showPending = searchDraftDiffersFromCommitted();
-  const pendingHtml = `<span class="inbox-search-pending dim" title="Entrée pour lancer la recherche">↵</span>`;
-
-  document.querySelectorAll<HTMLElement>(".search-bar-stack, .search-ctx-stack").forEach((stack) => {
-    const host =
-      stack.querySelector(".search-context-filters") ??
-      stack.querySelector(".search-bar-meta__badges") ??
-      stack.querySelector(".search-ctx-badges") ??
-      stack;
-    const existing = host.querySelector(".inbox-search-badges");
-    if (html) {
-      if (existing) existing.outerHTML = html;
-      else host.insertAdjacentHTML("beforeend", html);
-    } else {
-      existing?.remove();
-    }
-
-    const label = stack.querySelector("label.inbox-search");
-    const input =
-      label?.querySelector<HTMLInputElement>("input[type='search']") ??
-      stack.querySelector<HTMLInputElement>("input[type='search']");
-    if (!input) return;
-
-    const pending = input.parentElement?.querySelector(".inbox-search-pending");
-    if (showPending && !pending) {
-      input.insertAdjacentHTML("afterend", pendingHtml);
-    } else if (!showPending && pending) {
-      pending.remove();
-    }
-  });
 }
 
 function inboxSearchContextActive(): boolean {
@@ -2458,18 +2368,6 @@ function patchSavedSearchNewCount(id: string, count: number, lastSeenAt?: string
   state.savedSearches = state.savedSearches.map((s) =>
     s.id === id ? { ...s, newCount: count, lastSeenAt: seen } : s,
   );
-}
-
-function openSearchModal(): void {
-  state.searchModalOpen = true;
-  void refreshSearchTagCatalog();
-  render();
-}
-
-function closeSearchModal(): void {
-  if (!state.searchModalOpen) return;
-  state.searchModalOpen = false;
-  render();
 }
 
 async function loadThreadsForSearchContext(append = false): Promise<void> {
@@ -4836,12 +4734,6 @@ async function launchDomainMailSearch(domain: string): Promise<void> {
   }
 }
 
-function isSearchActive(): boolean {
-  if (state.view === "folderManager" && folderManagerPanelMailbox()) return false;
-  if (state.activeSavedSearchId) return true;
-  return hasCommittedSearchCriteria(committedSearchCriteriaSnapshot());
-}
-
 function usesSearchContextLoader(): boolean {
   if (state.view === "folderManager" && folderManagerBrowsingPanel()) return false;
   if (isSavedDraftsVirtualMailbox(listMailboxForPanel())) return false;
@@ -4981,13 +4873,6 @@ async function applyInboxFilterFromHashHit(hit: InboxFilterHit): Promise<void> {
     toastSearchBarResult();
     render();
   }
-}
-
-function searchDraftDiffersFromCommitted(): boolean {
-  return !searchCriteriaSnapshotsEqual(
-    draftSearchCriteriaSnapshot(),
-    committedSearchCriteriaSnapshot()
-  );
 }
 
 function threadsVisibleInList(): ThreadListItem[] {
@@ -10615,7 +10500,6 @@ registerWireEventsBridge({
   orgV2DismissProposal,
   applySavedSearchView,
   llmTranslateThreadUi,
-  syncSearchBarChrome,
   launchTagMailSearch,
   switchActiveAccount,
   loadNewsletterRules,
@@ -10632,7 +10516,6 @@ registerWireEventsBridge({
   confirmMoveDialog,
   enterComposeView,
   readNlButtonRule,
-  closeSearchModal,
   hydrateEmailHtml,
   threadIsAutoMail,
   openSettingsView,
@@ -10645,14 +10528,12 @@ registerWireEventsBridge({
   composeAiRewrite,
   composeAiGrammar,
   navigateToInbox,
-  openSearchModal,
   fmSelectMailbox,
   fmCreateMailbox,
   pickAttachments,
   prepareReplyAll,
   summarizeThread,
   openMoveDialog,
-  isSearchActive,
   onThreadMoveTo,
   sendQuickReply,
   prepareForward,
@@ -10800,8 +10681,7 @@ registerMailListDeps({
   loadThreadsForSearchContext,
 });
 
-registerSearchQueryContext({ effectiveSearchMailboxPath });
-registerSearchThreadsRunDeps({ committedSearchCriteriaSnapshot });
+registerSearchQueryContext({ resolveSearchMailboxPath });
 
 registerOpenThreadDeps({
   openSavedDraftById,
@@ -10827,11 +10707,7 @@ registerOpenThreadDeps({
 registerSearchCommitDeps({
   loadMailView,
   loadThreadsForSearchContext,
-  isSearchActive,
-  searchQueryUsesThreadsApi,
   threadsVisibleInList,
-  searchMailboxForQuery,
-  effectiveSearchMailboxPath,
   clearThreadAiSummaryState,
   withLlmQueue,
   recordSearchCommittedActivity,
@@ -10839,6 +10715,11 @@ registerSearchCommitDeps({
   resolveAccountIdFromRef,
   tagFamilyForInvoke,
   canonicalEmailForNlMatch,
+});
+
+registerSearchBarUiDeps({
+  refreshSearchTagCatalog,
+  searchDraftDiffersFromCommitted,
 });
 
 initMailboxDigest({

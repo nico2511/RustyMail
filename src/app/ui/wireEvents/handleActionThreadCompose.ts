@@ -61,6 +61,8 @@ import {
   setAddressBookEditEmail,
   addressBookRowsCache,
   commitSearchQuery,
+  closeSearchModal,
+  openSearchModal,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -595,10 +597,10 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     }
     case "open-search-modal":
-      (app()["openSearchModal"] as (...a: unknown[]) => unknown)();
+      openSearchModal();
       return true;
     case "close-search-modal":
-      (app()["closeSearchModal"] as (...a: unknown[]) => unknown)();
+      closeSearchModal();
       return true;
     case "search-modal-commit":
       commitSearchQuery({ fromModal: true });

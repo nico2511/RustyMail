@@ -72,6 +72,7 @@ import { state } from "../state";
 import { threadIdsMatch } from "../lib/threadIdsMatch";
 import { openThread } from "../mail/openThreadView";
 import { commitSearchQuery } from "../mail/searchCommitQuery";
+import { syncSearchBarChrome } from "../mail/searchBarUi";
 import { app } from "./wireEventsBridge";
 export function wireEvents() {
   const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
@@ -609,7 +610,7 @@ export function wireEvents() {
       "input",
       (event) => {
         state.searchDraft = (event.currentTarget as HTMLInputElement).value;
-        (app()["syncSearchBarChrome"] as (...a: unknown[]) => unknown)();
+        syncSearchBarChrome();
         if (/#(?:tag|source|kind|entity|state)/i.test(state.searchDraft)) {
           void (app()["refreshSearchTagCatalog"] as (...a: unknown[]) => unknown)();
         }

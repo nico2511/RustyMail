@@ -64,6 +64,7 @@ import {
   setSkipAccountIdentityCaptureOnce,
   setAddressBookEditEmail,
   addressBookRowsCache,
+  isSearchActive,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -330,7 +331,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         } else if (
           state.view === "list" &&
           !isSavedDraftsVirtualMailbox(state.selectedMailbox ?? "") &&
-          !(app()["isSearchActive"] as (...a: unknown[]) => unknown)() &&
+          !isSearchActive() &&
           state.listFilter !== (app()["defaultListFilterFromPrefs"] as (...a: unknown[]) => unknown)()
         ) {
           await applyListFilter((app()["defaultListFilterFromPrefs"] as (...a: unknown[]) => unknown)());

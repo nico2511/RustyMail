@@ -1,13 +1,55 @@
 import { buildSearchQueryPayload } from "../../searchQueryBuild";
+import { parseSearchBarDraft } from "../../searchBarParse";
+import {
+  hasCommittedSearchCriteria,
+  snapshotFromStructuralState,
+  type SearchCriteriaSnapshot,
+} from "../../searchQueryState";
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import { currentAccount } from "../core/accountContext";
 import { folderManagerPanelMailbox } from "./mailboxPanelContext";
 import { state } from "../state";
 
-let effectiveSearchMailboxPathImpl: () => string | null = () => null;
+let resolveSearchMailboxPathImpl: (requested: string) => string | null = () => null;
 
-export function registerSearchQueryContext(deps: { effectiveSearchMailboxPath: () => string | null }): void {
-  effectiveSearchMailboxPathImpl = deps.effectiveSearchMailboxPath;
+export function registerSearchQueryContext(deps: {
+  resolveSearchMailboxPath: (requested: string) => string | null;
+}): void {
+  resolveSearchMailboxPathImpl = deps.resolveSearchMailboxPath;
+}
+
+export function effectiveSearchMailboxPath(): string | null {
+  const parsed = parseSearchBarDraft(state.searchDraft, state.newsletterRules);
+  const fromDraft = parsed.mailboxPath?.trim();
+  if (fromDraft && !isSavedDraftsVirtualMailbox(fromDraft)) {
+    return resolveSearchMailboxPathImpl(fromDraft);
+  }
+  const committed = state.searchMailboxPath?.trim();
+  if (committed && !isSavedDraftsVirtualMailbox(committed)) return committed;
+  return null;
+}
+
+export function committedSearchCriteriaSnapshot(): SearchCriteriaSnapshot {
+  return snapshotFromStructuralState(state);
+}
+
+export function isSearchActive(): boolean {
+  if (state.view === "folderManager" && folderManagerPanelMailbox()) return false;
+  if (state.activeSavedSearchId) return true;
+  return hasCommittedSearchCriteria(committedSearchCriteriaSnapshot());
+}
+
+export function searchQueryUsesThreadsApi(): boolean {
+  return Boolean(
+    state.search.trim() ||
+      state.searchSenders.length > 0 ||
+      state.searchTags.length > 0 ||
+      state.searchLanguageFilter?.trim() ||
+      state.searchRelativeDays != null ||
+      state.searchHasAttachment != null ||
+      state.searchMinSecurityScore != null ||
+      state.searchMailboxPrefix?.trim(),
+  );
 }
 
 export function searchAccountIdForQuery(): string {
@@ -20,13 +62,21 @@ export function searchAccountIdForQuery(): string {
 }
 
 export function searchMailboxForQuery(): string | null {
-  const explicit = effectiveSearchMailboxPathImpl();
+  const explicit = effectiveSearchMailboxPath();
   if (explicit) return explicit;
   if (state.searchScope === "mailbox") {
     const m = (folderManagerPanelMailbox() ?? state.selectedMailbox)?.trim();
     return m && !isSavedDraftsVirtualMailbox(m) ? m : "INBOX";
   }
   return null;
+}
+
+export function searchQueryMailboxForList(): string {
+  const explicit = searchMailboxForQuery();
+  if (explicit) return explicit;
+  const panelMb = folderManagerPanelMailbox();
+  if (panelMb) return panelMb;
+  return state.selectedMailbox?.trim() || "INBOX";
 }
 
 export function buildSearchQueryFromCurrentState() {

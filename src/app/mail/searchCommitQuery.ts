@@ -7,6 +7,9 @@ import {
   extractNlSearchFallbackText,
   parsedSearchBarHasModifiers,
   resetSearchStructuralState,
+  searchCriteriaSnapshotsEqual,
+  snapshotFromStructuralState,
+  type SearchCriteriaSnapshot,
   type SearchStructuralState,
 } from "../../searchQueryState";
 import type { Tag, ThreadListItem } from "../types";
@@ -18,15 +21,18 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { searchThreads } from "./searchThreadsRun";
+import {
+  committedSearchCriteriaSnapshot,
+  effectiveSearchMailboxPath,
+  isSearchActive,
+  searchMailboxForQuery,
+  searchQueryUsesThreadsApi,
+} from "./searchQueryContext";
 
 export type SearchCommitDeps = {
   loadMailView: (append: boolean) => Promise<void>;
   loadThreadsForSearchContext: (append?: boolean) => Promise<void>;
-  isSearchActive: () => boolean;
-  searchQueryUsesThreadsApi: () => boolean;
   threadsVisibleInList: () => ThreadListItem[];
-  searchMailboxForQuery: () => string | null;
-  effectiveSearchMailboxPath: () => string | null | undefined;
   clearThreadAiSummaryState: () => void;
   withLlmQueue: <T>(label: string, fn: (signal: AbortSignal) => Promise<T>) => Promise<T | null>;
   recordSearchCommittedActivity: () => void;
@@ -122,6 +128,36 @@ export function applyParsedSearchBarToState(parsed: ReturnType<typeof parseSearc
   applyParsedSearchBarToStructural(state, parsed);
 }
 
+export function draftSearchCriteriaSnapshot(draft = state.searchDraft): SearchCriteriaSnapshot {
+  const scratch: SearchStructuralState & { searchTags: Tag[] } = {
+    search: "",
+    searchSenders: [],
+    searchTags: [],
+    searchMailboxPath: null,
+    searchAccountOverrideId: null,
+    searchNewsletterRule: null,
+    searchScope: "account",
+    listFilter: "all",
+    searchNlMode: null,
+    searchLanguageFilter: null,
+    searchRelativeDays: null,
+    searchHasAttachment: null,
+    searchMinSecurityScore: null,
+    searchMailboxPrefix: null,
+  };
+  resetSearchStructuralState(scratch);
+  const parsed = parseSearchBarDraft(draft.trim(), state.newsletterRules);
+  applyParsedSearchBarToStructural(scratch, parsed);
+  return snapshotFromStructuralState(scratch);
+}
+
+export function searchDraftDiffersFromCommitted(): boolean {
+  return !searchCriteriaSnapshotsEqual(
+    draftSearchCriteriaSnapshot(),
+    committedSearchCriteriaSnapshot(),
+  );
+}
+
 export function mergeSearchBarTag(raw: { family: string; value: string }): void {
   mergeSearchBarTagOnTarget(state, raw);
 }
@@ -154,7 +190,7 @@ export function hasSearchBarCriteria(): boolean {
 export function toastSearchBarResult(): void {
   const d = deps();
   const n = d.threadsVisibleInList().length;
-  const mbTarget = d.searchMailboxForQuery();
+  const mbTarget = searchMailboxForQuery();
   const scope =
     state.searchScope === "account" && !mbTarget
       ? " · tout le compte"
@@ -181,11 +217,11 @@ export function toastSearchBarResult(): void {
 
 export async function applySearchBarQuery(): Promise<void> {
   const d = deps();
-  if (d.searchQueryUsesThreadsApi()) {
+  if (searchQueryUsesThreadsApi()) {
     await searchThreads();
     return;
   }
-  if (d.isSearchActive()) {
+  if (isSearchActive()) {
     await d.loadThreadsForSearchContext(false);
     return;
   }
@@ -391,7 +427,7 @@ export function commitSearchQuery(opts?: { fromModal?: boolean }): void {
         const scope =
           state.searchScope === "account"
             ? " (compte entier)"
-            : d.effectiveSearchMailboxPath()
+            : effectiveSearchMailboxPath()
               ? " (dossier précis)"
               : "";
         toast(`Recherche NL : ${bits.join(" · ")}${scope}.`);
