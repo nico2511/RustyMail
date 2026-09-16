@@ -34,6 +34,9 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/ui/briefMailShell.ts` | Coquille HTML brief dossier |
 | `app/mail/mailboxDigest.ts` | Brief d’action dossier (debounce, fetch, bouton toolbar) |
 | `app/mail/idleAiCachePrefetch.ts` | Préchargement cache LLM au idle |
+| `app/mail/searchQueryContext.ts` | Payload recherche (`buildSearchQueryFromCurrentState`, compte/dossier) |
+| `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` + génération annulation |
+| `app/mail/fetchOpenThread.ts` | `fetchOpenThreadOrNotify()` (invoke `open_thread`) |
 | `app/mail/mailListView.ts` | Chargement liste (`loadMailView`, compteurs, filtres) + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
