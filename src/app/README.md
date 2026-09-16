@@ -47,6 +47,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `sidebarRender.ts` | Barre latérale dossiers / vues |
 | `mainViewRender.ts` | Routage vue principale (`renderMain`) |
 | `listRender.ts` | Liste inbox (`renderList`, lignes fil) |
+| `threadViewRender.ts` | Vue fil (`renderThread`, messages, sécurité) |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 

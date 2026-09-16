@@ -1,5 +1,16 @@
 import type { Account } from "../../../accountSetup";
-import type { CleanedMessageView, ThreadListItem } from "../../types";
+import type {
+  CleanedMessageView,
+  MailSecurityFinding,
+  MailSecuritySignals,
+  MailUnsubscribeLink,
+  MessageViewMode,
+  NewsletterRuleRow,
+  Tag,
+  ThreadListItem,
+  ThreadParticipantLink,
+  ThreadRecipientPresenceEvents,
+} from "../../types";
 import type { SavedSearchListItem } from "../../../savedSearches";
 import type { StatusBarProgressJob } from "../../../statusBarProgress";
 
@@ -39,6 +50,50 @@ export type RenderDeps = {
   searchViewBatchJobStatusText: () => string;
   folderManagerPanelMailbox: () => string | null;
   cleanThreadListPreview: (raw: string) => string;
+  threadParticipantsWithEmails: (messages: CleanedMessageView[]) => ThreadParticipantLink[];
+  threadQuickReplyTargetName: (msgs: CleanedMessageView[]) => string;
+  threadParticipantFirstMessageIds: (messages: CleanedMessageView[]) => Set<string>;
+  threadRecipientPresenceEventsByMessageId: (
+    messages: CleanedMessageView[],
+  ) => Map<string, ThreadRecipientPresenceEvents>;
+  threadAiSummaryShownInZen: () => boolean;
+  threadIsAutoMail: (thread?: { isNewsletterThread?: boolean } | null, threadId?: string | null) => boolean;
+  threadListFollowed: (thread: ThreadListItem) => boolean;
+  shouldOfferPerMessageTranslate: (
+    message: CleanedMessageView,
+    targetLang: string,
+    threadTags?: Tag[],
+  ) => boolean;
+  threadTreeLaneRight: (
+    thread: { messages: CleanedMessageView[] },
+    message: CleanedMessageView,
+  ) => { isRoot: boolean; laneRight: boolean };
+  isOwnSender: (sender: string) => boolean;
+  senderAccentVars: (sender: string) => string;
+  receivedAtIsoDatetime: (receivedAt: string) => string;
+  effectiveMessageViewMode: (message: CleanedMessageView, userMode: MessageViewMode) => MessageViewMode;
+  newsletterEmailListed: (email: string) => boolean;
+  threadSuppressAutoEnvelopeMeta: (
+    thread: { isNewsletterThread?: boolean },
+    message: CleanedMessageView,
+    nlListedHere: boolean,
+  ) => boolean;
+  messageHtmlForDisplay: (message: CleanedMessageView, mode: MessageViewMode) => string | null;
+  extractUnsubscribeLinksFromHtml: (raw: string) => MailUnsubscribeLink[];
+  threadMessageAnchorId: (messageId: string, index: number) => string;
+  normalizedMailSecurity: (message: CleanedMessageView) => MailSecuritySignals;
+  mailSecurityTierClass: (ms: MailSecuritySignals) => string;
+  mailSecurityFindingsForDisplay: (
+    message: CleanedMessageView,
+    ms: MailSecuritySignals,
+  ) => MailSecurityFinding[];
+  zenSummaryHtmlFragments: (text: string) => string;
+  canonicalEmailForNlMatch: (raw: string) => string | null;
+  firstMatchingNewsletterRule: (email: string) => NewsletterRuleRow | null;
+  parseMaybeDate: (value: string) => Date | null;
+  dayKey: (date: Date) => string;
+  unsubscribeHrefScore: (hrefRaw: string) => number;
+  isSecurityLlmAugmentPending: (messageId: string) => boolean;
 };
 
 let deps: RenderDeps | null = null;
