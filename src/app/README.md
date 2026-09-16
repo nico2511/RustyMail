@@ -1,6 +1,6 @@
 # Front-end (`src/`)
 
-Découpage progressif du monolithe historique. **`application.ts` reste le cœur** (logique + `wireEvents`) ; on en retire des morceaux autonomes au fil des itérations.
+Découpage progressif du monolithe historique. **`application.ts` reste le cœur** (logique métier) ; le rendu et le câblage DOM sont extraits progressivement.
 
 ## Point d’entrée
 
@@ -52,6 +52,8 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `settingsRender.ts` | Paramètres (onglets, modale IA réglages) |
 | `aiPanelRender.ts` | Panneau Détails / brief dossier / agent IA |
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
+| `wireEvents.ts` | `wireEvents()` + `handleAction()` (pont `registerWireEventsBridge()`) |
+| `wireEventsBridge.ts` | Registre runtime des handlers laissés dans `application.ts` |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
@@ -61,6 +63,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. **`wireEvents`** → `app/ui/wireEvents.ts` (dernier gros bloc couplé)
+1. Réduire le pont **`registerWireEventsBridge()`** (imports directs + petits modules domaine)
+2. Découper **`handleAction`** par domaine (`inbox`, `compose`, `settings`, `org`)
 
 `npm run verify:ts` · `npm test`
