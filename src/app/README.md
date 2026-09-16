@@ -44,6 +44,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `statusFooterRender.ts` | Barre d’état globale, chips activité, progression inline |
 | `aiQuickPanelRender.ts` | Panneau rapide fonctionnalités IA (sidebar + barre) |
 | `aiFeatureTogglesRender.ts` | HTML toggles IA (compact / paramètres) |
+| `sidebarRender.ts` | Barre latérale dossiers / vues |
+| `mainViewRender.ts` | Routage vue principale (`renderMain`) |
+| `listRender.ts` | Liste inbox (`renderList`, lignes fil) |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
@@ -53,10 +56,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. **`render/sidebarRender.ts`** — `renderSidebar` (gros mais relativement isolé)
-2. **`render/`** — liste, fil, compose, paramètres (par lots)
-3. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
-
-## Tests
+1. **`render/`** — fil, compose, paramètres, panneau IA (par lots)
+2. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
 
 `npm run verify:ts` · `npm test`

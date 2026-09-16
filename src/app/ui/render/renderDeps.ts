@@ -1,5 +1,5 @@
 import type { Account } from "../../../accountSetup";
-import type { CleanedMessageView } from "../../types";
+import type { CleanedMessageView, ThreadListItem } from "../../types";
 import type { SavedSearchListItem } from "../../../savedSearches";
 import type { StatusBarProgressJob } from "../../../statusBarProgress";
 
@@ -34,6 +34,11 @@ export type RenderDeps = {
   renderOrganizationV2Page: () => string;
   renderFolderManagerPage: () => string;
   renderList: (mode?: "full" | "threads-only" | "filters-only") => string;
+  threadsVisibleInList: () => ThreadListItem[];
+  isSearchActive: () => boolean;
+  searchViewBatchJobStatusText: () => string;
+  folderManagerPanelMailbox: () => string | null;
+  cleanThreadListPreview: (raw: string) => string;
 };
 
 let deps: RenderDeps | null = null;
