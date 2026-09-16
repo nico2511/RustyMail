@@ -40,6 +40,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `listChrome.ts` | Badges sidebar, bannières compte, fil d’Ariane |
 | `searchBadgeChip.ts` | Puce critère de recherche |
 | `searchRender.ts` | Barre recherche, badges, modale, actions vue enregistrée |
+| `modalsRender.ts` | Déplacer, mailbox, citations, compose, image, split send, reprise brouillon |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 

@@ -17,6 +17,7 @@ export type RenderDeps = {
   activeSavedSearchItem: () => SavedSearchListItem | undefined;
   searchViewCanOpenOrganizer: () => boolean;
   searchViewCanAffinerFlux: () => boolean;
+  sourceMailboxForThread: (threadId: string) => string;
 };
 
 let deps: RenderDeps | null = null;
