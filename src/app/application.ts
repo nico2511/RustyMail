@@ -132,7 +132,8 @@ import {
   invalidateIdleAiCachePrefetch,
   scheduleIdleAiCachePrefetch,
 } from "./mail/idleAiCachePrefetch";
-import { truncateSearchBadgeLabel } from "./lib/searchBadgeLabel";
+import { formatNewsletterRuleInput } from "./lib/newsletterRuleFormat";
+import { SAVED_VIEW_BATCH_MAX } from "./lib/savedViewBatch";
 import { tagToSearchDraft, threadTagsForModal } from "./lib/threadTagsModal";
 import { registerRenderDeps } from "./ui/render/renderDeps";
 import {
@@ -142,8 +143,14 @@ import {
   renderInboxChipBadge,
   renderViewNavTrail,
 } from "./ui/render/listChrome";
-import { renderSearchBadgeChip } from "./ui/render/searchBadgeChip";
 import { renderActionBriefHtml } from "./ui/render/actionBriefHtml";
+import {
+  renderInboxSearchContextBlock,
+  renderSearchBadgesHtml,
+  renderSearchBarStackHtml,
+  renderSearchModal,
+  inboxSearchIconSvg,
+} from "./ui/render/searchRender";
 import {
   renderThreadTagsDialog,
 } from "./ui/render/threadTagsRender";
@@ -2155,11 +2162,6 @@ function firstMatchingNewsletterRule(email: string): NewsletterRuleRow | null {
   return null;
 }
 
-function formatNewsletterRuleInput(r: NewsletterRuleRow): string {
-  if ((r.localPart ?? "*").toLowerCase() === "*") return `*.${r.domain}`;
-  return `${r.localPart}@${r.domain}`;
-}
-
 async function loadNewsletterRules(): Promise<void> {
   if (!isTauriRuntime()) {
     state.newsletterRules = [];
@@ -2503,29 +2505,6 @@ async function refreshSearchTagCatalog(): Promise<void> {
     state.searchTagCatalog = [];
   }
 }
-
-function searchScopeLabel(): string {
-  if (state.searchScope === "mailbox") {
-    const mb = state.selectedMailbox || "INBOX";
-    const { full } = threadMailboxListLabel(mb);
-    return `Dossier affiché (barre latérale) : ${full}`;
-  }
-  return "Tout le compte";
-}
-
-function searchScopeBadgeShort(): string {
-  if (state.searchScope === "account") return "Compte";
-  const mb = state.selectedMailbox || "INBOX";
-  const { label } = threadMailboxListLabel(mb);
-  return truncateSearchBadgeLabel(label, 20);
-}
-
-const SEARCH_LIST_FILTER_LABELS: Record<Exclude<State["listFilter"], "all">, string> = {
-  unread: "Non lus",
-  starred: "Suivis",
-  focused: "Priorité",
-  auto: "Auto",
-};
 
 function committedSearchCriteriaSnapshot(): SearchCriteriaSnapshot {
   return snapshotFromStructuralState(state);
@@ -4762,8 +4741,6 @@ async function loadAddressBookSidebarCount(): Promise<void> {
   }
 }
 
-const SAVED_VIEW_BATCH_MAX = 500;
-
 function buildSearchQueryFromCurrentState() {
   const archiveRoot = (state.appPrefs.general.archiveRoot ?? "Archive").trim() || "Archive";
   const mailboxPrefixRaw = state.searchMailboxPrefix?.trim();
@@ -5618,10 +5595,6 @@ function threadsVisibleInList(): ThreadListItem[] {
 
 function threadListFollowed(thread: ThreadListItem): boolean {
   return Boolean(thread.followed);
-}
-
-function inboxSearchIconSvg() {
-  return `<svg class="inbox-search-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>`;
 }
 
 function activeMessageTranslationJobCount(): number {
@@ -14743,269 +14716,6 @@ function renderAiFeatureTogglesHtml(layout: "settings" | "compact" = "compact"):
   ).join("");
 }
 
-function renderSearchBadgesHtml(): string {
-  const parts: string[] = [];
-
-  const q = state.search.trim();
-  if (q) {
-    const short = truncateSearchBadgeLabel(q, 24);
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "text",
-        label: `« ${short} »`,
-        title: `Texte : ${q}`,
-        action: "clear-search-text",
-      })
-    );
-  }
-
-  for (const sender of state.searchSenders) {
-    const at = sender.indexOf("@");
-    const local = at >= 0 ? sender.slice(0, at) : sender;
-    const isDomainOnly = at < 0 && sender.includes(".");
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "sender",
-        label: isDomainOnly
-          ? truncateSearchBadgeLabel(sender, 20)
-          : `@${truncateSearchBadgeLabel(local, 18)}`,
-        title: isDomainOnly ? `Domaine expéditeur : ${sender}` : `Contact : ${sender}`,
-        action: "clear-search-sender-one",
-        dataEmail: sender,
-      })
-    );
-  }
-
-  const explicitMb = effectiveSearchMailboxPath();
-  if (explicitMb) {
-    const { label, full } = threadMailboxListLabel(explicitMb);
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "scope-mailbox",
-        label: truncateSearchBadgeLabel(label, 18),
-        title: label === full ? `Dossier : ${full}` : `Dossier : ${label} — ${full}`,
-        action: "clear-search-mailbox",
-      })
-    );
-  }
-
-  if (state.searchAccountOverrideId?.trim()) {
-    const acc = state.accounts.find((a) => a.id === state.searchAccountOverrideId);
-    const label = acc?.email ?? state.searchAccountOverrideId;
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "scope-account",
-        label: truncateSearchBadgeLabel(label, 20),
-        title: `Compte : ${label}`,
-        action: "clear-search-account",
-      })
-    );
-  }
-
-  for (const tag of state.searchTags) {
-    const fam = String(tag.family).toLowerCase();
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "tags",
-        label: truncateSearchBadgeLabel(`#${fam}:${tag.value}`, 24),
-        title: `Tag ${fam}:${tag.value} — domaine expéditeur (source) ou dossier/type (kind)`,
-        action: "clear-search-tag-one",
-        dataTag: `${fam}:${tag.value}`,
-      })
-    );
-  }
-
-  if (state.searchNewsletterRule) {
-    const rule = formatNewsletterRuleInput(state.searchNewsletterRule);
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "auto-rule",
-        label: truncateSearchBadgeLabel(rule, 22),
-        title: `Règle auto : ${rule}`,
-        action: "clear-search-newsletter-rule",
-      })
-    );
-  }
-
-  const lf = state.listFilter;
-  if (state.searchModifiersTouched && lf !== "all") {
-    parts.push(
-      renderSearchBadgeChip({
-        kind: `filter-${lf}`,
-        label: SEARCH_LIST_FILTER_LABELS[lf],
-        title: "Retirer ce filtre de la recherche",
-        action: "clear-search-list-filter",
-      })
-    );
-  }
-
-  if (state.searchNlMode || state.searchLanguageFilter) {
-    const bits: string[] = [];
-    if (state.searchNlMode) bits.push(`mode ${state.searchNlMode}`);
-    if (state.searchLanguageFilter) bits.push(`langue ${state.searchLanguageFilter.toUpperCase()}`);
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "nl",
-        label: truncateSearchBadgeLabel(`IA : ${bits.join(" · ") || "interprétation"}`, 28),
-        title: "Recherche interprétée en langage naturel. Cliquez pour retirer les modificateurs IA.",
-        action: "clear-search-nl-filters",
-      })
-    );
-  }
-
-  const lang = state.searchLanguageFilter?.trim();
-  if (lang) {
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "language",
-        label: lang.toUpperCase(),
-        title: `Langue : ${lang}`,
-        action: "clear-search-nl-filters",
-      })
-    );
-  }
-
-  /** Portée : Compte ↔ dossier de la barre latérale (pas le #local:… explicite). */
-  if (!explicitMb && state.view !== "folderManager" && inboxSearchContextActive()) {
-    parts.push(
-      renderSearchBadgeChip({
-        kind: state.searchScope === "account" ? "scope-account" : "scope-mailbox",
-        label: searchScopeBadgeShort(),
-        title: `${searchScopeLabel()} — cliquer pour basculer avec « tout le compte »`,
-        action: "toggle-search-scope",
-        dismissible: false,
-      })
-    );
-  }
-
-  if (
-    state.searchSenders.length > 0 &&
-    isTauriRuntime() &&
-    isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")
-  ) {
-    parts.push(
-      `<button type="button" class="search-badge search-badge--summarize" role="listitem" data-action="summarize-sender-threads" title="Résumer le fil ouvert ou le contexte filtré"><span class="search-badge__label">Résumer</span></button>`
-    );
-  }
-
-  if (parts.length === 0) return "";
-
-  return `<div class="inbox-search-badges" role="list" aria-label="Critères de recherche actifs">${parts.join("")}</div>`;
-}
-
-function renderSaveSearchViewButtonHtml(): string {
-  if (!canSaveSearchView()) return "";
-  return `<button type="button" class="search-save-view-btn" data-action="save-saved-search" title="Enregistrer ces critères comme vue dans la sidebar">Enregistrer la vue</button>`;
-}
-
-function renderSearchBarMetaRow(
-  badgesHtml: string,
-  trailingActionsHtml = "",
-  opts?: { includeSaveButton?: boolean },
-): string {
-  const saveBtn = opts?.includeSaveButton !== false ? renderSaveSearchViewButtonHtml() : "";
-  const actions = [saveBtn, trailingActionsHtml].filter(Boolean).join("");
-  if (!badgesHtml && !actions) return "";
-  return `<div class="search-bar-meta">
-    ${badgesHtml ? `<div class="search-bar-meta__badges search-context-filters" aria-label="Critères actifs">${badgesHtml}</div>` : ""}
-    ${actions ? `<div class="search-bar-meta__actions search-ctx-actions" role="toolbar">${actions}</div>` : ""}
-  </div>`;
-}
-
-function renderSearchBarFieldHtml(inputId: string, opts?: { showSlashHint?: boolean }): string {
-  const showSlash = opts?.showSlashHint !== false;
-  const showNl =
-    isTauriRuntime() && isAiFeatureEnabled(state.appPrefs.ai, "featureSearchNlEnabled");
-  return `
-    <label class="inbox-search surface-sm">
-      ${inboxSearchIconSvg()}
-      <input id="${escapeAttr(inputId)}" type="search" value="${escapeAttr(state.searchDraft)}" placeholder="Rechercher… Entrée · @contact · #local:dossier (Tab) · #compte" aria-label="Rechercher : Entrée pour valider · #local:nom ou #local:&quot;Perso/Archives&quot;" autocomplete="off" />
-      ${searchDraftDiffersFromCommitted() ? `<span class="inbox-search-pending dim" title="Entrée pour lancer la recherche">↵</span>` : ""}
-      ${
-        showNl
-          ? `<button type="button" class="inbox-search-nl ghost-button" data-action="search-nl-assist" title="Assistant : décrire la recherche en langage naturel (LLM)">NL</button>`
-          : ""
-      }
-      ${showSlash ? `<span class="kbd">/</span>` : ""}
-    </label>`;
-}
-
-function renderSearchBarStackHtml(
-  inputId: string,
-  opts?: { showSlashHint?: boolean; includeSaveButton?: boolean },
-): string {
-  const badges = renderSearchBadgesHtml();
-  const meta = renderSearchBarMetaRow(badges, "", { includeSaveButton: opts?.includeSaveButton });
-  return `<div class="inbox-search-stack search-bar-stack">${renderSearchBarFieldHtml(inputId, opts)}${meta}</div>`;
-}
-
-function renderSearchViewActionsHtml(visibleCount: number): string {
-  if (!isTauriRuntime() || !inboxSearchContextActive()) return "";
-  const n = Math.min(visibleCount, SAVED_VIEW_BATCH_MAX);
-  const saved = activeSavedSearchItem();
-  const btns: string[] = [];
-  if (n > 0) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-mark-read" title="Marquer comme lus (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Lus</button>`,
-    );
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-archive" title="Archiver (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Archiver</button>`,
-    );
-  }
-  if (searchViewCanOpenOrganizer()) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-open-organizer" title="Ouvrir Organiser V2 (structure boîte, sans rescan global)">Organiser</button>`,
-    );
-  }
-  if (searchViewCanAffinerFlux()) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--affiner" data-action="search-view-affiner" title="LLM : proposer un dossier IMAP pour ce flux (Propositions Organiser activées)">Affiner</button>`,
-    );
-  }
-  if (state.activeSavedSearchId && saved && (saved.newCount ?? 0) > 0) {
-    const marking = state.savedSearchMarkingSeenId === state.activeSavedSearchId;
-    btns.push(
-      marking
-        ? `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" disabled aria-busy="true">Marquage…</button>`
-        : `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" data-action="saved-search-mark-seen" title="Marquer la vue comme à jour (badge nouveaux)">+${saved.newCount} · vu</button>`,
-    );
-  }
-  return btns.join("");
-}
-
-function renderInboxSearchContextBlock(visibleCount: number): string {
-  const badges = renderSearchBadgesHtml();
-  const actionBtns = renderSearchViewActionsHtml(visibleCount);
-  const meta = renderSearchBarMetaRow(badges, actionBtns);
-  return `<div class="search-ctx-stack search-bar-stack search-bar-stack--context" data-search-bar-root>
-    ${renderSearchBarFieldHtml("search-input", { showSlashHint: true })}
-    ${meta}
-  </div>`;
-}
-
-function renderSearchModal(): string {
-  if (!state.searchModalOpen) return "";
-  return `
-    <div class="modal-backdrop search-modal-backdrop" data-action="close-search-modal">
-      <div class="modal surface-elevated search-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
-        <div class="modal-header">
-          <strong id="search-modal-title">Recherche</strong>
-          <button type="button" class="icon-pill" data-action="close-search-modal" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body search-modal-body">
-          <p class="dim search-modal-hint">Vous pouvez taper librement (« mails de Jean avec factures en 2024 »), ou utiliser la syntaxe avancée : <code>@contact</code>, <code>#local:dossier</code>, <code>#compte</code>, tags. <kbd class="kbd">Entrée</kbd> pour lancer.</p>
-          ${renderSearchBarStackHtml("search-modal-input", { showSlashHint: false, includeSaveButton: false })}
-        </div>
-        <div class="modal-footer">
-          ${canSaveSearchViewInModal() ? `<button type="button" class="search-save-view-btn" data-action="save-saved-search" title="Enregistrer la recherche comme vue">Enregistrer la vue</button>` : ""}
-          <button type="button" class="ghost-button" data-action="close-search-modal">Fermer</button>
-          <button type="button" class="primary-button" data-action="search-modal-commit" style="padding:9px 14px">Rechercher</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function render() {
   syncMailboxDigestPanelWithFeaturePref();
   accountsFormIdentityScratch = undefined;
@@ -17899,6 +17609,14 @@ registerRenderDeps({
   normalizeThreadSenderLabel,
   formatThreadReadingWhen,
   sortMessagesByReceivedDescending,
+  effectiveSearchMailboxPath,
+  inboxSearchContextActive,
+  canSaveSearchView,
+  canSaveSearchViewInModal,
+  searchDraftDiffersFromCommitted,
+  activeSavedSearchItem,
+  searchViewCanOpenOrganizer,
+  searchViewCanAffinerFlux,
 });
 
 initMailboxDigest({

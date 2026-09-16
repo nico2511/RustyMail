@@ -1,4 +1,5 @@
 import type { CleanedMessageView } from "../../types";
+import type { SavedSearchListItem } from "../../../savedSearches";
 
 /** Callbacks laissés dans application.ts pour éviter les imports circulaires depuis les modules render. */
 export type RenderDeps = {
@@ -8,6 +9,14 @@ export type RenderDeps = {
   normalizeThreadSenderLabel: (sender: string) => string;
   formatThreadReadingWhen: (receivedAt: string) => string;
   sortMessagesByReceivedDescending: (messages: CleanedMessageView[]) => CleanedMessageView[];
+  effectiveSearchMailboxPath: () => string | null;
+  inboxSearchContextActive: () => boolean;
+  canSaveSearchView: () => boolean;
+  canSaveSearchViewInModal: () => boolean;
+  searchDraftDiffersFromCommitted: () => boolean;
+  activeSavedSearchItem: () => SavedSearchListItem | undefined;
+  searchViewCanOpenOrganizer: () => boolean;
+  searchViewCanAffinerFlux: () => boolean;
 };
 
 let deps: RenderDeps | null = null;

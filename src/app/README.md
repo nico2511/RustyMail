@@ -31,12 +31,27 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/mailboxDigest.ts` | Brief d’action dossier (debounce, fetch, bouton toolbar) |
 | `app/mail/idleAiCachePrefetch.ts` | Préchargement cache LLM au idle |
 
+### Rendu UI (`app/ui/render/`)
+
+Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `application.ts` (fil d’Ariane, tags fil, etc.).
+
+| Fichier | Contenu |
+| ------- | ------- |
+| `listChrome.ts` | Badges sidebar, bannières compte, fil d’Ariane |
+| `searchBadgeChip.ts` | Puce critère de recherche |
+| `searchRender.ts` | Barre recherche, badges, modale, actions vue enregistrée |
+| `threadTagsRender.ts` | Modale / chips tags fil |
+| `actionBriefHtml.ts` | HTML brief d’action IA |
+
+Libs associées : `searchBadgeLabel.ts`, `searchScopeLabels.ts`, `searchListFilterLabels.ts`, `savedViewBatch.ts`, `newsletterRuleFormat.ts`, `threadTagsModal.ts`.
+
 Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.mjs`, `tools/degrade-extract-batch3.mjs`.
 
 ## Prochaines extractions (ordre suggéré)
 
-1. **`render*.ts`** → plusieurs fichiers sous `app/ui/render/` avec pont `renderDeps` (registre rempli par `application.ts`) — évite les imports circulaires
-2. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
+1. **`render/modals*.ts`** — move, compose close, resume draft, split send, etc.
+2. **`render/`** — liste, fil, compose, paramètres (par lots)
+3. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
 
 ## Tests
 
