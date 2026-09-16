@@ -4,41 +4,47 @@ Source of truth for the front end (`src/styles.css`, `src/main.ts`): tokens, Com
 
 ## Principles
 
-- **Theme:** Very dark background; layered surfaces (`--deep` → `--surface` → `--elevated`); subtle borders (`--border` / `--border-weak`)
-- **Radii:** `--radius-btn: 3px` for buttons (Slate Monolith); cards/panels use `--radius-sm` / `--radius-md`
-- **Density:** Inbox and thread lists are airy but professional; minimal rounding on dense actions
+- **Theme:** Warm **pastel light** — cream surfaces (`--deep` → `--surface` → `--elevated`); neither pure white nor slate-dark. Subtle borders (`--border` / `--border-weak`).
+- **Accents:** Soft sage (`--sm-primary`), dusty rose (`--sm-tertiary`), optional lavender / peach / sky tokens for chips and highlights.
+- **Radii:** `--radius-btn: 8px` and slightly rounder panels (`--radius-sm` … `--radius-lg`) for a calm, approachable feel.
+- **Density:** Inbox and thread lists stay airy and professional; readable contrast on pastel backgrounds (`--text` on `--surface`).
 
 ## Typography
 
-- **UI:** `"Inter"` (serif **Newsreader** in some preview zones)
+- **UI:** `system-ui` stack (local only — no Google Fonts).
 - **Composer (markdown):** monospace on `.composer-mail-shell .composer-body textarea`
 - **Text colors:** `--text`, `--muted`, `--dim` — prefer variables over hard-coded grays
 
 ## Palette & tokens (`:root`)
 
-**Color board:** [guidance-color.png](./guidance-color.png) — **Slate Monolith** (Primary `#6F7A6F`, Secondary `#747873`, Tertiary `#37272A`, Neutral `#787775`)
+Pastel reference (2026 refonte):
 
-- **Accents:** `--sm-primary` … `--sm-neutral`; `--accent` = `--sm-primary`; `--accent-dim` for light highlights
-- **Buttons:**
-  - **Primary:** `--btn-primary-fill` + `--btn-primary-text` (e.g. Send)
-  - **Secondary:** `--btn-secondary-*`
-  - **Outlined:** `.ghost-button` — border `--btn-outlined-border`
-- **Destructive (trash icons):** `--sm-danger-surface` / `--sm-danger-border` / `--sm-danger-fg`
-- **Semantics:** `--danger`, `--success`, `--warn`
+| Role | Token | Example |
+| ---- | ----- | ------- |
+| Canvas | `--deep` | Warm gray-cream |
+| Panels | `--base`, `--surface`, `--elevated` | Layered off-whites |
+| Accent | `--accent` (= `--sm-primary`) | Sage green |
+| Warm accent | `--accent-warm`, `--accent-peach` | Tags, highlights |
+| Primary button | `--btn-primary-fill` + `--btn-primary-text` | Sage fill, dark text |
+| Secondary | `--btn-secondary-*` | Light gray fill |
+| Overlays | `--scrim`, `--scrim-heavy` | Modals / AI quick panel |
+| Destructive | `--sm-danger-*`, `--danger` | Soft coral |
+
+Legacy **Slate Monolith** dark palette was replaced by this light pastel system; old `guidance-color.png` remains historical reference only.
 
 ## Surfaces & layout
 
 - **`.surface` / `.surface-sm`:** cards with shadows `--carved` / `--carved-sm`
 - **Inbox:** `inbox-*` (app bar, chips, list panel)
-- **Thread reading:** `.thread-reading` — monolith-style header (large subject, participants + avatars, Archive / Reply, `thread-zen` summary when `state.aiOutput`), **full width** of main panel
+- **Thread reading:** `.thread-reading` — header (subject, participants + avatars, Archive / Reply, `thread-zen` summary when `state.aiOutput`), **full width** of main panel
 - **List:** no tag column on the right; mailbox choice via **sidebar** only
 
 ## Composer: `.composer-mail-shell`
 
 - `<section class="compose-view composer-mail-shell">` — mail compose only (not account setup)
-- Palette follows `guidance-color.png` (no separate blue composer theme)
+- Palette follows global pastel tokens
 - **Send:** global primary (`--btn-primary-fill`)
-- Markdown / active tone: sage green `--sm-primary`, `--accent-dim`
+- Markdown / active tone: `--accent`, `--accent-dim`
 - **`composer-accent-outline`:** Add attachment, Adjust tone
 - **Cc · Bcc:** `.compose-link` → `--accent`
 
@@ -77,9 +83,10 @@ Source of truth for the front end (`src/styles.css`, `src/main.ts`): tokens, Com
 
 ## Possible evolutions
 
-- Three-column layout (AI rail + editor + wide panel) if product targets it
+- Optional **dark** theme via `prefers-color-scheme` or explicit toggle (tokens are centralized for this)
+- Three-column layout refinements (AI rail + editor + wide panel)
 - Rich editor with unified undo beyond Markdown toolbar
 
 ---
 
-*Older “North Star” inspiration docs were removed during consolidation; this file tracks the shipping UI.*
+*Older “North Star” / Slate Monolith docs were consolidated; this file tracks the shipping UI.*
