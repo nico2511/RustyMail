@@ -1,17 +1,24 @@
 import { invoke } from "@tauri-apps/api/core";
+
 import { listen, TauriEvent } from "@tauri-apps/api/event";
+
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+
 import DOMPurify from "dompurify";
+
 import { ipcThrottleMs, invokeAiCacheGet } from "../ipc_bridge";
+
 import {
   clearThreadsRecentlyRemoved,
   filterRecentlyRemovedThreads,
   markThreadsRecentlyRemoved,
 } from "../recentlyRemovedThreads";
+
 import {
   collapseLargeDataImageMarkdown,
   expandInlineImagePlaceholders,
 } from "../composeMarkdownImages";
+
 import {
   LOCAL_SAVED_DRAFTS_MAILBOX,
   SAVED_DRAFT_THREAD_PREFIX,
@@ -29,6 +36,7 @@ import {
   threadMailboxColumnTitle,
   threadMailboxListLabel,
 } from "../mailboxKinds";
+
 import {
   SYNC_MAILBOXES_BATCH_SIZE,
   chunkStringList,
@@ -36,30 +44,67 @@ import {
   syncInvokeTimeoutMs as syncInvokeTimeoutMsFor,
   type SyncMailboxesOutcome,
 } from "../imapSyncTypes";
+
 import { notifyImapWatchFocusedMailbox as notifyImapWatchFocusedMailboxCore } from "../imapWatchFocus";
+
 import { mergeServerThreadPage } from "../mailListPage";
+
 import { appendQuotedMessageToDraft } from "../composeQuote";
+
 import {
   formatFriendlyThreadListDate,
   parseThreadListActivityDate,
   savedDraftDatesColumnSnippet,
   threadListActivityTooltip,
 } from "../threadListDates";
+
 import type { AppPrefs, AppPrefsAi } from "../prefs_defaults";
+
 import {
   WHISPER_PTT_KEY_CODES,
   defaultAppPrefs,
   normalizeAiPrefsMerged,
 } from "../prefs_defaults";
+
 import { getUiLocale, localeTag, setLocale, t } from "../i18n";
+
 import type { PromptCatalogItem } from "../promptsSettingsPanel";
+
 import { maybeShowFirstRunWizard } from "../setupWizard";
+
+import { toast } from "./lib/toast";
+
+import { inputValue, numberValue, selectValue, checkedValue, formatTime } from "./lib/domForm";
+
+import { formatPlainTextWithLinks, linkifyPlainSegment, trimUrlTrailingPunct } from "./lib/textFormat";
+
+import { initials, formatTag, isNoisyTag } from "./lib/tags";
+
+import { iconSvg } from "./lib/iconSvg";
+
+import {
+  openTextPromptModal,
+  finishTextPromptModal,
+  renderTextPromptModal,
+  openConfirmModal,
+  finishConfirmModal,
+  renderConfirmModal,
+  isTextPromptOpen,
+  isConfirmOpen,
+} from "./modals/promptConfirm";
+
+import { utf8StringToBase64, base64ToUtf8String, mailHtmlMountAttrs, flattenNestedParagraphInDocument, base64ToImageBlob } from "./lib/htmlMessage";
+
+import { composeRewriteStyleFromTone, toneLabelsFr, tones } from "./core/composeTone";
 import "../styles.css";
+
 import { escapeAttr, escapeHtml } from "../ui/sanitize";
+
 import {
   renderStatusBarProgressInlineHtml,
   type StatusBarProgressJob,
 } from "../statusBarProgress";
+
 import {
   accountFieldTouched,
   applyDomainPresetIfSafe,
@@ -74,10 +119,15 @@ import {
   type OAuthAccountWizardPhase,
   type SecurityMode,
 } from "../accountSetup";
+
 import { attachAtAutocomplete } from "../atAutocomplete";
+
 import { attachHashAutocomplete, isHashAutocompletePanelOpen, type InboxFilterHit } from "../hashAutocomplete";
+
 import { isAtAutocompletePanelOpen } from "../atAutocomplete";
+
 import { parseSearchBarDraft } from "../searchBarParse";
+
 import {
   applyNlSearchQueryToState,
   extractNlSearchFallbackText,
@@ -90,13 +140,17 @@ import {
   type SearchCriteriaSnapshot,
   type SearchStructuralState,
 } from "../searchQueryState";
+
 import { buildSearchQueryPayload } from "../searchQueryBuild";
+
 import { recordSearchHistory } from "../searchHistory";
+
 import {
   applySavedSearchToState,
   buildSavedSearchUiState,
   buildSavedSearchUpsert,
 } from "../savedSearchApply";
+
 import {
   applySavedSearchCmd,
   deleteSavedSearchCmd,
@@ -105,7 +159,9 @@ import {
   upsertSavedSearchCmd,
   type SavedSearchListItem,
 } from "../savedSearches";
+
 import { renderSavedSearchesSidebarHtml, renderSuggestedViewsCardHtml } from "../savedSearchView";
+
 import {
   clearSuggestionShownKeys,
   dismissViewSuggestionCmd,
@@ -118,18 +174,21 @@ import {
   setActivityRecordingEnabled,
   type SuggestedSavedView,
 } from "../activity";
+
 import {
   mountComposeRecipientChips,
   type ComposeRecipientChipsHandle,
   type ComposeRecipientField,
   type RecipientChip,
 } from "../composeRecipientChips";
+
 import {
   AI_FEATURE_TOGGLE_GROUPS,
   type AiFeatureKey,
   isAiFeatureEnabled,
   setAllAiFeatures,
 } from "../aiFeatures";
+
 import {
   applyEngineConnectionMode,
   engineConnectionMode,
@@ -143,7 +202,9 @@ import {
   type SettingsAiModalId,
   type SettingsAiPanelDeps,
 } from "../settingsAiPanel";
+
 import { captureAiPrefsFieldsFromDom, syncLlmEnginePrefsToDom } from "../aiPrefsPersist";
+
 import {
   getAssistSkillUi,
   assistModeLabel,
@@ -162,7 +223,9 @@ import {
   type AssistMode,
   type AssistSkillId,
 } from "../assistAgent";
+
 import { cancelActiveLlmStreamJob, extractPartialJsonStringField, isLlmCancelledError, runLlmStreamJob } from "../llmStream";
+
 import {
   clearContactProfile,
   getContactDetail,
@@ -178,6 +241,7 @@ import {
   setContactsKeywordDraft,
   setContactsListQuery,
 } from "../contactsView";
+
 import {
   navApplyPendingScrollRestore,
   navJumpToStackIndex,
@@ -198,6 +262,7 @@ import {
   type NavSnapshot,
   type NavSettingsTab,
 } from "../navigation";
+
 import {
   defaultOrganizationState,
   optimisticOrgRemoveThreads,
@@ -213,6 +278,7 @@ import {
   type OrgThreadRef,
   type OrganizationViewState,
 } from "../organizationView";
+
 import {
   ORG_V2_APPLY_CHUNK_SIZE,
   chunkStringIds,
@@ -229,7 +295,9 @@ import {
   renderOrganizationV2View,
   type OrganizationV2ViewState,
 } from "../organizationViewV2";
+
 import type { OrgApplyProgress } from "../organizationView";
+
 import {
   archiveMailboxThreads,
   defaultFolderManagerState,
@@ -239,17 +307,21 @@ import {
   setMailboxLocked,
   type FolderManagerViewState,
 } from "../folderManagerView";
+
 import {
   isDescendantMailboxPath,
   loadFolderTreeExpanded,
   saveFolderTreeExpanded,
   splitMailboxSegments,
 } from "../mailboxTree";
-import { state } from "./state";
-import { registerRender } from "./dispatch";
-import { root as appShell } from "./dom";
-import type { View, Tone, Tag, Entity, ThreadListItem, Draft, DraftPreview, DraftRevisionListItem, DraftDiffLine, DraftCompareView, MicDictationTarget, MessageViewMode, ComposeLayout, MicState, MailSecuritySignals, CleanedMessageView, DiscussionThreadView, AppStatus, AppPathsView, AppCapabilities, LlmRuntimeStatus, NewsletterRuleRow, InboxFilterCounts, ActionBriefResult, CloseComposeModal, ResumeDraftModal, OrphanDraftSessionItem, State, SearchViewBatchJob, MailboxFolderStatsRow, SavedDraftListItem, SemanticEmbeddingCountsSnapshot, FluxAffinerResult, MailUnsubscribeLink, SplitPlan, InlineAttachPayload, ThreadParticipantLink, ThreadRecipientPresenceEvents, TextPromptModalSpec, ConfirmModalSpec, NavigateOpts, OAuthDesktopLoginOutcome, SummaryResult, ActionBriefEvidenceLink, AddressBookRow, ShortcutRow, SavedDraftOpenPayload, SendDraftOutcome, SplitSendResult, LlmTranslationResult, MicActionOpts } from "./types";
 
+import { state } from "./state";
+
+import { registerRender } from "./dispatch";
+
+import { root as appShell } from "./dom";
+
+import type { View, Tone, Tag, Entity, ThreadListItem, Draft, DraftPreview, DraftRevisionListItem, DraftDiffLine, DraftCompareView, MicDictationTarget, MessageViewMode, ComposeLayout, MicState, MailSecuritySignals, CleanedMessageView, DiscussionThreadView, AppStatus, AppPathsView, AppCapabilities, LlmRuntimeStatus, NewsletterRuleRow, InboxFilterCounts, ActionBriefResult, CloseComposeModal, ResumeDraftModal, OrphanDraftSessionItem, State, SearchViewBatchJob, MailboxFolderStatsRow, SavedDraftListItem, SemanticEmbeddingCountsSnapshot, FluxAffinerResult, MailUnsubscribeLink, SplitPlan, InlineAttachPayload, ThreadParticipantLink, ThreadRecipientPresenceEvents, TextPromptModalSpec, ConfirmModalSpec, NavigateOpts, OAuthDesktopLoginOutcome, SummaryResult, ActionBriefEvidenceLink, AddressBookRow, ShortcutRow, SavedDraftOpenPayload, SendDraftOutcome, SplitSendResult, LlmTranslationResult, MicActionOpts } from "./types";
 
 let llmQueueAbort: AbortController | null = null;
 
@@ -308,30 +380,6 @@ function draftPayloadForRust(d: Draft): Draft {
   };
 }
 
-const tones: Tone[] = ["Professional", "Casual", "Assertive", "Empathetic"];
-
-const toneLabelsFr: Record<Tone, string> = {
-  Professional: "Professionnel",
-  Casual: "Décontracté",
-  Assertive: "Ferme",
-  Empathetic: "Empathique",
-};
-
-function composeRewriteStyleFromTone(): string {
-  switch (state.tone) {
-    case "Professional":
-      return "Formal";
-    case "Casual":
-      return "Casual";
-    case "Assertive":
-      return "Assertive";
-    case "Empathetic":
-      return "Polite";
-    default:
-      return "Neutral";
-  }
-}
-
 function captureAiFeatureTogglesFromDom(root: ParentNode = document): void {
   root.querySelectorAll<HTMLInputElement>("[data-ai-feature]").forEach((el) => {
     const key = el.dataset.aiFeature as AiFeatureKey | undefined;
@@ -344,53 +392,6 @@ async function persistAiFeaturePrefs(): Promise<void> {
   if (!isTauriRuntime()) return;
   state.appPrefs.ai = normalizeAiPrefsMerged(state.appPrefs.ai);
   await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
-}
-
-function renderAiFeatureTogglesHtml(layout: "settings" | "compact" = "compact"): string {
-  const ai = state.appPrefs.ai;
-  if (layout === "settings") {
-    return AI_FEATURE_TOGGLE_GROUPS.map(
-      (group, idx) => `
-      ${idx > 0 ? '<hr class="settings-section-divider settings-ai-features-divider" />' : ""}
-      <fieldset class="settings-ai-features-group ai-feature-group">
-        <legend class="ai-feature-group__title">${escapeHtml(group.title)}</legend>
-        <div class="ai-feature-group__items">
-          ${group.items
-            .map(
-              (item) => `
-          <label class="settings-form-check ai-feature-toggle">
-            <input type="checkbox" data-ai-feature="${escapeAttr(item.key)}" ${ai[item.key] ? "checked" : ""} />
-            <span class="settings-form-check-text">
-              <span class="settings-form-check-title">${escapeHtml(item.label)}</span>
-              <span class="dim settings-ai-feature-desc">${escapeHtml(item.description)}</span>
-            </span>
-          </label>`
-            )
-            .join("")}
-        </div>
-      </fieldset>`
-    ).join("");
-  }
-  return AI_FEATURE_TOGGLE_GROUPS.map(
-    (group) => `
-      <fieldset class="ai-feature-group">
-        <legend class="ai-feature-group__title">${escapeHtml(group.title)}</legend>
-        <div class="ai-feature-group__items">
-          ${group.items
-            .map(
-              (item) => `
-            <label class="settings-form-check ai-feature-toggle">
-              <input type="checkbox" data-ai-feature="${escapeAttr(item.key)}" ${ai[item.key] ? "checked" : ""} />
-              <span class="settings-form-check-text">
-                <span class="settings-form-check-title">${escapeHtml(item.label)}</span>
-                ${settingsExplainHtml(escapeHtml(item.description), "toggle")}
-              </span>
-            </label>`
-            )
-            .join("")}
-        </div>
-      </fieldset>`
-  ).join("");
 }
 
 async function rewriteDictatedSegmentWithTone(raw: string): Promise<string> {
@@ -1010,94 +1011,6 @@ function writeSidebarCollapsedPreference(collapsed: boolean) {
   } catch {
     /* navigation privée, quota, etc. */
   }
-}
-
-let textPromptModal: TextPromptModalSpec | null = null;
-
-let textPromptResolver: ((value: string | null) => void) | null = null;
-
-let confirmModal: ConfirmModalSpec | null = null;
-
-let confirmResolver: ((ok: boolean) => void) | null = null;
-
-function openTextPromptModal(spec: TextPromptModalSpec): Promise<string | null> {
-  textPromptModal = spec;
-  render();
-  return new Promise((resolve) => {
-    textPromptResolver = resolve;
-  });
-}
-
-function finishTextPromptModal(value: string | null) {
-  textPromptModal = null;
-  const r = textPromptResolver;
-  textPromptResolver = null;
-  r?.(value);
-  render();
-}
-
-function openConfirmModal(spec: ConfirmModalSpec): Promise<boolean> {
-  confirmModal = spec;
-  render();
-  return new Promise((resolve) => {
-    confirmResolver = resolve;
-  });
-}
-
-function finishConfirmModal(ok: boolean) {
-  confirmModal = null;
-  const r = confirmResolver;
-  confirmResolver = null;
-  r?.(ok);
-  render();
-}
-
-function renderTextPromptModal(): string {
-  if (!textPromptModal) return "";
-  const m = textPromptModal;
-  return `
-    <div class="modal-backdrop" data-action="text-prompt-cancel">
-      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="text-prompt-title">
-        <div class="modal-header">
-          <strong id="text-prompt-title">${escapeHtml(m.title)}</strong>
-          <button type="button" class="icon-pill" data-action="text-prompt-cancel" aria-label="Annuler">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body" style="display:grid;gap:12px">
-          ${m.body ? `<p class="dim" style="margin:0;line-height:1.45">${escapeHtml(m.body)}</p>` : ""}
-          <label class="settings-field" style="display:grid;gap:6px;margin:0">
-            <span>${escapeHtml(m.label)}</span>
-            <input id="text-prompt-input" type="text" class="field-input" value="${escapeAttr(m.defaultValue)}" autocomplete="off" />
-          </label>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="ghost-button" data-action="text-prompt-cancel">Annuler</button>
-          <button type="button" class="primary-button" data-action="text-prompt-confirm">OK</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-function renderConfirmModal(): string {
-  if (!confirmModal) return "";
-  const m = confirmModal;
-  const okLabel = m.confirmLabel?.trim() || "Confirmer";
-  const okClass = m.danger ? "primary-button danger-ok" : "primary-button";
-  return `
-    <div class="modal-backdrop" data-action="confirm-modal-no">
-      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
-        <div class="modal-header">
-          <strong id="confirm-modal-title">${escapeHtml(m.title)}</strong>
-          <button type="button" class="icon-pill" data-action="confirm-modal-no" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body" style="display:grid;gap:10px">
-          <p style="margin:0;line-height:1.5">${escapeHtml(m.body)}</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="ghost-button" data-action="confirm-modal-no">Annuler</button>
-          <button type="button" class="${okClass}" data-action="confirm-modal-yes">${escapeHtml(okLabel)}</button>
-        </div>
-      </div>
-    </div>`;
 }
 
 async function refreshSettingsPathsFromBackend(): Promise<void> {
@@ -2009,12 +1922,6 @@ function navCurrentBreadcrumbSegment(): string | null {
   }
 }
 
-function renderViewNavTrail(actionsHtml?: string): string {
-  const seg = navCurrentBreadcrumbSegment();
-  if (!seg) return "";
-  return navRenderTrailHtml(seg, escapeHtml, escapeAttr, actionsHtml ? { actionsHtml } : {});
-}
-
 async function navigateToBreadcrumbIndex(stackIndex: number): Promise<void> {
   if (stackIndex < 0) {
     navigateToInbox();
@@ -2424,12 +2331,6 @@ function defaultListFilterFromPrefs(): State["listFilter"] {
   return LIST_FILTER_VALUES.includes(raw as State["listFilter"]) ? (raw as State["listFilter"]) : "all";
 }
 
-function renderInboxChipBadge(count: number): string {
-  const n = Math.max(0, Math.floor(Number(count)) || 0);
-  if (n <= 0) return "";
-  return ` <span class="inbox-chip-badge">${n}</span>`;
-}
-
 function settingsExplainHtml(inner: string, kind: "lead" | "field" | "toggle" = "lead"): string {
   if (kind === "toggle") {
     return `<span class="settings-explain settings-explain--toggle"><span class="settings-explain__content">${inner}</span></span>`;
@@ -2475,19 +2376,6 @@ async function loadInboxFilterCounts(): Promise<void> {
   }
 }
 
-function renderFolderSidebarCountPill(mb: string): string {
-  const u = state.mailboxUnread[mb] ?? 0;
-  const t = state.mailboxTotal[mb] ?? 0;
-  if (t <= 0 && u <= 0) return "";
-  const title =
-    u > 0
-      ? `${t} conversation${t === 1 ? "" : "s"} · ${u} non lu${u === 1 ? "" : "s"}`
-      : `${t} conversation${t === 1 ? "" : "s"} en cache`;
-  return `<span class="folder-count folder-count-wrap" title="${escapeAttr(title)}"><span class="folder-count-num">${t}</span>${
-    u > 0 ? `<span class="folder-count-unread" aria-label="${u} non lu${u === 1 ? "" : "s"}">${u}</span>` : ""
-  }</span>`;
-}
-
 const DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY = "rustymail.dismissDefaultAccountPrompt";
 
 function defaultAccountIdFromPrefs(): string | undefined {
@@ -2529,33 +2417,6 @@ function shouldShowDefaultAccountPrompt(): boolean {
     /* ignore */
   }
   return true;
-}
-
-function renderDefaultAccountPromptBanner(): string {
-  if (!shouldShowDefaultAccountPrompt()) return "";
-  const prefId = defaultAccountIdFromPrefs();
-  const opts = state.accounts
-    .map((a) => {
-      const label = (a.displayName || a.email || a.id).trim();
-      const selected = prefId === a.id || (!prefId && a.id === state.selectedAccountId);
-      return `<option value="${escapeAttr(a.id)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
-    })
-    .join("");
-  return `
-    <div class="inbox-brief-banner inbox-brief-banner--hint default-account-prompt" role="region" aria-label="Compte par défaut au démarrage">
-      <div class="inbox-brief-banner__title">Compte à l’ouverture</div>
-      <div class="inbox-brief-banner__text">
-        <p>Vous avez <strong>${state.accounts.length} comptes</strong>. Choisissez celui ouvert par défaut au démarrage de RustyMail.</p>
-        <div class="default-account-prompt__row">
-          <select class="settings-ctl settings-ctl-select default-account-prompt__select" id="default-account-prompt-select" aria-label="Compte par défaut">
-            ${opts}
-          </select>
-          <button type="button" class="primary-button" data-action="save-default-account-prompt">Enregistrer</button>
-          <button type="button" class="ghost-button" data-action="dismiss-default-account-prompt">Plus tard</button>
-          <button type="button" class="ghost-button" data-action="open-settings-default-account">Paramètres</button>
-        </div>
-      </div>
-    </div>`;
 }
 
 async function persistDefaultAccountId(accountId: string): Promise<void> {
@@ -2854,35 +2715,6 @@ async function loadAccountsFromBackend(options?: { silent?: boolean; timeoutMs?:
   }
 }
 
-function renderAccountsRecoveryBanner(): string {
-  if (state.accounts.length > 0) return "";
-  const dbPath = state.lastAppPaths?.dbPath?.trim();
-  const detail =
-    state.accountsLoadError ||
-    (isTauriRuntime() ?
-      "Aucun compte dans la base locale — vos mails en cache peuvent être sur un autre fichier SQLite (voir Paramètres → Stockage)."
-    : "Ouvrez RustyMail en mode Tauri (npm run tauri:dev), pas seulement le serveur Vite dans le navigateur.");
-  return `
-    <div class="accounts-recovery-banner surface-sm" role="alert">
-      <strong>Compte introuvable</strong>
-      <p class="dim" style="margin:8px 0 0;line-height:1.5;font-size:13px">${escapeHtml(detail)}</p>
-      ${
-        dbPath
-          ? `<p class="dim" style="margin:8px 0 0;font-size:12px;word-break:break-all">Base : ${escapeHtml(dbPath)}</p>`
-          : ""
-      }
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
-        <button type="button" class="primary-button" data-action="settings">Paramètres → Comptes</button>
-        <button type="button" class="ghost-button" data-action="reload-accounts">Réessayer le chargement</button>
-        ${
-          isTauriRuntime()
-            ? `<button type="button" class="ghost-button" data-action="settings-tab" data-settings-tab="storage">Chemins disque</button>`
-            : ""
-        }
-      </div>
-    </div>`;
-}
-
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => reject(new Error("Tauri command timeout")), timeoutMs);
@@ -3075,178 +2907,6 @@ const SEARCH_LIST_FILTER_LABELS: Record<Exclude<State["listFilter"], "all">, str
   auto: "Auto",
 };
 
-function renderSearchBadgeChip(opts: {
-  kind: string;
-  label: string;
-  title: string;
-  action: string;
-  dismissible?: boolean;
-  dataEmail?: string;
-  dataTag?: string;
-}): string {
-  const dismissible = opts.dismissible !== false;
-  const suffix = dismissible
-    ? `<span class="search-badge__x" aria-hidden="true">×</span>`
-    : `<span class="search-badge__hint" aria-hidden="true">↕</span>`;
-  const extra = [
-    opts.dataEmail ? `data-email="${escapeAttr(opts.dataEmail)}"` : "",
-    opts.dataTag ? `data-tag="${escapeAttr(opts.dataTag)}"` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  return `<button type="button" class="search-badge search-badge--${opts.kind}" role="listitem" data-action="${escapeAttr(opts.action)}" ${extra} title="${escapeAttr(opts.title)}"><span class="search-badge__label">${escapeHtml(opts.label)}</span>${suffix}</button>`;
-}
-
-function renderSearchBadgesHtml(): string {
-  const parts: string[] = [];
-
-  const q = state.search.trim();
-  if (q) {
-    const short = truncateSearchBadgeLabel(q, 24);
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "text",
-        label: `« ${short} »`,
-        title: `Texte : ${q}`,
-        action: "clear-search-text",
-      })
-    );
-  }
-
-  for (const sender of state.searchSenders) {
-    const at = sender.indexOf("@");
-    const local = at >= 0 ? sender.slice(0, at) : sender;
-    const isDomainOnly = at < 0 && sender.includes(".");
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "sender",
-        label: isDomainOnly
-          ? truncateSearchBadgeLabel(sender, 20)
-          : `@${truncateSearchBadgeLabel(local, 18)}`,
-        title: isDomainOnly ? `Domaine expéditeur : ${sender}` : `Contact : ${sender}`,
-        action: "clear-search-sender-one",
-        dataEmail: sender,
-      })
-    );
-  }
-
-  const explicitMb = effectiveSearchMailboxPath();
-  if (explicitMb) {
-    const { label, full } = threadMailboxListLabel(explicitMb);
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "scope-mailbox",
-        label: truncateSearchBadgeLabel(label, 18),
-        title: label === full ? `Dossier : ${full}` : `Dossier : ${label} — ${full}`,
-        action: "clear-search-mailbox",
-      })
-    );
-  }
-
-  if (state.searchAccountOverrideId?.trim()) {
-    const acc = state.accounts.find((a) => a.id === state.searchAccountOverrideId);
-    const label = acc?.email ?? state.searchAccountOverrideId;
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "scope-account",
-        label: truncateSearchBadgeLabel(label, 20),
-        title: `Compte : ${label}`,
-        action: "clear-search-account",
-      })
-    );
-  }
-
-  for (const tag of state.searchTags) {
-    const fam = String(tag.family).toLowerCase();
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "tags",
-        label: truncateSearchBadgeLabel(`#${fam}:${tag.value}`, 24),
-        title: `Tag ${fam}:${tag.value} — domaine expéditeur (source) ou dossier/type (kind)`,
-        action: "clear-search-tag-one",
-        dataTag: `${fam}:${tag.value}`,
-      })
-    );
-  }
-
-  if (state.searchNewsletterRule) {
-    const rule = formatNewsletterRuleInput(state.searchNewsletterRule);
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "auto-rule",
-        label: truncateSearchBadgeLabel(rule, 22),
-        title: `Règle auto : ${rule}`,
-        action: "clear-search-newsletter-rule",
-      })
-    );
-  }
-
-  const lf = state.listFilter;
-  if (state.searchModifiersTouched && lf !== "all") {
-    parts.push(
-      renderSearchBadgeChip({
-        kind: `filter-${lf}`,
-        label: SEARCH_LIST_FILTER_LABELS[lf],
-        title: "Retirer ce filtre de la recherche",
-        action: "clear-search-list-filter",
-      })
-    );
-  }
-
-  if (state.searchNlMode || state.searchLanguageFilter) {
-    const bits: string[] = [];
-    if (state.searchNlMode) bits.push(`mode ${state.searchNlMode}`);
-    if (state.searchLanguageFilter) bits.push(`langue ${state.searchLanguageFilter.toUpperCase()}`);
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "nl",
-        label: truncateSearchBadgeLabel(`IA : ${bits.join(" · ") || "interprétation"}`, 28),
-        title: "Recherche interprétée en langage naturel. Cliquez pour retirer les modificateurs IA.",
-        action: "clear-search-nl-filters",
-      })
-    );
-  }
-
-  const lang = state.searchLanguageFilter?.trim();
-  if (lang) {
-    parts.push(
-      renderSearchBadgeChip({
-        kind: "language",
-        label: lang.toUpperCase(),
-        title: `Langue : ${lang}`,
-        action: "clear-search-nl-filters",
-      })
-    );
-  }
-
-  /** Portée : Compte ↔ dossier de la barre latérale (pas le #local:… explicite). */
-  if (!explicitMb && state.view !== "folderManager" && inboxSearchContextActive()) {
-    parts.push(
-      renderSearchBadgeChip({
-        kind: state.searchScope === "account" ? "scope-account" : "scope-mailbox",
-        label: searchScopeBadgeShort(),
-        title: `${searchScopeLabel()} — cliquer pour basculer avec « tout le compte »`,
-        action: "toggle-search-scope",
-        dismissible: false,
-      })
-    );
-  }
-
-  if (
-    state.searchSenders.length > 0 &&
-    isTauriRuntime() &&
-    isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")
-  ) {
-    parts.push(
-      `<button type="button" class="search-badge search-badge--summarize" role="listitem" data-action="summarize-sender-threads" title="Résumer le fil ouvert ou le contexte filtré"><span class="search-badge__label">Résumer</span></button>`
-    );
-  }
-
-  if (parts.length === 0) return "";
-
-  return `<div class="inbox-search-badges" role="list" aria-label="Critères de recherche actifs">${parts.join("")}</div>`;
-}
-
 function committedSearchCriteriaSnapshot(): SearchCriteriaSnapshot {
   return snapshotFromStructuralState(state);
 }
@@ -3286,25 +2946,6 @@ function canSaveSearchViewInModal(): boolean {
   return hasCommittedSearchCriteria(draftSearchCriteriaSnapshot());
 }
 
-function renderSaveSearchViewButtonHtml(): string {
-  if (!canSaveSearchView()) return "";
-  return `<button type="button" class="search-save-view-btn" data-action="save-saved-search" title="Enregistrer ces critères comme vue dans la sidebar">Enregistrer la vue</button>`;
-}
-
-function renderSearchBarMetaRow(
-  badgesHtml: string,
-  trailingActionsHtml = "",
-  opts?: { includeSaveButton?: boolean },
-): string {
-  const saveBtn = opts?.includeSaveButton !== false ? renderSaveSearchViewButtonHtml() : "";
-  const actions = [saveBtn, trailingActionsHtml].filter(Boolean).join("");
-  if (!badgesHtml && !actions) return "";
-  return `<div class="search-bar-meta">
-    ${badgesHtml ? `<div class="search-bar-meta__badges search-context-filters" aria-label="Critères actifs">${badgesHtml}</div>` : ""}
-    ${actions ? `<div class="search-bar-meta__actions search-ctx-actions" role="toolbar">${actions}</div>` : ""}
-  </div>`;
-}
-
 function syncSearchBarChrome(): void {
   const html = renderSearchBadgesHtml();
   const showPending = searchDraftDiffersFromCommitted();
@@ -3337,33 +2978,6 @@ function syncSearchBarChrome(): void {
       pending.remove();
     }
   });
-}
-
-function renderSearchBarFieldHtml(inputId: string, opts?: { showSlashHint?: boolean }): string {
-  const showSlash = opts?.showSlashHint !== false;
-  const showNl =
-    isTauriRuntime() && isAiFeatureEnabled(state.appPrefs.ai, "featureSearchNlEnabled");
-  return `
-    <label class="inbox-search surface-sm">
-      ${inboxSearchIconSvg()}
-      <input id="${escapeAttr(inputId)}" type="search" value="${escapeAttr(state.searchDraft)}" placeholder="Rechercher… Entrée · @contact · #local:dossier (Tab) · #compte" aria-label="Rechercher : Entrée pour valider · #local:nom ou #local:&quot;Perso/Archives&quot;" autocomplete="off" />
-      ${searchDraftDiffersFromCommitted() ? `<span class="inbox-search-pending dim" title="Entrée pour lancer la recherche">↵</span>` : ""}
-      ${
-        showNl
-          ? `<button type="button" class="inbox-search-nl ghost-button" data-action="search-nl-assist" title="Assistant : décrire la recherche en langage naturel (LLM)">NL</button>`
-          : ""
-      }
-      ${showSlash ? `<span class="kbd">/</span>` : ""}
-    </label>`;
-}
-
-function renderSearchBarStackHtml(
-  inputId: string,
-  opts?: { showSlashHint?: boolean; includeSaveButton?: boolean },
-): string {
-  const badges = renderSearchBadgesHtml();
-  const meta = renderSearchBarMetaRow(badges, "", { includeSaveButton: opts?.includeSaveButton });
-  return `<div class="inbox-search-stack search-bar-stack">${renderSearchBarFieldHtml(inputId, opts)}${meta}</div>`;
 }
 
 function inboxSearchContextActive(): boolean {
@@ -3407,73 +3021,6 @@ function patchSavedSearchNewCount(id: string, count: number, lastSeenAt?: string
   state.savedSearches = state.savedSearches.map((s) =>
     s.id === id ? { ...s, newCount: count, lastSeenAt: seen } : s,
   );
-}
-
-function renderSearchViewActionsHtml(visibleCount: number): string {
-  if (!isTauriRuntime() || !inboxSearchContextActive()) return "";
-  const n = Math.min(visibleCount, SAVED_VIEW_BATCH_MAX);
-  const saved = activeSavedSearchItem();
-  const btns: string[] = [];
-  if (n > 0) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-mark-read" title="Marquer comme lus (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Lus</button>`,
-    );
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-archive" title="Archiver (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Archiver</button>`,
-    );
-  }
-  if (searchViewCanOpenOrganizer()) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-open-organizer" title="Ouvrir Organiser V2 (structure boîte, sans rescan global)">Organiser</button>`,
-    );
-  }
-  if (searchViewCanAffinerFlux()) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--affiner" data-action="search-view-affiner" title="LLM : proposer un dossier IMAP pour ce flux (Propositions Organiser activées)">Affiner</button>`,
-    );
-  }
-  if (state.activeSavedSearchId && saved && (saved.newCount ?? 0) > 0) {
-    const marking = state.savedSearchMarkingSeenId === state.activeSavedSearchId;
-    btns.push(
-      marking
-        ? `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" disabled aria-busy="true">Marquage…</button>`
-        : `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" data-action="saved-search-mark-seen" title="Marquer la vue comme à jour (badge nouveaux)">+${saved.newCount} · vu</button>`,
-    );
-  }
-  return btns.join("");
-}
-
-function renderInboxSearchContextBlock(visibleCount: number): string {
-  const badges = renderSearchBadgesHtml();
-  const actionBtns = renderSearchViewActionsHtml(visibleCount);
-  const meta = renderSearchBarMetaRow(badges, actionBtns);
-  return `<div class="search-ctx-stack search-bar-stack search-bar-stack--context" data-search-bar-root>
-    ${renderSearchBarFieldHtml("search-input", { showSlashHint: true })}
-    ${meta}
-  </div>`;
-}
-
-function renderSearchModal(): string {
-  if (!state.searchModalOpen) return "";
-  return `
-    <div class="modal-backdrop search-modal-backdrop" data-action="close-search-modal">
-      <div class="modal surface-elevated search-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
-        <div class="modal-header">
-          <strong id="search-modal-title">Recherche</strong>
-          <button type="button" class="icon-pill" data-action="close-search-modal" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body search-modal-body">
-          <p class="dim search-modal-hint">Vous pouvez taper librement (« mails de Jean avec factures en 2024 »), ou utiliser la syntaxe avancée : <code>@contact</code>, <code>#local:dossier</code>, <code>#compte</code>, tags. <kbd class="kbd">Entrée</kbd> pour lancer.</p>
-          ${renderSearchBarStackHtml("search-modal-input", { showSlashHint: false, includeSaveButton: false })}
-        </div>
-        <div class="modal-footer">
-          ${canSaveSearchViewInModal() ? `<button type="button" class="search-save-view-btn" data-action="save-saved-search" title="Enregistrer la recherche comme vue">Enregistrer la vue</button>` : ""}
-          <button type="button" class="ghost-button" data-action="close-search-modal">Fermer</button>
-          <button type="button" class="primary-button" data-action="search-modal-commit" style="padding:9px 14px">Rechercher</button>
-        </div>
-      </div>
-    </div>
-  `;
 }
 
 function openSearchModal(): void {
@@ -4740,344 +4287,9 @@ function mailboxDigestSlotInList(): boolean {
   return state.mailboxDigestPanelOpen && mailboxDigestPanelEligible();
 }
 
-function renderMailboxDigestTriggerButton(extraClass = ""): string {
-  if (!isMailboxDigestFeatureEnabled()) return "";
-  if (!mailboxDigestPanelEligible()) return "";
-  const open = mailboxDigestSlotInList();
-  const busy = state.mailboxDigestRefreshing && open;
-  const title = open ? "Fermer le brief d’action du dossier" : "Ouvrir le brief d’action IA du dossier";
-  const cls = ["ghost-button", "status-bar-digest-trigger", extraClass, open ? "is-active" : ""]
-    .filter(Boolean)
-    .join(" ");
-  return `<button type="button" class="${cls}" data-action="toggle-mailbox-digest-panel" aria-expanded="${open ? "true" : "false"}" title="${escapeAttr(title)}">${
-    busy ? `<span class="mini-sync"><span class="spinner" aria-hidden="true"></span><span>Brief</span></span>` : "Brief"
-  }</button>`;
-}
-
 function aiSidePanelExpandedForShell(): boolean {
   if (state.view === "contacts" || state.view === "contact") return false;
   return state.aiOpen || mailboxDigestSlotInList();
-}
-
-function render() {
-  syncMailboxDigestPanelWithFeaturePref();
-  accountsFormIdentityScratch = undefined;
-  if (state.view === "settings" && state.settingsTab === "accounts") {
-    const mailInput = document.querySelector<HTMLInputElement>("#account-email");
-    if (mailInput && !skipAccountIdentityCaptureOnce) {
-      accountsFormIdentityScratch = {
-        email: mailInput.value ?? "",
-        displayName: document.querySelector<HTMLInputElement>("#account-display-name")?.value ?? "",
-      };
-    }
-    if (skipAccountIdentityCaptureOnce) {
-      skipAccountIdentityCaptureOnce = false;
-    }
-  }
-
-  // Preserve scroll positions across full re-render (appShell.innerHTML rebuilds DOM).
-  const prevFolderList = document.querySelector<HTMLElement>(".folder-list");
-  const prevSidebarScrollTop = prevFolderList?.scrollTop ?? 0;
-  const prevSidebarScrollLeft = prevFolderList?.scrollLeft ?? 0;
-  const prevOrgPanel = document.querySelector<HTMLElement>(".organization-panel");
-  const prevOrgScrollTop = prevOrgPanel?.scrollTop ?? 0;
-  const prevAiModalBody = state.settingsAiModal
-    ? document.querySelector<HTMLElement>(".settings-ai-modal-body")
-    : null;
-  const prevAiModalScrollTop = prevAiModalBody?.scrollTop ?? 0;
-
-  const isCompose = state.view === "compose";
-  const aiPanelExpanded = aiSidePanelExpandedForShell();
-  appShell.className = `app-shell ${aiPanelExpanded ? "" : "ai-collapsed"}${isCompose ? " compose-fullscreen-active" : ""}${
-    !isCompose && state.sidebarCollapsed ? " sidebar-collapsed" : ""
-  }`;
-  const panelW =
-    typeof state.appPrefs.ai.aiPanelWidthPx === "number" && Number.isFinite(state.appPrefs.ai.aiPanelWidthPx) ?
-      Math.min(640, Math.max(260, Math.round(state.appPrefs.ai.aiPanelWidthPx)))
-    : 340;
-  appShell.style.setProperty("--ai-width", aiPanelExpanded ? `${panelW}px` : "0px");
-  appShell.innerHTML = `
-    <div class="noise"></div>
-    ${
-      isCompose ?
-        `
-    ${renderComposer()}
-    `
-      : `
-    ${renderSidebar()}
-    <main class="main">${
-      !isCompose && state.sidebarCollapsed ?
-        `<button type="button" class="main-sidebar-reveal" data-action="toggle-sidebar" aria-label="Afficher le menu des dossiers" title="Menu">☰</button>`
-      : ""
-    }${renderMain()}</main>
-    ${aiPanelExpanded ? renderAiPanel() : ""}
-    `
-    }
-    ${renderMoveDialog()}
-    ${renderMailboxManageDialog()}
-    ${renderQuoteFoldDialog()}
-    ${renderThreadTagsDialog()}
-    ${renderCloseComposeDialog()}
-    ${renderResumeDraftDialog()}
-    ${renderImageDialog()}
-    ${renderSplitSendDialog()}
-    ${renderTextPromptModal()}
-    ${renderConfirmModal()}
-    ${renderSearchModal()}
-    ${renderSettingsAiModal()}
-    ${renderAiQuickPanelOverlay()}
-    ${renderGlobalStatusFooter()}
-  `;
-  wireEvents();
-  wireFolderManagerDnD();
-  if (textPromptModal) {
-    window.requestAnimationFrame(() => {
-      const inp = document.querySelector<HTMLInputElement>("#text-prompt-input");
-      if (inp) {
-        inp.focus();
-        inp.select();
-      }
-    });
-  }
-  if (state.searchModalOpen && !textPromptModal) {
-    window.requestAnimationFrame(() => {
-      const inp = document.querySelector<HTMLInputElement>("#search-modal-input");
-      if (!inp) return;
-      inp.focus();
-      const len = state.searchDraft.length;
-      try {
-        inp.setSelectionRange(len, len);
-      } catch {
-        /* type=search */
-      }
-    });
-  }
-
-  // Restore sidebar scroll after wiring events/layout.
-  const nextFolderList = document.querySelector<HTMLElement>(".folder-list");
-  if (nextFolderList) {
-    nextFolderList.scrollTop = prevSidebarScrollTop;
-    nextFolderList.scrollLeft = prevSidebarScrollLeft;
-  }
-  const nextOrgPanel = document.querySelector<HTMLElement>(".organization-panel");
-  if (nextOrgPanel && prevOrgScrollTop > 0) {
-    nextOrgPanel.scrollTop = prevOrgScrollTop;
-  }
-  const nextAiModalBody = state.settingsAiModal
-    ? document.querySelector<HTMLElement>(".settings-ai-modal-body")
-    : null;
-  if (nextAiModalBody && prevAiModalScrollTop > 0) {
-    nextAiModalBody.scrollTop = prevAiModalScrollTop;
-  }
-  window.requestAnimationFrame(() => {
-    navApplyPendingScrollRestore();
-    if (nextOrgPanel && prevOrgScrollTop > 0) {
-      nextOrgPanel.scrollTop = prevOrgScrollTop;
-    }
-    if (nextAiModalBody && prevAiModalScrollTop > 0) {
-      nextAiModalBody.scrollTop = prevAiModalScrollTop;
-    }
-  });
-}
-
-function renderCloseComposeDialog(): string {
-  const m = state.closeComposeModal;
-  if (!m) return "";
-  const title = (m.subject || "").trim() || "Sans objet";
-  const already = m.hasSavedRecord;
-  return `
-    <div class="modal-backdrop" data-action="close-close-compose-modal">
-      <div class="modal surface-elevated modal-shell-stop-prop close-compose-modal" role="dialog" aria-modal="true" aria-label="Fermer le compositeur">
-        <div class="modal-header">
-          <strong>Fermer le compositeur ?</strong>
-          <button type="button" class="icon-pill" data-action="close-close-compose-modal" aria-label="Annuler">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body" style="display:grid;gap:10px">
-          <p style="margin:0">
-            ${
-              already
-                ? `Ce brouillon est déjà dans <strong>Sauvés</strong> (autosave). Vous pouvez le garder ou le supprimer.`
-                : `Le brouillon peut être conservé dans <strong>Sauvés</strong> (hors IMAP) ou supprimé définitivement.`
-            }
-          </p>
-          <p class="dim" style="margin:0">
-            Objet : <strong>${escapeHtml(title)}</strong>
-          </p>
-        </div>
-        <div class="modal-footer close-compose-modal__footer">
-          <button type="button" class="ghost-button" data-action="close-close-compose-modal">Annuler</button>
-          <button type="button" class="ghost-button" data-action="close-compose-without-saving">Supprimer définitivement</button>
-          <button type="button" class="primary-button" data-action="save-and-close-compose">Garder dans Sauvés</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderResumeDraftDialog(): string {
-  const m = state.resumeDraftModal;
-  if (!m?.sessions?.length) return "";
-  const rows = m.sessions
-    .map((s) => {
-      const tip = escapeAttr(s.preview || s.title);
-      return `
-        <div class="resume-draft-row" style="display:grid;gap:6px;padding:10px 0;border-top:1px solid color-mix(in srgb, var(--border) 80%, transparent)">
-          <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline">
-            <strong title="${tip}">${escapeHtml(s.title)}</strong>
-            <span class="dim" style="font-size:0.85em">${escapeHtml(formatFriendlyThreadListDate(s.updatedAt))}</span>
-          </div>
-          ${s.preview ? `<p class="dim" style="margin:0;font-size:0.9em">${escapeHtml(s.preview)}</p>` : ""}
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button type="button" class="primary-button" data-action="resume-orphan-draft" data-session-id="${escapeAttr(s.sessionId)}">Reprendre</button>
-            <button type="button" class="ghost-button" data-action="dismiss-orphan-draft" data-session-id="${escapeAttr(s.sessionId)}">Ignorer</button>
-          </div>
-        </div>`;
-    })
-    .join("");
-  return `
-    <div class="modal-backdrop" data-action="close-resume-draft-modal">
-      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Reprendre un brouillon">
-        <div class="modal-header">
-          <strong>Brouillon non terminé</strong>
-          <button type="button" class="icon-pill" data-action="close-resume-draft-modal" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body" style="display:grid;gap:4px">
-          <p style="margin:0 0 8px">Une session précédente a laissé des versions locales. Reprendre ou ignorer ?</p>
-          ${rows}
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="ghost-button" data-action="close-resume-draft-modal">Plus tard</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderImageDialog() {
-  const m = state.imageModal;
-  if (!m) return "";
-  const safeSrc = escapeAttr(m.src);
-  const label = (m.alt || "Image").trim();
-  return `
-    <div class="modal-backdrop" data-action="close-image-modal">
-      <div class="modal surface-elevated image-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="${escapeAttr(label)}">
-        <div class="modal-header">
-          <strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(label)}</strong>
-          <button type="button" class="icon-pill" data-action="close-image-modal" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body image-modal-body">
-          <img class="email-img-responsive" src="${safeSrc}" alt="${escapeAttr(label)}" />
-        </div>
-        <div class="modal-footer">
-          <a class="ghost-button" href="${safeSrc}" target="_blank" rel="noreferrer noopener">Ouvrir dans un onglet</a>
-          <button type="button" class="primary-button" data-action="close-image-modal">Fermer</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderSplitSendDialog(): string {
-  const plan = state.splitSendConfirm;
-  if (!plan || !plan.chunks.length) return "";
-  const n = plan.chunks.length;
-  const targetMo = (plan.serverTargetBytes / (1024 * 1024)).toFixed(0);
-  const budgetMo = (plan.budgetBytes / (1024 * 1024)).toFixed(1);
-  const warnHtml =
-    plan.hasOversized ?
-      `<div class="split-send-warn" role="alert">
-        <strong>Fichier(s) au-delà du budget (~${budgetMo} Mo par mail, cible serveur ~${targetMo} Mo)</strong>
-        <p class="dim" style="margin:6px 0 0;font-size:13px">L’envoi peut être refusé par le serveur pour ces lots. Vous pouvez quand même essayer.</p>
-        <ul class="split-send-warn-list">
-          ${plan.chunks
-            .filter((c) => c.oversized)
-            .map((c) => {
-              const label = (c.displayNames?.[0] ?? c.paths[0] ?? "?").trim();
-              return `<li>${escapeHtml(label)} — ${formatAttachmentSizeKb(c.totalBytes)}</li>`;
-            })
-            .join("")}
-        </ul>
-      </div>`
-    : "";
-  const listHtml = plan.chunks
-    .map((ch, i) => {
-      const names =
-        ch.displayNames?.length ?
-          ch.displayNames.map((x) => escapeHtml(x.trim())).join(", ")
-        : ch.paths.map((p) => escapeHtml((p.split(/[/\\]/).pop() ?? p).trim())).join(", ");
-      const tag = ch.oversized ? ` <span class="split-send-oversized-tag">limite</span>` : "";
-      return `<li class="split-send-chunk-row"><span class="dim">Mail ${i + 1}/${n}</span> — ${names} — <strong>${formatAttachmentSizeKb(ch.totalBytes)}</strong>${tag}</li>`;
-    })
-    .join("");
-  return `
-    <div class="modal-backdrop" data-action="cancel-split-send">
-      <div class="modal surface-elevated split-send-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="split-send-title">
-        <div class="modal-header">
-          <strong id="split-send-title">Envoi en ${n} parties</strong>
-          <button type="button" class="icon-pill" data-action="cancel-split-send" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body split-send-modal-body">
-          <p class="dim" style="margin:0 0 10px;font-size:13px">
-            Les pièces jointes dépassent ~${budgetMo} Mo par message (limite côté serveur souvent ~${targetMo} Mo une fois encodées).
-            Le message sera découpé en <strong>${n} e-mails</strong> dans la même conversation (réponses chaînées).
-          </p>
-          ${warnHtml}
-          <p class="dim" style="margin:0 0 6px;font-size:12px">Répartition proposée :</p>
-          <ul class="split-send-chunk-list">${listHtml}</ul>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="ghost-button" data-action="cancel-split-send">Annuler</button>
-          <button type="button" class="primary-button" data-action="confirm-split-send">Envoyer en ${n} parties</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderMoveDialog() {
-  if (!state.moveOpen) return "";
-  const tid = state.moveThreadId ?? "";
-  const source = tid ? sourceMailboxForThread(tid) : state.selectedMailbox || "INBOX";
-  const targets = mailboxesAllowedForMove(state.mailboxes).filter(
-    (m) => m.toLowerCase() !== source.toLowerCase()
-  );
-  const current = state.moveTargetMailbox;
-  const optionsHtml = targets
-    .map((m) => {
-      const { label } = threadMailboxListLabel(m);
-      const display = label === m ? m : `${label} — ${m}`;
-      const selected = m.toLowerCase() === current.toLowerCase() ? " selected" : "";
-      return `<option value="${escapeAttr(m)}"${selected}>${escapeHtml(display)}</option>`;
-    })
-    .join("");
-  const sourceLabel = threadMailboxListLabel(source).label;
-  const noTargets = targets.length === 0;
-  return `
-    <div class="modal-backdrop" data-action="close-move">
-      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="move-modal-title">
-        <div class="modal-header">
-          <strong id="move-modal-title">Déplacer vers…</strong>
-          <button class="icon-pill" data-action="close-move" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body" style="display:grid;gap:10px;min-width:320px">
-          <p class="dim" style="margin:0;font-size:12px">Depuis <strong>${escapeHtml(sourceLabel)}</strong> — la corbeille et les messages envoyés ne sont pas proposés.</p>
-          ${
-            noTargets
-              ? `<p class="dim" style="margin:0;font-size:12px">Aucun dossier cible disponible.</p>`
-              : `<label class="dim" style="display:grid;gap:6px;font-size:12px">Dossier cible
-                  <select id="move-target-select" data-action="move-target-change" style="padding:8px 10px;border-radius:var(--radius-btn,6px);background:transparent;color:var(--text);border:1px solid var(--border-weak)">
-                    ${optionsHtml}
-                  </select>
-                </label>`
-          }
-        </div>
-        <div class="modal-footer">
-          <button class="ghost-button" data-action="close-move">Annuler</button>
-          <button class="primary-button" data-action="confirm-move" style="padding:9px 14px"${noTargets ? " disabled" : ""}>Déplacer</button>
-        </div>
-      </div>
-    </div>
-  `;
 }
 
 function threadTagsForModal(tags: Tag[]): Tag[] {
@@ -5148,286 +4360,6 @@ function launchTagMailSearch(tag: Tag): void {
   applyParsedSearchBarToState(parseSearchBarDraft(draft, state.newsletterRules));
   render();
   void searchThreads();
-}
-
-function renderThreadTagChip(tag: Tag): string {
-  const label = formatTag(tag);
-  const draft = tagToSearchDraft(tag);
-  if (!draft) {
-    return `<span class="thread-tag-chip">${escapeHtml(label)}</span>`;
-  }
-  const fam = String(tag.family).toLowerCase();
-  return `<button type="button" class="thread-tag-chip thread-tag-chip--search" data-action="search-from-tag" data-tag-family="${escapeAttr(fam)}" data-tag-value="${escapeAttr(tag.value)}" title="Rechercher · ${escapeAttr(label)}">${escapeHtml(label)}</button>`;
-}
-
-function renderThreadTagsChipsHtml(tags: Tag[]): string {
-  if (!tags.length) return `<p class="dim thread-tags-empty">Aucun tag.</p>`;
-  const byFamily = new Map<Tag["family"], Tag[]>();
-  for (const tag of tags) {
-    const list = byFamily.get(tag.family) ?? [];
-    list.push(tag);
-    byFamily.set(tag.family, list);
-  }
-  const order: Tag["family"][] = ["Kind", "Source", "State", "Entity"];
-  return order
-    .filter((family) => byFamily.has(family))
-    .map((family) => {
-      const chips = (byFamily.get(family) ?? [])
-        .map((tag) => renderThreadTagChip(tag))
-        .join("");
-      return `<section class="thread-tags-group" aria-label="${escapeAttr(threadTagFamilyLabel(family))}">
-        <p class="thread-tags-group-kicker dim">${escapeHtml(threadTagFamilyLabel(family))}</p>
-        <div class="thread-tags-group-chips">${chips}</div>
-      </section>`;
-    })
-    .join("");
-}
-
-function renderThreadTagsDialog(): string {
-  if (!state.threadTagsModalOpen || state.view !== "thread" || !state.selectedThread) return "";
-  const thread = state.selectedThread;
-  const threadTags = threadTagsForModal(thread.tags ?? []);
-  const msgs = sortMessagesByReceivedDescending(thread.messages ?? []);
-  const perMessageHtml = msgs
-    .map((message, i) => {
-      const tags = threadTagsForModal(message.tags ?? []);
-      if (!tags.length) return "";
-      const label = normalizeThreadSenderLabel(message.sender) || `Message ${i + 1}`;
-      const when = formatThreadReadingWhen(message.receivedAt);
-      return `<section class="thread-tags-msg-block" aria-label="Tags message ${i + 1}">
-        <p class="thread-tags-msg-kicker dim">${escapeHtml(label)}${when ? ` · ${escapeHtml(when)}` : ""}</p>
-        ${renderThreadTagsChipsHtml(tags)}
-      </section>`;
-    })
-    .filter(Boolean)
-    .join("");
-  const nThread = threadTags.length;
-  const nMsg = msgs.reduce((s, m) => s + threadTagsForModal(m.tags ?? []).length, 0);
-  const countHint =
-    nThread + nMsg === 0 ? "Aucun tag indexé"
-    : nMsg > 0 ? `${nThread} sur le fil · tags par message ci-dessous`
-    : `${nThread} tag${nThread === 1 ? "" : "s"}`;
-  return `
-    <div class="modal-backdrop" data-action="close-thread-tags">
-      <div class="modal surface-elevated thread-tags-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="thread-tags-title">
-        <div class="modal-header">
-          <strong id="thread-tags-title">Tags du fil</strong>
-          <button type="button" class="icon-pill" data-action="close-thread-tags" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <p class="thread-tags-subtitle dim">${escapeHtml(thread.subject)} · ${escapeHtml(countHint)}</p>
-        <div class="modal-body thread-tags-body">
-          <section class="thread-tags-section" aria-label="Tags du fil">
-            <p class="thread-tags-section-kicker">Fil</p>
-            ${renderThreadTagsChipsHtml(threadTags)}
-          </section>
-          ${perMessageHtml ? `<section class="thread-tags-section" aria-label="Tags par message"><p class="thread-tags-section-kicker">Par message</p>${perMessageHtml}</section>` : ""}
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="ghost-button" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}">Recalculer les tags</button>
-          <button type="button" class="ghost-button" data-action="close-thread-tags">Fermer</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderQuoteFoldDialog() {
-  const m = state.quoteFoldModal;
-  if (!m || m.blocks.length === 0) return "";
-  const blocksHtml =
-    m.blocks.length === 1
-      ? `<pre class="quote-fold-pre">${escapeHtml(m.blocks[0])}</pre>`
-      : m.blocks
-          .map(
-            (block, i) => `
-        <section class="quote-fold-block" aria-label="Citation ${i + 1}">
-          <p class="quote-fold-block-kicker dim">Citation ${i + 1}/${m.blocks.length}</p>
-          <pre class="quote-fold-pre">${escapeHtml(block)}</pre>
-        </section>`
-          )
-          .join("");
-  const n = m.blocks.length;
-  const extraitLbl = n === 1 ? "1 extrait cité" : `${n} extraits cités`;
-  return `
-    <div class="modal-backdrop" data-action="close-quote-fold">
-      <div class="modal surface-elevated quote-fold-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="quote-fold-title">
-        <div class="modal-header">
-          <strong id="quote-fold-title">Historique masqué</strong>
-          <button type="button" class="icon-pill" data-action="close-quote-fold" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-        <p class="quote-fold-subtitle dim">${escapeHtml(m.senderLabel)} · ${m.foldedLines} lignes · ${extraitLbl}</p>
-        <div class="modal-body quote-fold-body">${blocksHtml}</div>
-        <div class="modal-footer">
-          <button type="button" class="ghost-button" data-action="close-quote-fold">Fermer</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderMailboxManageDialog() {
-  if (!state.mailboxManageOpen) return "";
-  return `
-    <div class="modal-backdrop" data-action="close-mailbox-manage">
-      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Mailbox actions">
-        <div class="modal-header">
-          <strong>Mailbox</strong>
-          <button class="icon-pill" data-action="close-mailbox-manage" aria-label="Close">${iconSvg("close")}</button>
-        </div>
-        <div class="modal-body" style="display:grid;gap:10px">
-          <button class="ghost-button" data-action="mb-create">Create mailbox…</button>
-          <button class="ghost-button" data-action="mb-rename">Rename mailbox…</button>
-          <button class="ghost-button" data-action="mb-subscribe">Subscribe mailbox</button>
-          <button class="ghost-button" data-action="mb-delete" style="color:var(--danger)">Delete mailbox…</button>
-          <button class="ghost-button" data-action="open-folder-manager-view">Ouvrir la vue Dossiers…</button>
-          <p class="dim" style="font-size:12px;margin:4px 0 0">Current: <strong>${escapeHtml(state.selectedMailbox || "INBOX")}</strong></p>
-        </div>
-        <div class="modal-footer">
-          <button class="ghost-button" data-action="close-mailbox-manage">Close</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderAiQuickPanelOverlay(): string {
-  if (!state.aiQuickPanelOpen) return "";
-  return `
-    <div class="ai-quick-panel-backdrop" data-action="toggle-ai-quick-panel" aria-hidden="true"></div>
-    <div class="ai-quick-panel ai-quick-panel--overlay surface-sm modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Fonctionnalités IA">
-      <div class="ai-quick-panel__head">
-        <strong>Fonctionnalités IA</strong>
-        <div class="ai-quick-panel__head-actions">
-          <div class="ai-quick-panel__bulk">
-            <button type="button" class="ghost-button ghost-button-sm" data-action="ai-features-all-on">Tout activer</button>
-            <button type="button" class="ghost-button ghost-button-sm" data-action="ai-features-all-off">Tout désactiver</button>
-          </div>
-          <button type="button" class="icon-pill" data-action="toggle-ai-quick-panel" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-      </div>
-      <div class="ai-quick-panel__body">${renderAiFeatureTogglesHtml()}</div>
-      <p class="dim ai-quick-panel__hint">Les changements sont enregistrés immédiatement. Paramètres détaillés → IA & dictée → Fonctionnalités.</p>
-    </div>`;
-}
-
-function renderSidebarAiQuickTrigger(): string {
-  return `<div class="sidebar-footer-ai">
-      <button
-        type="button"
-        class="folder-button sidebar-ai-trigger ${state.aiQuickPanelOpen ? "sidebar-ai-trigger--open" : ""}"
-        data-action="toggle-ai-quick-panel"
-        aria-expanded="${state.aiQuickPanelOpen ? "true" : "false"}"
-        title="Activer ou désactiver les fonctionnalités IA"
-      >
-        <span class="folder-icon">IA</span>
-        <span class="folder-name">Fonctionnalités IA</span>
-      </button>
-    </div>`;
-}
-
-function renderStatusBarAiQuickTrigger(): string {
-  return `<button
-      type="button"
-      class="status-bar-ai-trigger ghost-button"
-      data-action="toggle-ai-quick-panel"
-      aria-expanded="${state.aiQuickPanelOpen ? "true" : "false"}"
-      title="Activer ou désactiver les fonctionnalités IA"
-    >IA</button>`;
-}
-
-function renderSidebar() {
-  const account = currentAccount();
-  const accountLabel = account?.email ?? "No account configured";
-  const folders = state.mailboxes.length ? state.mailboxes : ["INBOX"];
-  const system = pickSystemMailboxes(folders);
-  const systemNames = new Set(system.map((x) => x.name));
-  const personal = folders.filter((mb) => !systemNames.has(mb));
-  const personalCount = personal.length;
-  return `
-    <aside class="sidebar" aria-label="Mail navigation">
-      <button type="button" class="sidebar-collapse-edge" data-action="toggle-sidebar" aria-label="Masquer les dossiers" title="Réduire le volet">
-        <span class="sidebar-collapse-edge__glyph" aria-hidden="true"></span>
-      </button>
-      <div class="sidebar-header">
-        <div class="sidebar-header-top">
-          <div class="sidebar-account">
-            <span class="avatar large" style="background:rgba(200,149,108,.16);color:var(--accent)">SC</span>
-            <span><strong>RustyMail</strong><small class="dim" style="display:block">${escapeHtml(accountLabel)}</small></span>
-          </div>
-        </div>
-        <div class="sidebar-actions">
-          <button class="primary-button" data-action="compose" style="padding:9px 10px;border-radius:var(--radius-btn);width:100%"><span>Composer</span> <span class="kbd">N</span></button>
-          <select id="account-select" class="account-select" style="width:100%" ${state.accounts.length ? "" : "disabled"}>
-            ${state.accounts.map((a) => `<option value="${escapeAttr(a.id)}" ${a.id === state.selectedAccountId ? "selected" : ""}>${escapeHtml(a.displayName || a.email)}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-      <nav class="folder-list" aria-label="Folders">
-        ${
-          isTauriRuntime() && account
-            ? `<div class="sidebar-folder-group sidebar-folder-group--virtual-local">
-              ${
-                state.accounts.length > 1
-                  ? `<button type="button" class="folder-button ${state.selectedMailbox === UNIFIED_INBOX_MAILBOX ? "active" : ""}" data-mailbox="${escapeAttr(UNIFIED_INBOX_MAILBOX)}" aria-label="Tous les comptes — boîtes de réception">
-                <span class="folder-icon">All</span>
-                <span class="folder-name">Tous les comptes</span>
-              </button>`
-                  : ""
-              }
-              <button type="button" class="folder-button ${state.selectedMailbox === LOCAL_SAVED_DRAFTS_MAILBOX ? "active" : ""}" data-mailbox="${escapeAttr(LOCAL_SAVED_DRAFTS_MAILBOX)}" aria-label="Sauvés — ${state.savedDraftsMailboxCount} brouillon${state.savedDraftsMailboxCount === 1 ? "" : "s"}">
-                <span class="folder-icon">Sv</span>
-                <span class="folder-name">Sauvés</span>
-                <span class="folder-count">${state.savedDraftsMailboxCount}</span>
-              </button>
-              <button type="button" class="folder-button ${state.view === "contacts" || state.view === "contact" ? "active" : ""}" data-action="open-contacts-view" aria-label="Carnet d'adresses">
-                <span class="folder-icon">Ct</span>
-                <span class="folder-name">Carnet</span>
-                ${renderAddressBookSidebarCountPill()}
-              </button>
-            </div>`
-            : ""
-        }
-        <div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">IMAP</span></div>
-        <div class="sidebar-folder-group">
-          ${system
-            .map(
-              ({ kind, name }) => `
-                <button class="folder-button ${name === state.selectedMailbox ? "active" : ""}" data-mailbox="${escapeAttr(name)}">
-                  <span class="folder-icon">${mailboxKindIcon(kind)}</span>
-                  <span class="folder-name">${escapeHtml(mailboxKindLabelFr(kind))}</span>
-                  ${renderFolderSidebarCountPill(name)}
-                </button>
-              `
-            )
-            .join("")}
-        </div>
-
-        <button type="button" class="folder-button ${state.view === "folderManager" ? "active" : ""}" data-action="open-folder-manager-view" title="Gérer l’arbre des dossiers personnels">
-          <span class="folder-icon">Ar</span>
-          <span class="folder-name">Dossiers</span>
-          ${personalCount ? `<span class="folder-count">${personalCount}</span>` : ""}
-        </button>
-      </nav>
-      ${
-        isTauriRuntime() && account
-          ? `<div class="sidebar-saved-views" aria-label="Vues enregistrées">
-              <div class="sidebar-section-label sidebar-section-label--saved-views"><span class="dim">Vues</span></div>
-              ${activityTrackingEnabled() ? renderSuggestedViewsCardHtml(state.suggestedSavedViews, escapeHtml, escapeAttr) : ""}
-              ${renderSavedSearchesSidebarHtml(state.savedSearches, state.activeSavedSearchId, escapeHtml, escapeAttr)}
-            </div>`
-          : ""
-      }
-      <div class="sidebar-footer">
-        <button type="button" class="folder-button ${state.view === "organizationV2" ? "active" : ""}" data-action="open-organization-v2-view" title="Organiser V2 — structure boîte (sans LLM). Les regroupements par critères = vues enregistrées.">
-          <span class="folder-icon">O2</span><span class="folder-name">Organiser V2</span>
-        </button>
-        <button type="button" class="folder-button" data-action="settings">
-          <span class="folder-icon">ST</span><span class="folder-name">Paramètres</span><span class="folder-count">${state.accounts.length}</span>
-        </button>
-        ${renderSidebarAiQuickTrigger()}
-      </div>
-    </aside>
-  `;
 }
 
 async function refreshOrganizationReport(): Promise<void> {
@@ -6798,53 +5730,6 @@ async function launchDomainMailSearch(domain: string): Promise<void> {
   }
 }
 
-function renderAddressBookSidebarCountPill(): string {
-  const n = state.addressBookSidebarCount;
-  if (n == null || n < 0) return "";
-  const title = `${n} contact${n === 1 ? "" : "s"} dans le carnet`;
-  return `<span class="folder-count folder-count-wrap" title="${escapeAttr(title)}"><span class="folder-count-num">${n}</span></span>`;
-}
-
-function renderMain() {
-  if (state.view === "thread") return renderThread();
-  if (state.view === "compose") return renderComposer();
-  if (state.view === "settings") return renderSettings();
-  if (state.view === "contacts") {
-    const acc = currentAccount();
-    return renderContactsListPage(acc?.displayName || acc?.email || "Compte");
-  }
-  if (state.view === "contact") return renderContactDetailPage();
-  if (state.view === "organization") {
-    return renderOrganizationView(state.organization, {
-      escapeHtml,
-      escapeAttr,
-      iconSvg: (name) => iconSvg(name as Parameters<typeof iconSvg>[0]),
-      renderThreadSample: renderOrgThreadSampleRow,
-      mailboxLabel: (mb) => threadMailboxListLabel(mb).label,
-    });
-  }
-  if (state.view === "organizationV2") {
-    return renderOrganizationV2View(state.organizationV2, {
-      escapeHtml,
-      escapeAttr,
-      iconSvg: (name) => iconSvg(name as Parameters<typeof iconSvg>[0]),
-      renderThreadSample: renderOrgThreadSampleRow,
-      mailboxLabel: (mb) => threadMailboxListLabel(mb).label,
-    });
-  }
-  if (state.view === "folderManager") {
-    return renderFolderManagerView(state.folderManager, {
-      escapeHtml,
-      escapeAttr,
-      iconSvg: (name) => iconSvg(name as Parameters<typeof iconSvg>[0]),
-      mailboxLabel: (mb) => threadMailboxListLabel(mb).label,
-      renderSearchFilters: () => renderList("filters-only"),
-      renderListPanel: () => renderList("threads-only"),
-    });
-  }
-  return renderList();
-}
-
 function isSearchActive(): boolean {
   if (state.view === "folderManager" && folderManagerPanelMailbox()) return false;
   if (state.activeSavedSearchId) return true;
@@ -7330,11 +6215,6 @@ function gatherStatusBarProgressJobs(): StatusBarProgressJob[] {
   return Array.from(byId.values());
 }
 
-function renderStatusBarProgressInline(): string {
-  const jobs = gatherStatusBarProgressJobs();
-  return renderStatusBarProgressInlineHtml(jobs, escapeHtml, escapeAttr);
-}
-
 function paintLlmPrefetchProgressDom(): void {
   const pct = state.llmPrefetchPercent;
   const active = state.llmPrefetchInFlight || (pct != null && Number.isFinite(pct));
@@ -7430,66 +6310,6 @@ function organizationActivityChipHtml(): string {
   return `<span class="inbox-footer-chip inbox-footer-chip--busy inbox-footer-chip--org" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> ${escapeHtml(label)}</span>`;
 }
 
-function renderBackgroundActivityChips(opts: { digestSlot: boolean }): string {
-  const chips: string[] = [];
-  const orgChip = organizationActivityChipHtml();
-  if (orgChip) chips.push(orgChip);
-  const orgV2Chip = organizationV2ActivityChipHtml();
-  if (orgV2Chip) chips.push(orgV2Chip);
-  const affinerChip = searchViewBatchActivityChipHtml();
-  if (affinerChip) chips.push(affinerChip);
-  if (state.syncInProgress) {
-    const tip = (state.syncMessage || "Synchronisation IMAP en cours").trim();
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> IMAP</span>`
-    );
-  }
-  if (state.llmPrefetchPercent != null) {
-    chips.push(
-      `<span class="inbox-footer-chip" title="Téléchargement ou préparation du modèle LLM">LLM ${state.llmPrefetchPercent}%</span>`
-    );
-  }
-  if (state.idleAiCachePrefetchBusy) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Préremplissage du cache IA (synthèses / traductions de fil) pendant une période calme"><span class="spinner spinner--tiny" aria-hidden="true"></span> Cache IA</span>`
-    );
-  }
-  if (opts.digestSlot && state.mailboxDigestRefreshing) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Brief d’action du dossier en cours"><span class="spinner spinner--tiny" aria-hidden="true"></span> Brief</span>`
-    );
-  }
-  if (state.llmJobLabel) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(state.llmJobLabel)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> ${escapeHtml(state.llmJobLabel)}</span>`
-    );
-  }
-  const nMsgTr = activeMessageTranslationJobCount();
-  if (nMsgTr > 0) {
-    const tip =
-      nMsgTr === 1 ?
-        "Traduction LLM d’un message en cours"
-      : `${nMsgTr} traductions de messages en cours`;
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> Trad. msg${nMsgTr > 1 ? ` (${nMsgTr})` : ""}</span>`
-    );
-  }
-  const nSec = activeSecurityLlmAugmentCount();
-  if (nSec > 0) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(
-        nSec === 1 ? "Analyse sécurité IA (complément LLM) en cours" : `${nSec} analyses sécurité IA en cours`
-      )}"><span class="spinner spinner--tiny" aria-hidden="true"></span> Sécurité${nSec > 1 ? ` (${nSec})` : ""}</span>`
-    );
-  }
-  if (state.agentSession?.busy && !state.llmJobLabel) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Assistant « Préparer une réponse » — transition"><span class="spinner spinner--tiny" aria-hidden="true"></span> Assistant</span>`
-    );
-  }
-  return chips.join("");
-}
-
 function inboxListFooterInnerHtml(draftBoxVirtual: boolean, total: number): string {
   const loadMore =
     state.hasMoreThreads ?
@@ -7516,369 +6336,6 @@ function inboxListFooterInnerHtml(draftBoxVirtual: boolean, total: number): stri
       <div class="inbox-panel-footer__center">${center}</div>
       <div class="inbox-panel-footer__trail">${endList}</div>
     </div>`;
-}
-
-function renderGlobalStatusFooter(): string {
-  const st = state.status;
-  const coreReady = isTauriRuntime() && Boolean(state.capabilities?.mailCore);
-  const dotClass = coreReady ? "status-dot status-dot--ok" : "status-dot status-dot--idle";
-  const modeLabel = isTauriRuntime() ? "Tauri" : "Navigateur";
-  const coreLabel = !isTauriRuntime() ? "hors Tauri" : coreReady ? "cœur prêt" : "cœur off";
-  const readLabel =
-    !isTauriRuntime() ? "—" : state.capabilities?.readabilityModules ? "lisibilité OK" : "lisibilité off";
-  const chips = renderBackgroundActivityChips({ digestSlot: true });
-  const chipBlock = chips ? `<span class="status-bar-chip-group" role="status" aria-live="polite">${chips}</span>` : "";
-  const acc = currentAccount();
-  const email = acc?.email?.trim() ?? "";
-  const accShort = email.length > 36 ? `${email.slice(0, 34)}…` : email;
-  const accBlock = accShort
-    ? `<span class="status-bar-account dim" title="${escapeAttr(email)}">${escapeHtml(accShort)}</span>`
-    : `<span class="status-bar-account dim">Aucun compte</span>`;
-  const composeAiQuick =
-    state.view === "compose" ?
-      `<div class="status-bar-compose-ai">${renderStatusBarAiQuickTrigger()}</div>`
-    : "";
-  const progressInline = renderStatusBarProgressInline();
-  return `
-    <footer class="status-bar-wrap">
-      ${composeAiQuick}
-      <footer class="status-bar">
-        <span class="${dotClass}" title="${coreReady ? "Noyau mail prêt" : "Noyau mail indisponible ou navigateur"}"></span>
-        <span class="status-bar-app">${escapeHtml(st?.appName ?? "RustyMail")} ${escapeHtml(st?.version ?? "0.1.1")}</span>
-        <span class="status-bar-sep" aria-hidden="true">·</span>
-        <span class="dim status-bar-compact">${escapeHtml(modeLabel)} · ${escapeHtml(coreLabel)} · ${escapeHtml(readLabel)}</span>
-        ${progressInline}
-        ${chipBlock}
-        ${
-          state.llmJobLabel
-            ? `<button type="button" class="ghost-button status-bar-llm-cancel" data-action="llm-cancel-job" title="Annuler l’opération IA en cours">Annuler IA</button>`
-            : ""
-        }
-        <span class="status-bar-spacer" aria-hidden="true"></span>
-        ${accBlock}
-      </footer>
-    </footer>`;
-}
-
-function renderList(mode: "full" | "threads-only" | "filters-only" = "full") {
-  const visible = threadsVisibleInList();
-  const total = state.threads.length;
-  const panelMb = folderManagerPanelMailbox();
-  const listMailbox = panelMb ?? state.selectedMailbox;
-  const draftBoxVirtual = isSavedDraftsVirtualMailbox(listMailbox);
-  const mailboxKey = listMailbox || "INBOX";
-  const fc = state.inboxFilterCounts;
-  const allN = draftBoxVirtual ? 0 : (fc?.all ?? state.mailboxTotal[mailboxKey] ?? total);
-  const unreadN = draftBoxVirtual ? 0 : (fc?.unread ?? state.mailboxUnread[mailboxKey] ?? 0);
-  const starredN = draftBoxVirtual ? 0 : (fc?.starred ?? 0);
-  const focusedN = draftBoxVirtual ? 0 : (fc?.focused ?? 0);
-  const autoN = draftBoxVirtual ? 0 : (fc?.auto ?? 0);
-  const listEntityPlural = draftBoxVirtual ? `brouillon${total === 1 ? "" : "s"}` : `conversation${total === 1 ? "" : "s"}`;
-  const imapToolbarLocked = draftBoxVirtual;
-  const filterAll = state.listFilter === "all";
-  const filterUnread = state.listFilter === "unread";
-  const filterStarred = state.listFilter === "starred";
-  const filterFocused = state.listFilter === "focused";
-  const filterAuto = state.listFilter === "auto";
-  const showEmptyTrash =
-    !draftBoxVirtual && isTauriRuntime() && mailboxKind(listMailbox || "") === "trash";
-  const showBulkTrashVisible =
-    !draftBoxVirtual &&
-    isTauriRuntime() &&
-    !isSearchActive() &&
-    mailboxKind(listMailbox || "") !== "trash" &&
-    visible.length > 0 &&
-    (state.listFilter === "all" ||
-      state.listFilter === "unread" ||
-      state.listFilter === "focused" ||
-      state.listFilter === "auto" ||
-      state.listFilter === "starred");
-
-  const searchContext = inboxSearchContextActive();
-  const savedView = activeSavedSearchItem();
-  const mailboxTitleRaw = draftBoxVirtual
-    ? threadMailboxListLabel(LOCAL_SAVED_DRAFTS_MAILBOX).label
-    : panelMb
-      ? threadMailboxListLabel(panelMb).label
-      : state.selectedMailbox || "INBOX";
-  const listTitle = searchContext
-    ? savedView
-      ? savedView.name
-      : "Recherche"
-    : mailboxTitleRaw;
-  const mailboxLabel = escapeHtml(listTitle);
-  const batchJobMsg = searchViewBatchJobStatusText();
-  const listSubtitle = searchContext
-    ? `${visible.length} fil${visible.length === 1 ? "" : "s"} affiché${visible.length === 1 ? "" : "s"}${savedView && (savedView.newCount ?? 0) > 0 ? ` · ${savedView.newCount} nouveau${savedView.newCount === 1 ? "" : "x"}` : ""}${batchJobMsg ? ` · ${batchJobMsg}` : state.syncMessage ? ` · ${state.syncMessage}` : ""}`
-    : `${visible.length} sur ${total} ${listEntityPlural}${state.syncMessage ? ` · ${state.syncMessage}` : ""}`;
-
-  const imapFiltersBlock =
-    draftBoxVirtual ?
-      `
-        <label class="inbox-search surface-sm inbox-search--sauves-only">
-          ${inboxSearchIconSvg()}
-          <input id="search-input" type="search" value="${escapeAttr(state.searchDraft)}" placeholder="Filtrer… Entrée pour appliquer" aria-label="Filtrer les brouillons sauvegardés" autocomplete="off" />
-          ${searchDraftDiffersFromCommitted() ? `<span class="inbox-search-pending dim" title="Entrée pour appliquer le filtre">↵</span>` : ""}
-        </label>
-      `
-    : searchContext
-      ? renderInboxSearchContextBlock(visible.length)
-    : `
-        ${renderSearchBarStackHtml("search-input", { showSlashHint: true })}
-
-        <div class="inbox-chips" role="toolbar" aria-label="Filtres de la boîte">
-          <button type="button" class="inbox-chip ${filterAll ? "inbox-chip-active" : ""}" data-action="list-filter-all">Tout${renderInboxChipBadge(allN)}</button>
-          <button type="button" class="inbox-chip ${filterUnread ? "inbox-chip-active" : ""}" data-action="list-filter-unread">
-            Non lus${renderInboxChipBadge(unreadN)}
-          </button>
-          <button type="button" class="inbox-chip ${filterStarred ? "inbox-chip-active" : ""}" data-action="list-filter-starred" title="Fils marqués « Suivre » (étoile) — tous dossiers">
-            Suivis${renderInboxChipBadge(starredN)}
-          </button>
-          <button type="button" class="inbox-chip ${filterFocused ? "inbox-chip-active" : ""}" data-action="list-filter-focused" title="Masquer les fils classés expéditeur automatique">
-            Priorité${renderInboxChipBadge(focusedN)}
-          </button>
-          <button type="button" class="inbox-chip ${filterAuto ? "inbox-chip-active" : ""}" data-action="list-filter-auto" title="Uniquement les fils expéditeur automatique">
-            Auto${renderInboxChipBadge(autoN)}
-          </button>
-        </div>
-      `;
-
-  const sauvesHint =
-    draftBoxVirtual ?
-      `<p class="inbox-mailbox-note dim">Stockage local (SQLite). Aucune donnée envoyée au serveur IMAP.</p>`
-    : "";
-
-  const inboxListPanelHtml = `
-      <div class="inbox-panel surface">
-        <div class="inbox-thread-list" role="list">
-          ${
-            visible.length
-              ? visible.map(renderThreadRow).join("")
-              : `<div class="inbox-empty">
-                  <p class="inbox-empty-title">${draftBoxVirtual ? "Aucun brouillon sauvegardé" : "Aucune conversation"}</p>
-                  <p class="inbox-empty-hint dim">${
-                    draftBoxVirtual
-                      ? "Dans le compositeur, appuyez sur « Enregistrer » pour ajouter un brouillon à cette liste."
-                      : isSearchActive()
-                        ? "Aucun message ne correspond. Essayez un autre mot-clé, le dossier « Tout », ou synchronisez la boîte."
-                        : "Changez de filtre ou de dossier, ou lancez une synchronisation."
-                  }</p>
-                </div>`
-          }
-        </div>
-        <div class="inbox-panel-footer">
-          ${inboxListFooterInnerHtml(draftBoxVirtual, total)}
-        </div>
-      </div>`;
-
-  if (mode === "threads-only") return inboxListPanelHtml;
-  if (mode === "filters-only") return imapFiltersBlock;
-
-  return `
-    <section class="thread-view inbox-index ${draftBoxVirtual ? "inbox-index--sauves" : ""}${searchContext ? " inbox-index--search-context" : ""}" aria-label="Inbox">
-      <header class="inbox-appbar${searchContext ? " inbox-appbar--search-context" : ""}">
-        <div class="inbox-appbar-top">
-          <div class="inbox-appbar-intro">
-            <div class="inbox-mailbox-title-row">
-              ${
-                draftBoxVirtual ?
-                  `<button type="button" class="ghost-button inbox-back-imap-btn" data-action="leave-saved-drafts-mailbox" title="Revenir aux dossiers IMAP">← IMAP</button>`
-                : searchContext
-                  ? `<button type="button" class="ghost-button inbox-back-imap-btn" data-action="clear-search-exit" title="Quitter la recherche et revenir au dossier">← ${escapeHtml(threadMailboxListLabel(mailboxTitleRaw).label)}</button>`
-                : ""
-              }
-              <h1 class="inbox-mailbox-title${searchContext ? " inbox-mailbox-title--search" : ""}">${mailboxLabel}</h1>
-              ${
-                savedView && (savedView.newCount ?? 0) > 0
-                  ? `<span class="inbox-view-new-pill" aria-label="${savedView.newCount} nouveau${savedView.newCount === 1 ? "" : "x"}">+${savedView.newCount}</span>`
-                  : ""
-              }
-            </div>
-            <p class="inbox-mailbox-sub">${escapeHtml(listSubtitle)}</p>
-            ${
-              state.mailListError && !draftBoxVirtual
-                ? `<p class="inbox-load-error" role="alert">${escapeHtml(state.mailListError)}</p>`
-                : ""
-            }
-            ${sauvesHint}
-          </div>
-          <div class="inbox-appbar-actions">
-            ${!imapToolbarLocked ? renderMailboxDigestTriggerButton("inbox-toolbar-btn") : ""}
-            <button type="button" class="ghost-button inbox-toolbar-btn" data-action="open-mailbox-manage" title="Gérer les dossiers" ${
-              imapToolbarLocked ? "disabled" : ""
-            }>Dossiers</button>
-            <button type="button" class="ghost-button inbox-toolbar-btn" data-action="sync-inbox" title="Synchroniser la boîte IMAP (Ctrl+F5)" ${
-              imapToolbarLocked || state.syncInProgress ? "disabled" : ""
-            }>
-              ${state.syncInProgress ? `<span class="mini-sync"><span class="spinner" aria-hidden="true"></span><span>Sync…</span></span>` : "Sync"}
-            </button>
-            ${
-              showEmptyTrash
-                ? `<button type="button" class="ghost-button inbox-toolbar-btn" style="color:var(--danger)" data-action="empty-trash-mailbox" title="Supprimer définitivement tous les messages de ce dossier">Tout supprimer</button>`
-                : ""
-            }
-            ${
-              showBulkTrashVisible
-                ? `<button type="button" class="ghost-button inbox-toolbar-btn" style="color:var(--danger)" data-action="bulk-trash-visible" title="Mettre à la corbeille toutes les conversations actuellement affichées">Tout supprimer</button>`
-                : ""
-            }
-          </div>
-        </div>
-
-        ${imapFiltersBlock}
-      </header>
-      ${renderAccountsRecoveryBanner()}
-      ${renderDefaultAccountPromptBanner()}
-
-      ${inboxListPanelHtml}
-    </section>
-  `;
-}
-
-function renderThreadRow(thread: ThreadListItem) {
-  const firstParticipant = thread.participants[0] ?? "??";
-  const tid = String(thread.id);
-  const savedRowId = savedDraftIdFromThreadId(tid);
-  const unreadCls = thread.unread ? "thread-row--unread" : "";
-  const mbRaw = thread.mailbox ?? state.selectedMailbox ?? "INBOX";
-  const { label: folderLabel } = threadMailboxListLabel(mbRaw);
-  const folderTitle = escapeAttr(threadMailboxColumnTitle(mbRaw));
-  const accountBadge = (() => {
-    const aid = thread.accountId?.trim();
-    if (!aid || !isUnifiedInboxMailbox(state.selectedMailbox)) return "";
-    const acc = state.accounts.find((a) => a.id === aid);
-    const label = (acc?.email || acc?.displayName || aid).trim();
-    if (!label) return "";
-    return `<span class="inbox-thread-account-badge dim" title="${escapeAttr(label)}">${escapeHtml(label)}</span>`;
-  })();
-  const unread = Boolean(thread.unread);
-  const toggleSeenTitle = unread ? "Marquer comme lu" : "Marquer comme non lu";
-  const activityRaw = thread.lastActivity ?? "";
-  const activityDisplay = formatFriendlyThreadListDate(activityRaw);
-  const activityTip = escapeAttr(threadListActivityTooltip(activityRaw));
-  const activityParsed = parseThreadListActivityDate(activityRaw);
-  const activityDatetime = activityParsed ? escapeAttr(activityParsed.toISOString()) : "";
-  const attachN = Math.max(0, Math.floor(Number(thread.attachmentCount) || 0));
-  const attachAria = attachN === 1 ? "1 pièce jointe" : `${attachN} pièces jointes`;
-  const attachGlyph =
-    attachN > 0
-      ? `<span class="inbox-thread-attach-hint dim" role="img" aria-label="${escapeAttr(attachAria)}">${iconSvg("attachment")}</span>`
-      : "";
-  const messageN = Math.max(1, Math.floor(Number(thread.messageCount) || 1));
-  const threadAria = `Conversation, ${messageN} messages`;
-  const threadGlyph =
-    messageN > 1
-      ? `<span class="inbox-thread-count-hint dim" role="img" aria-label="${escapeAttr(threadAria)}" title="${escapeAttr(threadAria)}">${iconSvg("thread")}<span class="inbox-thread-count-badge">${messageN}</span></span>`
-      : "";
-
-  if (savedRowId) {
-    const revN = Math.max(0, Number(thread.savedRevisionCount) || 0);
-    const verLabel = revN <= 1 ? "1 version locale" : `${revN} versions locales`;
-    const { line1, line2, tip } = savedDraftDatesColumnSnippet(thread.savedCreatedAt, thread.lastActivity);
-    const dateTip = escapeAttr(tip || activityTip);
-
-    return `
-    <div class="thread-row inbox-thread-row thread-row--saved-local" data-thread-id="${escapeAttr(tid)}" role="listitem">
-      <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}">
-        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(firstParticipant)}</span>
-        <span class="inbox-thread-stack">
-          <span class="inbox-thread-line1">
-            <span class="inbox-thread-from">${escapeHtml(firstParticipant)}</span>
-          </span>
-          <span class="inbox-thread-subject">
-            <strong>${escapeHtml(thread.subject)}</strong>
-          </span>
-          <p class="thread-preview inbox-thread-preview dim">${escapeHtml(verLabel)} · ouvrir dans le compositeur</p>
-        </span>
-      </button>
-      <div class="inbox-thread-date-col inbox-thread-date-col--saved-draft" title="${dateTip}">
-        <div class="saved-draft-date-stack">
-          ${
-            line1
-              ? `<div class="saved-draft-date-line saved-draft-date-line--primary">${escapeHtml(line1)}</div>`
-              : ""
-          }
-          ${
-            line2
-              ? `<div class="saved-draft-date-line saved-draft-date-line--secondary dim">${escapeHtml(line2)}</div>`
-              : ""
-          }
-        </div>
-      </div>
-      <div class="inbox-thread-folder-col" title="${folderTitle}">
-        <span class="inbox-thread-folder-label">${escapeHtml(folderLabel)}</span>
-      </div>
-      <div class="thread-row-actions inbox-thread-actions row-actions" onclick="event.stopPropagation()">
-        <button type="button" class="icon-pill danger" data-action="delete-saved-draft" data-saved-draft-id="${escapeAttr(savedRowId)}" title="Retirer de la liste" aria-label="Supprimer le brouillon enregistré">${iconSvg(
-      "trash"
-    )}</button>
-      </div>
-    </div>
-  `;
-  }
-
-  const allowedTargets = mailboxesAllowedForMove(state.mailboxes);
-  const sourceKey = mbRaw.trim().toLowerCase();
-  const moveOptionsHtml = allowedTargets
-    .filter((m) => m.toLowerCase() !== sourceKey)
-    .map((m) => {
-      const { label } = threadMailboxListLabel(m);
-      const display = label === m ? m : `${label} — ${m}`;
-      return `<option value="${escapeAttr(m)}">${escapeHtml(display)}</option>`;
-    })
-    .join("");
-  const folderSelectHtml =
-    allowedTargets.length > 0
-      ? `<select class="inbox-thread-folder-move" data-action="move-thread-select" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${escapeAttr(mbRaw)}" title="Déplacer vers un autre dossier" aria-label="Déplacer ce fil vers un autre dossier"><option value="" selected>${escapeHtml(folderLabel)}</option>${moveOptionsHtml}</select>`
-      : `<span class="inbox-thread-folder-label">${escapeHtml(folderLabel)}</span>`;
-  const followed = threadListFollowed(thread);
-  const followTitle = followed ? "Retirer du suivi" : "Suivre ce fil";
-  const followIconHtml = `<button type="button" class="icon-pill inbox-thread-follow-toggle ${
-    followed ? "inbox-thread-follow-toggle--on" : ""
-  }" data-action="toggle-thread-follow" data-thread-id="${escapeAttr(tid)}" title="${escapeAttr(
-    followTitle
-  )}" aria-label="${escapeAttr(followTitle)}" aria-pressed="${followed}">${iconSvg(
-    followed ? "starFilled" : "starOutline"
-  )}</button>`;
-  const previewClean = cleanThreadListPreview(thread.preview);
-
-  return `
-    <div class="thread-row inbox-thread-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}" role="listitem">
-      <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}">
-        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(firstParticipant)}</span>
-        <span class="inbox-thread-stack">
-          <span class="inbox-thread-line1">
-            <span class="inbox-thread-from">${escapeHtml(firstParticipant)}</span>
-            ${accountBadge}
-            <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="${activityDatetime}" title="${activityTip}">${escapeHtml(activityDisplay)}</time>
-          </span>
-          <span class="inbox-thread-subject">
-            ${thread.unread ? '<span class="inbox-unread-dot" aria-hidden="true"></span>' : ""}
-            <strong>${escapeHtml(thread.subject)}</strong>
-            ${attachGlyph}
-            ${threadGlyph}
-          </span>
-          <p class="thread-preview inbox-thread-preview">${escapeHtml(previewClean)}</p>
-        </span>
-      </button>
-      <div class="inbox-thread-date-col" title="${activityTip}">
-        <time class="inbox-thread-date-label dim" datetime="${activityDatetime}">${escapeHtml(activityDisplay)}</time>
-      </div>
-      <div class="inbox-thread-folder-col" title="${folderTitle}" onclick="event.stopPropagation()">
-        ${folderSelectHtml}
-      </div>
-      <div class="thread-row-actions inbox-thread-actions row-actions" onclick="event.stopPropagation()">
-        ${followIconHtml}
-        <span class="action-sep" aria-hidden="true"></span>
-        <button type="button" class="icon-pill inbox-seen-toggle ${unread ? "inbox-seen-toggle--is-unread" : ""}" data-action="toggle-thread-seen" data-thread-id="${escapeAttr(
-    tid
-  )}" title="${escapeAttr(toggleSeenTitle)}" aria-label="${escapeAttr(toggleSeenTitle)}">${iconSvg(unread ? "read" : "unread")}</button>
-        <span class="action-sep" aria-hidden="true"></span>
-        <button type="button" class="icon-pill danger" data-mv="trash" data-thread-id="${escapeAttr(tid)}" title="Corbeille" aria-label="Corbeille">${iconSvg("trash")}</button>
-        <button type="button" class="icon-pill" data-mv="archive" data-thread-id="${escapeAttr(tid)}" title="Archiver" aria-label="Archiver">${iconSvg("archive")}</button>
-      </div>
-    </div>
-  `;
 }
 
 async function onOrgSyncMailbox(mailbox: string): Promise<void> {
@@ -7952,195 +6409,6 @@ async function onOrgDeleteMailboxOne(mailbox: string, mailboxRefId: string): Pro
   await runOrgApply(acc.id, "empty-mailboxes", undefined, undefined, "delete-mailbox", [refId]);
 }
 
-function renderOrgThreadSampleRow(ref: OrgThreadRef, proposal: OrgProposal): string {
-  const syncBtn = (mailbox: string, title: string) => {
-    const mbAttr = escapeAttr(mailbox);
-    const syncing = state.organization.rowSyncMailbox === mailbox;
-    return `<button type="button" class="icon-pill${syncing ? " is-loading" : ""}" data-action="org-sync-mailbox" data-mailbox="${mbAttr}" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}" ${syncing ? "disabled" : ""}>${iconSvg("sync")}</button>`;
-  };
-  if (ref.threadId.startsWith("mailbox:")) {
-    const mbRaw = ref.mailbox.trim();
-    const { label: folderLabel } = threadMailboxListLabel(mbRaw);
-    const mbAttr = escapeAttr(mbRaw);
-    const rowActions = [
-      syncBtn(mbRaw, "Resynchroniser ce dossier"),
-      `<span class="action-sep" aria-hidden="true"></span>`,
-      `<button type="button" class="icon-pill danger" data-action="org-delete-mailbox-one" data-mailbox="${mbAttr}" data-mailbox-ref-id="${escapeAttr(ref.threadId)}" title="Supprimer ce dossier vide" aria-label="Supprimer le dossier">${iconSvg("trash")}</button>`,
-    ].join("");
-    return `
-    <div class="thread-row inbox-thread-row org-thread-row org-thread-row--mailbox" data-mailbox-ref="${mbAttr}" role="listitem">
-      <button type="button" class="thread-row-main inbox-thread-row-main" data-action="org-open-mailbox" data-mailbox="${mbAttr}" title="Ouvrir ce dossier">
-        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.12);color:var(--sm-primary)">${iconSvg("archive")}</span>
-        <span class="inbox-thread-stack">
-          <span class="inbox-thread-line1">
-            <span class="inbox-thread-from">${escapeHtml(folderLabel)}</span>
-          </span>
-          <span class="inbox-thread-subject"><strong>${escapeHtml(ref.subject)}</strong></span>
-        </span>
-      </button>
-      <div class="inbox-thread-folder-col" title="${escapeAttr(mbRaw)}" onclick="event.stopPropagation()">
-        <button type="button" class="org-mailbox-link inbox-thread-folder-label" data-action="org-open-mailbox" data-mailbox="${mbAttr}" title="Ouvrir ce dossier">${escapeHtml(folderLabel)}</button>
-      </div>
-      <div class="thread-row-actions inbox-thread-actions row-actions org-thread-row-actions" onclick="event.stopPropagation()">${rowActions}</div>
-    </div>`;
-  }
-  const tid = ref.threadId;
-  const senderRaw = (ref.senderEmail ?? ref.fromLabel ?? "").trim();
-  const from = senderRaw || ref.mailbox || "??";
-  const unread = Boolean(ref.unread);
-  const unreadCls = unread ? "thread-row--unread" : "";
-  const mbRaw = ref.mailbox || "INBOX";
-  const { label: folderLabel } = threadMailboxListLabel(mbRaw);
-  const folderTitle = escapeAttr(threadMailboxColumnTitle(mbRaw));
-  const previewClean = cleanThreadListPreview(ref.preview ?? "");
-  const activityRaw = ref.lastActivity ?? "";
-  const activityDisplay = formatFriendlyThreadListDate(activityRaw);
-  const activityTip = escapeAttr(threadListActivityTooltip(activityRaw));
-  const activityParsed = parseThreadListActivityDate(activityRaw);
-  const activityDatetime = activityParsed ? escapeAttr(activityParsed.toISOString()) : "";
-  const nlListed = senderRaw ? newsletterEmailListed(senderRaw) : false;
-  const autoBtn = senderRaw.includes("@") ? renderThreadNlRuleButton(senderRaw, nlListed) : "";
-  const mbAttr = escapeAttr(mbRaw);
-  const rowActions: string[] = [];
-  if (autoBtn) rowActions.push(autoBtn);
-  if (rowActions.length) rowActions.push(`<span class="action-sep" aria-hidden="true"></span>`);
-  rowActions.push(
-    `<button type="button" class="icon-pill danger" data-mv="trash" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${mbAttr}" title="Corbeille (ce fil)" aria-label="Corbeille">${iconSvg("trash")}</button>`,
-  );
-  rowActions.push(`<span class="action-sep" aria-hidden="true"></span>`);
-  rowActions.push(
-    `<button type="button" class="icon-pill" data-mv="archive" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${mbAttr}" title="Archiver (ce fil)" aria-label="Archiver">${iconSvg("archive")}</button>`,
-  );
-  rowActions.push(`<span class="action-sep" aria-hidden="true"></span>`);
-  rowActions.push(syncBtn(mbRaw, "Resynchroniser le dossier de ce fil"));
-  const rowActionsHtml = rowActions.join("");
-  const unsubCol = (() => {
-    // Affiche une colonne dédiée uniquement pour les cartes de désinscription.
-    const isUnsubCard =
-      proposal.kind === "unsubscribeNewsletter" || proposal.kind === "unsubscribeTransactional";
-    if (!isUnsubCard) return "";
-    const links = sortUnsubscribeLinks((ref.unsubscribeLinks ?? []).filter(Boolean)).slice(0, 3);
-    if (!links.length) return `<div class="org-unsub-col dim" title="Aucun lien de désinscription indexé">—</div>`;
-    const primary = links[0];
-    const extra = links.length > 1 ? ` (+${links.length - 1})` : "";
-    return `<div class="org-unsub-col" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
-      <button type="button" class="org-unsub-link" data-action="mail-unsubscribe-open" data-href="${escapeAttr(primary)}" title="${escapeAttr(primary)}">Se désinscrire${escapeHtml(extra)}</button>
-    </div>`;
-  })();
-  return `
-    <div class="thread-row inbox-thread-row org-thread-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}" role="listitem">
-      <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}" title="Lire le fil">
-        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(from)}</span>
-        <span class="inbox-thread-stack">
-          <span class="inbox-thread-line1">
-            <span class="inbox-thread-from">${escapeHtml(from)}</span>
-            <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="${activityDatetime}" title="${activityTip}">${escapeHtml(activityDisplay)}</time>
-          </span>
-          <span class="inbox-thread-subject">
-            ${unread ? '<span class="inbox-unread-dot" aria-hidden="true"></span>' : ""}
-            <strong>${escapeHtml(ref.subject || "(sans sujet)")}</strong>
-          </span>
-          <p class="thread-preview inbox-thread-preview">${escapeHtml(previewClean)}</p>
-        </span>
-      </button>
-      <div class="inbox-thread-date-col" title="${activityTip}">
-        <time class="inbox-thread-date-label dim" datetime="${activityDatetime}">${escapeHtml(activityDisplay)}</time>
-      </div>
-      <div class="inbox-thread-folder-col" title="${folderTitle}" onclick="event.stopPropagation()">
-        <button type="button" class="org-mailbox-link inbox-thread-folder-label" data-action="org-open-mailbox" data-mailbox="${mbAttr}" title="Ouvrir ce dossier">${escapeHtml(folderLabel)}</button>
-      </div>
-      ${unsubCol}
-      <div class="thread-row-actions inbox-thread-actions row-actions" onclick="event.stopPropagation()">${rowActionsHtml}</div>
-    </div>
-  `;
-}
-
-function iconSvg(
-  name:
-    | "trash"
-    | "archive"
-    | "read"
-    | "unread"
-    | "reply"
-    | "replyAll"
-    | "forward"
-    | "spark"
-    | "download"
-    | "open"
-    | "close"
-    | "move"
-    | "attachment"
-    | "shield"
-    | "mic"
-    | "mailViewClean"
-    | "mailViewRaw"
-    | "thread"
-    | "starOutline"
-    | "starFilled"
-    | "globe"
-    | "unsubscribe"
-    | "sync"
-    | "panel"
-    | "tags"
-) {
-  const common = 'width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"';
-  switch (name) {
-    case "trash":
-      return `<svg ${common}><path d="M9 3h6m-8 4h10m-9 0 1 15h6l1-15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v7M14 11v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
-    case "archive":
-      return `<svg ${common}><path d="M4 7h16v14H4V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M3 7l1-3h16l1 3H3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 11h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
-    case "read":
-      return `<svg ${common}><path d="M20 7 9 18l-5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    case "unread":
-      return `<svg ${common}><path d="M4 6h16v12H4V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
-    case "reply":
-      return `<svg ${common}><path d="M10 9V5L3 12l7 7v-4c7 0 10 2 11 6 0-8-3-12-11-12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
-    case "replyAll":
-      return `<svg ${common}><path d="M2 10h7M2 13h7M2 16h7" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"/><path d="M14 10V6L7 13l7 7v-4c7 0 10 2 11 6 0-8-3-12-11-12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
-    case "forward":
-      return `<svg ${common}><path d="M14 9V5l7 7-7 7v-4c-7 0-10 2-11 6 0-8 3-12 11-12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
-    case "spark":
-      return `<svg ${common}><path d="M12 2l1.2 4.2L17.5 8l-4.3 1.8L12 14l-1.2-4.2L6.5 8l4.3-1.8L12 2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M19 13l.7 2.4L22 16l-2.3 1-.7 2.5-.7-2.5-2.3-1 2.3-.6L19 13Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
-    case "download":
-      return `<svg ${common}><path d="M12 3v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 11l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
-    case "open":
-      return `<svg ${common}><path d="M14 3h7v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 14 21 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 14v5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    case "close":
-      return `<svg ${common}><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>`;
-    case "move":
-      return `<svg ${common}><path d="M7 7h10v10H7V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 3h11v11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 14 21 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
-    case "attachment":
-      return `<svg ${common}><path d="M9 12.5 13.8 7.7a3.1 3.1 0 1 1 4.4 4.4L11 19.3a5.1 5.1 0 1 1-7.2-7.2l7.2-7.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    case "shield":
-      return `<svg ${common}><path d="M12 3 20 6v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-3Z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M9.2 12.3 11 14l3.8-4.2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    case "mic":
-      return `<svg ${common}><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4Z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M8 12v.5a4 4 0 0 0 8 0V12M12 19v3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
-    case "mailViewClean":
-      /* Lecture « mise en page » */
-      return `<svg ${common}><path d="M7 8h14M7 13h14M7 18h11" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
-    case "mailViewRaw":
-      /* Source brut (</>) */
-      return `<svg ${common}><path d="M9 17 5 12l4-5M15 17l4-5-4-5" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/><path d="m13 6.5-2 12" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"/></svg>`;
-    case "thread":
-      /* Trois bulles empilées : conversation à plusieurs messages. */
-      return `<svg ${common}><path d="M5 6h11a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H10l-4 3v-3H5a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 10h6M9 13h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-    case "starOutline":
-      return `<svg ${common}><path d="m12 3.5 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.9l6-.9L12 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/></svg>`;
-    case "starFilled":
-      return `<svg ${common}><path d="m12 3.5 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.9l6-.9L12 3.5Z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
-    case "globe":
-      return `<svg ${common}><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.65" fill="none"/><path d="M3 12h18M12 3a14 14 0 0 0 0 18M12 3a14 14 0 0 1 0 18" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`;
-    case "unsubscribe":
-      return `<svg ${common}><path d="M8 8.5h8M8 12h5.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M9 16.5h6M12 3v3.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="m7.5 6.5 1.2-2.2M16.5 6.5 15.3 4.3" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"/></svg>`;
-    case "sync":
-      return `<svg ${common}><path d="M20 12a8 8 0 0 1-14.5 4.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M4 4v5h5M4 12a8 8 0 0 1 14.5-4.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M20 20v-5h-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    case "panel":
-      return `<svg ${common}><rect x="4" y="5" width="16" height="14" rx="1.5" stroke="currentColor" stroke-width="1.75"/><path d="M11 5v14" stroke="currentColor" stroke-width="1.75"/></svg>`;
-    case "tags":
-      return `<svg ${common}><path d="M10 3h4l7 7-9 9-7-7 5-5Z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.35" fill="currentColor"/></svg>`;
-  }
-}
-
 function iconThreadMessageViewToggle(userMode: MessageViewMode): string {
   /* En vue lisible : proposer le passage au brut ; en brut : revenir lisible quand pertinent. */
   const cleanActive = userMode === "clean";
@@ -8150,37 +6418,6 @@ function iconThreadMessageViewToggle(userMode: MessageViewMode): string {
   return `<button type="button" class="icon-pill thread-view-mode-toggle ${cleanActive ? "" : "thread-view-mode-toggle--raw"}" data-action="toggle-message-view" title="${
     cleanActive ? escapeAttr(rawTitle) : escapeAttr(cleanTitle)
   }" aria-label="${escapeAttr(cleanActive ? "Afficher tout brut" : "Vue lisible automatique")}">${iconSvg(cleanActive ? "mailViewRaw" : "mailViewClean")}</button>`;
-}
-
-function utf8StringToBase64(s: string): string {
-  const bytes = new TextEncoder().encode(s);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
-  return btoa(bin);
-}
-
-function base64ToUtf8String(b64: string): string {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
-}
-
-function mailHtmlMountAttrs(messageId: string, html: string): string {
-  const b64 = utf8StringToBase64(html);
-  return `data-message-id="${escapeAttr(messageId)}" data-email-html-b64="${b64}"`;
-}
-
-function flattenNestedParagraphInDocument(doc: Document) {
-  const root = doc.body;
-  if (!root) return;
-  for (let guard = 0; guard < 400; guard++) {
-    const inner = root.querySelector("p > p");
-    if (!inner?.parentElement) break;
-    const parent = inner.parentElement;
-    while (inner.firstChild) parent.insertBefore(inner.firstChild, inner);
-    inner.remove();
-  }
 }
 
 function unsubscribeHrefScore(hrefRaw: string): number {
@@ -8305,26 +6542,6 @@ function hideRelocatedUnsubscribeInDoc(doc: Document): void {
 function extractUnsubscribeLinksFromHtml(raw: string): MailUnsubscribeLink[] {
   if (!raw.trim()) return [];
   return sanitizeEmailHtml(raw, { allowRemoteImages: false, relocateUnsubscribe: false }).unsubscribeLinks;
-}
-
-function renderMailUnsubscribeBar(links: MailUnsubscribeLink[]): string {
-  if (!links.length) return "";
-  const sorted = [...links].sort((a, b) => unsubscribeHrefScore(b.href) - unsubscribeHrefScore(a.href));
-  const btns = sorted
-    .map(
-      (l) =>
-        `<button type="button" class="mail-unsubscribe-bar__btn" data-action="mail-unsubscribe-open" data-href="${escapeAttr(l.href)}" title="${escapeAttr(l.href)}">${escapeHtml(l.label)}</button>`
-    )
-    .join("");
-  const hint =
-    sorted.length > 1 ? `${sorted.length} liens détectés dans le message` : "Lien extrait du corps du message";
-  return `<div class="mail-unsubscribe-bar" role="region" aria-label="Désabonnement">
-    <div class="mail-unsubscribe-bar__lead">
-      <span class="mail-unsubscribe-bar__kicker">Désabonnement</span>
-      <span class="mail-unsubscribe-bar__hint dim">${escapeHtml(hint)}</span>
-    </div>
-    <div class="mail-unsubscribe-bar__actions">${btns}</div>
-  </div>`;
 }
 
 function messageHtmlForDisplay(message: CleanedMessageView, mode: MessageViewMode): string | null {
@@ -8513,13 +6730,6 @@ function normalizeMailCidToken(cidUrl: string): string {
   } catch {
     return tail.replace(/^<|>$/g, "").trim().toLowerCase();
   }
-}
-
-function base64ToImageBlob(base64: string, mimeType: string): Blob {
-  const bin = atob(base64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new Blob([bytes], { type: mimeType.trim() || "application/octet-stream" });
 }
 
 async function resolveSrcForMailImageLightbox(rawSrc: string, messageId?: string | null): Promise<{ src: string; revokeObjectUrl?: string | null }> {
@@ -8738,21 +6948,6 @@ function threadParticipantsWithEmails(messages: CleanedMessageView[]): ThreadPar
     map.set(name, email.includes("@") ? email : "");
   }
   return [...map.entries()].map(([name, email]) => ({ name, email }));
-}
-
-function renderThreadParticipantLink(p: ThreadParticipantLink, className = "thread-participant-link"): string {
-  if (p.email) {
-    return `<button type="button" class="${className} label" data-action="contacts-open-detail" data-email="${escapeAttr(p.email)}" title="${escapeAttr(p.email)}">${escapeHtml(p.name)}</button>`;
-  }
-  return `<span class="label" style="margin-right:6px;background:rgba(173,188,216,.06);color:var(--text)">${escapeHtml(p.name)}</span>`;
-}
-
-function renderMessageSenderLink(message: CleanedMessageView, className = "thread-msg-from"): string {
-  const email = (message.senderEmail ?? "").trim().toLowerCase();
-  if (email.includes("@")) {
-    return `<button type="button" class="${className} thread-participant-link" data-action="contacts-open-detail" data-email="${escapeAttr(email)}" title="${escapeAttr(email)}">${escapeHtml(message.sender)}</button>`;
-  }
-  return `<strong class="${className}">${escapeHtml(message.sender)}</strong>`;
 }
 
 function sortMessagesByReceivedAscending(messages: CleanedMessageView[]): CleanedMessageView[] {
@@ -9145,51 +7340,6 @@ function shouldOfferThreadTranslate(
   return thread.messages.some((m) => shouldOfferPerMessageTranslate(m, mother, thread.tags));
 }
 
-function renderThreadNlRuleButton(seSenderRaw: string, nlListedHere: boolean): string {
-  if (!isTauriRuntime()) return "";
-  const seNorm = canonicalEmailForNlMatch(seSenderRaw);
-  if (!seNorm) return "";
-  if (nlListedHere) {
-    const matched = firstMatchingNewsletterRule(seSenderRaw);
-    const key = matched ? formatNewsletterRuleInput(matched) : (seNorm as string);
-    const tip = `Expéditeur auto (activé) — cliquer pour désactiver · ${key}`;
-    return `<button type="button" class="icon-pill icon-pill-sm thread-auto-sender thread-auto-sender--on" data-action="newsletter-msg-remove-rule" data-rule="${escapeAttr(key)}" title="${escapeAttr(tip)}" aria-label="${escapeAttr(tip)}"><span class="thread-auto-sender__glyph" aria-hidden="true">A</span></button>`;
-  }
-  const tip = `Expéditeur auto — cliquer pour activer · ${seNorm}`;
-  return `<button type="button" class="icon-pill icon-pill-sm thread-auto-sender thread-auto-sender--off" data-action="newsletter-msg-add-rule" data-rule="${escapeAttr(seNorm)}" title="${escapeAttr(tip)}" aria-label="${escapeAttr(tip)}"><span class="thread-auto-sender__glyph" aria-hidden="true">A</span></button>`;
-}
-
-function renderThreadMsgHeadActions(
-  message: CleanedMessageView,
-  nlRuleHtml: string,
-  threadTags?: Tag[]
-): string {
-  const motherRaw = state.appPrefs.general.motherLanguage?.trim() || "fr";
-  const offerTr = shouldOfferPerMessageTranslate(message, motherRaw, threadTags);
-  const globeBtn =
-    offerTr ?
-      `<button type="button" class="icon-pill icon-pill-sm thread-msg-translate" data-action="llm-translate-message" data-msg-id="${escapeAttr(message.messageId)}" title="Traduire ce message vers la langue mère (LLM)" aria-label="Traduire ce message">${iconSvg("globe")}</button>`
-    : "";
-  const security = renderMailSecurityPop(message, { compact: true });
-  const retagBtn = state.selectedThreadId?.trim()
-    ? `<button type="button" class="icon-pill icon-pill-sm thread-msg-retag" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId)}" title="Recalculer les tags du fil" aria-label="Recalculer les tags du fil">${iconSvg("sync")}</button>`
-    : "";
-  const quoteBtn =
-    message.collapsedQuotes.length ?
-      `<button type="button" class="icon-pill icon-pill-sm thread-quote-open" data-action="open-quote-fold" data-msg-id="${escapeAttr(message.messageId)}" title="Citations repliées" aria-label="Citations repliées">${iconSvg("open")}</button>`
-    : "";
-  const replyBtn = `<button type="button" class="icon-pill icon-pill-sm thread-reply-one" data-action="reply-one" data-msg-id="${escapeAttr(message.messageId)}" title="Répondre à ce mail" aria-label="Répondre à ce mail">${iconSvg("reply")}</button>`;
-  const forwardOneBtn = `<button type="button" class="icon-pill icon-pill-sm thread-forward-one" data-action="forward-one" data-msg-id="${escapeAttr(message.messageId)}" title="Transférer ce message" aria-label="Transférer ce message">${iconSvg("forward")}</button>`;
-
-  const aiBar = globeBtn ? `<div class="action-bar action-bar--ai action-bar--compact">${globeBtn}</div>` : "";
-  const secBar = security ? `<div class="action-bar action-bar--sec action-bar--compact">${security}</div>` : "";
-  const utilParts = [retagBtn, quoteBtn, nlRuleHtml].filter(Boolean).join("");
-  const utilBar = utilParts ? `<div class="action-bar action-bar--util action-bar--compact">${utilParts}</div>` : "";
-  const opsBar = `<div class="action-bar action-bar--ops action-bar--compact">${replyBtn}${forwardOneBtn}</div>`;
-
-  return `<div class="thread-msg-head-actions" role="group" aria-label="Actions sur ce message">${aiBar}${secBar}${utilBar}${opsBar}</div>`;
-}
-
 function repairUtf8Mojibake(s: string): string {
   const t = s ?? "";
   if (!t.includes("Ã") && !t.includes("Â")) return t;
@@ -9476,25 +7626,6 @@ function scrollToThreadMessage(messageId: string): void {
   }
 }
 
-function renderThreadParticipantFirstBadge(message: CleanedMessageView, firstIds: Set<string>): string {
-  if (!firstIds.has(message.messageId)) return "";
-  const acc = currentAccount();
-  const ownEmailLower = acc?.email?.trim().toLowerCase() ?? "";
-  const senderEmailLower = (message.senderEmail ?? "").trim().toLowerCase();
-  if (ownEmailLower && senderEmailLower && ownEmailLower === senderEmailLower) return "";
-  if (isOwnSender(message.sender)) return "";
-  const canon = canonicalEmailForNlMatch(message.senderEmail ?? "");
-  const sender = escapeHtml(message.sender);
-  const emailBit = canon ? ` <span class="dim thread-timeline-note__addr">(${escapeHtml(canon)})</span>` : "";
-  return `<div class="thread-timeline-note" role="note">
-    <span class="thread-timeline-note__glyph" aria-hidden="true">${iconSvg("thread")}</span>
-    <span class="thread-timeline-note__text-wrap">
-      <span class="dim thread-timeline-note__kicker">Première apparition dans le fil</span>
-      <span class="thread-timeline-note__who"><strong>${sender}</strong>${emailBit}</span>
-    </span>
-  </div>`;
-}
-
 function normalizeRecipientEmailForDiff(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -9591,83 +7722,6 @@ function threadRecipientPresenceEventsByMessageId(
   return out;
 }
 
-function renderThreadRecipientPresenceNote(events: ThreadRecipientPresenceEvents | undefined): string {
-  if (!events || (!events.added.length && !events.removed.length)) return "";
-  const line = (r: { name?: string | null; email: string }) => {
-    const em = escapeHtml(r.email.trim());
-    const nm = r.name?.trim();
-    return nm ? `<strong>${escapeHtml(nm)}</strong> <span class="dim">&lt;${em}&gt;</span>` : `<strong>${em}</strong>`;
-  };
-  const added = events.added.length
-    ? `<div class="thread-recipient-diff__col thread-recipient-diff__col--add"><span class="dim thread-recipient-diff__tag">+ To/Cc</span><span class="thread-recipient-diff__list">${events.added
-        .map(line)
-        .join(", ")}</span></div>`
-    : "";
-  const removed = events.removed.length
-    ? `<div class="thread-recipient-diff__col thread-recipient-diff__col--rem"><span class="dim thread-recipient-diff__tag">− To/Cc</span><span class="thread-recipient-diff__list">${events.removed
-        .map(line)
-        .join(", ")}</span></div>`
-    : "";
-  return `<div class="thread-recipient-diff surface-sm" role="note" aria-label="Évolution des destinataires dans le fil">${removed}${added}</div>`;
-}
-
-function renderThreadRecipientDiffStrip(older: CleanedMessageView, newer: CleanedMessageView): string {
-  const prevM = recipientMapForDiff(older);
-  const curM = recipientMapForDiff(newer);
-  const added: Array<{ name?: string | null; email: string }> = [];
-  const removed: Array<{ name?: string | null; email: string }> = [];
-  for (const [k, r] of curM) {
-    if (!prevM.has(k)) added.push(r);
-  }
-  for (const [k, r] of prevM) {
-    if (!curM.has(k)) removed.push(r);
-  }
-  if (!added.length && !removed.length) return "";
-  const line = (r: { name?: string | null; email: string }) => {
-    const em = escapeHtml(r.email.trim());
-    const nm = r.name?.trim();
-    return nm ? `<strong>${escapeHtml(nm)}</strong> <span class="dim">&lt;${em}&gt;</span>` : `<strong>${em}</strong>`;
-  };
-  const addedBlock =
-    added.length ?
-      `<div class="thread-recipient-diff__col thread-recipient-diff__col--add"><span class="dim thread-recipient-diff__tag">+ To/Cc</span><span class="thread-recipient-diff__list">${added.map(line).join(", ")}</span></div>`
-    : "";
-  const remBlock =
-    removed.length ?
-      `<div class="thread-recipient-diff__col thread-recipient-diff__col--rem"><span class="dim thread-recipient-diff__tag">− To/Cc</span><span class="thread-recipient-diff__list">${removed.map(line).join(", ")}</span></div>`
-    : "";
-  return `<div class="thread-recipient-diff surface-sm" role="note" aria-label="Changements de destinataires par rapport au message précédent">${remBlock}${addedBlock}</div>`;
-}
-
-function renderMessageInlineTranslation(message: CleanedMessageView, targetLang: string, offerTranslationUi: boolean): string {
-  if (!isTauriRuntime()) return "";
-  if (!offerTranslationUi) {
-    const busy = Boolean(state.messageTranslationBusy[message.messageId]);
-    if (!busy) return "";
-  }
-  const key = `${message.messageId}|${targetLang}`;
-  const tText = state.messageTranslations[key];
-  const busy = Boolean(state.messageTranslationBusy[message.messageId]);
-  if (!offerTranslationUi && !busy && tText?.trim()) return "";
-  const langLabel = escapeHtml(targetLang.toUpperCase());
-  if (!tText?.trim()) {
-    if (!busy) return "";
-    return `<div class="message-inline-translation message-inline-translation--busy" aria-live="polite">
-      <span class="dim message-inline-translation__wait">Traduction en cours…</span>
-    </div>`;
-  }
-  const body = escapeHtml(tText);
-  const busyLine = busy ? `<p class="dim message-inline-translation__wait" style="margin:0 0 6px">Actualisation…</p>` : "";
-  return `<div class="message-inline-translation" lang="${escapeAttr(targetLang)}" dir="auto">
-    <div class="message-inline-translation__badge">Traduction · ${langLabel}</div>
-    ${busyLine}
-    <div class="message-inline-translation__body">${body}</div>
-    <div class="message-inline-translation__meta">
-      <button type="button" class="ghost-button ghost-button-sm" data-action="llm-translate-message" data-msg-id="${escapeAttr(message.messageId)}" data-llm-translate-refresh="1">Actualiser</button>
-    </div>
-  </div>`;
-}
-
 function threadTreeLaneRight(thread: { messages: CleanedMessageView[] }, message: CleanedMessageView): { isRoot: boolean; laneRight: boolean } {
   const ascending = sortMessagesByReceivedAscending(thread.messages);
   const rootId = ascending[0]?.messageId ?? "";
@@ -9691,29 +7745,6 @@ function threadTreeLaneRight(thread: { messages: CleanedMessageView[] }, message
   }
   const k = normalizeThreadSenderLabel(message.sender);
   return { isRoot: false, laneRight: lanes.get(k) ?? false };
-}
-
-function renderThreadMessageAttachmentSection(message: CleanedMessageView): string {
-  const n = message.attachments.length;
-  if (!n) return "";
-  const cards = message.attachments
-    .map(
-      (att) =>
-        `<div class="thread-attach-card surface-sm">
-          <span class="thread-attach-ico" aria-hidden="true">${iconSvg("attachment")}</span>
-          <div class="thread-attach-info">
-            <strong class="thread-attach-name">${escapeHtml(att.fileName)}</strong>
-            <span class="thread-attach-size dim">${escapeHtml(formatAttachmentSizeKb(att.sizeBytes))}</span>
-          </div>
-          <button type="button" class="icon-pill icon-pill-sm thread-attach-dl" data-att-download="${escapeAttr(att.id)}" data-msg-id="${escapeAttr(message.messageId)}" title="Télécharger">${iconSvg("download")}</button>
-        </div>`
-    )
-    .join("");
-  const framed = `<div class="thread-msg-attachments thread-msg-attachments--framed">${cards}</div>`;
-  if (n > 6) {
-    return `<details class="thread-attachments-fold"><summary class="thread-attachments-fold__sum">${escapeHtml(`Pièces jointes (${n})`)}</summary>${framed}</details>`;
-  }
-  return framed;
 }
 
 function senderAccentVars(sender: string): string {
@@ -9785,113 +7816,6 @@ function briefEvidenceButtons(links: ActionBriefEvidenceLink[]): string {
     .join("");
 }
 
-function renderBriefMailViewShell(bodyHtml: string, opts?: { kicker?: string }): string {
-  const kicker = opts?.kicker?.trim();
-  const top =
-    kicker ?
-      `<div class="thread-zen-top">
-        <span class="thread-zen-brand" aria-hidden="true">${iconSvg("spark")}</span>
-        <span class="thread-kicker thread-kicker-strong">${escapeHtml(kicker)}</span>
-      </div>`
-    : "";
-  return `<aside class="thread-zen surface-sm inbox-brief-mail" aria-label="Brief du dossier">${top}<div class="thread-zen-body">${bodyHtml}</div></aside>`;
-}
-
-function renderBriefMailItemCard(inner: string): string {
-  return `<div class="thread-msg-card inbox-brief-item-card">${inner}</div>`;
-}
-
-function renderActionBriefHtml(b: ActionBriefResult): string {
-  const confPct = Math.max(0, Math.min(100, Math.round(Number(b.confidence ?? 0) * 100)));
-  const bucket = escapeHtml(String(b.priorityBucket ?? "—"));
-  const mode = escapeHtml(String(b.mode ?? ""));
-  const verif = b.verificationRecommended
-    ? `<p class="thread-zen-par dim" role="status">Vérification recommandée</p>`
-    : "";
-  const skills =
-    b.executedSkills && b.executedSkills.length ?
-      `<p class="thread-zen-par dim inbox-brief-skills">Pipeline : ${escapeHtml(b.executedSkills.join(" → "))}</p>`
-    : "";
-
-  const sec = (title: string, inner: string) =>
-    `<section class="inbox-brief-section"><div class="thread-kicker">${escapeHtml(title)}</div>${inner}</section>`;
-
-  const changesBody =
-    (b.changes || [])
-      .map((c) => {
-        const ev = briefEvidenceButtons(c.evidenceLinks || []);
-        return renderBriefMailItemCard(
-          `<p class="thread-zen-par">${escapeHtml(c.summary || "")}</p>${ev}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const decisionsBody =
-    [...(b.decisions || [])]
-      .sort((a, d) => Number(a.rank) - Number(d.rank))
-      .map((d) => {
-        const opts = (d.optionsHint || [])
-          .map((o) => `<li>${escapeHtml(o)}</li>`)
-          .join("");
-        const optsHtml = opts ? `<ul class="thread-zen-list">${opts}</ul>` : "";
-        return renderBriefMailItemCard(
-          `<p class="thread-zen-par dim">#${escapeHtml(String(d.rank))}</p>
-          <p class="thread-zen-par"><strong>${escapeHtml(d.title)}</strong></p>
-          ${d.impact ? `<p class="thread-zen-par dim">${escapeHtml(d.impact)}</p>` : ""}
-          ${optsHtml}${briefEvidenceButtons(d.evidenceLinks || [])}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const actionsBody =
-    [...(b.recommendedActions || [])]
-      .sort((a, x) => Number(a.rank) - Number(x.rank))
-      .map((a) => {
-        const due = a.suggestedDue ? `<span class="dim"> · ${escapeHtml(a.suggestedDue)}</span>` : "";
-        const pr = a.priority ? `<span class="label inbox-brief-prio">${escapeHtml(a.priority)}</span> ` : "";
-        return renderBriefMailItemCard(
-          `${pr}<p class="thread-zen-par">${escapeHtml(a.action)}</p>
-          <p class="thread-zen-par dim">${escapeHtml(a.suggestedOwner || "")}${due}</p>
-          ${briefEvidenceButtons(a.evidenceLinks || [])}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const risksBody =
-    (b.risks || [])
-      .map((r) => {
-        const sev = r.severity ? ` <span class="dim">(${escapeHtml(r.severity)})</span>` : "";
-        return renderBriefMailItemCard(
-          `<p class="thread-zen-par"><strong>${escapeHtml(r.label)}</strong>${sev}</p>
-          ${r.detail ? `<p class="thread-zen-par dim">${escapeHtml(r.detail)}</p>` : ""}
-          ${briefEvidenceButtons(r.evidenceLinks || [])}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const ambBody =
-    (b.ambiguities || [])
-      .map((a) => {
-        return renderBriefMailItemCard(
-          `<p class="thread-zen-par"><strong>${escapeHtml(a.question)}</strong></p>
-          ${a.whyItMatters ? `<p class="thread-zen-par dim">${escapeHtml(a.whyItMatters)}</p>` : ""}
-          ${briefEvidenceButtons(a.evidenceLinks || [])}`
-        );
-      })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
-
-  const inner = `
-    <p class="thread-zen-par dim inbox-brief-meta">Confiance ${confPct}% · priorité <strong>${bucket}</strong>${mode ? ` · mode ${mode}` : ""}</p>
-    ${verif}
-    ${sec("Ce qui change", changesBody)}
-    ${sec("Décisions", decisionsBody)}
-    ${sec("Actions recommandées", actionsBody)}
-    ${sec("Risques & engagements", risksBody)}
-    ${sec("Ambiguïtés", ambBody)}
-    ${skills}`;
-  return renderBriefMailViewShell(inner, { kicker: "Brief d’action" });
-}
-
 function formatAttachmentSizeKb(sizeBytes: number): string {
   const kb = Math.max(0, Math.round(sizeBytes / 1024));
   return kb >= 1024 ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} Mo` : `${kb} Ko`;
@@ -9947,251 +7871,6 @@ function threadSuppressAutoEnvelopeMeta(
   nlListedHere: boolean
 ): boolean {
   return threadIsAutoMail(thread) || Boolean(message.isNewsletter) || nlListedHere;
-}
-
-function renderThread() {
-  const thread = state.selectedThread;
-  if (!thread) {
-    return `<section class="thread-view" aria-label="Fil"><div class="pane-header thread-load-empty">Fil indisponible — utilisez « ← Boîte de réception » ou relancez la synchronisation.</div></section>`;
-  }
-  const userMode = state.messageViewMode;
-  /** Derniers reçus en premier ; regroupement visuel si le même expéditeur envoie plusieurs mails d’affilée dans cet ordre. */
-  const msgs = sortMessagesByReceivedDescending(thread.messages);
-  const attachmentCount = msgs.reduce((total, message) => total + message.attachments.length, 0);
-  const participantLinks = threadParticipantsWithEmails(thread.messages);
-  const avCap = 5;
-  const avExtra = participantLinks.length > avCap ? participantLinks.length - avCap : 0;
-  const threadTagsCount = threadTagsForModal(thread.tags ?? []).length;
-  const threadTagsBtnTitle =
-    threadTagsCount > 0 ?
-      `Tags du fil (${threadTagsCount}) — kind, source, domaine…`
-    : "Tags du fil — kind, source, domaine…";
-  const replyTarget = escapeHtml(threadQuickReplyTargetName(msgs));
-  const translationTargetLang = state.appPrefs.general.motherLanguage?.trim() || "fr";
-  const firstParticipantIds = threadParticipantFirstMessageIds(thread.messages);
-  const recipientEventsById = threadRecipientPresenceEventsByMessageId(thread.messages);
-  const zenOut = threadAiSummaryShownInZen() ? (state.aiOutput?.trim() ?? "") : "";
-  const blockReply = threadIsAutoMail(thread);
-  const listRow =
-    state.selectedThreadId ?
-      state.threads.find((t) => String(t.id) === String(state.selectedThreadId))
-    : undefined;
-  const toolbarFollowed = listRow ? threadListFollowed(listRow) : false;
-  const threadUnreadNav = Boolean(listRow?.unread ?? thread?.unread);
-  const curSeenToggleTitle = threadUnreadNav ? "Marquer comme lu" : "Marquer comme non lu";
-  const curSeenToggleIcon = threadUnreadNav ? "read" : "unread";
-  const readingSimple = true;
-  const threadReadingLayoutClass = " thread-reading--reading-layout";
-
-  return `
-    <section class="thread-view thread-reading${threadReadingLayoutClass}" aria-label="Fil de discussion">
-      <header class="thread-reading-head">
-        ${renderViewNavTrail(`<div class="action-bar action-bar--ai" role="toolbar" aria-label="Actions IA">
-              <button type="button" class="icon-pill thread-nav-icon" data-action="summarize" title="Résumer" aria-label="Résumer">${iconSvg("spark")}</button>
-              ${
-                msgs.some((m) => shouldOfferPerMessageTranslate(m, translationTargetLang, thread.tags))
-                  ? `<button type="button" class="icon-pill thread-nav-icon" data-action="llm-translate-thread" title="Traduire tout le fil en un bloc (LLM)" aria-label="Traduire tout le fil">${iconSvg("globe")}</button>`
-                  : ""
-              }
-              <button type="button" class="icon-pill thread-nav-icon${state.aiOpen ? " icon-pill--active" : ""}" data-action="toggle-ai" aria-expanded="${state.aiOpen}" title="${state.aiOpen ? "Masquer le panneau Détails" : "Panneau Détails"}" aria-label="${state.aiOpen ? "Masquer le panneau Détails" : "Panneau Détails"}">${iconSvg("panel")}</button>
-            </div>
-            <div class="action-bar action-bar--util" role="toolbar" aria-label="Actions utilitaires">
-              <button type="button" class="icon-pill thread-nav-sync${state.syncInProgress ? " is-loading" : ""}" data-action="sync-inbox" title="Synchroniser (Ctrl+F5)" aria-label="Synchroniser" ${state.syncInProgress ? "disabled" : ""}>${state.syncInProgress ? `<span class="mini-sync"><span class="spinner" aria-hidden="true"></span></span>` : iconSvg("sync")}</button>
-            </div>`)}
-
-        <div class="thread-reading-hero">
-          <h1 class="thread-reading-title">${escapeHtml(thread.subject)}</h1>
-          <p class="thread-reading-stats dim">
-            ${msgs.length} message${msgs.length === 1 ? "" : "s"}${attachmentCount > 0 ? ` · ${attachmentCount} pièce${attachmentCount === 1 ? "" : "s"} jointe${attachmentCount === 1 ? "" : "s"}` : ""}
-          </p>
-
-          ${participantLinks.length ? `<div class="thread-participants-block">
-              <span class="thread-kicker">Participants</span>
-              <div class="thread-participants-chips">
-                ${participantLinks
-                  .slice(0, avCap)
-                  .map((p) => renderThreadParticipantLink(p, "thread-participant-chip"))
-                  .join("")}
-                ${avExtra ? `<span class="dim thread-participant-more">+${avExtra}</span>` : ""}
-              </div>
-            </div>` : ""}
-
-          <div class="thread-action-bar">
-            <div class="thread-more-actions">
-              <div class="action-bar action-bar--util" role="toolbar" aria-label="Actions utilitaires">
-                <button type="button" class="icon-pill${state.threadTagsModalOpen ? " icon-pill--active" : ""}" data-action="open-thread-tags" title="${escapeAttr(threadTagsBtnTitle)}" aria-label="${escapeAttr(threadTagsBtnTitle)}" aria-expanded="${state.threadTagsModalOpen}">${iconSvg("tags")}</button>
-                <button type="button" class="icon-pill" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}" title="Recalculer les tags" aria-label="Recalculer les tags">${iconSvg("sync")}</button>
-                <button type="button" class="icon-pill inbox-thread-follow-toggle ${toolbarFollowed ? "inbox-thread-follow-toggle--on" : ""}" data-action="toggle-thread-follow" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}" title="${escapeAttr(toolbarFollowed ? "Retirer du suivi" : "Suivre ce fil")}" aria-label="${escapeAttr(toolbarFollowed ? "Retirer du suivi" : "Suivre ce fil")}" aria-pressed="${toolbarFollowed}">${iconSvg(toolbarFollowed ? "starFilled" : "starOutline")}</button>
-                ${
-                  ENABLE_CLEAN_MESSAGE_VIEW ?
-                    `${iconThreadMessageViewToggle(userMode)}`
-                  : ""
-                }
-              </div>
-              <div class="action-bar action-bar--ops" role="toolbar" aria-label="Actions opérationnelles">
-                <button type="button" class="icon-pill" data-action="thread-archive-cur" title="Archiver" aria-label="Archiver">${iconSvg("archive")}</button>
-                <button type="button" class="icon-pill" data-action="thread-unarchive-cur" title="Désarchiver vers Inbox" aria-label="Désarchiver">${iconSvg("move")}</button>
-                ${
-                  blockReply
-                    ? ""
-                    : `<button type="button" class="icon-pill" data-action="reply" title="Répondre" aria-label="Répondre">${iconSvg("reply")}</button>`
-                }
-                <button type="button" class="icon-pill inbox-seen-toggle ${threadUnreadNav ? "inbox-seen-toggle--is-unread" : ""}" data-action="toggle-thread-seen-cur" title="${escapeAttr(curSeenToggleTitle)}" aria-label="${escapeAttr(curSeenToggleTitle)}">${iconSvg(curSeenToggleIcon)}</button>
-                <button type="button" class="icon-pill danger" data-action="thread-trash-cur" title="Corbeille" aria-label="Corbeille">${iconSvg("trash")}</button>
-                <button type="button" class="icon-pill" data-action="thread-move-cur" title="Déplacer" aria-label="Déplacer">${iconSvg("move")}</button>
-                ${
-                  blockReply
-                    ? ""
-                    : `<button type="button" class="icon-pill" data-action="reply-all" title="Répondre à tous" aria-label="Répondre à tous">${iconSvg("replyAll")}</button>`
-                }
-                <button type="button" class="icon-pill" data-action="forward" title="Transférer" aria-label="Transférer">${iconSvg("forward")}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      ${zenOut ? `<aside class="thread-zen surface-sm" aria-label="Résumé">
-          <div class="thread-zen-top">
-            <span class="thread-zen-brand" aria-hidden="true">${iconSvg("spark")}</span>
-            <span class="thread-kicker thread-kicker-strong">Résumé</span>
-          </div>
-          <div class="thread-zen-body">${zenSummaryHtmlFragments(zenOut)}</div>
-        </aside>` : ""}
-
-      <div class="thread-messages thread-messages-reading">
-        ${msgs
-          .map((message, i) => {
-            const prev = msgs[i - 1];
-            const sameSenderAsPrev =
-              Boolean(prev) && normalizeThreadSenderLabel(prev!.sender) === normalizeThreadSenderLabel(message.sender);
-            const showMeta = !sameSenderAsPrev;
-            const showAvatar = !sameSenderAsPrev;
-            const daySeparator = renderDaySeparator(prev?.receivedAt, message.receivedAt);
-            const laneTree = threadTreeLaneRight(thread, message);
-            const isMine = isOwnSender(message.sender);
-            const isRoot = laneTree.isRoot;
-            const isSolo = msgs.length === 1;
-            const laneRight = laneTree.laneRight;
-            const accentVars = senderAccentVars(message.sender);
-            const isoWhen = receivedAtIsoDatetime(message.receivedAt);
-            const eff = effectiveMessageViewMode(message, userMode);
-            const showsHtmlBubble =
-              eff === "original"
-                ? Boolean(message.htmlBody)
-                : Boolean(message.cleanedHtmlBody?.trim());
-            const seSenderRaw = message.senderEmail?.trim() ?? "";
-            /** Liste côté client + drapeaux renvoyés par open_thread après enrichissement SQLite. */
-            const nlListedHere =
-              Boolean(message.isNewsletter) || newsletterEmailListed(seSenderRaw);
-            const suppressAutoEnvelope = threadSuppressAutoEnvelopeMeta(thread, message, nlListedHere);
-            const nlRuleRow = renderThreadNlRuleButton(seSenderRaw, nlListedHere);
-            const participantFirst =
-              suppressAutoEnvelope ? "" : renderThreadParticipantFirstBadge(message, firstParticipantIds);
-            const recipientPresenceHtml = suppressAutoEnvelope
-              ? ""
-              : renderThreadRecipientPresenceNote(recipientEventsById.get(message.messageId));
-            const offerMsgTranslate = shouldOfferPerMessageTranslate(message, translationTargetLang, thread.tags);
-            const inlineTr = renderMessageInlineTranslation(message, translationTargetLang, offerMsgTranslate);
-            const htmlForDisplay = showsHtmlBubble ? messageHtmlForDisplay(message, eff) : null;
-            const unsubLinks = htmlForDisplay ? extractUnsubscribeLinksFromHtml(htmlForDisplay) : [];
-            const headActionsHtml = renderThreadMsgHeadActions(message, nlRuleRow, thread.tags);
-            const headMainHtml =
-              showMeta ?
-                readingSimple
-                  ? `${renderMessageSenderLink(message)}
-                        <span class="thread-msg-head-sep" aria-hidden="true">·</span>
-                        <time class="thread-msg-time"${isoWhen ? ` datetime="${escapeAttr(isoWhen)}"` : ""}>${escapeHtml(formatThreadReadingWhen(message.receivedAt))}</time>`
-                  : `<time class="thread-msg-time"${isoWhen ? ` datetime="${escapeAttr(isoWhen)}"` : ""}>${escapeHtml(formatThreadReadingWhen(message.receivedAt))}</time>
-                        <span class="thread-msg-head-sep" aria-hidden="true">·</span>
-                        ${renderMessageSenderLink(message)}`
-              : `<time class="thread-msg-time thread-msg-time--inline"${isoWhen ? ` datetime="${escapeAttr(isoWhen)}"` : ""}>${escapeHtml(formatThreadReadingWhen(message.receivedAt))}</time>`;
-            const anchorId = threadMessageAnchorId(message.messageId, i);
-            const anchorName = message.messageId.trim() || anchorId;
-            return `
-              ${daySeparator}
-              ${participantFirst}
-              ${recipientPresenceHtml}
-              <a class="thread-msg-anchor" name="${escapeAttr(anchorName)}" id="${escapeAttr(anchorId)}" aria-hidden="true"></a>
-              <article class="message thread-msg ${isMine ? "mine" : ""} ${laneRight ? "thread-msg--lane-right" : ""} ${isRoot ? "thread-msg--root" : ""} ${isSolo ? "thread-msg--solo" : ""} ${showsHtmlBubble ? "has-html" : ""} ${showMeta ? "thread-msg--head" : "compact"}" style="${accentVars}">
-                ${showAvatar ? `<span class="avatar thread-msg-avatar">${initials(message.sender)}</span>` : `<span class="avatar avatar-spacer" aria-hidden="true"></span>`}
-                <div class="message-stack">
-                  <header class="message-head-row${showMeta ? "" : " message-head-row--compact"}">
-                    <div class="thread-msg-head-main">${headMainHtml}</div>
-                    ${headActionsHtml}
-                  </header>
-                  <div class="thread-msg-card mail-security-tier ${mailSecurityTierClass(normalizedMailSecurity(message))}">
-                    ${renderMessageBody(message, eff, unsubLinks)}
-                    ${inlineTr}
-                    ${
-                      message.attachments.length > 1
-                        ? `<div class="thread-attach-bulk-row">
-                        <button type="button" class="ghost-button thread-attach-bulk-btn" data-action="download-all-attachments" data-msg-id="${escapeAttr(message.messageId)}" title="Enregistrer toutes les pièces jointes de ce message dans Téléchargements">
-                          ${iconSvg("download")}<span>Tout télécharger (${message.attachments.length})</span>
-                        </button>
-                      </div>`
-                        : ""
-                    }
-                    ${renderThreadMessageAttachmentSection(message)}
-                    ${""}
-                  </div>
-                </div>
-              </article>
-            `;
-          })
-          .join("")}
-      </div>
-
-      ${
-        blockReply
-          ? ""
-          : `<div class="thread-quick-zone">
-        <div class="thread-quick-reveal-bar">
-          <button
-            type="button"
-            class="thread-quick-reveal surface-sm${state.threadQuickReplyOpen ? " is-open" : ""}"
-            data-action="toggle-thread-quick-reply"
-            aria-expanded="${state.threadQuickReplyOpen ? "true" : "false"}"
-            aria-controls="thread-quick-panel"
-            title="${state.threadQuickReplyOpen ? "Masquer la réponse rapide" : "Afficher la réponse rapide"}"
-          >
-            ${iconSvg("reply")}
-            <span class="thread-quick-reveal-label">Répondre à <strong>${replyTarget}</strong></span>
-            <span class="thread-quick-reveal-chevron" aria-hidden="true"></span>
-          </button>
-        </div>
-        <div id="thread-quick-panel" class="thread-quick-panel${state.threadQuickReplyOpen ? " is-open" : ""}">
-          <div class="thread-quick-panel-inner">
-            <footer class="quick-reply thread-quick-footer">
-              <div class="thread-quick-sheet surface-sm">
-                <p class="thread-quick-kicker"><span>Répondre à</span> <strong>${replyTarget}</strong></p>
-                <input
-                  type="text"
-                  class="thread-quick-field"
-                  placeholder="Écrivez votre réponse…"
-                  data-quick-reply
-                  autocomplete="off"
-                  ${state.threadQuickReplyOpen ? "" : " tabindex=\"-1\""}
-                />
-                <div class="thread-quick-bottom">
-                  <div class="thread-quick-links">
-                    <button type="button" class="thread-linkish" data-action="quick-reply-compose" title="Composer">Composer</button>
-                    <span class="thread-quick-div" aria-hidden="true"></span>
-                    <button type="button" class="thread-linkish" data-action="forward" title="Transférer">Transférer</button>
-                  </div>
-                  <div class="thread-quick-send">
-                    <button type="button" class="ghost-button thread-quick-secondary" data-action="quick-reply-send-all">Tous</button>
-                    <button type="button" class="primary-button thread-quick-primary" data-action="quick-reply-send">Envoyer la réponse</button>
-                  </div>
-                </div>
-              </div>
-            </footer>
-          </div>
-        </div>
-      </div>`
-      }
-    </section>
-  `;
 }
 
 function defaultMailSecuritySignals(): MailSecuritySignals {
@@ -10269,89 +7948,6 @@ function mailSecurityTierClass(ms: MailSecuritySignals): string {
       : "mail-security-tier--suspicion";
 }
 
-function renderMailSecurityPop(message: CleanedMessageView, opts?: { compact?: boolean }): string {
-  const ms = normalizedMailSecurity(message);
-  // UX: ne pas afficher de badge quand tout va bien (évite "RAS" omniprésent et inutile).
-  if (ms.severity === "ok") return "";
-  const label = ms.severity === "attention" ? t("security.attention") : t("security.suspicion");
-  const chipClass =
-    ms.severity === "attention" ? "mail-security-hit--attention" : "mail-security-hit--suspicion";
-  const hasLlmHint =
-    Boolean(ms.llmBudget) || (ms.findings?.some((f) => f.kind === "llmIntent") ?? false);
-  const iaPill = hasLlmHint
-    ? `<span class="mail-security-ia-pill" title="${escapeAttr(t("security.iaHint"))}">IA</span>`
-    : "";
-  const mid = message.messageId?.trim();
-  const iaSecurityOn = isAiFeatureEnabled(state.appPrefs.ai, "featureSecurityLlmEnabled");
-  const iaPending = Boolean(
-    mid &&
-      iaSecurityOn &&
-      securityLlmAugmentBusy[mid] &&
-      !securityLlmAugmentCache[mid] &&
-      !securityLlmAugmentFailed[mid]
-  );
-  const displayFindings = mailSecurityFindingsForDisplay(message, ms);
-  const findings =
-    displayFindings.map(
-      (f) =>
-        `<li class="mail-security-finding mail-security-finding--${escapeAttr(String(f.severity))}">${escapeHtml(f.messageFr)}${
-          f.kind === "llmIntent" ?
-            ` <span class="dim mail-security-kind-ia" title="${escapeAttr(t("security.iaContribution"))}">(IA)</span>`
-          : ""
-        }</li>`
-    ) ?? [];
-  const findingsBlock = findings.length
-    ? `<ul class="mail-security-findings" role="list">${findings.join("")}</ul>`
-    : iaPending
-      ? `<p class="mail-security-panel__pending dim">${escapeHtml(t("security.iaPending"))}</p>`
-      : "";
-  const senderEmail = (message.senderEmail || "").trim();
-  const tid = state.selectedThreadId ?? "";
-  const sourceMb = (state.selectedMailbox || "INBOX").trim();
-  const actions =
-    opts?.compact || isVirtualMailbox(sourceMb)
-      ? ""
-      : `<div class="mail-security-panel__actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
-          <button type="button" class="ghost-button" data-action="security-move-junk" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${escapeAttr(sourceMb)}">${escapeHtml(t("security.moveJunk"))}</button>
-          <button type="button" class="ghost-button" data-action="security-filter-search" title="Filtrer les mails à score de sécurité élevé">Filtrer #security</button>
-          ${
-            senderEmail.includes("@")
-              ? `<button type="button" class="ghost-button" data-action="security-mark-newsletter" data-sender-email="${escapeAttr(senderEmail)}">${escapeHtml(t("security.markNewsletter"))}</button>`
-              : ""
-          }
-        </div>`;
-  const wrap = opts?.compact ? "mail-security-pop mail-security-pop--compact" : "mail-security-pop";
-  return `<details class="${wrap}">
-  <summary class="mail-security-hit ${chipClass}" title="${escapeAttr(t("security.chipTitle", { label }))}" aria-label="${escapeAttr(t("security.chipAria", { label }))}">
-    <span class="mail-security-hit__ico" aria-hidden="true">${iconSvg("shield")}</span>
-    ${iaPill}
-  </summary>
-  <div class="mail-security-panel">
-    <p class="mail-security-panel__lead">${escapeHtml(ms.summaryFr)}</p>
-    ${findingsBlock ? `<p class="mail-security-panel__kicker">${escapeHtml(t("security.detail"))}</p>${findingsBlock}` : ""}
-    ${actions}
-  </div>
-</details>`;
-}
-
-function renderMessageBody(message: CleanedMessageView, mode: MessageViewMode, unsubLinks?: MailUnsubscribeLink[]) {
-  const unsubBar =
-    unsubLinks === undefined
-      ? ""
-      : renderMailUnsubscribeBar(unsubLinks);
-  if (mode === "original") {
-    if (message.htmlBody)
-      return `${unsubBar}<div class="message-html" ${mailHtmlMountAttrs(message.messageId, message.htmlBody)}></div>`;
-    return `<div class="message-text">${escapeHtml(message.sourceText)}</div>`;
-  }
-  // clean: HTML nettoyé côté Rust quand disponible, sinon texte (signatures / citations)
-  const cleanHtml = message.cleanedHtmlBody?.trim();
-  if (cleanHtml) {
-    return `${unsubBar}<div class="message-html message-html--clean" ${mailHtmlMountAttrs(message.messageId, cleanHtml)}></div>`;
-  }
-  return `<div class="message-text">${escapeHtml(message.cleanedText || message.sourceText)}</div>`;
-}
-
 function parseMaybeDate(value: string): Date | null {
   const raw = String(value).trim();
   if (!raw || raw === "—" || raw === "-" || raw === "–") return null;
@@ -10368,23 +7964,6 @@ function formatThreadCompactClock(receivedAt: string): string {
 
 function dayKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function renderDaySeparator(prevReceivedAt: string | undefined, curReceivedAt: string) {
-  const cur = parseMaybeDate(curReceivedAt);
-  if (!cur) return "";
-  const prev = prevReceivedAt ? parseMaybeDate(prevReceivedAt) : null;
-  if (prev && dayKey(prev) === dayKey(cur)) return "";
-
-  const today = new Date();
-  const label =
-    dayKey(cur) === dayKey(today)
-      ? "Aujourd’hui"
-      : dayKey(cur) === dayKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1))
-        ? "Hier"
-        : cur.toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "short" });
-
-  return `<div class="day-separator"><span>${escapeHtml(label)}</span></div>`;
 }
 
 function isOwnSender(sender: string) {
@@ -10420,339 +7999,6 @@ function formatDraftRevisionStamp(iso: string): string {
   return new Date(t).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
 }
 
-function renderComposerHistoriquePane(): string {
-  if (!isTauriRuntime()) {
-    return `<aside class="composer-history-pane composer-history-pane--disabled" aria-label="Historique du brouillon">
-      <p class="composer-history-pane__hint dim">L’historique local des versions est disponible dans l’app bureau (Tauri).</p>
-    </aside>`;
-  }
-  const revs = state.draftRevisions;
-  const expanded = state.draftVersionsListExpanded;
-  const n = revs.length;
-  const summaryLabel =
-    n === 0 ? "Aucune version" : n === 1 ? "1 version" : `${n} versions`;
-
-  const rows =
-    revs.length ?
-      revs
-        .map(
-          (rev) => `<li class="composer-history-pane__rev">
-              <button type="button" class="composer-history-pane__icon-action" data-action="compare-draft-revision" data-revision-id="${escapeAttr(rev.id)}" title="Comparer avec le brouillon actuel">
-                ⇄
-              </button>
-              <button type="button" class="composer-history-pane__icon-action" data-action="restore-draft-revision" data-revision-id="${escapeAttr(rev.id)}" title="Restaurer cette version">
-                ↩
-              </button>
-              <span class="composer-history-pane__stamp dim">${escapeHtml(formatDraftRevisionStamp(rev.createdAt))}</span>
-            </li>`
-        )
-        .join("")
-    : "";
-
-  const listBlock =
-    expanded || n === 0
-      ? `<ul class="composer-history-pane__list" role="list">${
-          n ? rows : `<li class="composer-history-pane__empty dim">Pas encore de snapshot (éditez quelques secondes puis revenez).</li>`
-        }</ul>`
-      : "";
-
-  const comparisonBlock =
-    state.draftDiffRevisionId
-      ? `
-        <div class="composer-history-pane__detail" role="region" aria-label="Comparaison">
-          <div class="composer-history-pane__detail-head">
-            <span class="composer-history-pane__detail-label dim">Comparaison</span>
-            <button type="button" class="ghost-button composer-history-pane__mode-toggle" data-action="toggle-draft-compare-view" ${
-              state.draftDiffLoading ? "disabled" : ""
-            } title="Basculer aperçu HTML / diff +/−">
-              ${state.draftDiffView === "preview" ? "Diff" : "Aperçu"}
-            </button>
-          </div>
-          ${
-            state.draftDiffLoading
-              ? `<p class="composer-history-pane__microhint dim">Chargement…</p>`
-              : state.draftDiffView === "preview"
-                ? `<div class="preview preview--revision">${sanitizeEmailHtml(state.draftRevisionPreview?.html ?? "").html}</div>`
-                : state.draftDiffLines.length
-                  ? `<pre class="draft-diff__pre draft-diff__pre--composer">${state.draftDiffLines
-                      .map((l) => {
-                        const cls =
-                          l.kind === "add"
-                            ? "draft-diff__line draft-diff__line--add"
-                            : l.kind === "del"
-                              ? "draft-diff__line draft-diff__line--del"
-                              : "draft-diff__line";
-                        const prefix = l.kind === "add" ? "+" : l.kind === "del" ? "-" : " ";
-                        return `<span class="${cls}">${escapeHtml(prefix)} ${escapeHtml(l.text)}</span>`;
-                      })
-                      .join("\n")}</pre>`
-                  : `<p class="composer-history-pane__microhint dim">Aucune différence.</p>`
-          }
-        </div>`
-      : !state.draftDiffRevisionId && n > 0 && !expanded
-        ? `<p class="composer-history-pane__microhint dim">Liste repliée — ouvrir pour choisir une version (⇄ comparer).</p>`
-        : n > 0 && !state.draftDiffRevisionId && expanded
-          ? `<p class="composer-history-pane__microhint dim">⇄ comparer · ↩ restaurer</p>`
-          : "";
-
-  return `<aside class="composer-history-pane" aria-label="Historique du brouillon">
-      <div class="composer-history-pane__bar">
-        <button
-          type="button"
-          class="composer-history-pane__summary"
-          data-action="toggle-draft-versions-expanded"
-          aria-expanded="${expanded}"
-          title="Afficher ou masquer la liste des versions"
-          ${state.draftRevisionsLoading ? "disabled" : ""}
-        >
-          <span class="composer-history-pane__chev" aria-hidden="true">${expanded ? "▾" : "▸"}</span>
-          <span class="composer-history-pane__summary-text">${escapeHtml(summaryLabel)}</span>
-          ${state.draftRevisionsLoading ? `<span class="composer-history-pane__spinner dim" aria-hidden="true"> …</span>` : ""}
-        </button>
-        <button type="button" class="composer-history-pane__mini-refresh" data-action="refresh-draft-history" title="Rafraîchir la liste" aria-label="Rafraîchir la liste" ${
-          state.draftRevisionsLoading ? "disabled" : ""
-        }>↻</button>
-      </div>
-      ${listBlock}
-      ${comparisonBlock}
-    </aside>`;
-}
-
-function renderComposer() {
-  const draft = state.draft;
-  const attachments = draft?.attachmentPaths ?? [];
-  const layout = state.composeLayout;
-  const isHistorique = layout === "historique";
-  const showPreviewPane = layout !== "write" && !isHistorique;
-  const textareaOffscreen = layout === "preview";
-  const forcedCcBcc = draftHasRecipientsExtra(draft);
-  const showCcBccRows = Boolean(state.composeCcBccOpen || forcedCcBcc);
-  const ccBccToggle =
-    forcedCcBcc ?
-      ""
-    : `<button type="button" class="compose-link" data-action="toggle-compose-cc-bcc">${
-        state.composeCcBccOpen ? "Réduire" : "Cc · Cci"
-      }</button>`;
-
-  const ccRows = showCcBccRows ?
-    `<div class="field-row"><label class="compose-field-label">Cc</label><div id="compose-cc-host" class="compose-recipients-host compose-to-cell"></div></div>
-     <div class="field-row"><label class="compose-field-label">Cci</label><div id="compose-bcc-host" class="compose-recipients-host compose-to-cell"></div></div>`
-    : "";
-
-  const correctionPanelHtml =
-    state.composeGrammarSuggestions?.length ?
-      `<aside class="compose-correction-panel surface-sm" role="complementary" aria-label="Correction de texte">
-        <div class="compose-correction-panel__head">
-          <strong>Correction de texte</strong>
-          <button type="button" class="ghost-button compose-correction-dismiss" data-action="compose-grammar-dismiss">Fermer</button>
-        </div>
-        <ul class="compose-correction-list" role="list">
-          ${state.composeGrammarSuggestions
-            .map(
-              (g, i) => `
-            <li class="compose-correction-item" role="listitem">
-              <div class="compose-correction-item__main">
-                <p class="compose-correction-reason dim">${escapeHtml(g.reason)}</p>
-                <p class="compose-correction-diff"><span class="compose-correction-del">${escapeHtml(g.original)}</span> → <strong>${escapeHtml(g.replacement)}</strong></p>
-              </div>
-              <button type="button" class="ghost-button compose-correction-apply" data-action="compose-grammar-apply" data-grammar-i="${i}">Appliquer</button>
-            </li>`
-            )
-            .join("")}
-        </ul>
-      </aside>`
-    : "";
-
-  return `
-    <section class="compose-view composer-mail-shell composer-fullscreen-shell" aria-label="Composer">
-      <header class="compose-fs-header">
-        <div class="compose-fs-hintbar">
-          <p class="compose-fs-layout-hint dim" aria-hidden="true">
-            Markdown · <span class="kbd">M</span> basculer la vue du compositeur
-          </p>
-        </div>
-        <div class="compose-fs-header-row">
-          <button type="button" class="icon-button compose-fs-close" data-action="close-compose" aria-label="Fermer le composer">×</button>
-          <div class="compose-fs-title-block">
-            <span class="compose-fs-kicker">Composer</span>
-            <span class="compose-fs-subtitle dim">${escapeHtml(composeKindTitle(draft?.kind))}</span>
-          </div>
-          <div class="compose-fs-tabs-stack">
-            <nav class="compose-fs-tabs" role="tablist" aria-label="Mode d’affichage du composer">
-              <button type="button" role="tab" aria-selected="${layout === "split"}" class="compose-fs-tab ${layout === "split" ? "is-active" : ""}" data-action="set-compose-layout" data-compose-layout="split">Split</button>
-              <button type="button" role="tab" aria-selected="${layout === "write"}" class="compose-fs-tab ${layout === "write" ? "is-active" : ""}" data-action="set-compose-layout" data-compose-layout="write">Écrire</button>
-              <button type="button" role="tab" aria-selected="${layout === "preview"}" class="compose-fs-tab ${layout === "preview" ? "is-active" : ""}" data-action="set-compose-layout" data-compose-layout="preview">Aperçu</button>
-              <button type="button" role="tab" aria-selected="${layout === "historique"}" class="compose-fs-tab ${layout === "historique" ? "is-active" : ""}" data-action="set-compose-layout" data-compose-layout="historique"${
-                isTauriRuntime() ? "" : " disabled"
-              } title="Comparer les versions locales du brouillon (app bureau)">Historique</button>
-            </nav>
-          </div>
-          ${
-            isTauriRuntime()
-              ? `<button type="button" class="ghost-button compose-fs-save-saved-draft" data-action="save-saved-draft" title="Enregistrer dans la liste Brouillons sauvegardés (barre latérale)">Enregistrer</button>`
-              : ""
-          }
-          <button type="button" class="primary-button compose-fs-send compose-send" data-action="send">Envoyer</button>
-        </div>
-      </header>
-      <div class="compose-workspace">
-        <div class="compose-meta-card surface-sm">
-          <div class="field-row compose-to-row">
-            <label for="compose-to" class="compose-field-label">À</label>
-            <div class="compose-to-cell">
-              <div id="compose-to-host" class="compose-recipients-host"></div>
-              ${ccBccToggle ? `<span class="compose-recipient-extra">${ccBccToggle}</span>` : ""}
-            </div>
-          </div>
-          ${ccRows}
-          <div class="field-row compose-subject-row"><label for="compose-subject" class="compose-field-label">Objet</label><input id="compose-subject" class="compose-subject-input" placeholder="Objet du message" value="${escapeAttr(draft?.subject ?? "")}" /></div>
-          <div class="field-row compose-files-row">
-            <label class="compose-field-label">Fichiers</label>
-            <div class="attachments-row attachments-row--unified">
-              <div class="compose-attachments-chips-scroll" aria-label="Liste des pièces jointes">
-                <div class="attachments-chips compose-attachments-chips" aria-label="Pièces jointes">
-                ${
-                  attachments.length ?
-                    attachments
-                      .map((p) => {
-                        const base = fileBaseName(p);
-                        return `<span class="attachment-chip surface-sm" title="${escapeAttr(p)}">
-              <span class="chip-icon" aria-hidden="true">${iconSvg("attachment")}</span>
-              <span class="chip-name">${escapeHtml(base)}</span>
-              <button class="chip-remove" data-action="remove-attachment" data-path="${escapeAttr(p)}" aria-label="Retirer ${escapeAttr(base)}" title="Retirer">×</button>
-            </span>`;
-                      })
-                      .join("")
-                  : `<span class="dim compose-attachments-empty">Aucune pièce jointe</span>`
-                }
-                </div>
-              </div>
-              <div class="attachments-actions">
-                <button class="ghost-button composer-accent-outline" type="button" data-action="pick-attachments" title="Ajouter des pièces jointes">Ajouter…</button>
-                <button class="ghost-button" type="button" data-action="clear-attachments" title="Vider la liste" ${attachments.length ? "" : "disabled"}>Effacer</button>
-              </div>
-            </div>
-            <input id="compose-attachments" value="${escapeAttr(attachmentPathsJoinedForHiddenField(attachments))}" style="display:none" />
-          </div>
-          <div class="composer-advanced composer-advanced--footnote">
-            <button
-              type="button"
-              class="composer-advanced-micro"
-              data-action="toggle-compose-advanced"
-              aria-expanded="${state.composeAdvancedOpen}"
-            >
-              <span class="composer-advanced-chevron" aria-hidden="true">${state.composeAdvancedOpen ? "▾" : "▸"}</span>
-              <span>${state.composeAdvancedOpen ? "Masquer les options techniques" : "Options techniques"}</span>
-              <span class="composer-advanced-micro-hint dim">multipart HTML</span>
-            </button>
-            ${
-              state.composeAdvancedOpen
-                ? `<div class="composer-advanced-body composer-advanced-body--footnote">
-                    <div class="field-row field-row--tight-top field-row--advanced">
-                      <label for="compose-send-html" class="dim">HTML</label>
-                      <label class="composer-checkbox-inline">
-                        <input id="compose-send-html" type="checkbox" ${draft?.sendHtml ? "checked" : ""} />
-                        <span class="dim composer-checkbox-help">Envoyer en multipart (texte brut + HTML)</span>
-                      </label>
-                    </div>
-                  </div>`
-                : ""
-            }
-          </div>
-        </div>
-      <div class="compose-editor-sheet">
-        <div class="compose-secondary-toolbar">
-          <div
-            class="compose-toolbar-voice"
-            title="Dictée : Whisper transcrit l’audio. Les boutons Style déterminent le ton si « Réécrire avec le style » est activé dans IA → Dictée (réécriture LLM après dictée)."
-          >
-            <span class="composer-toolbar-caption dim">Dictée</span>
-            <div class="tone-inline tone-inline--voice">
-              <span class="composer-toolbar-caption dim composer-toolbar-caption--sub">Style</span>
-              ${tones
-                .map(
-                  (tone) =>
-                    `<button type="button" class="tone-button ${tone === state.tone ? "active" : ""}" data-tone="${tone}" title="Style par défaut pour Réécriture IA (${toneLabelsFr[tone]})">${escapeHtml(toneLabelsFr[tone])}</button>`
-                )
-                .join("")}
-            </div>
-            <div class="compose-mic-cluster">
-              <button
-                class="mic-button ${state.micState}"
-                type="button"
-                data-action="mic"
-                title="${escapeAttr(composeMicButtonTitle())}"
-                aria-label="${escapeAttr(micAriaLabel("compose"))}"
-                aria-pressed="${state.micState === "recording"}"
-              >
-                <span class="mic-button__ico" aria-hidden="true">${iconSvg("mic")}</span>
-              </button>
-            </div>
-          </div>
-          <div class="md-toolbar md-toolbar-rich" role="toolbar" aria-label="Mise en forme Markdown">
-            <button type="button" class="ghost-button md-button" data-md="bold" title="Gras (Ctrl+B)">Gras</button>
-            <button type="button" class="ghost-button md-button" data-md="italic" title="Italique (Ctrl+I)">Italique</button>
-            <button type="button" class="ghost-button md-button md-button-underline" data-md="underline" title="Souligné (Ctrl+U)">Soul.</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-md="h1" title="Titre 1 (#)">Titre 1</button>
-            <button type="button" class="ghost-button md-button" data-md="h2" title="Titre 2 (##)">Titre 2</button>
-            <button type="button" class="ghost-button md-button" data-md="h3" title="Titre 3 (###)">Titre 3</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-md="ul" title="Liste à puces">Puces</button>
-            <button type="button" class="ghost-button md-button" data-md="ol" title="Liste numérotée">Num.</button>
-            <button type="button" class="ghost-button md-button" data-md="link" title="Lien (Ctrl+K)">Lien</button>
-            <button type="button" class="ghost-button md-button" data-md="image" title="Image (URL Markdown)">Image</button>
-            <button type="button" class="ghost-button md-button" data-md="table" title="Tableau Markdown">Tableau</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-md="code" title="Code">&lt;&gt;</button>
-            <button type="button" class="ghost-button md-button" data-md="quote" title="Citation">Citation</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-md="undo" title="Annuler">Annuler</button>
-            <button type="button" class="ghost-button md-button" data-md="redo" title="Refaire">Refaire</button>
-          </div>
-          <div class="compose-llm-strip dim" role="group" aria-label="Brouillon · réécriture IA" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:11px">
-            <span>Réécriture ·</span>
-            <button
-              type="button"
-              class="ghost-button md-button"
-              data-action="compose-ai-rewrite-selected-tone"
-              title="Réécrire tout le texte avec le style choisi à gauche (Dictée · Réécriture)"
-            >
-              Style sélectionné
-            </button>
-            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Formal" title="Ton formel (LLM)">Formel</button>
-            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Casual" title="Ton décontracté">Décontracté</button>
-            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Concise" title="Concis">Concis</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-action="compose-ai-grammar" title="Orthographe & formulation (LLM)">Correction</button>
-            ${
-              isAiFeatureEnabled(state.appPrefs.ai, "featureQuickReplyComposeEnabled")
-                ? `<span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-action="llm-quick-replies-compose" title="Suggestions de réponses (sans fil ouvert)">Réponses rapides</button>`
-                : ""
-            }
-          </div>
-        </div>
-        ${correctionPanelHtml}
-        <div class="composer-body composer-body--${isHistorique ? "historique" : layout}">
-          <textarea
-            id="compose-body"
-            class="${textareaOffscreen ? "composer-source-offscreen" : ""}"
-            placeholder="Rédiger en Markdown…"
-            ${textareaOffscreen ? 'tabindex="-1" aria-hidden="true"' : ""}
-          >${escapeHtml(state.composeBody)}</textarea>
-          ${isHistorique ? renderComposerHistoriquePane() : showPreviewPane ? `<div class="preview">${state.preview?.html ?? ""}</div>` : ""}
-          <div class="drop-hint" aria-hidden="true">
-            <strong>Déposez des fichiers dans cette fenêtre</strong>
-            <span>Pièces jointes : glisser-déposer depuis l’explorateur (chemins locaux, app bureau).</span>
-          </div>
-        </div>
-      </div>
-      </div>
-    </section>
-  `;
-}
-
 function settingsDraftProfile(): Account | undefined {
   if (state.settingsSelectedAccountId === "new") return undefined;
   return state.accounts.find((a) => a.id === state.settingsSelectedAccountId);
@@ -10782,127 +8028,6 @@ function mergedProfileForAccountsForm(): Account | undefined {
   };
 }
 
-function renderSettingsGeneralPanel(): string {
-  const ml = state.appPrefs.general.motherLanguage;
-  const globalBook = Boolean(state.appPrefs.general.addressBookGlobalScope);
-  const activitySuggestions = state.appPrefs.general.activitySuggestionsEnabled !== false;
-  const defaultLf = defaultListFilterFromPrefs();
-  const prefAccId = defaultAccountIdFromPrefs() ?? "";
-  const accountOptions =
-    state.accounts.length ?
-      `<option value="" ${!prefAccId ? "selected" : ""}>Premier compte de la liste</option>${state.accounts
-        .map((a) => {
-          const label = (a.displayName || a.email || a.id).trim();
-          return `<option value="${escapeAttr(a.id)}" ${prefAccId === a.id ? "selected" : ""}>${escapeHtml(label)}</option>`;
-        })
-        .join("")}`
-    : `<option value="" selected>— Aucun compte configuré —</option>`;
-  return wrapSettingsPage(`
-    <div class="settings-card settings-general surface-sm">
-      <section class="settings-general-section" aria-labelledby="settings-general-lang-heading">
-        <h3 id="settings-general-lang-heading" class="thread-kicker settings-form-kicker">${escapeHtml(t("settings.general.languageHeading"))}</h3>
-        ${settingsExplainHtml(t("settings.general.languageExplain"))}
-        <div class="settings-form-row">
-          <label class="compose-field-label" for="prefs-mother-language">${escapeHtml(t("settings.general.motherLanguage"))}</label>
-          <select class="settings-ctl settings-ctl-select" id="prefs-mother-language">
-            <option value="fr" ${ml === "fr" ? "selected" : ""}>${escapeHtml(t("settings.general.langFr"))}</option>
-            <option value="fr-FR" ${ml === "fr-FR" ? "selected" : ""}>${escapeHtml(t("settings.general.langFrFR"))}</option>
-            <option value="en" ${ml === "en" ? "selected" : ""}>${escapeHtml(t("settings.general.langEn"))}</option>
-            <option value="en-US" ${ml === "en-US" ? "selected" : ""}>${escapeHtml(t("settings.general.langEnUS"))}</option>
-            <option value="pt" ${ml === "pt" ? "selected" : ""}>${escapeHtml(t("settings.general.langPt"))}</option>
-            <option value="pt-BR" ${ml === "pt-BR" ? "selected" : ""}>${escapeHtml(t("settings.general.langPtBR"))}</option>
-            <option value="es" ${ml === "es" ? "selected" : ""}>${escapeHtml(t("settings.general.langEs"))}</option>
-            <option value="de" ${ml === "de" ? "selected" : ""}>${escapeHtml(t("settings.general.langDe"))}</option>
-            <option value="it" ${ml === "it" ? "selected" : ""}>${escapeHtml(t("settings.general.langIt"))}</option>
-          </select>
-        </div>
-        <div class="settings-general-option">
-          <label class="settings-checkbox settings-general-option__label">
-            <input type="checkbox" id="prefs-address-book-global" ${globalBook ? "checked" : ""} />
-            <span>${escapeHtml(t("settings.general.globalAddressBook"))}</span>
-          </label>
-          ${settingsExplainHtml(t("settings.general.globalAddressBookExplain"))}
-        </div>
-        <div class="settings-general-option">
-          <label class="settings-checkbox settings-general-option__label">
-            <input type="checkbox" id="prefs-activity-suggestions" ${activitySuggestions ? "checked" : ""} />
-            <span>${escapeHtml(t("settings.general.activitySuggestions"))}</span>
-          </label>
-          ${settingsExplainHtml(t("settings.general.activitySuggestionsExplain"))}
-        </div>
-      </section>
-
-      <hr class="settings-section-divider" />
-
-      <section class="settings-general-section" aria-labelledby="settings-general-archive-heading">
-        <h3 id="settings-general-archive-heading" class="thread-kicker settings-form-kicker">Archivage</h3>
-        ${settingsExplainHtml("Hiérarchique : Archive/AAAA/MM-mois (locale app). Plat : dossier serveur (Gmail All Mail, Archive…).")}
-        <div class="settings-form-row">
-          <label class="compose-field-label" for="prefs-archive-layout">Mode</label>
-          <select class="settings-ctl settings-ctl-select" id="prefs-archive-layout">
-            <option value="hierarchical" ${(state.appPrefs.general.archiveLayout ?? "hierarchical") === "hierarchical" ? "selected" : ""}>Hiérarchique</option>
-            <option value="flat" ${state.appPrefs.general.archiveLayout === "flat" ? "selected" : ""}>Plat (serveur)</option>
-          </select>
-        </div>
-        <div class="settings-form-row">
-          <label class="compose-field-label" for="prefs-archive-root">Racine IMAP</label>
-          <input class="settings-ctl" id="prefs-archive-root" type="text" value="${escapeAttr(state.appPrefs.general.archiveRoot ?? "Archive")}" />
-        </div>
-        <div class="settings-form-row">
-          <label class="compose-field-label" for="prefs-stale-inbox-days">Inbox stale (jours)</label>
-          <input class="settings-ctl" id="prefs-stale-inbox-days" type="number" min="1" max="3650" value="${escapeAttr(String(state.appPrefs.general.staleInboxDays ?? 90))}" />
-        </div>
-        <div class="settings-form-row">
-          <label class="compose-field-label" for="prefs-hybrid-weight">Poids lexical hybride (0–1)</label>
-          <input class="settings-ctl" id="prefs-hybrid-weight" type="number" min="0" max="1" step="0.05" value="${escapeAttr(String(state.appPrefs.general.hybridLexicalWeight ?? 0.55))}" />
-        </div>
-        <div class="settings-general-option">
-          <label class="settings-checkbox settings-general-option__label">
-            <input type="checkbox" id="prefs-auto-archive-enabled" ${state.appPrefs.general.autoArchiveEnabled ? "checked" : ""} />
-            <span>Archivage automatique (règles opt-in)</span>
-          </label>
-        </div>
-      </section>
-
-      <hr class="settings-section-divider" />
-
-      <section class="settings-general-section" aria-labelledby="settings-general-startup-heading">
-        <h3 id="settings-general-startup-heading" class="thread-kicker settings-form-kicker">Démarrage</h3>
-        ${settingsExplainHtml(
-          "Compte mail ouvert par défaut au lancement de RustyMail (utile si vous avez plusieurs comptes IMAP). « Premier compte » = le premier de la liste dans Paramètres → Comptes."
-        )}
-        <div class="settings-form-row">
-          <label class="compose-field-label" for="prefs-default-account">Compte au démarrage</label>
-          <select class="settings-ctl settings-ctl-select" id="prefs-default-account">${accountOptions}</select>
-        </div>
-      </section>
-
-      <hr class="settings-section-divider" />
-
-      <section class="settings-general-section" aria-labelledby="settings-general-inbox-heading">
-        <h3 id="settings-general-inbox-heading" class="thread-kicker settings-form-kicker">Liste des mails</h3>
-        ${settingsExplainHtml(
-          "Filtre affiché par défaut à l’ouverture d’un dossier IMAP (puces Tout, Non lus, Suivis, Priorité, Auto)."
-        )}
-        <div class="settings-form-row">
-          <label class="compose-field-label" for="prefs-default-list-filter">Vue principale par défaut</label>
-          <select class="settings-ctl settings-ctl-select" id="prefs-default-list-filter">
-            <option value="all" ${defaultLf === "all" ? "selected" : ""}>Tout</option>
-            <option value="unread" ${defaultLf === "unread" ? "selected" : ""}>Non lus</option>
-            <option value="starred" ${defaultLf === "starred" ? "selected" : ""}>Suivis (tous dossiers)</option>
-            <option value="focused" ${defaultLf === "focused" ? "selected" : ""}>Priorité (hors expéditeurs auto)</option>
-            <option value="auto" ${defaultLf === "auto" ? "selected" : ""}>Auto (newsletters / expéditeurs auto)</option>
-          </select>
-        </div>
-      </section>
-
-      <div class="settings-form-footer settings-general-footer">
-        <button type="button" class="primary-button" data-action="save-general-prefs">${escapeHtml(t("common.save"))}</button>
-      </div>
-    </div>
-  `);
-}
-
 let addressBookRowsCache: AddressBookRow[] = [];
 
 async function refreshAddressBookList(): Promise<void> {
@@ -10922,63 +8047,6 @@ async function refreshAddressBookList(): Promise<void> {
   } catch {
     addressBookRowsCache = [];
   }
-}
-
-function renderSettingsAddressBookPanel(): string {
-  const acc = currentAccount();
-  const rows = addressBookRowsCache;
-  const editing = addressBookEditEmail;
-  const editRow = editing ? rows.find((r) => r.email === editing) : undefined;
-  return wrapSettingsPage(`
-    <div class="settings-card settings-card--span settings-address-book surface-sm">
-      <h3 class="thread-kicker">Carnet d’adresses</h3>
-      ${settingsExplainHtml("Contacts issus des messages et entrées manuelles. Les favoris remontent en tête des suggestions @.")}
-      ${
-        !acc
-          ? `<p class="dim">Sélectionnez un compte dans la barre latérale.</p>`
-          : `
-        <div class="settings-form-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <input type="search" class="settings-ctl" id="address-book-search" placeholder="Rechercher…" value="${escapeAttr(addressBookListQuery)}" />
-          <button type="button" class="ghost-button" data-action="address-book-refresh">Actualiser</button>
-          <button type="button" class="ghost-button" data-action="reindex-address-book">Réindexer depuis les mails</button>
-          <button type="button" class="ghost-button" data-action="address-book-export-vcard">Exporter vCard</button>
-          <button type="button" class="ghost-button" data-action="address-book-import-vcard">Importer vCard</button>
-        </div>
-        <div class="address-book-table-wrap">
-          <table class="address-book-table">
-            <thead><tr><th></th><th>Nom</th><th>E-mail</th><th>Notes</th><th></th></tr></thead>
-            <tbody>
-              ${rows
-                .map(
-                  (r) => `
-                <tr>
-                  <td><button type="button" class="address-book-star${r.isFavorite ? " is-on" : ""}" data-action="address-book-toggle-fav" data-email="${escapeAttr(r.email)}" title="Favori">${r.isFavorite ? "★" : "☆"}</button></td>
-                  <td>${escapeHtml(r.displayName || "—")}</td>
-                  <td class="mono">${escapeHtml(r.email)}</td>
-                  <td class="dim">${escapeHtml(r.notes || "")}</td>
-                  <td>
-                    <button type="button" class="ghost-button" data-action="address-book-edit" data-email="${escapeAttr(r.email)}">Modifier</button>
-                    ${r.source === "manual" ? `<button type="button" class="ghost-button" data-action="address-book-delete" data-email="${escapeAttr(r.email)}">Supprimer</button>` : ""}
-                  </td>
-                </tr>`
-                )
-                .join("")}
-            </tbody>
-          </table>
-        </div>
-        <div class="settings-form-panel">
-          <h4>${editing ? "Modifier le contact" : "Nouveau contact manuel"}</h4>
-          <div class="settings-form-row"><label>E-mail</label><input class="settings-ctl" id="ab-edit-email" value="${escapeAttr(editRow?.email ?? "")}" ${editing ? "readonly" : ""} /></div>
-          <div class="settings-form-row"><label>Nom affiché</label><input class="settings-ctl" id="ab-edit-name" value="${escapeAttr(editRow?.displayName ?? "")}" /></div>
-          <div class="settings-form-row"><label>Notes</label><textarea class="settings-ctl" id="ab-edit-notes" rows="2">${escapeHtml(editRow?.notes ?? "")}</textarea></div>
-          <label class="settings-checkbox"><input type="checkbox" id="ab-edit-fav" ${editRow?.isFavorite ? "checked" : ""} /> Favori</label>
-          <div class="settings-form-footer">
-            <button type="button" class="primary-button" data-action="address-book-save">${editing ? "Enregistrer" : "Ajouter"}</button>
-            ${editing ? `<button type="button" class="ghost-button" data-action="address-book-cancel-edit">Annuler</button>` : ""}
-          </div>
-        </div>`
-      }
-    </div>`);
 }
 
 function buildSemanticStatsBlockHtml(): string {
@@ -11037,378 +8105,6 @@ function buildSettingsAiPanelDeps(): SettingsAiPanelDeps {
     bootstrapModelsCompleted: Boolean(state.appPrefs.general.bootstrapModelsCompleted),
     engineSettingsTab: state.aiEngineSettingsTab,
   };
-}
-
-function renderSettingsAiPanel(): string {
-  return wrapSettingsPage(`
-    <div class="settings-card settings-card--span settings-ai">
-      ${renderSettingsAiHub(buildSettingsAiPanelDeps())}
-    </div>
-  `);
-}
-
-function renderSettingsAiModal(): string {
-  const modalId = state.settingsAiModal;
-  if (!modalId) return "";
-  const deps = buildSettingsAiPanelDeps();
-  const title = settingsAiModalTitle(modalId);
-  const mother = state.appPrefs.general.motherLanguage?.trim() || "fr";
-  const bodyHtml = renderSettingsAiModalBodyWithPrompts(
-    modalId,
-    deps,
-    state.promptCatalog,
-    state.promptCatalogLoadError,
-    mother,
-  );
-  return renderSettingsAiModalShell(modalId, title, bodyHtml, deps);
-}
-
-function renderSettingsAppearancePanel(): string {
-  const ai = state.appPrefs.ai;
-  return wrapSettingsPage(`
-    <div class="settings-card settings-appearance surface-sm">
-      <h2 class="thread-kicker settings-form-kicker" style="margin:0 0 10px">Apparence</h2>
-      ${settingsExplainHtml(
-        "Réglages visuels de l’application (indépendants de la configuration LLM). Pour l’instant : largeur du panneau droit <strong>Détails</strong> / <strong>Brief d’action</strong> (variable CSS <code>--ai-width</code>)."
-      )}
-      <div class="settings-form-row">
-        <label class="compose-field-label" for="prefs-ai-panel-width">Largeur panneau droit (px)</label>
-        <input class="settings-ctl" type="number" id="prefs-ai-panel-width" min="260" max="640" step="10" value="${escapeAttr(String(ai.aiPanelWidthPx))}" autocomplete="off" />
-      </div>
-      <div class="settings-form-footer" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-weak)">
-        <button type="button" class="primary-button" data-action="save-ai-prefs">Enregistrer l’apparence</button>
-      </div>
-    </div>
-  `);
-}
-
-function renderSettingsAutoSendersPanel(): string {
-  const rows = state.newsletterRules
-    .map((r) => {
-      const label = formatNewsletterRuleInput(r);
-      return `
-      <div class="settings-newsletter-row surface-sm">
-        <code class="settings-newsletter-domain">${escapeHtml(label)}</code>
-        <button type="button" class="ghost-button settings-newsletter-remove" data-action="newsletter-domain-remove" data-rule="${escapeAttr(label)}">Supprimer</button>
-      </div>`;
-    })
-    .join("");
-  return wrapSettingsPage(`
-    <div class="settings-card settings-card--span settings-newsletters surface-sm">
-      <h2 class="thread-kicker settings-form-kicker" style="margin:0 0 10px">Expéditeurs automatiques</h2>
-      ${settingsExplainHtml(
-        "Messages type <strong>noreply</strong>, confirmations, envois marketing ou ESP (<code>*.mailchimp.com</code>, etc.) : définissez ici qui est traité comme <strong>expéditeur automatique</strong>. Une règle peut être un domaine entier (<code>*.exemple.com</code>), ou une adresse précise (<code>order-update@amazon.fr</code>) pour laisser passer le SAV sur le même domaine. Les actions <strong>Répondre</strong> et <strong>Répondre à tous</strong> sont masquées quand le dernier message entrant correspond à une règle."
-      )}
-      <div class="settings-form-panel settings-newsletter-add">
-        <div class="settings-form-row settings-newsletter-add-row">
-          <label class="compose-field-label" for="newsletter-domain-input">Règle</label>
-          <input class="settings-ctl" type="text" id="newsletter-domain-input" placeholder="noreply@banque.fr · *.sendgrid.net · substack.com" autocomplete="off" autocapitalize="off" spellcheck="false" />
-          <button type="button" class="primary-button" data-action="newsletter-domain-add">Ajouter</button>
-        </div>
-      </div>
-      <div class="settings-newsletter-list" aria-label="Règles expéditeurs automatiques">
-        ${rows || `<p class="dim settings-account-list-empty">Aucune règle affichée (exemples par défaut en base au premier lancement Tauri).</p>`}
-      </div>
-    </div>
-  `);
-}
-
-function renderSettingsAccountsPanel(): string {
-  const persisted = settingsDraftProfile();
-  const isNew = state.settingsSelectedAccountId === "new";
-  const merged = mergedProfileForAccountsForm();
-  const scratch = state.accountFormOAuthPrefill ?? accountsFormIdentityScratch;
-  const authKindEffective: MailAuthKind = isNew ? state.accountFormAuthKind : (persisted?.authKind ?? "password");
-  const wizardBusy = isNew && state.accountOAuthWizardPhase != null && state.accountOAuthWizardPhase !== "error";
-  const showOAuthWizardLanding =
-    isNew &&
-    !state.accountPasswordSetupExpanded &&
-    authKindEffective === "password" &&
-    !state.oauthLockedEmail &&
-    state.accountOAuthWizardPhase == null;
-  const hint =
-    wizardBusy ?
-      "Configuration automatique du compte en cours…"
-    : showOAuthWizardLanding ?
-      "Choisissez <strong>Google</strong> ou <strong>Microsoft</strong> — le reste est automatique."
-    : isNew && state.accountPasswordSetupExpanded ?
-      "Compte IMAP classique : e-mail, mot de passe, puis <strong>Enregistrer</strong>."
-    : isNew ?
-      ""
-    : `Modification du compte <strong>${escapeHtml(persisted?.email ?? "")}</strong> — vous pouvez mettre à jour les serveurs sans changer le mot de passe.`;
-
-  const listRows = state.accounts
-    .map(
-      (a) => `
-        <button type="button" class="settings-account-row ${a.id === state.settingsSelectedAccountId ? "settings-account-row--active" : ""}"
-          data-action="settings-select-account" data-account-id="${escapeAttr(a.id)}">
-          <span class="settings-account-row-main">${escapeHtml(a.displayName || a.email)}</span>
-          <span class="settings-account-row-sub dim">${escapeHtml(a.email)}</span>
-        </button>`
-    )
-    .join("");
-
-  return wrapSettingsPage(`
-    <div class="settings-card settings-card--span settings-accounts-grid">
-      <aside class="settings-account-list" aria-label="Comptes configurés">
-        <div class="settings-account-list-title dim">Mes comptes</div>
-        ${listRows || `<p class="dim settings-account-list-empty">Aucun compte — ajoutez-en un.</p>`}
-        <button type="button" class="ghost-button settings-add-account" data-action="settings-new-account">+ Ajouter un compte</button>
-      </aside>
-      <div class="settings-account-editor">
-        ${hint ? settingsExplainHtml(hint) : ""}
-        ${renderAccountFormMarkup(merged, {
-          statusFallbackText:
-            "Le mot de passe est conservé dans le trousseau du système uniquement · les serveurs sont enregistrés en local (SQLite).",
-          accountMessage: state.accountMessage,
-          isNewAccount: isNew,
-          serversPanelOpen: !isNew || state.accountServersPanelOpen,
-          identityScratch: scratch,
-          persistedAccount: persisted,
-          authKindEffective,
-          showOAuthConnect: false,
-          oauthLockedEmail: state.oauthLockedEmail,
-          showOAuthWizardLanding: Boolean(isTauriRuntime() && showOAuthWizardLanding),
-          oauthWizardPhase: state.accountOAuthWizardPhase,
-          oauthWizardMessage: state.accountOAuthWizardMessage,
-          oauthWizardError: state.accountOAuthWizardError,
-          oauthGoogleConfigured: state.oauthGoogleConfigured,
-          oauthMicrosoftConfigured: state.oauthMicrosoftConfigured,
-        })}
-      </div>
-    </div>
-  `);
-}
-
-function renderSettingsShortcutsPanel(): string {
-  const mod = navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl";
-  const rows: ShortcutRow[] = [
-    { keys: `${mod}+T`, summary: "Recherche globale", detail: "Ouvre la modale de recherche (partout dans l’app). Reappuyer pour fermer.", scope: "Global" },
-    {
-      keys: `${mod}+F5`,
-      summary: "Synchroniser IMAP",
-      detail: "Relance la synchronisation du dossier courant (ou des dossiers principaux). F5 seul recharge l’application.",
-      scope: "Global",
-    },
-    { keys: "Échap", summary: "Fermer / retour", detail: "Ferme la modale de recherche, les dialogues, le panneau IA, puis navigation arrière.", scope: "Global" },
-    { keys: "/", summary: "Focus recherche", detail: "Affiche la liste et focus la barre de recherche ; ouvre la modale si la barre est absente.", scope: "Global" },
-    { keys: "n", summary: "Nouveau message", detail: "Ouvre le compositeur (sans Ctrl — ne pas confondre avec Ctrl+C copier).", scope: "Hors champ texte" },
-    { keys: "r", summary: "Répondre", detail: "Répondre au fil ouvert.", scope: "Fil" },
-    { keys: "s", summary: "Résumer le fil", detail: "Synthèse IA du fil courant.", scope: "Fil" },
-    { keys: "t", summary: "Traduire le fil", detail: "Traduction IA (sans Ctrl — ne pas confondre avec Ctrl+T).", scope: "Fil" },
-    { keys: "Tab", summary: "Panneau IA", detail: "Affiche ou masque le panneau latéral IA.", scope: "Fil" },
-    { keys: "m", summary: "Aperçu compositeur", detail: "Bascule l’aperçu HTML en rédaction.", scope: "Compositeur" },
-    { keys: "Entrée", summary: "Valider la recherche", detail: "Applique critères @, #, texte. Depuis la modale : retour à la liste avec résultats.", scope: "Recherche" },
-    { keys: "Tab", summary: "Autocomplétion recherche", detail: "Insère la suggestion @contact ou #dossier / #tag (sans lancer la recherche).", scope: "Recherche" },
-    { keys: "Boutons 4 / 5", summary: "Navigation souris", detail: "Précédent / suivant (comme le navigateur), si aucune modale ouverte.", scope: "Global" },
-  ];
-  const tableRows = rows
-    .map(
-      (r) => `
-        <tr>
-          <td class="shortcuts-table__keys"><kbd>${escapeHtml(r.keys)}</kbd></td>
-          <td><strong>${escapeHtml(r.summary)}</strong>${r.detail ? `<br><span class="dim">${escapeHtml(r.detail)}</span>` : ""}</td>
-          <td class="dim shortcuts-table__scope">${escapeHtml(r.scope ?? "")}</td>
-        </tr>`
-    )
-    .join("");
-  return wrapSettingsPage(`
-    <article class="settings-card settings-card--span surface-sm">
-      <h3 class="thread-kicker">Raccourcis clavier</h3>
-      ${settingsExplainHtml("Raccourcis actifs dans l’interface principale. Dans un champ de saisie (ou zone éditable), seuls Échap, Ctrl+T (recherche) et Ctrl+F5 (sync IMAP) s’appliquent. Les raccourcis à une touche ignorent Ctrl, Alt et Cmd (copier, coller, etc.). F5 seul recharge l’application.")}
-      <div class="shortcuts-table-wrap">
-        <table class="shortcuts-table">
-          <thead>
-            <tr><th scope="col">Raccourci</th><th scope="col">Action</th><th scope="col">Contexte</th></tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-    </article>
-  `);
-}
-
-function renderSettingsStoragePanel(): string {
-  if (!isTauriRuntime()) {
-    return wrapSettingsPage(
-      `<article class="settings-card surface-sm"><p class="dim" style="margin:0">Chemins disque : disponibles dans l’application bureau Tauri.</p></article>`
-    );
-  }
-  if (state.settingsPathsLoadError && !state.lastAppPaths) {
-    return wrapSettingsPage(`<article class="settings-card surface-sm">
-      <p style="margin:0">${escapeHtml(state.settingsPathsLoadError)}</p>
-      <button type="button" class="ghost-button settings-storage-refresh" data-action="settings-reload-paths">Recharger les chemins</button>
-    </article>`);
-  }
-  const p = state.lastAppPaths;
-  if (!p) {
-    return wrapSettingsPage(`<article class="settings-card surface-sm">
-      <p class="dim" style="margin:0">Chargement des chemins…</p>
-      <button type="button" class="ghost-button settings-storage-refresh" data-action="settings-reload-paths">Rafraîchir</button>
-    </article>`);
-  }
-  const sections: Array<{ heading: string; hint: string; rows: Array<[string, string]> }> = [
-    {
-      heading: "Courrier & cache local",
-      hint: "Messages synchronisés, fils de discussion, pièces jointes indexées.",
-      rows: [["Base SQLite", p.dbPath]],
-    },
-    {
-      heading: "Configuration application",
-      hint: "Préférences UI, comptes, options IA (hors trousseau).",
-      rows: [["Fichier JSON des préférences", p.prefsPath]],
-    },
-    {
-      heading: "Modèles IA sur disque",
-      hint: "Téléchargements locaux pour la recherche sémantique et llama-server.",
-      rows: [
-        ["Embeddings sémantiques (MiniLM ONNX)", p.modelsDir],
-        ["Cache modèles LLM (fichiers GGUF)", p.llmModelsDir],
-      ],
-    },
-  ];
-  return wrapSettingsPage(`<article class="settings-card settings-card--span surface-sm settings-storage-panel">
-    <header class="settings-storage-head">
-      <h3 class="thread-kicker settings-form-kicker settings-card__title">Chemins disque</h3>
-      <p class="dim settings-card__lead">Emplacements renvoyés par la commande Tauri <code>app_paths</code> (dossier de données de l’app).</p>
-      <button type="button" class="ghost-button settings-storage-refresh" data-action="settings-reload-paths">Rafraîchir</button>
-    </header>
-    ${sections
-      .map(
-        (sec) => `
-    <section class="settings-storage-section" aria-label="${escapeAttr(sec.heading)}">
-      <h4 class="settings-storage-section__title">${escapeHtml(sec.heading)}</h4>
-      <p class="dim settings-storage-section__hint">${escapeHtml(sec.hint)}</p>
-      <div class="settings-storage-paths">
-        ${sec.rows
-          .map(
-            ([label, path]) => `
-        <div class="settings-storage-path">
-          <div class="settings-storage-path__label">${escapeHtml(label)}</div>
-          <code class="settings-path-code">${escapeHtml(path)}</code>
-        </div>`
-          )
-          .join("")}
-      </div>
-    </section>`
-      )
-      .join('<hr class="settings-section-divider settings-storage-section-divider" />')}
-  </article>`);
-}
-
-function renderSettingsDeveloperPanel(): string {
-  return wrapSettingsPage(
-    `
-    <article class="settings-card surface-sm" aria-labelledby="settings-dev-stack-heading">
-      <h3 id="settings-dev-stack-heading" class="thread-kicker settings-form-kicker settings-card__title">Pile technique</h3>
-      <p class="dim settings-card__lead">Aperçu pour développeurs du client mail RustyMail.</p>
-      <ul class="settings-card__list">
-        <li><strong>Shell</strong> — Tauri 2, Rust (<code>crates/rustymail-*</code>, binaire <code>src-tauri</code>)</li>
-        <li><strong>UI</strong> — Vite, TypeScript, CSS (<code>dompurify</code> pour HTML mail)</li>
-        <li><strong>Données</strong> — SQLite + WAL (<code>rusqlite</code>), JSON prefs, trousseau OS</li>
-        <li><strong>Mail</strong> — IMAP (<code>async-imap</code>), SMTP (<code>lettre</code>), pièces jointes</li>
-        <li><strong>Recherche</strong> — lexical + mode hybrid / sémantique (<code>rustymail-semantic</code>, ONNX MiniLM)</li>
-        <li><strong>IA</strong> — OpenRouter ou serveur compatible OpenAI, llama-server, dictée Whisper</li>
-      </ul>
-      <p class="dim" style="margin:12px 0 0;font-size:12px;line-height:1.5">Détails : <code>README.md</code> et <code>docs/</code>.</p>
-    </article>
-    <article class="settings-card surface-sm" aria-labelledby="settings-dev-demo-heading">
-      <h3 id="settings-dev-demo-heading" class="thread-kicker settings-form-kicker settings-card__title">Données démo (pro fictif)</h3>
-      <p class="dim settings-card__lead">
-        <strong>Essayer</strong> — crée ou réinitialise <code>playground@demo.rustymail.app</code> (conversations pro en local, IMAP factice) pour tester le <strong>Brief d’action</strong>.
-      </p>
-      <p class="dim" style="margin:0 0 4px;font-size:13px;line-height:1.55">
-        <strong>Passer à un vrai compte</strong> — supprimez la démo puis ajoutez un compte IMAP dans <strong>Paramètres → Comptes</strong>.
-      </p>
-      <div class="settings-card__actions">
-        <button type="button" class="primary-button" data-action="demo-reset-playground">Réinitialiser la boîte démo pro</button>
-        <button type="button" class="ghost-button btn-danger-soft" data-action="demo-remove-playground">Supprimer la boîte démo</button>
-      </div>
-    </article>
-  `,
-    2
-  );
-}
-
-function renderSettings() {
-  const tabAccounts = state.settingsTab === "accounts";
-  const tabGeneral = state.settingsTab === "general";
-  const tabAppearance = state.settingsTab === "appearance";
-  const tabAutoSenders = state.settingsTab === "autoSenders";
-  const tabAi = state.settingsTab === "ai";
-  const tabAddressBook = state.settingsTab === "addressBook";
-  const tabStorage = state.settingsTab === "storage";
-  const tabShortcuts = state.settingsTab === "shortcuts";
-  const tabDeveloper = state.settingsTab === "developer";
-  let settingsBody = "";
-  switch (state.settingsTab) {
-    case "accounts":
-      settingsBody = renderSettingsAccountsPanel();
-      break;
-    case "general":
-      settingsBody = renderSettingsGeneralPanel();
-      break;
-    case "appearance":
-      settingsBody = renderSettingsAppearancePanel();
-      break;
-    case "autoSenders":
-      settingsBody = renderSettingsAutoSendersPanel();
-      break;
-    case "ai":
-      settingsBody = renderSettingsAiPanel();
-      break;
-    case "addressBook":
-      settingsBody = renderSettingsAddressBookPanel();
-      break;
-    case "storage":
-      settingsBody = renderSettingsStoragePanel();
-      break;
-    case "shortcuts":
-      settingsBody = renderSettingsShortcutsPanel();
-      break;
-    case "developer":
-      settingsBody = renderSettingsDeveloperPanel();
-      break;
-    default:
-      settingsBody = renderSettingsAccountsPanel();
-  }
-  return `
-    <section class="settings-root compose-view thread-view thread-reading" aria-label="${escapeAttr(t("settings.title"))}">
-      <header class="thread-reading-head" aria-label="${escapeAttr(t("settings.title"))}">
-        ${renderViewNavTrail()}
-        <div class="thread-reading-hero">
-          <h1 class="thread-reading-title">${escapeHtml(t("settings.title"))}</h1>
-        </div>
-      </header>
-      <div class="settings-tabbar" role="tablist" aria-label="${escapeAttr(t("settings.sectionsAria"))}">
-        <button type="button" role="tab" class="settings-tab ${tabAccounts ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="accounts" aria-selected="${tabAccounts}">${escapeHtml(t("settings.tabs.accounts"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabGeneral ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="general" aria-selected="${tabGeneral}">${escapeHtml(t("settings.tabs.general"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabAppearance ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="appearance" aria-selected="${tabAppearance}">${escapeHtml(t("settings.tabs.appearance"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabAutoSenders ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="autoSenders" aria-selected="${tabAutoSenders}"
-          title="noreply, notifications, newsletters, ESP…">${escapeHtml(t("settings.tabs.autoSenders"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabAi ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="ai" aria-selected="${tabAi}">${escapeHtml(t("settings.tabs.ai"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabAddressBook ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="addressBook" aria-selected="${tabAddressBook}">${escapeHtml(t("settings.tabs.addressBook"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabStorage ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="storage" aria-selected="${tabStorage}"
-          title="SQLite, JSON, modèles…">${escapeHtml(t("settings.tabs.storage"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabShortcuts ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="shortcuts" aria-selected="${tabShortcuts}"
-          title="Raccourcis clavier">${escapeHtml(t("settings.tabs.shortcuts"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabDeveloper ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="developer" aria-selected="${tabDeveloper}"
-          title="Dépôt, crates, libs">${escapeHtml(t("settings.tabs.developer"))}</button>
-      </div>
-      <div class="settings-body">
-        ${settingsBody}
-      </div>
-    </section>
-  `;
 }
 
 function threadIdsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
@@ -11504,80 +8200,6 @@ function threadAiSummaryShownInZen(): boolean {
   return state.view === "thread" && Boolean(state.selectedThread) && threadAiSummaryForCurrentThread();
 }
 
-function renderThreadQaBlockHtml(): string {
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadQaEnabled")) return "";
-  const dictationMic =
-    isTauriRuntime() && state.appPrefs.ai.dictationEnabled
-      ? `<div class="ai-qa-mic-cluster compose-mic-cluster" title="${escapeAttr(threadQaMicButtonTitle())}">
-          <button
-            class="mic-button ${state.micState}"
-            type="button"
-            data-action="mic-thread-qa"
-            aria-label="${escapeAttr(micAriaLabel("thread-qa"))}"
-            aria-pressed="${state.micState === "recording"}"
-          >
-            <span class="mic-button__ico" aria-hidden="true">${iconSvg("mic")}</span>
-          </button>
-        </div>`
-      : "";
-  return `<div class="ai-qa-block surface-sm">
-        <p class="dim ai-qa-block__title">Questions sur le fil</p>
-        <label class="dim ai-qa-block__label" for="thread-qa-input">Votre question</label>
-        <div class="ai-qa-input-row">
-          <textarea id="thread-qa-input" class="settings-ctl ai-qa-input" rows="2" placeholder="Ex. Quelles dates ont été proposées ? (dictée possible)">${escapeHtml(state.threadQaDraft)}</textarea>
-          ${dictationMic}
-        </div>
-        <div class="ai-qa-block__actions">
-          <button type="button" class="ghost-button ghost-button-sm" data-action="llm-qa-thread">Poser la question</button>
-          ${
-            state.threadQaAnswer || state.threadQaStreamText
-              ? `<button type="button" class="ghost-button ghost-button-sm" data-action="llm-qa-clear">Effacer</button>`
-              : ""
-          }
-        </div>
-        ${
-          state.threadQaStreamText.trim()
-            ? `<div class="ai-qa-answer ai-qa-answer--stream"><p class="ai-qa-answer__text">${formatPlainTextWithLinks(state.threadQaStreamText)}</p></div>`
-            : ""
-        }
-        ${
-          state.threadQaAnswer
-            ? `<div class="ai-qa-answer">
-          <p class="ai-qa-answer__text">${formatPlainTextWithLinks(state.threadQaAnswer.answer)}</p>
-          ${
-            state.threadQaAnswer.evidenceMessageIds.length
-              ? `<p class="dim ai-qa-block__evidence-label">Messages sources</p>
-          <div class="ai-qa-evidence">${state.threadQaAnswer.evidenceMessageIds
-            .map(
-              (mid) =>
-                `<button type="button" class="ghost-button ghost-button-sm ai-qa-evidence__btn" data-action="qa-open-message" data-msg-id="${escapeAttr(mid)}">${escapeHtml(mid.slice(0, 24))}${mid.length > 24 ? "…" : ""}</button>`
-            )
-            .join("")}</div>`
-              : ""
-          }
-        </div>`
-            : ""
-        }
-      </div>`;
-}
-
-function renderThreadSummaryPanelHtml(): string {
-  /** Même contenu que `thread-zen` dans la colonne fil — ne pas dupliquer dans Détails. */
-  if (threadAiSummaryShownInZen()) return "";
-  if (!threadAiSummaryForCurrentThread()) return "";
-  const tid = String(state.aiThreadScope);
-  const row = state.threads.find((t) => String(t.id) === tid);
-  const subject = state.selectedThread?.subject || row?.subject || "Fil";
-  return `
-    <div class="ai-thread-summary surface-sm" aria-label="Synthèse du fil">
-      <div class="ai-thread-summary__head">
-        <span class="thread-kicker thread-kicker-strong">Résumé</span>
-      </div>
-      <p class="dim ai-thread-summary__subject">${escapeHtml(subject)}</p>
-      <div class="thread-zen-body ai-thread-summary__body">${zenSummaryHtmlFragments(state.aiOutput!.trim())}</div>
-    </div>`;
-}
-
 function openSettingsView() {
   beginNavigation("settings", { resetStack: true });
   state.view = "settings";
@@ -11645,135 +8267,6 @@ async function stopAgentTelemetry(): Promise<void> {
     s.unlistenTelemetry();
     s.unlistenTelemetry = undefined;
   }
-}
-
-function renderAgentTelemetryHtml(session: NonNullable<typeof state.agentSession>): string {
-  if (!session.telemetry.length) return "";
-  const rows = session.telemetry
-    .map((t) => {
-      const label = assistSkillLabel(t.skill);
-      const lat = t.latencyMs > 0 ? `${t.latencyMs} ms` : "—";
-      const status =
-        t.status === "ok"
-          ? "OK"
-          : t.status === "skipped"
-            ? "Ignoré"
-            : t.status === "blocked"
-              ? "Bloqué"
-              : t.status === "error"
-              ? "Erreur"
-              : t.status;
-      const detail = t.message ? `<span class="dim"> · ${escapeHtml(t.message)}</span>` : "";
-      return `<li><span>${escapeHtml(label)}</span><span class="dim">${escapeHtml(status)} · ${lat}</span>${detail}</li>`;
-    })
-    .join("");
-  return `<details class="agent-panel__telemetry" open><summary>Exécution</summary><ul>${rows}</ul></details>`;
-}
-
-function renderAgentPrepareReplyPanelHtml(): string {
-  const s = state.agentSession;
-  if (!s || !threadIdsMatch(s.threadId, state.selectedThreadId)) return "";
-  const stepLabel = agentStepProgressLabel(s);
-  const modeSelect = `
-    <label class="agent-panel__mode dim">
-      Mode
-      <select class="settings-ctl" data-action="agent-set-mode" ${s.busy ? "disabled" : ""}>
-        <option value="quick" ${s.assistMode === "quick" ? "selected" : ""}>${escapeHtml(assistModeLabel("quick"))}</option>
-        <option value="deep" ${s.assistMode === "deep" ? "selected" : ""}>${escapeHtml(assistModeLabel("deep"))}</option>
-        <option value="strictSafe" ${s.assistMode === "strictSafe" ? "selected" : ""}>${escapeHtml(assistModeLabel("strictSafe"))}</option>
-      </select>
-    </label>`;
-  const intentBlock = s.intent
-    ? `<p class="agent-panel__intent">${escapeHtml(s.intent.intent)}</p><p class="dim">Ton : ${escapeHtml(s.intent.toneHint)}</p>`
-    : "";
-  const factsBlock =
-    s.facts?.facts?.length ?
-      `<ul class="agent-panel__facts">${s.facts.facts
-        .slice(0, 8)
-        .map((f) => `<li><span class="dim">${escapeHtml(f.kind)}</span> ${escapeHtml(f.text)}</li>`)
-        .join("")}</ul>`
-    : "";
-  const clarificationBlock =
-    s.step === "clarification" && s.clarificationQuestions.length ?
-      `<div class="agent-panel__clarification"><p><strong>Précisions utiles</strong></p><ul>${s.clarificationQuestions
-        .map((q) => `<li>${escapeHtml(q)}</li>`)
-        .join("")}</ul></div>`
-    : "";
-  const safetyBlock =
-    s.safetyFlags.length || s.consistencyIssues.length ?
-      `<div class="agent-panel__warnings">${[
-        ...s.consistencyIssues.map((i) => `<p class="agent-warn">⚠ ${escapeHtml(i)}</p>`),
-        ...s.safetyFlags.map((f) => `<p class="agent-warn dim">${escapeHtml(assistSafetyFlagLabel(f))}</p>`),
-      ].join("")}</div>`
-    : "";
-  const draftBlock =
-    (s.step === "draftReply" || s.draft.trim()) && (s.draft.trim() || s.busy) ?
-      `<textarea class="settings-ctl agent-panel__draft" id="agent-draft-text" rows="6" ${s.busy ? 'aria-busy="true"' : ""}>${escapeHtml(s.draft)}</textarea>`
-    : "";
-  const actionsBlock =
-    s.recommendations.filter((r) => r.kind === "action").length ?
-      `<div class="agent-panel__actions-list"><p class="dim"><strong>Actions</strong></p><ul>${s.recommendations
-        .filter((r) => r.kind === "action")
-        .map(
-          (r) =>
-            `<li>${escapeHtml(r.label)}${r.detail ? `<span class="dim"> · ${escapeHtml(r.detail)}</span>` : ""}</li>`,
-        )
-        .join("")}</ul></div>`
-    : "";
-  const slotsBlock =
-    s.slots.length ?
-      `<ul class="agent-panel__slots">${s.slots.map((sl) => `<li><button type="button" class="ghost-button" data-action="agent-append-slot" data-slot="${escapeAttr(sl)}">${escapeHtml(sl)}</button></li>`).join("")}</ul>`
-    : "";
-  const skillToggles = getAssistSkillUi().map((sk) => {
-    const on = agentSkillEnabled(sk.id);
-    const dis = s.busy || sk.id === "analyzeIntent" || sk.id === "draftReply";
-    return `<label class="agent-skill-toggle"><input type="checkbox" data-action="agent-toggle-skill" data-skill="${sk.id}" ${on ? "checked" : ""} ${dis ? "disabled" : ""}/> ${escapeHtml(sk.label)}</label>`;
-  }).join("");
-  const skillsBlock = `<details class="agent-panel__skills"><summary>Skills</summary><div class="agent-skill-toggles">${skillToggles}</div></details>`;
-  return `
-    <div class="agent-panel surface-sm">
-      <div class="agent-panel__head">
-        <strong>Assistant réponse</strong>
-        <span class="dim">${stepLabel}</span>
-        ${modeSelect}
-      </div>
-      ${s.busy ? `<p class="dim">Génération…</p>` : ""}
-      ${s.step === "analyzeIntent" ? intentBlock : ""}
-      ${skillsBlock}
-      ${factsBlock}
-      ${actionsBlock}
-      ${clarificationBlock}
-      ${safetyBlock}
-      ${draftBlock}
-      ${s.step === "suggestSlots" ? slotsBlock : ""}
-      ${renderAgentTelemetryHtml(s)}
-      <div class="agent-panel__actions">
-        <button type="button" class="ghost-button" data-action="agent-prepare-cancel">Annuler</button>
-        ${
-          s.step === "draftReply" && s.draft.trim()
-            ? `<button type="button" class="ghost-button" data-action="agent-insert-compose">Insérer dans compose</button>`
-            : ""
-        }
-        ${
-          s.step !== "suggestSlots" &&
-          !s.busy &&
-          (s.step === "clarification" || s.step !== "draftReply" || agentOfferSlotsStep(s))
-            ? `<button type="button" class="primary-button" data-action="agent-prepare-continue">${
-                s.step === "clarification"
-                  ? "Générer le brouillon quand même"
-                  : s.step === "draftReply"
-                    ? "Créneaux alternatifs"
-                    : "Continuer"
-              }</button>`
-            : ""
-        }
-        ${
-          s.step === "suggestSlots" && s.slots.length
-            ? `<button type="button" class="ghost-button" data-action="agent-append-all-slots">Ajouter au message</button>`
-            : ""
-        }
-      </div>
-    </div>`;
 }
 
 async function agentPrepareReplyStart(): Promise<void> {
@@ -12171,162 +8664,6 @@ async function agentInsertDraftIntoCompose(extra?: string): Promise<void> {
     console.error("agentInsertDraftIntoCompose prepare_reply", error);
     toast(`Impossible d’ouvrir la réponse dans le fil : ${tauriErrorMessage(error)}`);
   }
-}
-
-function renderAiPanel() {
-  if (mailboxDigestSlotInList()) {
-    const digestMboxTitle = escapeHtml(state.selectedMailbox || "INBOX");
-    const accountId = currentAccount()?.id?.trim() ?? "";
-    const mailboxKey = state.selectedMailbox || "INBOX";
-    const k = `${accountId}|${mailboxKey}`;
-    const keyMatches = state.mailboxDigestKey === k;
-    const banner = state.mailboxBriefBannerHtml.trim();
-    const brief = state.mailboxActionBrief;
-    const hasBrief = Boolean(brief && keyMatches);
-    const hasBanner = Boolean(banner);
-    const hasRenderable = hasBrief || hasBanner;
-    let digestBody = "";
-    if (state.mailboxDigestRefreshing && !hasRenderable) {
-      digestBody = `<div class="inbox-brief-body">${renderBriefMailViewShell(
-        `<p class="thread-zen-par dim" role="status">Génération du brief d’action…</p>`,
-        { kicker: "Brief d’action" }
-      )}</div>`;
-    } else if (hasBrief) {
-      digestBody = `<div class="inbox-brief-body">${renderActionBriefHtml(brief!)}</div>`;
-    } else if (keyMatches && hasBanner) {
-      digestBody = `<div class="inbox-brief-body">${banner}</div>`;
-    } else if (state.mailboxDigestKey && !keyMatches) {
-      digestBody = `<div class="inbox-brief-body">${renderBriefMailViewShell(
-        `<p class="thread-zen-par dim" role="status">Changement de dossier — actualisation du brief…</p>`,
-        { kicker: "Brief d’action" }
-      )}</div>`;
-    } else {
-      digestBody = `<div class="inbox-brief-body">${renderBriefMailViewShell(
-        `<p class="thread-zen-par dim">Le brief se charge automatiquement après chaque synchronisation ou chargement des conversations.</p>`,
-        { kicker: "Brief d’action" }
-      )}</div>`;
-    }
-    const busyLine =
-      state.mailboxDigestRefreshing && keyMatches && hasRenderable
-        ? `<p class="inbox-digest-busy dim" style="margin:0 14px 8px" aria-live="polite">Mise à jour…</p>`
-        : "";
-    const modeSel = state.mailboxBriefMode;
-    const briefModeApplied = state.mailboxActionBrief?.mode?.trim();
-    const ctxHint =
-      state.llmRuntimeStatus?.llamaServerNCtx ??
-      state.appPrefs.ai.localLlmContextSize ??
-      null;
-    const modeTitle =
-      modeSel === "auto"
-        ? `Auto : Quick / Decision / Deep selon la fenêtre de contexte${ctxHint ? ` (≈ ${ctxHint} jetons)` : ""}`
-        : `Plafond ${modeSel} ; le mode effectif peut être réduit si le contexte est petit`;
-    return `
-    <aside class="ai-panel ai-panel--digest-slot" aria-label="Brief d'action du dossier">
-      <header class="pane-header ai-panel-digest-head" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
-        <div>
-          <strong>Brief d'action</strong>
-          <small class="dim" style="display:block;margin-top:3px">${briefModeApplied ? `${escapeHtml(briefModeApplied)} · ` : ""}${digestMboxTitle}</small>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
-          <label class="dim" style="font-size:11px;display:flex;align-items:center;gap:4px">Mode
-            <select class="settings-ctl" data-action="mailbox-brief-mode" title="${escapeAttr(modeTitle)}" style="font-size:11px;padding:2px 6px;min-width:0">
-              <option value="auto" ${modeSel === "auto" ? "selected" : ""}>Auto</option>
-              <option value="quick" ${modeSel === "quick" ? "selected" : ""}>Quick</option>
-              <option value="decision" ${modeSel === "decision" ? "selected" : ""}>Decision</option>
-              <option value="deep" ${modeSel === "deep" ? "selected" : ""}>Deep</option>
-            </select>
-          </label>
-          <button type="button" class="ghost-button inbox-digest-dismiss" data-action="llm-inbox-digest" title="Relancer le brief du dossier">Rafraîchir</button>
-          <button type="button" class="icon-button" data-action="dismiss-mailbox-digest" aria-label="Fermer le brief">×</button>
-        </div>
-      </header>
-      ${busyLine}
-      <div class="ai-panel-digest-scroll inbox-brief-scroll">
-        ${digestBody}
-      </div>
-    </aside>`;
-  }
-
-  const threadReading = state.view === "thread" && state.selectedThread;
-  const thread = threadReading ? state.selectedThread : undefined;
-  const participantLinks = thread ? threadParticipantsWithEmails(thread.messages) : [];
-  const detailsTagCount = thread ? threadTagsForModal(thread.tags ?? []).length : 0;
-  return `
-    <aside class="ai-panel" aria-label="Détails">
-      <header class="pane-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div><strong>Détails</strong><small class="dim" style="display:block;margin-top:3px">${threadReading ? "Conversation" : "Lecture d’un fil requise"}</small></div>
-        <button type="button" class="icon-button" data-action="toggle-ai" aria-label="Fermer le panneau Détails">×</button>
-      </header>
-      <div class="ai-panel-body-scroll">
-
-      ${
-        threadReading && thread
-          ? `
-            <div class="details-block">
-              <div class="details-row"><span class="dim">Sujet</span><strong style="font-weight:700">${escapeHtml(thread.subject)}</strong></div>
-              <div class="details-row"><span class="dim">Participants</span><span>${participantLinks.map((p) => renderThreadParticipantLink(p)).join("") || '<span class="dim">—</span>'}</span></div>
-              ${
-                ENABLE_CLEAN_MESSAGE_VIEW
-                  ? `<div class="details-row"><span class="dim">Vue</span><span class="label" style="background:rgba(173,188,216,.06);color:var(--text)">${state.messageViewMode === "clean" ? "Lisible (auto)" : "Tout brut"}</span></div>`
-                  : ""
-              }
-              <div class="details-row"><span class="dim">Tags</span><span><button type="button" class="ghost-button thread-tags-details-link" data-action="open-thread-tags">${detailsTagCount ? `Voir les tags (${detailsTagCount})` : "Voir les tags"}</button></span></div>
-            </div>
-          `
-          : `
-            <div class="details-block details-block-muted">
-              <p class="dim" style="margin:0;line-height:1.5;font-size:12px">
-                Les détails du fil et les actions associées sont disponibles après ouverture d’une conversation.
-              </p>
-            </div>
-          `
-      }
-
-      ${threadReading && thread ? `<div class="ai-actions" style="margin-top:8px">
-        <button class="ai-action surface-sm" data-action="summarize"><span>[S]</span><span><strong>Aperçu du fil</strong><small class="dim" style="display:block">Résumé LLM · streaming</small></span></button>
-        ${
-          shouldOfferThreadTranslate(thread, state.appPrefs.general.motherLanguage?.trim() || "fr")
-            ? `<button class="ai-action surface-sm" data-action="llm-translate-thread"><span>[T]</span><span><strong>Traduire le fil</strong><small class="dim" style="display:block">Tout le fil en un bloc (langue mère · LLM)</small></span></button>`
-            : ""
-        }
-        ${
-          threadIsAutoMail(thread)
-            ? ""
-            : `<button class="ai-action surface-sm" data-action="llm-quick-replies-thread"><span>[Q]</span><span><strong>Réponses rapides</strong><small class="dim" style="display:block">Propositions LLM · injecter dans le compositeur</small></span></button>${
-                isAiFeatureEnabled(state.appPrefs.ai, "featureAgentPrepareReplyEnabled")
-                  ? `<button class="ai-action surface-sm" data-action="agent-prepare-start"><span>[A]</span><span><strong>Assistant réponse</strong><small class="dim" style="display:block">Faits · brouillon · cohérence</small></span></button>`
-                  : ""
-              }`
-        }
-      </div>` : ""}
-      ${threadReading && thread && !threadIsAutoMail(thread) ? renderAgentPrepareReplyPanelHtml() : ""}
-      ${threadReading && thread ? renderThreadQaBlockHtml() : ""}
-
-      ${
-        threadReading &&
-        !threadIsAutoMail(thread) &&
-        state.quickReplySuggestions.length &&
-        threadIdsMatch(state.aiThreadScope, state.selectedThreadId)
-          ? `<div class="ai-quick-replies" role="list">${state.quickReplySuggestions
-              .map(
-                (s, i) => `
-            <div class="ai-quick-reply-card surface-sm" role="listitem">
-              <div class="ai-quick-reply-card__tone dim">${escapeHtml(s.tone)}</div>
-              <p class="ai-quick-reply-card__text">${escapeHtml(s.text)}</p>
-              ${s.rationale?.trim() ? `<p class="ai-quick-reply-card__why dim">${escapeHtml(s.rationale.trim())}</p>` : ""}
-              <div class="ai-quick-reply-card__actions">
-                <button type="button" class="ghost-button ai-quick-reply-card__btn" data-action="quick-reply-compose" data-qr-index="${i}">Composer</button>
-                <button type="button" class="ghost-button ai-quick-reply-card__btn" data-action="quick-reply-copy" data-qr-index="${i}">Copier</button>
-              </div>
-            </div>`
-              )
-              .join("")}</div>`
-          : ""
-      }
-      ${renderThreadSummaryPanelHtml()}
-      </div>
-    </aside>
-  `;
 }
 
 let persistAiPrefsDebounce: ReturnType<typeof setTimeout> | undefined;
@@ -18454,8 +14791,7 @@ function mouseNavBlockedByOverlay(): boolean {
       state.mailboxManageOpen ||
       state.searchModalOpen ||
       state.settingsAiModal ||
-      textPromptModal ||
-      confirmModal
+      isTextPromptOpen() || isConfirmOpen()
   );
 }
 
@@ -18730,28 +15066,6 @@ function normalizeAccountRow(raw: unknown): Account | null {
   };
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function formatTag(tag?: Tag) {
-  if (!tag) return "untagged";
-  return `${tag.family.toLowerCase()}:${tag.value}`;
-}
-
-function isNoisyTag(tag?: Tag) {
-  if (!tag) return false;
-  if (tag.family === "Source" && tag.value.toLowerCase() === "imap") return true;
-  // Entity tags are AI-derived. By default they should not drive the main UI.
-  // Even when AI artifacts are shown, identifier:* is still noisy in practice.
-  return tag.family === "Entity" && tag.value.startsWith("identifier:");
-}
-
 function composeMicButtonTitle(): string {
   if (state.micState === "recording") {
     const ptt = composePushToTalkTargetCode();
@@ -18838,94 +15152,3503 @@ function micAriaLabel(target: MicDictationTarget = "compose") {
       : "Dictée — clic sur le micro";
 }
 
-function inputValue(id: string) {
-  return document.querySelector<HTMLInputElement>(`#${id}`)?.value.trim() ?? "";
-}
-
-function numberValue(id: string, fallback: number) {
-  const value = Number.parseInt(inputValue(id), 10);
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function selectValue(id: string, fallback: string) {
-  return document.querySelector<HTMLSelectElement>(`#${id}`)?.value ?? fallback;
-}
-
-function checkedValue(id: string) {
-  return document.querySelector<HTMLInputElement>(`#${id}`)?.checked ?? false;
-}
-
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  return `${minutes.toString().padStart(2, "0")}:${rest.toString().padStart(2, "0")}`;
-}
-
-function trimUrlTrailingPunct(url: string): { href: string; suffix: string } {
-  let href = url;
-  let suffix = "";
-  while (/[.,;:!?)}\]]$/.test(href)) {
-    suffix = href.slice(-1) + suffix;
-    href = href.slice(0, -1);
+function renderAiFeatureTogglesHtml(layout: "settings" | "compact" = "compact"): string {
+  const ai = state.appPrefs.ai;
+  if (layout === "settings") {
+    return AI_FEATURE_TOGGLE_GROUPS.map(
+      (group, idx) => `
+      ${idx > 0 ? '<hr class="settings-section-divider settings-ai-features-divider" />' : ""}
+      <fieldset class="settings-ai-features-group ai-feature-group">
+        <legend class="ai-feature-group__title">${escapeHtml(group.title)}</legend>
+        <div class="ai-feature-group__items">
+          ${group.items
+            .map(
+              (item) => `
+          <label class="settings-form-check ai-feature-toggle">
+            <input type="checkbox" data-ai-feature="${escapeAttr(item.key)}" ${ai[item.key] ? "checked" : ""} />
+            <span class="settings-form-check-text">
+              <span class="settings-form-check-title">${escapeHtml(item.label)}</span>
+              <span class="dim settings-ai-feature-desc">${escapeHtml(item.description)}</span>
+            </span>
+          </label>`
+            )
+            .join("")}
+        </div>
+      </fieldset>`
+    ).join("");
   }
-  return { href, suffix };
+  return AI_FEATURE_TOGGLE_GROUPS.map(
+    (group) => `
+      <fieldset class="ai-feature-group">
+        <legend class="ai-feature-group__title">${escapeHtml(group.title)}</legend>
+        <div class="ai-feature-group__items">
+          ${group.items
+            .map(
+              (item) => `
+            <label class="settings-form-check ai-feature-toggle">
+              <input type="checkbox" data-ai-feature="${escapeAttr(item.key)}" ${ai[item.key] ? "checked" : ""} />
+              <span class="settings-form-check-text">
+                <span class="settings-form-check-title">${escapeHtml(item.label)}</span>
+                ${settingsExplainHtml(escapeHtml(item.description), "toggle")}
+              </span>
+            </label>`
+            )
+            .join("")}
+        </div>
+      </fieldset>`
+  ).join("");
 }
 
-function linkifyPlainSegment(segment: string): string {
-  const out: string[] = [];
-  const urlRe = /https?:\/\/[^\s<>"']+/gi;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = urlRe.exec(segment)) !== null) {
-    out.push(escapeHtml(segment.slice(last, m.index)));
-    const { href, suffix } = trimUrlTrailingPunct(m[0]);
-    out.push(
-      `<a class="ai-qa-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(href)}</a>${escapeHtml(suffix)}`
+function renderViewNavTrail(actionsHtml?: string): string {
+  const seg = navCurrentBreadcrumbSegment();
+  if (!seg) return "";
+  return navRenderTrailHtml(seg, escapeHtml, escapeAttr, actionsHtml ? { actionsHtml } : {});
+}
+
+function renderInboxChipBadge(count: number): string {
+  const n = Math.max(0, Math.floor(Number(count)) || 0);
+  if (n <= 0) return "";
+  return ` <span class="inbox-chip-badge">${n}</span>`;
+}
+
+function renderFolderSidebarCountPill(mb: string): string {
+  const u = state.mailboxUnread[mb] ?? 0;
+  const t = state.mailboxTotal[mb] ?? 0;
+  if (t <= 0 && u <= 0) return "";
+  const title =
+    u > 0
+      ? `${t} conversation${t === 1 ? "" : "s"} · ${u} non lu${u === 1 ? "" : "s"}`
+      : `${t} conversation${t === 1 ? "" : "s"} en cache`;
+  return `<span class="folder-count folder-count-wrap" title="${escapeAttr(title)}"><span class="folder-count-num">${t}</span>${
+    u > 0 ? `<span class="folder-count-unread" aria-label="${u} non lu${u === 1 ? "" : "s"}">${u}</span>` : ""
+  }</span>`;
+}
+
+function renderDefaultAccountPromptBanner(): string {
+  if (!shouldShowDefaultAccountPrompt()) return "";
+  const prefId = defaultAccountIdFromPrefs();
+  const opts = state.accounts
+    .map((a) => {
+      const label = (a.displayName || a.email || a.id).trim();
+      const selected = prefId === a.id || (!prefId && a.id === state.selectedAccountId);
+      return `<option value="${escapeAttr(a.id)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+  return `
+    <div class="inbox-brief-banner inbox-brief-banner--hint default-account-prompt" role="region" aria-label="Compte par défaut au démarrage">
+      <div class="inbox-brief-banner__title">Compte à l’ouverture</div>
+      <div class="inbox-brief-banner__text">
+        <p>Vous avez <strong>${state.accounts.length} comptes</strong>. Choisissez celui ouvert par défaut au démarrage de RustyMail.</p>
+        <div class="default-account-prompt__row">
+          <select class="settings-ctl settings-ctl-select default-account-prompt__select" id="default-account-prompt-select" aria-label="Compte par défaut">
+            ${opts}
+          </select>
+          <button type="button" class="primary-button" data-action="save-default-account-prompt">Enregistrer</button>
+          <button type="button" class="ghost-button" data-action="dismiss-default-account-prompt">Plus tard</button>
+          <button type="button" class="ghost-button" data-action="open-settings-default-account">Paramètres</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderAccountsRecoveryBanner(): string {
+  if (state.accounts.length > 0) return "";
+  const dbPath = state.lastAppPaths?.dbPath?.trim();
+  const detail =
+    state.accountsLoadError ||
+    (isTauriRuntime() ?
+      "Aucun compte dans la base locale — vos mails en cache peuvent être sur un autre fichier SQLite (voir Paramètres → Stockage)."
+    : "Ouvrez RustyMail en mode Tauri (npm run tauri:dev), pas seulement le serveur Vite dans le navigateur.");
+  return `
+    <div class="accounts-recovery-banner surface-sm" role="alert">
+      <strong>Compte introuvable</strong>
+      <p class="dim" style="margin:8px 0 0;line-height:1.5;font-size:13px">${escapeHtml(detail)}</p>
+      ${
+        dbPath
+          ? `<p class="dim" style="margin:8px 0 0;font-size:12px;word-break:break-all">Base : ${escapeHtml(dbPath)}</p>`
+          : ""
+      }
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+        <button type="button" class="primary-button" data-action="settings">Paramètres → Comptes</button>
+        <button type="button" class="ghost-button" data-action="reload-accounts">Réessayer le chargement</button>
+        ${
+          isTauriRuntime()
+            ? `<button type="button" class="ghost-button" data-action="settings-tab" data-settings-tab="storage">Chemins disque</button>`
+            : ""
+        }
+      </div>
+    </div>`;
+}
+
+function renderSearchBadgeChip(opts: {
+  kind: string;
+  label: string;
+  title: string;
+  action: string;
+  dismissible?: boolean;
+  dataEmail?: string;
+  dataTag?: string;
+}): string {
+  const dismissible = opts.dismissible !== false;
+  const suffix = dismissible
+    ? `<span class="search-badge__x" aria-hidden="true">×</span>`
+    : `<span class="search-badge__hint" aria-hidden="true">↕</span>`;
+  const extra = [
+    opts.dataEmail ? `data-email="${escapeAttr(opts.dataEmail)}"` : "",
+    opts.dataTag ? `data-tag="${escapeAttr(opts.dataTag)}"` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `<button type="button" class="search-badge search-badge--${opts.kind}" role="listitem" data-action="${escapeAttr(opts.action)}" ${extra} title="${escapeAttr(opts.title)}"><span class="search-badge__label">${escapeHtml(opts.label)}</span>${suffix}</button>`;
+}
+
+function renderSearchBadgesHtml(): string {
+  const parts: string[] = [];
+
+  const q = state.search.trim();
+  if (q) {
+    const short = truncateSearchBadgeLabel(q, 24);
+    parts.push(
+      renderSearchBadgeChip({
+        kind: "text",
+        label: `« ${short} »`,
+        title: `Texte : ${q}`,
+        action: "clear-search-text",
+      })
     );
-    last = m.index + m[0].length;
   }
-  out.push(escapeHtml(segment.slice(last)));
-  return out.join("");
-}
 
-function formatPlainTextWithLinks(text: string): string {
-  const chunks: string[] = [];
-  const mdRe = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = mdRe.exec(text)) !== null) {
-    chunks.push(linkifyPlainSegment(text.slice(last, m.index)));
-    const { href } = trimUrlTrailingPunct(m[2]);
-    const label = m[1].trim() || href;
-    chunks.push(
-      `<a class="ai-qa-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
+  for (const sender of state.searchSenders) {
+    const at = sender.indexOf("@");
+    const local = at >= 0 ? sender.slice(0, at) : sender;
+    const isDomainOnly = at < 0 && sender.includes(".");
+    parts.push(
+      renderSearchBadgeChip({
+        kind: "sender",
+        label: isDomainOnly
+          ? truncateSearchBadgeLabel(sender, 20)
+          : `@${truncateSearchBadgeLabel(local, 18)}`,
+        title: isDomainOnly ? `Domaine expéditeur : ${sender}` : `Contact : ${sender}`,
+        action: "clear-search-sender-one",
+        dataEmail: sender,
+      })
     );
-    last = m.index + m[0].length;
   }
-  chunks.push(linkifyPlainSegment(text.slice(last)));
-  return chunks.join("");
+
+  const explicitMb = effectiveSearchMailboxPath();
+  if (explicitMb) {
+    const { label, full } = threadMailboxListLabel(explicitMb);
+    parts.push(
+      renderSearchBadgeChip({
+        kind: "scope-mailbox",
+        label: truncateSearchBadgeLabel(label, 18),
+        title: label === full ? `Dossier : ${full}` : `Dossier : ${label} — ${full}`,
+        action: "clear-search-mailbox",
+      })
+    );
+  }
+
+  if (state.searchAccountOverrideId?.trim()) {
+    const acc = state.accounts.find((a) => a.id === state.searchAccountOverrideId);
+    const label = acc?.email ?? state.searchAccountOverrideId;
+    parts.push(
+      renderSearchBadgeChip({
+        kind: "scope-account",
+        label: truncateSearchBadgeLabel(label, 20),
+        title: `Compte : ${label}`,
+        action: "clear-search-account",
+      })
+    );
+  }
+
+  for (const tag of state.searchTags) {
+    const fam = String(tag.family).toLowerCase();
+    parts.push(
+      renderSearchBadgeChip({
+        kind: "tags",
+        label: truncateSearchBadgeLabel(`#${fam}:${tag.value}`, 24),
+        title: `Tag ${fam}:${tag.value} — domaine expéditeur (source) ou dossier/type (kind)`,
+        action: "clear-search-tag-one",
+        dataTag: `${fam}:${tag.value}`,
+      })
+    );
+  }
+
+  if (state.searchNewsletterRule) {
+    const rule = formatNewsletterRuleInput(state.searchNewsletterRule);
+    parts.push(
+      renderSearchBadgeChip({
+        kind: "auto-rule",
+        label: truncateSearchBadgeLabel(rule, 22),
+        title: `Règle auto : ${rule}`,
+        action: "clear-search-newsletter-rule",
+      })
+    );
+  }
+
+  const lf = state.listFilter;
+  if (state.searchModifiersTouched && lf !== "all") {
+    parts.push(
+      renderSearchBadgeChip({
+        kind: `filter-${lf}`,
+        label: SEARCH_LIST_FILTER_LABELS[lf],
+        title: "Retirer ce filtre de la recherche",
+        action: "clear-search-list-filter",
+      })
+    );
+  }
+
+  if (state.searchNlMode || state.searchLanguageFilter) {
+    const bits: string[] = [];
+    if (state.searchNlMode) bits.push(`mode ${state.searchNlMode}`);
+    if (state.searchLanguageFilter) bits.push(`langue ${state.searchLanguageFilter.toUpperCase()}`);
+    parts.push(
+      renderSearchBadgeChip({
+        kind: "nl",
+        label: truncateSearchBadgeLabel(`IA : ${bits.join(" · ") || "interprétation"}`, 28),
+        title: "Recherche interprétée en langage naturel. Cliquez pour retirer les modificateurs IA.",
+        action: "clear-search-nl-filters",
+      })
+    );
+  }
+
+  const lang = state.searchLanguageFilter?.trim();
+  if (lang) {
+    parts.push(
+      renderSearchBadgeChip({
+        kind: "language",
+        label: lang.toUpperCase(),
+        title: `Langue : ${lang}`,
+        action: "clear-search-nl-filters",
+      })
+    );
+  }
+
+  /** Portée : Compte ↔ dossier de la barre latérale (pas le #local:… explicite). */
+  if (!explicitMb && state.view !== "folderManager" && inboxSearchContextActive()) {
+    parts.push(
+      renderSearchBadgeChip({
+        kind: state.searchScope === "account" ? "scope-account" : "scope-mailbox",
+        label: searchScopeBadgeShort(),
+        title: `${searchScopeLabel()} — cliquer pour basculer avec « tout le compte »`,
+        action: "toggle-search-scope",
+        dismissible: false,
+      })
+    );
+  }
+
+  if (
+    state.searchSenders.length > 0 &&
+    isTauriRuntime() &&
+    isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")
+  ) {
+    parts.push(
+      `<button type="button" class="search-badge search-badge--summarize" role="listitem" data-action="summarize-sender-threads" title="Résumer le fil ouvert ou le contexte filtré"><span class="search-badge__label">Résumer</span></button>`
+    );
+  }
+
+  if (parts.length === 0) return "";
+
+  return `<div class="inbox-search-badges" role="list" aria-label="Critères de recherche actifs">${parts.join("")}</div>`;
 }
 
-const DEFAULT_TOAST_DURATION_MS = 7200;
+function renderSaveSearchViewButtonHtml(): string {
+  if (!canSaveSearchView()) return "";
+  return `<button type="button" class="search-save-view-btn" data-action="save-saved-search" title="Enregistrer ces critères comme vue dans la sidebar">Enregistrer la vue</button>`;
+}
 
-const MAX_TOAST_STACK = 8;
+function renderSearchBarMetaRow(
+  badgesHtml: string,
+  trailingActionsHtml = "",
+  opts?: { includeSaveButton?: boolean },
+): string {
+  const saveBtn = opts?.includeSaveButton !== false ? renderSaveSearchViewButtonHtml() : "";
+  const actions = [saveBtn, trailingActionsHtml].filter(Boolean).join("");
+  if (!badgesHtml && !actions) return "";
+  return `<div class="search-bar-meta">
+    ${badgesHtml ? `<div class="search-bar-meta__badges search-context-filters" aria-label="Critères actifs">${badgesHtml}</div>` : ""}
+    ${actions ? `<div class="search-bar-meta__actions search-ctx-actions" role="toolbar">${actions}</div>` : ""}
+  </div>`;
+}
 
-function toast(message: string, durationMs: number = DEFAULT_TOAST_DURATION_MS) {
-  let box = document.querySelector<HTMLDivElement>("#toast-box");
-  if (!box) {
-    box = document.createElement("div");
-    box.id = "toast-box";
-    box.className = "toast-box";
-    document.body.appendChild(box);
+function renderSearchBarFieldHtml(inputId: string, opts?: { showSlashHint?: boolean }): string {
+  const showSlash = opts?.showSlashHint !== false;
+  const showNl =
+    isTauriRuntime() && isAiFeatureEnabled(state.appPrefs.ai, "featureSearchNlEnabled");
+  return `
+    <label class="inbox-search surface-sm">
+      ${inboxSearchIconSvg()}
+      <input id="${escapeAttr(inputId)}" type="search" value="${escapeAttr(state.searchDraft)}" placeholder="Rechercher… Entrée · @contact · #local:dossier (Tab) · #compte" aria-label="Rechercher : Entrée pour valider · #local:nom ou #local:&quot;Perso/Archives&quot;" autocomplete="off" />
+      ${searchDraftDiffersFromCommitted() ? `<span class="inbox-search-pending dim" title="Entrée pour lancer la recherche">↵</span>` : ""}
+      ${
+        showNl
+          ? `<button type="button" class="inbox-search-nl ghost-button" data-action="search-nl-assist" title="Assistant : décrire la recherche en langage naturel (LLM)">NL</button>`
+          : ""
+      }
+      ${showSlash ? `<span class="kbd">/</span>` : ""}
+    </label>`;
+}
+
+function renderSearchBarStackHtml(
+  inputId: string,
+  opts?: { showSlashHint?: boolean; includeSaveButton?: boolean },
+): string {
+  const badges = renderSearchBadgesHtml();
+  const meta = renderSearchBarMetaRow(badges, "", { includeSaveButton: opts?.includeSaveButton });
+  return `<div class="inbox-search-stack search-bar-stack">${renderSearchBarFieldHtml(inputId, opts)}${meta}</div>`;
+}
+
+function renderSearchViewActionsHtml(visibleCount: number): string {
+  if (!isTauriRuntime() || !inboxSearchContextActive()) return "";
+  const n = Math.min(visibleCount, SAVED_VIEW_BATCH_MAX);
+  const saved = activeSavedSearchItem();
+  const btns: string[] = [];
+  if (n > 0) {
+    btns.push(
+      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-mark-read" title="Marquer comme lus (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Lus</button>`,
+    );
+    btns.push(
+      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-archive" title="Archiver (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Archiver</button>`,
+    );
   }
-  while (box.children.length >= MAX_TOAST_STACK) {
-    box.firstElementChild?.remove();
+  if (searchViewCanOpenOrganizer()) {
+    btns.push(
+      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-open-organizer" title="Ouvrir Organiser V2 (structure boîte, sans rescan global)">Organiser</button>`,
+    );
   }
-  const element = document.createElement("div");
-  element.className = "toast surface-elevated";
-  element.textContent = message;
-  box.appendChild(element);
-  window.setTimeout(() => element.remove(), durationMs);
+  if (searchViewCanAffinerFlux()) {
+    btns.push(
+      `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--affiner" data-action="search-view-affiner" title="LLM : proposer un dossier IMAP pour ce flux (Propositions Organiser activées)">Affiner</button>`,
+    );
+  }
+  if (state.activeSavedSearchId && saved && (saved.newCount ?? 0) > 0) {
+    const marking = state.savedSearchMarkingSeenId === state.activeSavedSearchId;
+    btns.push(
+      marking
+        ? `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" disabled aria-busy="true">Marquage…</button>`
+        : `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" data-action="saved-search-mark-seen" title="Marquer la vue comme à jour (badge nouveaux)">+${saved.newCount} · vu</button>`,
+    );
+  }
+  return btns.join("");
+}
+
+function renderInboxSearchContextBlock(visibleCount: number): string {
+  const badges = renderSearchBadgesHtml();
+  const actionBtns = renderSearchViewActionsHtml(visibleCount);
+  const meta = renderSearchBarMetaRow(badges, actionBtns);
+  return `<div class="search-ctx-stack search-bar-stack search-bar-stack--context" data-search-bar-root>
+    ${renderSearchBarFieldHtml("search-input", { showSlashHint: true })}
+    ${meta}
+  </div>`;
+}
+
+function renderSearchModal(): string {
+  if (!state.searchModalOpen) return "";
+  return `
+    <div class="modal-backdrop search-modal-backdrop" data-action="close-search-modal">
+      <div class="modal surface-elevated search-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
+        <div class="modal-header">
+          <strong id="search-modal-title">Recherche</strong>
+          <button type="button" class="icon-pill" data-action="close-search-modal" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+        <div class="modal-body search-modal-body">
+          <p class="dim search-modal-hint">Vous pouvez taper librement (« mails de Jean avec factures en 2024 »), ou utiliser la syntaxe avancée : <code>@contact</code>, <code>#local:dossier</code>, <code>#compte</code>, tags. <kbd class="kbd">Entrée</kbd> pour lancer.</p>
+          ${renderSearchBarStackHtml("search-modal-input", { showSlashHint: false, includeSaveButton: false })}
+        </div>
+        <div class="modal-footer">
+          ${canSaveSearchViewInModal() ? `<button type="button" class="search-save-view-btn" data-action="save-saved-search" title="Enregistrer la recherche comme vue">Enregistrer la vue</button>` : ""}
+          <button type="button" class="ghost-button" data-action="close-search-modal">Fermer</button>
+          <button type="button" class="primary-button" data-action="search-modal-commit" style="padding:9px 14px">Rechercher</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMailboxDigestTriggerButton(extraClass = ""): string {
+  if (!isMailboxDigestFeatureEnabled()) return "";
+  if (!mailboxDigestPanelEligible()) return "";
+  const open = mailboxDigestSlotInList();
+  const busy = state.mailboxDigestRefreshing && open;
+  const title = open ? "Fermer le brief d’action du dossier" : "Ouvrir le brief d’action IA du dossier";
+  const cls = ["ghost-button", "status-bar-digest-trigger", extraClass, open ? "is-active" : ""]
+    .filter(Boolean)
+    .join(" ");
+  return `<button type="button" class="${cls}" data-action="toggle-mailbox-digest-panel" aria-expanded="${open ? "true" : "false"}" title="${escapeAttr(title)}">${
+    busy ? `<span class="mini-sync"><span class="spinner" aria-hidden="true"></span><span>Brief</span></span>` : "Brief"
+  }</button>`;
+}
+
+function render() {
+  syncMailboxDigestPanelWithFeaturePref();
+  accountsFormIdentityScratch = undefined;
+  if (state.view === "settings" && state.settingsTab === "accounts") {
+    const mailInput = document.querySelector<HTMLInputElement>("#account-email");
+    if (mailInput && !skipAccountIdentityCaptureOnce) {
+      accountsFormIdentityScratch = {
+        email: mailInput.value ?? "",
+        displayName: document.querySelector<HTMLInputElement>("#account-display-name")?.value ?? "",
+      };
+    }
+    if (skipAccountIdentityCaptureOnce) {
+      skipAccountIdentityCaptureOnce = false;
+    }
+  }
+
+  // Preserve scroll positions across full re-render (appShell.innerHTML rebuilds DOM).
+  const prevFolderList = document.querySelector<HTMLElement>(".folder-list");
+  const prevSidebarScrollTop = prevFolderList?.scrollTop ?? 0;
+  const prevSidebarScrollLeft = prevFolderList?.scrollLeft ?? 0;
+  const prevOrgPanel = document.querySelector<HTMLElement>(".organization-panel");
+  const prevOrgScrollTop = prevOrgPanel?.scrollTop ?? 0;
+  const prevAiModalBody = state.settingsAiModal
+    ? document.querySelector<HTMLElement>(".settings-ai-modal-body")
+    : null;
+  const prevAiModalScrollTop = prevAiModalBody?.scrollTop ?? 0;
+
+  const isCompose = state.view === "compose";
+  const aiPanelExpanded = aiSidePanelExpandedForShell();
+  appShell.className = `app-shell ${aiPanelExpanded ? "" : "ai-collapsed"}${isCompose ? " compose-fullscreen-active" : ""}${
+    !isCompose && state.sidebarCollapsed ? " sidebar-collapsed" : ""
+  }`;
+  const panelW =
+    typeof state.appPrefs.ai.aiPanelWidthPx === "number" && Number.isFinite(state.appPrefs.ai.aiPanelWidthPx) ?
+      Math.min(640, Math.max(260, Math.round(state.appPrefs.ai.aiPanelWidthPx)))
+    : 340;
+  appShell.style.setProperty("--ai-width", aiPanelExpanded ? `${panelW}px` : "0px");
+  appShell.innerHTML = `
+    <div class="noise"></div>
+    ${
+      isCompose ?
+        `
+    ${renderComposer()}
+    `
+      : `
+    ${renderSidebar()}
+    <main class="main">${
+      !isCompose && state.sidebarCollapsed ?
+        `<button type="button" class="main-sidebar-reveal" data-action="toggle-sidebar" aria-label="Afficher le menu des dossiers" title="Menu">☰</button>`
+      : ""
+    }${renderMain()}</main>
+    ${aiPanelExpanded ? renderAiPanel() : ""}
+    `
+    }
+    ${renderMoveDialog()}
+    ${renderMailboxManageDialog()}
+    ${renderQuoteFoldDialog()}
+    ${renderThreadTagsDialog()}
+    ${renderCloseComposeDialog()}
+    ${renderResumeDraftDialog()}
+    ${renderImageDialog()}
+    ${renderSplitSendDialog()}
+    ${renderTextPromptModal()}
+    ${renderConfirmModal()}
+    ${renderSearchModal()}
+    ${renderSettingsAiModal()}
+    ${renderAiQuickPanelOverlay()}
+    ${renderGlobalStatusFooter()}
+  `;
+  wireEvents();
+  wireFolderManagerDnD();
+  if (isTextPromptOpen()) {
+    window.requestAnimationFrame(() => {
+      const inp = document.querySelector<HTMLInputElement>("#text-prompt-input");
+      if (inp) {
+        inp.focus();
+        inp.select();
+      }
+    });
+  }
+  if (state.searchModalOpen && !isTextPromptOpen()) {
+    window.requestAnimationFrame(() => {
+      const inp = document.querySelector<HTMLInputElement>("#search-modal-input");
+      if (!inp) return;
+      inp.focus();
+      const len = state.searchDraft.length;
+      try {
+        inp.setSelectionRange(len, len);
+      } catch {
+        /* type=search */
+      }
+    });
+  }
+
+  // Restore sidebar scroll after wiring events/layout.
+  const nextFolderList = document.querySelector<HTMLElement>(".folder-list");
+  if (nextFolderList) {
+    nextFolderList.scrollTop = prevSidebarScrollTop;
+    nextFolderList.scrollLeft = prevSidebarScrollLeft;
+  }
+  const nextOrgPanel = document.querySelector<HTMLElement>(".organization-panel");
+  if (nextOrgPanel && prevOrgScrollTop > 0) {
+    nextOrgPanel.scrollTop = prevOrgScrollTop;
+  }
+  const nextAiModalBody = state.settingsAiModal
+    ? document.querySelector<HTMLElement>(".settings-ai-modal-body")
+    : null;
+  if (nextAiModalBody && prevAiModalScrollTop > 0) {
+    nextAiModalBody.scrollTop = prevAiModalScrollTop;
+  }
+  window.requestAnimationFrame(() => {
+    navApplyPendingScrollRestore();
+    if (nextOrgPanel && prevOrgScrollTop > 0) {
+      nextOrgPanel.scrollTop = prevOrgScrollTop;
+    }
+    if (nextAiModalBody && prevAiModalScrollTop > 0) {
+      nextAiModalBody.scrollTop = prevAiModalScrollTop;
+    }
+  });
+}
+
+function renderCloseComposeDialog(): string {
+  const m = state.closeComposeModal;
+  if (!m) return "";
+  const title = (m.subject || "").trim() || "Sans objet";
+  const already = m.hasSavedRecord;
+  return `
+    <div class="modal-backdrop" data-action="close-close-compose-modal">
+      <div class="modal surface-elevated modal-shell-stop-prop close-compose-modal" role="dialog" aria-modal="true" aria-label="Fermer le compositeur">
+        <div class="modal-header">
+          <strong>Fermer le compositeur ?</strong>
+          <button type="button" class="icon-pill" data-action="close-close-compose-modal" aria-label="Annuler">${iconSvg("close")}</button>
+        </div>
+        <div class="modal-body" style="display:grid;gap:10px">
+          <p style="margin:0">
+            ${
+              already
+                ? `Ce brouillon est déjà dans <strong>Sauvés</strong> (autosave). Vous pouvez le garder ou le supprimer.`
+                : `Le brouillon peut être conservé dans <strong>Sauvés</strong> (hors IMAP) ou supprimé définitivement.`
+            }
+          </p>
+          <p class="dim" style="margin:0">
+            Objet : <strong>${escapeHtml(title)}</strong>
+          </p>
+        </div>
+        <div class="modal-footer close-compose-modal__footer">
+          <button type="button" class="ghost-button" data-action="close-close-compose-modal">Annuler</button>
+          <button type="button" class="ghost-button" data-action="close-compose-without-saving">Supprimer définitivement</button>
+          <button type="button" class="primary-button" data-action="save-and-close-compose">Garder dans Sauvés</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderResumeDraftDialog(): string {
+  const m = state.resumeDraftModal;
+  if (!m?.sessions?.length) return "";
+  const rows = m.sessions
+    .map((s) => {
+      const tip = escapeAttr(s.preview || s.title);
+      return `
+        <div class="resume-draft-row" style="display:grid;gap:6px;padding:10px 0;border-top:1px solid color-mix(in srgb, var(--border) 80%, transparent)">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline">
+            <strong title="${tip}">${escapeHtml(s.title)}</strong>
+            <span class="dim" style="font-size:0.85em">${escapeHtml(formatFriendlyThreadListDate(s.updatedAt))}</span>
+          </div>
+          ${s.preview ? `<p class="dim" style="margin:0;font-size:0.9em">${escapeHtml(s.preview)}</p>` : ""}
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="primary-button" data-action="resume-orphan-draft" data-session-id="${escapeAttr(s.sessionId)}">Reprendre</button>
+            <button type="button" class="ghost-button" data-action="dismiss-orphan-draft" data-session-id="${escapeAttr(s.sessionId)}">Ignorer</button>
+          </div>
+        </div>`;
+    })
+    .join("");
+  return `
+    <div class="modal-backdrop" data-action="close-resume-draft-modal">
+      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Reprendre un brouillon">
+        <div class="modal-header">
+          <strong>Brouillon non terminé</strong>
+          <button type="button" class="icon-pill" data-action="close-resume-draft-modal" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+        <div class="modal-body" style="display:grid;gap:4px">
+          <p style="margin:0 0 8px">Une session précédente a laissé des versions locales. Reprendre ou ignorer ?</p>
+          ${rows}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="ghost-button" data-action="close-resume-draft-modal">Plus tard</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderImageDialog() {
+  const m = state.imageModal;
+  if (!m) return "";
+  const safeSrc = escapeAttr(m.src);
+  const label = (m.alt || "Image").trim();
+  return `
+    <div class="modal-backdrop" data-action="close-image-modal">
+      <div class="modal surface-elevated image-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="${escapeAttr(label)}">
+        <div class="modal-header">
+          <strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(label)}</strong>
+          <button type="button" class="icon-pill" data-action="close-image-modal" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+        <div class="modal-body image-modal-body">
+          <img class="email-img-responsive" src="${safeSrc}" alt="${escapeAttr(label)}" />
+        </div>
+        <div class="modal-footer">
+          <a class="ghost-button" href="${safeSrc}" target="_blank" rel="noreferrer noopener">Ouvrir dans un onglet</a>
+          <button type="button" class="primary-button" data-action="close-image-modal">Fermer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSplitSendDialog(): string {
+  const plan = state.splitSendConfirm;
+  if (!plan || !plan.chunks.length) return "";
+  const n = plan.chunks.length;
+  const targetMo = (plan.serverTargetBytes / (1024 * 1024)).toFixed(0);
+  const budgetMo = (plan.budgetBytes / (1024 * 1024)).toFixed(1);
+  const warnHtml =
+    plan.hasOversized ?
+      `<div class="split-send-warn" role="alert">
+        <strong>Fichier(s) au-delà du budget (~${budgetMo} Mo par mail, cible serveur ~${targetMo} Mo)</strong>
+        <p class="dim" style="margin:6px 0 0;font-size:13px">L’envoi peut être refusé par le serveur pour ces lots. Vous pouvez quand même essayer.</p>
+        <ul class="split-send-warn-list">
+          ${plan.chunks
+            .filter((c) => c.oversized)
+            .map((c) => {
+              const label = (c.displayNames?.[0] ?? c.paths[0] ?? "?").trim();
+              return `<li>${escapeHtml(label)} — ${formatAttachmentSizeKb(c.totalBytes)}</li>`;
+            })
+            .join("")}
+        </ul>
+      </div>`
+    : "";
+  const listHtml = plan.chunks
+    .map((ch, i) => {
+      const names =
+        ch.displayNames?.length ?
+          ch.displayNames.map((x) => escapeHtml(x.trim())).join(", ")
+        : ch.paths.map((p) => escapeHtml((p.split(/[/\\]/).pop() ?? p).trim())).join(", ");
+      const tag = ch.oversized ? ` <span class="split-send-oversized-tag">limite</span>` : "";
+      return `<li class="split-send-chunk-row"><span class="dim">Mail ${i + 1}/${n}</span> — ${names} — <strong>${formatAttachmentSizeKb(ch.totalBytes)}</strong>${tag}</li>`;
+    })
+    .join("");
+  return `
+    <div class="modal-backdrop" data-action="cancel-split-send">
+      <div class="modal surface-elevated split-send-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="split-send-title">
+        <div class="modal-header">
+          <strong id="split-send-title">Envoi en ${n} parties</strong>
+          <button type="button" class="icon-pill" data-action="cancel-split-send" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+        <div class="modal-body split-send-modal-body">
+          <p class="dim" style="margin:0 0 10px;font-size:13px">
+            Les pièces jointes dépassent ~${budgetMo} Mo par message (limite côté serveur souvent ~${targetMo} Mo une fois encodées).
+            Le message sera découpé en <strong>${n} e-mails</strong> dans la même conversation (réponses chaînées).
+          </p>
+          ${warnHtml}
+          <p class="dim" style="margin:0 0 6px;font-size:12px">Répartition proposée :</p>
+          <ul class="split-send-chunk-list">${listHtml}</ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="ghost-button" data-action="cancel-split-send">Annuler</button>
+          <button type="button" class="primary-button" data-action="confirm-split-send">Envoyer en ${n} parties</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMoveDialog() {
+  if (!state.moveOpen) return "";
+  const tid = state.moveThreadId ?? "";
+  const source = tid ? sourceMailboxForThread(tid) : state.selectedMailbox || "INBOX";
+  const targets = mailboxesAllowedForMove(state.mailboxes).filter(
+    (m) => m.toLowerCase() !== source.toLowerCase()
+  );
+  const current = state.moveTargetMailbox;
+  const optionsHtml = targets
+    .map((m) => {
+      const { label } = threadMailboxListLabel(m);
+      const display = label === m ? m : `${label} — ${m}`;
+      const selected = m.toLowerCase() === current.toLowerCase() ? " selected" : "";
+      return `<option value="${escapeAttr(m)}"${selected}>${escapeHtml(display)}</option>`;
+    })
+    .join("");
+  const sourceLabel = threadMailboxListLabel(source).label;
+  const noTargets = targets.length === 0;
+  return `
+    <div class="modal-backdrop" data-action="close-move">
+      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="move-modal-title">
+        <div class="modal-header">
+          <strong id="move-modal-title">Déplacer vers…</strong>
+          <button class="icon-pill" data-action="close-move" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+        <div class="modal-body" style="display:grid;gap:10px;min-width:320px">
+          <p class="dim" style="margin:0;font-size:12px">Depuis <strong>${escapeHtml(sourceLabel)}</strong> — la corbeille et les messages envoyés ne sont pas proposés.</p>
+          ${
+            noTargets
+              ? `<p class="dim" style="margin:0;font-size:12px">Aucun dossier cible disponible.</p>`
+              : `<label class="dim" style="display:grid;gap:6px;font-size:12px">Dossier cible
+                  <select id="move-target-select" data-action="move-target-change" style="padding:8px 10px;border-radius:var(--radius-btn,6px);background:transparent;color:var(--text);border:1px solid var(--border-weak)">
+                    ${optionsHtml}
+                  </select>
+                </label>`
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="ghost-button" data-action="close-move">Annuler</button>
+          <button class="primary-button" data-action="confirm-move" style="padding:9px 14px"${noTargets ? " disabled" : ""}>Déplacer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderThreadTagChip(tag: Tag): string {
+  const label = formatTag(tag);
+  const draft = tagToSearchDraft(tag);
+  if (!draft) {
+    return `<span class="thread-tag-chip">${escapeHtml(label)}</span>`;
+  }
+  const fam = String(tag.family).toLowerCase();
+  return `<button type="button" class="thread-tag-chip thread-tag-chip--search" data-action="search-from-tag" data-tag-family="${escapeAttr(fam)}" data-tag-value="${escapeAttr(tag.value)}" title="Rechercher · ${escapeAttr(label)}">${escapeHtml(label)}</button>`;
+}
+
+function renderThreadTagsChipsHtml(tags: Tag[]): string {
+  if (!tags.length) return `<p class="dim thread-tags-empty">Aucun tag.</p>`;
+  const byFamily = new Map<Tag["family"], Tag[]>();
+  for (const tag of tags) {
+    const list = byFamily.get(tag.family) ?? [];
+    list.push(tag);
+    byFamily.set(tag.family, list);
+  }
+  const order: Tag["family"][] = ["Kind", "Source", "State", "Entity"];
+  return order
+    .filter((family) => byFamily.has(family))
+    .map((family) => {
+      const chips = (byFamily.get(family) ?? [])
+        .map((tag) => renderThreadTagChip(tag))
+        .join("");
+      return `<section class="thread-tags-group" aria-label="${escapeAttr(threadTagFamilyLabel(family))}">
+        <p class="thread-tags-group-kicker dim">${escapeHtml(threadTagFamilyLabel(family))}</p>
+        <div class="thread-tags-group-chips">${chips}</div>
+      </section>`;
+    })
+    .join("");
+}
+
+function renderThreadTagsDialog(): string {
+  if (!state.threadTagsModalOpen || state.view !== "thread" || !state.selectedThread) return "";
+  const thread = state.selectedThread;
+  const threadTags = threadTagsForModal(thread.tags ?? []);
+  const msgs = sortMessagesByReceivedDescending(thread.messages ?? []);
+  const perMessageHtml = msgs
+    .map((message, i) => {
+      const tags = threadTagsForModal(message.tags ?? []);
+      if (!tags.length) return "";
+      const label = normalizeThreadSenderLabel(message.sender) || `Message ${i + 1}`;
+      const when = formatThreadReadingWhen(message.receivedAt);
+      return `<section class="thread-tags-msg-block" aria-label="Tags message ${i + 1}">
+        <p class="thread-tags-msg-kicker dim">${escapeHtml(label)}${when ? ` · ${escapeHtml(when)}` : ""}</p>
+        ${renderThreadTagsChipsHtml(tags)}
+      </section>`;
+    })
+    .filter(Boolean)
+    .join("");
+  const nThread = threadTags.length;
+  const nMsg = msgs.reduce((s, m) => s + threadTagsForModal(m.tags ?? []).length, 0);
+  const countHint =
+    nThread + nMsg === 0 ? "Aucun tag indexé"
+    : nMsg > 0 ? `${nThread} sur le fil · tags par message ci-dessous`
+    : `${nThread} tag${nThread === 1 ? "" : "s"}`;
+  return `
+    <div class="modal-backdrop" data-action="close-thread-tags">
+      <div class="modal surface-elevated thread-tags-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="thread-tags-title">
+        <div class="modal-header">
+          <strong id="thread-tags-title">Tags du fil</strong>
+          <button type="button" class="icon-pill" data-action="close-thread-tags" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+        <p class="thread-tags-subtitle dim">${escapeHtml(thread.subject)} · ${escapeHtml(countHint)}</p>
+        <div class="modal-body thread-tags-body">
+          <section class="thread-tags-section" aria-label="Tags du fil">
+            <p class="thread-tags-section-kicker">Fil</p>
+            ${renderThreadTagsChipsHtml(threadTags)}
+          </section>
+          ${perMessageHtml ? `<section class="thread-tags-section" aria-label="Tags par message"><p class="thread-tags-section-kicker">Par message</p>${perMessageHtml}</section>` : ""}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="ghost-button" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}">Recalculer les tags</button>
+          <button type="button" class="ghost-button" data-action="close-thread-tags">Fermer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderQuoteFoldDialog() {
+  const m = state.quoteFoldModal;
+  if (!m || m.blocks.length === 0) return "";
+  const blocksHtml =
+    m.blocks.length === 1
+      ? `<pre class="quote-fold-pre">${escapeHtml(m.blocks[0])}</pre>`
+      : m.blocks
+          .map(
+            (block, i) => `
+        <section class="quote-fold-block" aria-label="Citation ${i + 1}">
+          <p class="quote-fold-block-kicker dim">Citation ${i + 1}/${m.blocks.length}</p>
+          <pre class="quote-fold-pre">${escapeHtml(block)}</pre>
+        </section>`
+          )
+          .join("");
+  const n = m.blocks.length;
+  const extraitLbl = n === 1 ? "1 extrait cité" : `${n} extraits cités`;
+  return `
+    <div class="modal-backdrop" data-action="close-quote-fold">
+      <div class="modal surface-elevated quote-fold-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="quote-fold-title">
+        <div class="modal-header">
+          <strong id="quote-fold-title">Historique masqué</strong>
+          <button type="button" class="icon-pill" data-action="close-quote-fold" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+        <p class="quote-fold-subtitle dim">${escapeHtml(m.senderLabel)} · ${m.foldedLines} lignes · ${extraitLbl}</p>
+        <div class="modal-body quote-fold-body">${blocksHtml}</div>
+        <div class="modal-footer">
+          <button type="button" class="ghost-button" data-action="close-quote-fold">Fermer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMailboxManageDialog() {
+  if (!state.mailboxManageOpen) return "";
+  return `
+    <div class="modal-backdrop" data-action="close-mailbox-manage">
+      <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Mailbox actions">
+        <div class="modal-header">
+          <strong>Mailbox</strong>
+          <button class="icon-pill" data-action="close-mailbox-manage" aria-label="Close">${iconSvg("close")}</button>
+        </div>
+        <div class="modal-body" style="display:grid;gap:10px">
+          <button class="ghost-button" data-action="mb-create">Create mailbox…</button>
+          <button class="ghost-button" data-action="mb-rename">Rename mailbox…</button>
+          <button class="ghost-button" data-action="mb-subscribe">Subscribe mailbox</button>
+          <button class="ghost-button" data-action="mb-delete" style="color:var(--danger)">Delete mailbox…</button>
+          <button class="ghost-button" data-action="open-folder-manager-view">Ouvrir la vue Dossiers…</button>
+          <p class="dim" style="font-size:12px;margin:4px 0 0">Current: <strong>${escapeHtml(state.selectedMailbox || "INBOX")}</strong></p>
+        </div>
+        <div class="modal-footer">
+          <button class="ghost-button" data-action="close-mailbox-manage">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAiQuickPanelOverlay(): string {
+  if (!state.aiQuickPanelOpen) return "";
+  return `
+    <div class="ai-quick-panel-backdrop" data-action="toggle-ai-quick-panel" aria-hidden="true"></div>
+    <div class="ai-quick-panel ai-quick-panel--overlay surface-sm modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Fonctionnalités IA">
+      <div class="ai-quick-panel__head">
+        <strong>Fonctionnalités IA</strong>
+        <div class="ai-quick-panel__head-actions">
+          <div class="ai-quick-panel__bulk">
+            <button type="button" class="ghost-button ghost-button-sm" data-action="ai-features-all-on">Tout activer</button>
+            <button type="button" class="ghost-button ghost-button-sm" data-action="ai-features-all-off">Tout désactiver</button>
+          </div>
+          <button type="button" class="icon-pill" data-action="toggle-ai-quick-panel" aria-label="Fermer">${iconSvg("close")}</button>
+        </div>
+      </div>
+      <div class="ai-quick-panel__body">${renderAiFeatureTogglesHtml()}</div>
+      <p class="dim ai-quick-panel__hint">Les changements sont enregistrés immédiatement. Paramètres détaillés → IA & dictée → Fonctionnalités.</p>
+    </div>`;
+}
+
+function renderSidebarAiQuickTrigger(): string {
+  return `<div class="sidebar-footer-ai">
+      <button
+        type="button"
+        class="folder-button sidebar-ai-trigger ${state.aiQuickPanelOpen ? "sidebar-ai-trigger--open" : ""}"
+        data-action="toggle-ai-quick-panel"
+        aria-expanded="${state.aiQuickPanelOpen ? "true" : "false"}"
+        title="Activer ou désactiver les fonctionnalités IA"
+      >
+        <span class="folder-icon">IA</span>
+        <span class="folder-name">Fonctionnalités IA</span>
+      </button>
+    </div>`;
+}
+
+function renderStatusBarAiQuickTrigger(): string {
+  return `<button
+      type="button"
+      class="status-bar-ai-trigger ghost-button"
+      data-action="toggle-ai-quick-panel"
+      aria-expanded="${state.aiQuickPanelOpen ? "true" : "false"}"
+      title="Activer ou désactiver les fonctionnalités IA"
+    >IA</button>`;
+}
+
+function renderSidebar() {
+  const account = currentAccount();
+  const accountLabel = account?.email ?? "No account configured";
+  const folders = state.mailboxes.length ? state.mailboxes : ["INBOX"];
+  const system = pickSystemMailboxes(folders);
+  const systemNames = new Set(system.map((x) => x.name));
+  const personal = folders.filter((mb) => !systemNames.has(mb));
+  const personalCount = personal.length;
+  return `
+    <aside class="sidebar" aria-label="Mail navigation">
+      <button type="button" class="sidebar-collapse-edge" data-action="toggle-sidebar" aria-label="Masquer les dossiers" title="Réduire le volet">
+        <span class="sidebar-collapse-edge__glyph" aria-hidden="true"></span>
+      </button>
+      <div class="sidebar-header">
+        <div class="sidebar-header-top">
+          <div class="sidebar-account">
+            <span class="avatar large" style="background:rgba(200,149,108,.16);color:var(--accent)">SC</span>
+            <span><strong>RustyMail</strong><small class="dim" style="display:block">${escapeHtml(accountLabel)}</small></span>
+          </div>
+        </div>
+        <div class="sidebar-actions">
+          <button class="primary-button" data-action="compose" style="padding:9px 10px;border-radius:var(--radius-btn);width:100%"><span>Composer</span> <span class="kbd">N</span></button>
+          <select id="account-select" class="account-select" style="width:100%" ${state.accounts.length ? "" : "disabled"}>
+            ${state.accounts.map((a) => `<option value="${escapeAttr(a.id)}" ${a.id === state.selectedAccountId ? "selected" : ""}>${escapeHtml(a.displayName || a.email)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <nav class="folder-list" aria-label="Folders">
+        ${
+          isTauriRuntime() && account
+            ? `<div class="sidebar-folder-group sidebar-folder-group--virtual-local">
+              ${
+                state.accounts.length > 1
+                  ? `<button type="button" class="folder-button ${state.selectedMailbox === UNIFIED_INBOX_MAILBOX ? "active" : ""}" data-mailbox="${escapeAttr(UNIFIED_INBOX_MAILBOX)}" aria-label="Tous les comptes — boîtes de réception">
+                <span class="folder-icon">All</span>
+                <span class="folder-name">Tous les comptes</span>
+              </button>`
+                  : ""
+              }
+              <button type="button" class="folder-button ${state.selectedMailbox === LOCAL_SAVED_DRAFTS_MAILBOX ? "active" : ""}" data-mailbox="${escapeAttr(LOCAL_SAVED_DRAFTS_MAILBOX)}" aria-label="Sauvés — ${state.savedDraftsMailboxCount} brouillon${state.savedDraftsMailboxCount === 1 ? "" : "s"}">
+                <span class="folder-icon">Sv</span>
+                <span class="folder-name">Sauvés</span>
+                <span class="folder-count">${state.savedDraftsMailboxCount}</span>
+              </button>
+              <button type="button" class="folder-button ${state.view === "contacts" || state.view === "contact" ? "active" : ""}" data-action="open-contacts-view" aria-label="Carnet d'adresses">
+                <span class="folder-icon">Ct</span>
+                <span class="folder-name">Carnet</span>
+                ${renderAddressBookSidebarCountPill()}
+              </button>
+            </div>`
+            : ""
+        }
+        <div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">IMAP</span></div>
+        <div class="sidebar-folder-group">
+          ${system
+            .map(
+              ({ kind, name }) => `
+                <button class="folder-button ${name === state.selectedMailbox ? "active" : ""}" data-mailbox="${escapeAttr(name)}">
+                  <span class="folder-icon">${mailboxKindIcon(kind)}</span>
+                  <span class="folder-name">${escapeHtml(mailboxKindLabelFr(kind))}</span>
+                  ${renderFolderSidebarCountPill(name)}
+                </button>
+              `
+            )
+            .join("")}
+        </div>
+
+        <button type="button" class="folder-button ${state.view === "folderManager" ? "active" : ""}" data-action="open-folder-manager-view" title="Gérer l’arbre des dossiers personnels">
+          <span class="folder-icon">Ar</span>
+          <span class="folder-name">Dossiers</span>
+          ${personalCount ? `<span class="folder-count">${personalCount}</span>` : ""}
+        </button>
+      </nav>
+      ${
+        isTauriRuntime() && account
+          ? `<div class="sidebar-saved-views" aria-label="Vues enregistrées">
+              <div class="sidebar-section-label sidebar-section-label--saved-views"><span class="dim">Vues</span></div>
+              ${activityTrackingEnabled() ? renderSuggestedViewsCardHtml(state.suggestedSavedViews, escapeHtml, escapeAttr) : ""}
+              ${renderSavedSearchesSidebarHtml(state.savedSearches, state.activeSavedSearchId, escapeHtml, escapeAttr)}
+            </div>`
+          : ""
+      }
+      <div class="sidebar-footer">
+        <button type="button" class="folder-button ${state.view === "organizationV2" ? "active" : ""}" data-action="open-organization-v2-view" title="Organiser V2 — structure boîte (sans LLM). Les regroupements par critères = vues enregistrées.">
+          <span class="folder-icon">O2</span><span class="folder-name">Organiser V2</span>
+        </button>
+        <button type="button" class="folder-button" data-action="settings">
+          <span class="folder-icon">ST</span><span class="folder-name">Paramètres</span><span class="folder-count">${state.accounts.length}</span>
+        </button>
+        ${renderSidebarAiQuickTrigger()}
+      </div>
+    </aside>
+  `;
+}
+
+function renderAddressBookSidebarCountPill(): string {
+  const n = state.addressBookSidebarCount;
+  if (n == null || n < 0) return "";
+  const title = `${n} contact${n === 1 ? "" : "s"} dans le carnet`;
+  return `<span class="folder-count folder-count-wrap" title="${escapeAttr(title)}"><span class="folder-count-num">${n}</span></span>`;
+}
+
+function renderMain() {
+  if (state.view === "thread") return renderThread();
+  if (state.view === "compose") return renderComposer();
+  if (state.view === "settings") return renderSettings();
+  if (state.view === "contacts") {
+    const acc = currentAccount();
+    return renderContactsListPage(acc?.displayName || acc?.email || "Compte");
+  }
+  if (state.view === "contact") return renderContactDetailPage();
+  if (state.view === "organization") {
+    return renderOrganizationView(state.organization, {
+      escapeHtml,
+      escapeAttr,
+      iconSvg: (name) => iconSvg(name as Parameters<typeof iconSvg>[0]),
+      renderThreadSample: renderOrgThreadSampleRow,
+      mailboxLabel: (mb) => threadMailboxListLabel(mb).label,
+    });
+  }
+  if (state.view === "organizationV2") {
+    return renderOrganizationV2View(state.organizationV2, {
+      escapeHtml,
+      escapeAttr,
+      iconSvg: (name) => iconSvg(name as Parameters<typeof iconSvg>[0]),
+      renderThreadSample: renderOrgThreadSampleRow,
+      mailboxLabel: (mb) => threadMailboxListLabel(mb).label,
+    });
+  }
+  if (state.view === "folderManager") {
+    return renderFolderManagerView(state.folderManager, {
+      escapeHtml,
+      escapeAttr,
+      iconSvg: (name) => iconSvg(name as Parameters<typeof iconSvg>[0]),
+      mailboxLabel: (mb) => threadMailboxListLabel(mb).label,
+      renderSearchFilters: () => renderList("filters-only"),
+      renderListPanel: () => renderList("threads-only"),
+    });
+  }
+  return renderList();
+}
+
+function renderStatusBarProgressInline(): string {
+  const jobs = gatherStatusBarProgressJobs();
+  return renderStatusBarProgressInlineHtml(jobs, escapeHtml, escapeAttr);
+}
+
+function renderBackgroundActivityChips(opts: { digestSlot: boolean }): string {
+  const chips: string[] = [];
+  const orgChip = organizationActivityChipHtml();
+  if (orgChip) chips.push(orgChip);
+  const orgV2Chip = organizationV2ActivityChipHtml();
+  if (orgV2Chip) chips.push(orgV2Chip);
+  const affinerChip = searchViewBatchActivityChipHtml();
+  if (affinerChip) chips.push(affinerChip);
+  if (state.syncInProgress) {
+    const tip = (state.syncMessage || "Synchronisation IMAP en cours").trim();
+    chips.push(
+      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> IMAP</span>`
+    );
+  }
+  if (state.llmPrefetchPercent != null) {
+    chips.push(
+      `<span class="inbox-footer-chip" title="Téléchargement ou préparation du modèle LLM">LLM ${state.llmPrefetchPercent}%</span>`
+    );
+  }
+  if (state.idleAiCachePrefetchBusy) {
+    chips.push(
+      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Préremplissage du cache IA (synthèses / traductions de fil) pendant une période calme"><span class="spinner spinner--tiny" aria-hidden="true"></span> Cache IA</span>`
+    );
+  }
+  if (opts.digestSlot && state.mailboxDigestRefreshing) {
+    chips.push(
+      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Brief d’action du dossier en cours"><span class="spinner spinner--tiny" aria-hidden="true"></span> Brief</span>`
+    );
+  }
+  if (state.llmJobLabel) {
+    chips.push(
+      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(state.llmJobLabel)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> ${escapeHtml(state.llmJobLabel)}</span>`
+    );
+  }
+  const nMsgTr = activeMessageTranslationJobCount();
+  if (nMsgTr > 0) {
+    const tip =
+      nMsgTr === 1 ?
+        "Traduction LLM d’un message en cours"
+      : `${nMsgTr} traductions de messages en cours`;
+    chips.push(
+      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> Trad. msg${nMsgTr > 1 ? ` (${nMsgTr})` : ""}</span>`
+    );
+  }
+  const nSec = activeSecurityLlmAugmentCount();
+  if (nSec > 0) {
+    chips.push(
+      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(
+        nSec === 1 ? "Analyse sécurité IA (complément LLM) en cours" : `${nSec} analyses sécurité IA en cours`
+      )}"><span class="spinner spinner--tiny" aria-hidden="true"></span> Sécurité${nSec > 1 ? ` (${nSec})` : ""}</span>`
+    );
+  }
+  if (state.agentSession?.busy && !state.llmJobLabel) {
+    chips.push(
+      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Assistant « Préparer une réponse » — transition"><span class="spinner spinner--tiny" aria-hidden="true"></span> Assistant</span>`
+    );
+  }
+  return chips.join("");
+}
+
+function renderGlobalStatusFooter(): string {
+  const st = state.status;
+  const coreReady = isTauriRuntime() && Boolean(state.capabilities?.mailCore);
+  const dotClass = coreReady ? "status-dot status-dot--ok" : "status-dot status-dot--idle";
+  const modeLabel = isTauriRuntime() ? "Tauri" : "Navigateur";
+  const coreLabel = !isTauriRuntime() ? "hors Tauri" : coreReady ? "cœur prêt" : "cœur off";
+  const readLabel =
+    !isTauriRuntime() ? "—" : state.capabilities?.readabilityModules ? "lisibilité OK" : "lisibilité off";
+  const chips = renderBackgroundActivityChips({ digestSlot: true });
+  const chipBlock = chips ? `<span class="status-bar-chip-group" role="status" aria-live="polite">${chips}</span>` : "";
+  const acc = currentAccount();
+  const email = acc?.email?.trim() ?? "";
+  const accShort = email.length > 36 ? `${email.slice(0, 34)}…` : email;
+  const accBlock = accShort
+    ? `<span class="status-bar-account dim" title="${escapeAttr(email)}">${escapeHtml(accShort)}</span>`
+    : `<span class="status-bar-account dim">Aucun compte</span>`;
+  const composeAiQuick =
+    state.view === "compose" ?
+      `<div class="status-bar-compose-ai">${renderStatusBarAiQuickTrigger()}</div>`
+    : "";
+  const progressInline = renderStatusBarProgressInline();
+  return `
+    <footer class="status-bar-wrap">
+      ${composeAiQuick}
+      <footer class="status-bar">
+        <span class="${dotClass}" title="${coreReady ? "Noyau mail prêt" : "Noyau mail indisponible ou navigateur"}"></span>
+        <span class="status-bar-app">${escapeHtml(st?.appName ?? "RustyMail")} ${escapeHtml(st?.version ?? "0.1.1")}</span>
+        <span class="status-bar-sep" aria-hidden="true">·</span>
+        <span class="dim status-bar-compact">${escapeHtml(modeLabel)} · ${escapeHtml(coreLabel)} · ${escapeHtml(readLabel)}</span>
+        ${progressInline}
+        ${chipBlock}
+        ${
+          state.llmJobLabel
+            ? `<button type="button" class="ghost-button status-bar-llm-cancel" data-action="llm-cancel-job" title="Annuler l’opération IA en cours">Annuler IA</button>`
+            : ""
+        }
+        <span class="status-bar-spacer" aria-hidden="true"></span>
+        ${accBlock}
+      </footer>
+    </footer>`;
+}
+
+function renderList(mode: "full" | "threads-only" | "filters-only" = "full") {
+  const visible = threadsVisibleInList();
+  const total = state.threads.length;
+  const panelMb = folderManagerPanelMailbox();
+  const listMailbox = panelMb ?? state.selectedMailbox;
+  const draftBoxVirtual = isSavedDraftsVirtualMailbox(listMailbox);
+  const mailboxKey = listMailbox || "INBOX";
+  const fc = state.inboxFilterCounts;
+  const allN = draftBoxVirtual ? 0 : (fc?.all ?? state.mailboxTotal[mailboxKey] ?? total);
+  const unreadN = draftBoxVirtual ? 0 : (fc?.unread ?? state.mailboxUnread[mailboxKey] ?? 0);
+  const starredN = draftBoxVirtual ? 0 : (fc?.starred ?? 0);
+  const focusedN = draftBoxVirtual ? 0 : (fc?.focused ?? 0);
+  const autoN = draftBoxVirtual ? 0 : (fc?.auto ?? 0);
+  const listEntityPlural = draftBoxVirtual ? `brouillon${total === 1 ? "" : "s"}` : `conversation${total === 1 ? "" : "s"}`;
+  const imapToolbarLocked = draftBoxVirtual;
+  const filterAll = state.listFilter === "all";
+  const filterUnread = state.listFilter === "unread";
+  const filterStarred = state.listFilter === "starred";
+  const filterFocused = state.listFilter === "focused";
+  const filterAuto = state.listFilter === "auto";
+  const showEmptyTrash =
+    !draftBoxVirtual && isTauriRuntime() && mailboxKind(listMailbox || "") === "trash";
+  const showBulkTrashVisible =
+    !draftBoxVirtual &&
+    isTauriRuntime() &&
+    !isSearchActive() &&
+    mailboxKind(listMailbox || "") !== "trash" &&
+    visible.length > 0 &&
+    (state.listFilter === "all" ||
+      state.listFilter === "unread" ||
+      state.listFilter === "focused" ||
+      state.listFilter === "auto" ||
+      state.listFilter === "starred");
+
+  const searchContext = inboxSearchContextActive();
+  const savedView = activeSavedSearchItem();
+  const mailboxTitleRaw = draftBoxVirtual
+    ? threadMailboxListLabel(LOCAL_SAVED_DRAFTS_MAILBOX).label
+    : panelMb
+      ? threadMailboxListLabel(panelMb).label
+      : state.selectedMailbox || "INBOX";
+  const listTitle = searchContext
+    ? savedView
+      ? savedView.name
+      : "Recherche"
+    : mailboxTitleRaw;
+  const mailboxLabel = escapeHtml(listTitle);
+  const batchJobMsg = searchViewBatchJobStatusText();
+  const listSubtitle = searchContext
+    ? `${visible.length} fil${visible.length === 1 ? "" : "s"} affiché${visible.length === 1 ? "" : "s"}${savedView && (savedView.newCount ?? 0) > 0 ? ` · ${savedView.newCount} nouveau${savedView.newCount === 1 ? "" : "x"}` : ""}${batchJobMsg ? ` · ${batchJobMsg}` : state.syncMessage ? ` · ${state.syncMessage}` : ""}`
+    : `${visible.length} sur ${total} ${listEntityPlural}${state.syncMessage ? ` · ${state.syncMessage}` : ""}`;
+
+  const imapFiltersBlock =
+    draftBoxVirtual ?
+      `
+        <label class="inbox-search surface-sm inbox-search--sauves-only">
+          ${inboxSearchIconSvg()}
+          <input id="search-input" type="search" value="${escapeAttr(state.searchDraft)}" placeholder="Filtrer… Entrée pour appliquer" aria-label="Filtrer les brouillons sauvegardés" autocomplete="off" />
+          ${searchDraftDiffersFromCommitted() ? `<span class="inbox-search-pending dim" title="Entrée pour appliquer le filtre">↵</span>` : ""}
+        </label>
+      `
+    : searchContext
+      ? renderInboxSearchContextBlock(visible.length)
+    : `
+        ${renderSearchBarStackHtml("search-input", { showSlashHint: true })}
+
+        <div class="inbox-chips" role="toolbar" aria-label="Filtres de la boîte">
+          <button type="button" class="inbox-chip ${filterAll ? "inbox-chip-active" : ""}" data-action="list-filter-all">Tout${renderInboxChipBadge(allN)}</button>
+          <button type="button" class="inbox-chip ${filterUnread ? "inbox-chip-active" : ""}" data-action="list-filter-unread">
+            Non lus${renderInboxChipBadge(unreadN)}
+          </button>
+          <button type="button" class="inbox-chip ${filterStarred ? "inbox-chip-active" : ""}" data-action="list-filter-starred" title="Fils marqués « Suivre » (étoile) — tous dossiers">
+            Suivis${renderInboxChipBadge(starredN)}
+          </button>
+          <button type="button" class="inbox-chip ${filterFocused ? "inbox-chip-active" : ""}" data-action="list-filter-focused" title="Masquer les fils classés expéditeur automatique">
+            Priorité${renderInboxChipBadge(focusedN)}
+          </button>
+          <button type="button" class="inbox-chip ${filterAuto ? "inbox-chip-active" : ""}" data-action="list-filter-auto" title="Uniquement les fils expéditeur automatique">
+            Auto${renderInboxChipBadge(autoN)}
+          </button>
+        </div>
+      `;
+
+  const sauvesHint =
+    draftBoxVirtual ?
+      `<p class="inbox-mailbox-note dim">Stockage local (SQLite). Aucune donnée envoyée au serveur IMAP.</p>`
+    : "";
+
+  const inboxListPanelHtml = `
+      <div class="inbox-panel surface">
+        <div class="inbox-thread-list" role="list">
+          ${
+            visible.length
+              ? visible.map(renderThreadRow).join("")
+              : `<div class="inbox-empty">
+                  <p class="inbox-empty-title">${draftBoxVirtual ? "Aucun brouillon sauvegardé" : "Aucune conversation"}</p>
+                  <p class="inbox-empty-hint dim">${
+                    draftBoxVirtual
+                      ? "Dans le compositeur, appuyez sur « Enregistrer » pour ajouter un brouillon à cette liste."
+                      : isSearchActive()
+                        ? "Aucun message ne correspond. Essayez un autre mot-clé, le dossier « Tout », ou synchronisez la boîte."
+                        : "Changez de filtre ou de dossier, ou lancez une synchronisation."
+                  }</p>
+                </div>`
+          }
+        </div>
+        <div class="inbox-panel-footer">
+          ${inboxListFooterInnerHtml(draftBoxVirtual, total)}
+        </div>
+      </div>`;
+
+  if (mode === "threads-only") return inboxListPanelHtml;
+  if (mode === "filters-only") return imapFiltersBlock;
+
+  return `
+    <section class="thread-view inbox-index ${draftBoxVirtual ? "inbox-index--sauves" : ""}${searchContext ? " inbox-index--search-context" : ""}" aria-label="Inbox">
+      <header class="inbox-appbar${searchContext ? " inbox-appbar--search-context" : ""}">
+        <div class="inbox-appbar-top">
+          <div class="inbox-appbar-intro">
+            <div class="inbox-mailbox-title-row">
+              ${
+                draftBoxVirtual ?
+                  `<button type="button" class="ghost-button inbox-back-imap-btn" data-action="leave-saved-drafts-mailbox" title="Revenir aux dossiers IMAP">← IMAP</button>`
+                : searchContext
+                  ? `<button type="button" class="ghost-button inbox-back-imap-btn" data-action="clear-search-exit" title="Quitter la recherche et revenir au dossier">← ${escapeHtml(threadMailboxListLabel(mailboxTitleRaw).label)}</button>`
+                : ""
+              }
+              <h1 class="inbox-mailbox-title${searchContext ? " inbox-mailbox-title--search" : ""}">${mailboxLabel}</h1>
+              ${
+                savedView && (savedView.newCount ?? 0) > 0
+                  ? `<span class="inbox-view-new-pill" aria-label="${savedView.newCount} nouveau${savedView.newCount === 1 ? "" : "x"}">+${savedView.newCount}</span>`
+                  : ""
+              }
+            </div>
+            <p class="inbox-mailbox-sub">${escapeHtml(listSubtitle)}</p>
+            ${
+              state.mailListError && !draftBoxVirtual
+                ? `<p class="inbox-load-error" role="alert">${escapeHtml(state.mailListError)}</p>`
+                : ""
+            }
+            ${sauvesHint}
+          </div>
+          <div class="inbox-appbar-actions">
+            ${!imapToolbarLocked ? renderMailboxDigestTriggerButton("inbox-toolbar-btn") : ""}
+            <button type="button" class="ghost-button inbox-toolbar-btn" data-action="open-mailbox-manage" title="Gérer les dossiers" ${
+              imapToolbarLocked ? "disabled" : ""
+            }>Dossiers</button>
+            <button type="button" class="ghost-button inbox-toolbar-btn" data-action="sync-inbox" title="Synchroniser la boîte IMAP (Ctrl+F5)" ${
+              imapToolbarLocked || state.syncInProgress ? "disabled" : ""
+            }>
+              ${state.syncInProgress ? `<span class="mini-sync"><span class="spinner" aria-hidden="true"></span><span>Sync…</span></span>` : "Sync"}
+            </button>
+            ${
+              showEmptyTrash
+                ? `<button type="button" class="ghost-button inbox-toolbar-btn" style="color:var(--danger)" data-action="empty-trash-mailbox" title="Supprimer définitivement tous les messages de ce dossier">Tout supprimer</button>`
+                : ""
+            }
+            ${
+              showBulkTrashVisible
+                ? `<button type="button" class="ghost-button inbox-toolbar-btn" style="color:var(--danger)" data-action="bulk-trash-visible" title="Mettre à la corbeille toutes les conversations actuellement affichées">Tout supprimer</button>`
+                : ""
+            }
+          </div>
+        </div>
+
+        ${imapFiltersBlock}
+      </header>
+      ${renderAccountsRecoveryBanner()}
+      ${renderDefaultAccountPromptBanner()}
+
+      ${inboxListPanelHtml}
+    </section>
+  `;
+}
+
+function renderThreadRow(thread: ThreadListItem) {
+  const firstParticipant = thread.participants[0] ?? "??";
+  const tid = String(thread.id);
+  const savedRowId = savedDraftIdFromThreadId(tid);
+  const unreadCls = thread.unread ? "thread-row--unread" : "";
+  const mbRaw = thread.mailbox ?? state.selectedMailbox ?? "INBOX";
+  const { label: folderLabel } = threadMailboxListLabel(mbRaw);
+  const folderTitle = escapeAttr(threadMailboxColumnTitle(mbRaw));
+  const accountBadge = (() => {
+    const aid = thread.accountId?.trim();
+    if (!aid || !isUnifiedInboxMailbox(state.selectedMailbox)) return "";
+    const acc = state.accounts.find((a) => a.id === aid);
+    const label = (acc?.email || acc?.displayName || aid).trim();
+    if (!label) return "";
+    return `<span class="inbox-thread-account-badge dim" title="${escapeAttr(label)}">${escapeHtml(label)}</span>`;
+  })();
+  const unread = Boolean(thread.unread);
+  const toggleSeenTitle = unread ? "Marquer comme lu" : "Marquer comme non lu";
+  const activityRaw = thread.lastActivity ?? "";
+  const activityDisplay = formatFriendlyThreadListDate(activityRaw);
+  const activityTip = escapeAttr(threadListActivityTooltip(activityRaw));
+  const activityParsed = parseThreadListActivityDate(activityRaw);
+  const activityDatetime = activityParsed ? escapeAttr(activityParsed.toISOString()) : "";
+  const attachN = Math.max(0, Math.floor(Number(thread.attachmentCount) || 0));
+  const attachAria = attachN === 1 ? "1 pièce jointe" : `${attachN} pièces jointes`;
+  const attachGlyph =
+    attachN > 0
+      ? `<span class="inbox-thread-attach-hint dim" role="img" aria-label="${escapeAttr(attachAria)}">${iconSvg("attachment")}</span>`
+      : "";
+  const messageN = Math.max(1, Math.floor(Number(thread.messageCount) || 1));
+  const threadAria = `Conversation, ${messageN} messages`;
+  const threadGlyph =
+    messageN > 1
+      ? `<span class="inbox-thread-count-hint dim" role="img" aria-label="${escapeAttr(threadAria)}" title="${escapeAttr(threadAria)}">${iconSvg("thread")}<span class="inbox-thread-count-badge">${messageN}</span></span>`
+      : "";
+
+  if (savedRowId) {
+    const revN = Math.max(0, Number(thread.savedRevisionCount) || 0);
+    const verLabel = revN <= 1 ? "1 version locale" : `${revN} versions locales`;
+    const { line1, line2, tip } = savedDraftDatesColumnSnippet(thread.savedCreatedAt, thread.lastActivity);
+    const dateTip = escapeAttr(tip || activityTip);
+
+    return `
+    <div class="thread-row inbox-thread-row thread-row--saved-local" data-thread-id="${escapeAttr(tid)}" role="listitem">
+      <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}">
+        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(firstParticipant)}</span>
+        <span class="inbox-thread-stack">
+          <span class="inbox-thread-line1">
+            <span class="inbox-thread-from">${escapeHtml(firstParticipant)}</span>
+          </span>
+          <span class="inbox-thread-subject">
+            <strong>${escapeHtml(thread.subject)}</strong>
+          </span>
+          <p class="thread-preview inbox-thread-preview dim">${escapeHtml(verLabel)} · ouvrir dans le compositeur</p>
+        </span>
+      </button>
+      <div class="inbox-thread-date-col inbox-thread-date-col--saved-draft" title="${dateTip}">
+        <div class="saved-draft-date-stack">
+          ${
+            line1
+              ? `<div class="saved-draft-date-line saved-draft-date-line--primary">${escapeHtml(line1)}</div>`
+              : ""
+          }
+          ${
+            line2
+              ? `<div class="saved-draft-date-line saved-draft-date-line--secondary dim">${escapeHtml(line2)}</div>`
+              : ""
+          }
+        </div>
+      </div>
+      <div class="inbox-thread-folder-col" title="${folderTitle}">
+        <span class="inbox-thread-folder-label">${escapeHtml(folderLabel)}</span>
+      </div>
+      <div class="thread-row-actions inbox-thread-actions row-actions" onclick="event.stopPropagation()">
+        <button type="button" class="icon-pill danger" data-action="delete-saved-draft" data-saved-draft-id="${escapeAttr(savedRowId)}" title="Retirer de la liste" aria-label="Supprimer le brouillon enregistré">${iconSvg(
+      "trash"
+    )}</button>
+      </div>
+    </div>
+  `;
+  }
+
+  const allowedTargets = mailboxesAllowedForMove(state.mailboxes);
+  const sourceKey = mbRaw.trim().toLowerCase();
+  const moveOptionsHtml = allowedTargets
+    .filter((m) => m.toLowerCase() !== sourceKey)
+    .map((m) => {
+      const { label } = threadMailboxListLabel(m);
+      const display = label === m ? m : `${label} — ${m}`;
+      return `<option value="${escapeAttr(m)}">${escapeHtml(display)}</option>`;
+    })
+    .join("");
+  const folderSelectHtml =
+    allowedTargets.length > 0
+      ? `<select class="inbox-thread-folder-move" data-action="move-thread-select" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${escapeAttr(mbRaw)}" title="Déplacer vers un autre dossier" aria-label="Déplacer ce fil vers un autre dossier"><option value="" selected>${escapeHtml(folderLabel)}</option>${moveOptionsHtml}</select>`
+      : `<span class="inbox-thread-folder-label">${escapeHtml(folderLabel)}</span>`;
+  const followed = threadListFollowed(thread);
+  const followTitle = followed ? "Retirer du suivi" : "Suivre ce fil";
+  const followIconHtml = `<button type="button" class="icon-pill inbox-thread-follow-toggle ${
+    followed ? "inbox-thread-follow-toggle--on" : ""
+  }" data-action="toggle-thread-follow" data-thread-id="${escapeAttr(tid)}" title="${escapeAttr(
+    followTitle
+  )}" aria-label="${escapeAttr(followTitle)}" aria-pressed="${followed}">${iconSvg(
+    followed ? "starFilled" : "starOutline"
+  )}</button>`;
+  const previewClean = cleanThreadListPreview(thread.preview);
+
+  return `
+    <div class="thread-row inbox-thread-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}" role="listitem">
+      <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}">
+        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(firstParticipant)}</span>
+        <span class="inbox-thread-stack">
+          <span class="inbox-thread-line1">
+            <span class="inbox-thread-from">${escapeHtml(firstParticipant)}</span>
+            ${accountBadge}
+            <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="${activityDatetime}" title="${activityTip}">${escapeHtml(activityDisplay)}</time>
+          </span>
+          <span class="inbox-thread-subject">
+            ${thread.unread ? '<span class="inbox-unread-dot" aria-hidden="true"></span>' : ""}
+            <strong>${escapeHtml(thread.subject)}</strong>
+            ${attachGlyph}
+            ${threadGlyph}
+          </span>
+          <p class="thread-preview inbox-thread-preview">${escapeHtml(previewClean)}</p>
+        </span>
+      </button>
+      <div class="inbox-thread-date-col" title="${activityTip}">
+        <time class="inbox-thread-date-label dim" datetime="${activityDatetime}">${escapeHtml(activityDisplay)}</time>
+      </div>
+      <div class="inbox-thread-folder-col" title="${folderTitle}" onclick="event.stopPropagation()">
+        ${folderSelectHtml}
+      </div>
+      <div class="thread-row-actions inbox-thread-actions row-actions" onclick="event.stopPropagation()">
+        ${followIconHtml}
+        <span class="action-sep" aria-hidden="true"></span>
+        <button type="button" class="icon-pill inbox-seen-toggle ${unread ? "inbox-seen-toggle--is-unread" : ""}" data-action="toggle-thread-seen" data-thread-id="${escapeAttr(
+    tid
+  )}" title="${escapeAttr(toggleSeenTitle)}" aria-label="${escapeAttr(toggleSeenTitle)}">${iconSvg(unread ? "read" : "unread")}</button>
+        <span class="action-sep" aria-hidden="true"></span>
+        <button type="button" class="icon-pill danger" data-mv="trash" data-thread-id="${escapeAttr(tid)}" title="Corbeille" aria-label="Corbeille">${iconSvg("trash")}</button>
+        <button type="button" class="icon-pill" data-mv="archive" data-thread-id="${escapeAttr(tid)}" title="Archiver" aria-label="Archiver">${iconSvg("archive")}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderOrgThreadSampleRow(ref: OrgThreadRef, proposal: OrgProposal): string {
+  const syncBtn = (mailbox: string, title: string) => {
+    const mbAttr = escapeAttr(mailbox);
+    const syncing = state.organization.rowSyncMailbox === mailbox;
+    return `<button type="button" class="icon-pill${syncing ? " is-loading" : ""}" data-action="org-sync-mailbox" data-mailbox="${mbAttr}" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}" ${syncing ? "disabled" : ""}>${iconSvg("sync")}</button>`;
+  };
+  if (ref.threadId.startsWith("mailbox:")) {
+    const mbRaw = ref.mailbox.trim();
+    const { label: folderLabel } = threadMailboxListLabel(mbRaw);
+    const mbAttr = escapeAttr(mbRaw);
+    const rowActions = [
+      syncBtn(mbRaw, "Resynchroniser ce dossier"),
+      `<span class="action-sep" aria-hidden="true"></span>`,
+      `<button type="button" class="icon-pill danger" data-action="org-delete-mailbox-one" data-mailbox="${mbAttr}" data-mailbox-ref-id="${escapeAttr(ref.threadId)}" title="Supprimer ce dossier vide" aria-label="Supprimer le dossier">${iconSvg("trash")}</button>`,
+    ].join("");
+    return `
+    <div class="thread-row inbox-thread-row org-thread-row org-thread-row--mailbox" data-mailbox-ref="${mbAttr}" role="listitem">
+      <button type="button" class="thread-row-main inbox-thread-row-main" data-action="org-open-mailbox" data-mailbox="${mbAttr}" title="Ouvrir ce dossier">
+        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.12);color:var(--sm-primary)">${iconSvg("archive")}</span>
+        <span class="inbox-thread-stack">
+          <span class="inbox-thread-line1">
+            <span class="inbox-thread-from">${escapeHtml(folderLabel)}</span>
+          </span>
+          <span class="inbox-thread-subject"><strong>${escapeHtml(ref.subject)}</strong></span>
+        </span>
+      </button>
+      <div class="inbox-thread-folder-col" title="${escapeAttr(mbRaw)}" onclick="event.stopPropagation()">
+        <button type="button" class="org-mailbox-link inbox-thread-folder-label" data-action="org-open-mailbox" data-mailbox="${mbAttr}" title="Ouvrir ce dossier">${escapeHtml(folderLabel)}</button>
+      </div>
+      <div class="thread-row-actions inbox-thread-actions row-actions org-thread-row-actions" onclick="event.stopPropagation()">${rowActions}</div>
+    </div>`;
+  }
+  const tid = ref.threadId;
+  const senderRaw = (ref.senderEmail ?? ref.fromLabel ?? "").trim();
+  const from = senderRaw || ref.mailbox || "??";
+  const unread = Boolean(ref.unread);
+  const unreadCls = unread ? "thread-row--unread" : "";
+  const mbRaw = ref.mailbox || "INBOX";
+  const { label: folderLabel } = threadMailboxListLabel(mbRaw);
+  const folderTitle = escapeAttr(threadMailboxColumnTitle(mbRaw));
+  const previewClean = cleanThreadListPreview(ref.preview ?? "");
+  const activityRaw = ref.lastActivity ?? "";
+  const activityDisplay = formatFriendlyThreadListDate(activityRaw);
+  const activityTip = escapeAttr(threadListActivityTooltip(activityRaw));
+  const activityParsed = parseThreadListActivityDate(activityRaw);
+  const activityDatetime = activityParsed ? escapeAttr(activityParsed.toISOString()) : "";
+  const nlListed = senderRaw ? newsletterEmailListed(senderRaw) : false;
+  const autoBtn = senderRaw.includes("@") ? renderThreadNlRuleButton(senderRaw, nlListed) : "";
+  const mbAttr = escapeAttr(mbRaw);
+  const rowActions: string[] = [];
+  if (autoBtn) rowActions.push(autoBtn);
+  if (rowActions.length) rowActions.push(`<span class="action-sep" aria-hidden="true"></span>`);
+  rowActions.push(
+    `<button type="button" class="icon-pill danger" data-mv="trash" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${mbAttr}" title="Corbeille (ce fil)" aria-label="Corbeille">${iconSvg("trash")}</button>`,
+  );
+  rowActions.push(`<span class="action-sep" aria-hidden="true"></span>`);
+  rowActions.push(
+    `<button type="button" class="icon-pill" data-mv="archive" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${mbAttr}" title="Archiver (ce fil)" aria-label="Archiver">${iconSvg("archive")}</button>`,
+  );
+  rowActions.push(`<span class="action-sep" aria-hidden="true"></span>`);
+  rowActions.push(syncBtn(mbRaw, "Resynchroniser le dossier de ce fil"));
+  const rowActionsHtml = rowActions.join("");
+  const unsubCol = (() => {
+    // Affiche une colonne dédiée uniquement pour les cartes de désinscription.
+    const isUnsubCard =
+      proposal.kind === "unsubscribeNewsletter" || proposal.kind === "unsubscribeTransactional";
+    if (!isUnsubCard) return "";
+    const links = sortUnsubscribeLinks((ref.unsubscribeLinks ?? []).filter(Boolean)).slice(0, 3);
+    if (!links.length) return `<div class="org-unsub-col dim" title="Aucun lien de désinscription indexé">—</div>`;
+    const primary = links[0];
+    const extra = links.length > 1 ? ` (+${links.length - 1})` : "";
+    return `<div class="org-unsub-col" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
+      <button type="button" class="org-unsub-link" data-action="mail-unsubscribe-open" data-href="${escapeAttr(primary)}" title="${escapeAttr(primary)}">Se désinscrire${escapeHtml(extra)}</button>
+    </div>`;
+  })();
+  return `
+    <div class="thread-row inbox-thread-row org-thread-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}" role="listitem">
+      <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}" title="Lire le fil">
+        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(from)}</span>
+        <span class="inbox-thread-stack">
+          <span class="inbox-thread-line1">
+            <span class="inbox-thread-from">${escapeHtml(from)}</span>
+            <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="${activityDatetime}" title="${activityTip}">${escapeHtml(activityDisplay)}</time>
+          </span>
+          <span class="inbox-thread-subject">
+            ${unread ? '<span class="inbox-unread-dot" aria-hidden="true"></span>' : ""}
+            <strong>${escapeHtml(ref.subject || "(sans sujet)")}</strong>
+          </span>
+          <p class="thread-preview inbox-thread-preview">${escapeHtml(previewClean)}</p>
+        </span>
+      </button>
+      <div class="inbox-thread-date-col" title="${activityTip}">
+        <time class="inbox-thread-date-label dim" datetime="${activityDatetime}">${escapeHtml(activityDisplay)}</time>
+      </div>
+      <div class="inbox-thread-folder-col" title="${folderTitle}" onclick="event.stopPropagation()">
+        <button type="button" class="org-mailbox-link inbox-thread-folder-label" data-action="org-open-mailbox" data-mailbox="${mbAttr}" title="Ouvrir ce dossier">${escapeHtml(folderLabel)}</button>
+      </div>
+      ${unsubCol}
+      <div class="thread-row-actions inbox-thread-actions row-actions" onclick="event.stopPropagation()">${rowActionsHtml}</div>
+    </div>
+  `;
+}
+
+function renderMailUnsubscribeBar(links: MailUnsubscribeLink[]): string {
+  if (!links.length) return "";
+  const sorted = [...links].sort((a, b) => unsubscribeHrefScore(b.href) - unsubscribeHrefScore(a.href));
+  const btns = sorted
+    .map(
+      (l) =>
+        `<button type="button" class="mail-unsubscribe-bar__btn" data-action="mail-unsubscribe-open" data-href="${escapeAttr(l.href)}" title="${escapeAttr(l.href)}">${escapeHtml(l.label)}</button>`
+    )
+    .join("");
+  const hint =
+    sorted.length > 1 ? `${sorted.length} liens détectés dans le message` : "Lien extrait du corps du message";
+  return `<div class="mail-unsubscribe-bar" role="region" aria-label="Désabonnement">
+    <div class="mail-unsubscribe-bar__lead">
+      <span class="mail-unsubscribe-bar__kicker">Désabonnement</span>
+      <span class="mail-unsubscribe-bar__hint dim">${escapeHtml(hint)}</span>
+    </div>
+    <div class="mail-unsubscribe-bar__actions">${btns}</div>
+  </div>`;
+}
+
+function renderThreadParticipantLink(p: ThreadParticipantLink, className = "thread-participant-link"): string {
+  if (p.email) {
+    return `<button type="button" class="${className} label" data-action="contacts-open-detail" data-email="${escapeAttr(p.email)}" title="${escapeAttr(p.email)}">${escapeHtml(p.name)}</button>`;
+  }
+  return `<span class="label" style="margin-right:6px;background:rgba(173,188,216,.06);color:var(--text)">${escapeHtml(p.name)}</span>`;
+}
+
+function renderMessageSenderLink(message: CleanedMessageView, className = "thread-msg-from"): string {
+  const email = (message.senderEmail ?? "").trim().toLowerCase();
+  if (email.includes("@")) {
+    return `<button type="button" class="${className} thread-participant-link" data-action="contacts-open-detail" data-email="${escapeAttr(email)}" title="${escapeAttr(email)}">${escapeHtml(message.sender)}</button>`;
+  }
+  return `<strong class="${className}">${escapeHtml(message.sender)}</strong>`;
+}
+
+function renderThreadNlRuleButton(seSenderRaw: string, nlListedHere: boolean): string {
+  if (!isTauriRuntime()) return "";
+  const seNorm = canonicalEmailForNlMatch(seSenderRaw);
+  if (!seNorm) return "";
+  if (nlListedHere) {
+    const matched = firstMatchingNewsletterRule(seSenderRaw);
+    const key = matched ? formatNewsletterRuleInput(matched) : (seNorm as string);
+    const tip = `Expéditeur auto (activé) — cliquer pour désactiver · ${key}`;
+    return `<button type="button" class="icon-pill icon-pill-sm thread-auto-sender thread-auto-sender--on" data-action="newsletter-msg-remove-rule" data-rule="${escapeAttr(key)}" title="${escapeAttr(tip)}" aria-label="${escapeAttr(tip)}"><span class="thread-auto-sender__glyph" aria-hidden="true">A</span></button>`;
+  }
+  const tip = `Expéditeur auto — cliquer pour activer · ${seNorm}`;
+  return `<button type="button" class="icon-pill icon-pill-sm thread-auto-sender thread-auto-sender--off" data-action="newsletter-msg-add-rule" data-rule="${escapeAttr(seNorm)}" title="${escapeAttr(tip)}" aria-label="${escapeAttr(tip)}"><span class="thread-auto-sender__glyph" aria-hidden="true">A</span></button>`;
+}
+
+function renderThreadMsgHeadActions(
+  message: CleanedMessageView,
+  nlRuleHtml: string,
+  threadTags?: Tag[]
+): string {
+  const motherRaw = state.appPrefs.general.motherLanguage?.trim() || "fr";
+  const offerTr = shouldOfferPerMessageTranslate(message, motherRaw, threadTags);
+  const globeBtn =
+    offerTr ?
+      `<button type="button" class="icon-pill icon-pill-sm thread-msg-translate" data-action="llm-translate-message" data-msg-id="${escapeAttr(message.messageId)}" title="Traduire ce message vers la langue mère (LLM)" aria-label="Traduire ce message">${iconSvg("globe")}</button>`
+    : "";
+  const security = renderMailSecurityPop(message, { compact: true });
+  const retagBtn = state.selectedThreadId?.trim()
+    ? `<button type="button" class="icon-pill icon-pill-sm thread-msg-retag" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId)}" title="Recalculer les tags du fil" aria-label="Recalculer les tags du fil">${iconSvg("sync")}</button>`
+    : "";
+  const quoteBtn =
+    message.collapsedQuotes.length ?
+      `<button type="button" class="icon-pill icon-pill-sm thread-quote-open" data-action="open-quote-fold" data-msg-id="${escapeAttr(message.messageId)}" title="Citations repliées" aria-label="Citations repliées">${iconSvg("open")}</button>`
+    : "";
+  const replyBtn = `<button type="button" class="icon-pill icon-pill-sm thread-reply-one" data-action="reply-one" data-msg-id="${escapeAttr(message.messageId)}" title="Répondre à ce mail" aria-label="Répondre à ce mail">${iconSvg("reply")}</button>`;
+  const forwardOneBtn = `<button type="button" class="icon-pill icon-pill-sm thread-forward-one" data-action="forward-one" data-msg-id="${escapeAttr(message.messageId)}" title="Transférer ce message" aria-label="Transférer ce message">${iconSvg("forward")}</button>`;
+
+  const aiBar = globeBtn ? `<div class="action-bar action-bar--ai action-bar--compact">${globeBtn}</div>` : "";
+  const secBar = security ? `<div class="action-bar action-bar--sec action-bar--compact">${security}</div>` : "";
+  const utilParts = [retagBtn, quoteBtn, nlRuleHtml].filter(Boolean).join("");
+  const utilBar = utilParts ? `<div class="action-bar action-bar--util action-bar--compact">${utilParts}</div>` : "";
+  const opsBar = `<div class="action-bar action-bar--ops action-bar--compact">${replyBtn}${forwardOneBtn}</div>`;
+
+  return `<div class="thread-msg-head-actions" role="group" aria-label="Actions sur ce message">${aiBar}${secBar}${utilBar}${opsBar}</div>`;
+}
+
+function renderThreadParticipantFirstBadge(message: CleanedMessageView, firstIds: Set<string>): string {
+  if (!firstIds.has(message.messageId)) return "";
+  const acc = currentAccount();
+  const ownEmailLower = acc?.email?.trim().toLowerCase() ?? "";
+  const senderEmailLower = (message.senderEmail ?? "").trim().toLowerCase();
+  if (ownEmailLower && senderEmailLower && ownEmailLower === senderEmailLower) return "";
+  if (isOwnSender(message.sender)) return "";
+  const canon = canonicalEmailForNlMatch(message.senderEmail ?? "");
+  const sender = escapeHtml(message.sender);
+  const emailBit = canon ? ` <span class="dim thread-timeline-note__addr">(${escapeHtml(canon)})</span>` : "";
+  return `<div class="thread-timeline-note" role="note">
+    <span class="thread-timeline-note__glyph" aria-hidden="true">${iconSvg("thread")}</span>
+    <span class="thread-timeline-note__text-wrap">
+      <span class="dim thread-timeline-note__kicker">Première apparition dans le fil</span>
+      <span class="thread-timeline-note__who"><strong>${sender}</strong>${emailBit}</span>
+    </span>
+  </div>`;
+}
+
+function renderThreadRecipientPresenceNote(events: ThreadRecipientPresenceEvents | undefined): string {
+  if (!events || (!events.added.length && !events.removed.length)) return "";
+  const line = (r: { name?: string | null; email: string }) => {
+    const em = escapeHtml(r.email.trim());
+    const nm = r.name?.trim();
+    return nm ? `<strong>${escapeHtml(nm)}</strong> <span class="dim">&lt;${em}&gt;</span>` : `<strong>${em}</strong>`;
+  };
+  const added = events.added.length
+    ? `<div class="thread-recipient-diff__col thread-recipient-diff__col--add"><span class="dim thread-recipient-diff__tag">+ To/Cc</span><span class="thread-recipient-diff__list">${events.added
+        .map(line)
+        .join(", ")}</span></div>`
+    : "";
+  const removed = events.removed.length
+    ? `<div class="thread-recipient-diff__col thread-recipient-diff__col--rem"><span class="dim thread-recipient-diff__tag">− To/Cc</span><span class="thread-recipient-diff__list">${events.removed
+        .map(line)
+        .join(", ")}</span></div>`
+    : "";
+  return `<div class="thread-recipient-diff surface-sm" role="note" aria-label="Évolution des destinataires dans le fil">${removed}${added}</div>`;
+}
+
+function renderThreadRecipientDiffStrip(older: CleanedMessageView, newer: CleanedMessageView): string {
+  const prevM = recipientMapForDiff(older);
+  const curM = recipientMapForDiff(newer);
+  const added: Array<{ name?: string | null; email: string }> = [];
+  const removed: Array<{ name?: string | null; email: string }> = [];
+  for (const [k, r] of curM) {
+    if (!prevM.has(k)) added.push(r);
+  }
+  for (const [k, r] of prevM) {
+    if (!curM.has(k)) removed.push(r);
+  }
+  if (!added.length && !removed.length) return "";
+  const line = (r: { name?: string | null; email: string }) => {
+    const em = escapeHtml(r.email.trim());
+    const nm = r.name?.trim();
+    return nm ? `<strong>${escapeHtml(nm)}</strong> <span class="dim">&lt;${em}&gt;</span>` : `<strong>${em}</strong>`;
+  };
+  const addedBlock =
+    added.length ?
+      `<div class="thread-recipient-diff__col thread-recipient-diff__col--add"><span class="dim thread-recipient-diff__tag">+ To/Cc</span><span class="thread-recipient-diff__list">${added.map(line).join(", ")}</span></div>`
+    : "";
+  const remBlock =
+    removed.length ?
+      `<div class="thread-recipient-diff__col thread-recipient-diff__col--rem"><span class="dim thread-recipient-diff__tag">− To/Cc</span><span class="thread-recipient-diff__list">${removed.map(line).join(", ")}</span></div>`
+    : "";
+  return `<div class="thread-recipient-diff surface-sm" role="note" aria-label="Changements de destinataires par rapport au message précédent">${remBlock}${addedBlock}</div>`;
+}
+
+function renderMessageInlineTranslation(message: CleanedMessageView, targetLang: string, offerTranslationUi: boolean): string {
+  if (!isTauriRuntime()) return "";
+  if (!offerTranslationUi) {
+    const busy = Boolean(state.messageTranslationBusy[message.messageId]);
+    if (!busy) return "";
+  }
+  const key = `${message.messageId}|${targetLang}`;
+  const tText = state.messageTranslations[key];
+  const busy = Boolean(state.messageTranslationBusy[message.messageId]);
+  if (!offerTranslationUi && !busy && tText?.trim()) return "";
+  const langLabel = escapeHtml(targetLang.toUpperCase());
+  if (!tText?.trim()) {
+    if (!busy) return "";
+    return `<div class="message-inline-translation message-inline-translation--busy" aria-live="polite">
+      <span class="dim message-inline-translation__wait">Traduction en cours…</span>
+    </div>`;
+  }
+  const body = escapeHtml(tText);
+  const busyLine = busy ? `<p class="dim message-inline-translation__wait" style="margin:0 0 6px">Actualisation…</p>` : "";
+  return `<div class="message-inline-translation" lang="${escapeAttr(targetLang)}" dir="auto">
+    <div class="message-inline-translation__badge">Traduction · ${langLabel}</div>
+    ${busyLine}
+    <div class="message-inline-translation__body">${body}</div>
+    <div class="message-inline-translation__meta">
+      <button type="button" class="ghost-button ghost-button-sm" data-action="llm-translate-message" data-msg-id="${escapeAttr(message.messageId)}" data-llm-translate-refresh="1">Actualiser</button>
+    </div>
+  </div>`;
+}
+
+function renderThreadMessageAttachmentSection(message: CleanedMessageView): string {
+  const n = message.attachments.length;
+  if (!n) return "";
+  const cards = message.attachments
+    .map(
+      (att) =>
+        `<div class="thread-attach-card surface-sm">
+          <span class="thread-attach-ico" aria-hidden="true">${iconSvg("attachment")}</span>
+          <div class="thread-attach-info">
+            <strong class="thread-attach-name">${escapeHtml(att.fileName)}</strong>
+            <span class="thread-attach-size dim">${escapeHtml(formatAttachmentSizeKb(att.sizeBytes))}</span>
+          </div>
+          <button type="button" class="icon-pill icon-pill-sm thread-attach-dl" data-att-download="${escapeAttr(att.id)}" data-msg-id="${escapeAttr(message.messageId)}" title="Télécharger">${iconSvg("download")}</button>
+        </div>`
+    )
+    .join("");
+  const framed = `<div class="thread-msg-attachments thread-msg-attachments--framed">${cards}</div>`;
+  if (n > 6) {
+    return `<details class="thread-attachments-fold"><summary class="thread-attachments-fold__sum">${escapeHtml(`Pièces jointes (${n})`)}</summary>${framed}</details>`;
+  }
+  return framed;
+}
+
+function renderBriefMailViewShell(bodyHtml: string, opts?: { kicker?: string }): string {
+  const kicker = opts?.kicker?.trim();
+  const top =
+    kicker ?
+      `<div class="thread-zen-top">
+        <span class="thread-zen-brand" aria-hidden="true">${iconSvg("spark")}</span>
+        <span class="thread-kicker thread-kicker-strong">${escapeHtml(kicker)}</span>
+      </div>`
+    : "";
+  return `<aside class="thread-zen surface-sm inbox-brief-mail" aria-label="Brief du dossier">${top}<div class="thread-zen-body">${bodyHtml}</div></aside>`;
+}
+
+function renderBriefMailItemCard(inner: string): string {
+  return `<div class="thread-msg-card inbox-brief-item-card">${inner}</div>`;
+}
+
+function renderActionBriefHtml(b: ActionBriefResult): string {
+  const confPct = Math.max(0, Math.min(100, Math.round(Number(b.confidence ?? 0) * 100)));
+  const bucket = escapeHtml(String(b.priorityBucket ?? "—"));
+  const mode = escapeHtml(String(b.mode ?? ""));
+  const verif = b.verificationRecommended
+    ? `<p class="thread-zen-par dim" role="status">Vérification recommandée</p>`
+    : "";
+  const skills =
+    b.executedSkills && b.executedSkills.length ?
+      `<p class="thread-zen-par dim inbox-brief-skills">Pipeline : ${escapeHtml(b.executedSkills.join(" → "))}</p>`
+    : "";
+
+  const sec = (title: string, inner: string) =>
+    `<section class="inbox-brief-section"><div class="thread-kicker">${escapeHtml(title)}</div>${inner}</section>`;
+
+  const changesBody =
+    (b.changes || [])
+      .map((c) => {
+        const ev = briefEvidenceButtons(c.evidenceLinks || []);
+        return renderBriefMailItemCard(
+          `<p class="thread-zen-par">${escapeHtml(c.summary || "")}</p>${ev}`
+        );
+      })
+      .join("") || `<p class="thread-zen-par dim">—</p>`;
+
+  const decisionsBody =
+    [...(b.decisions || [])]
+      .sort((a, d) => Number(a.rank) - Number(d.rank))
+      .map((d) => {
+        const opts = (d.optionsHint || [])
+          .map((o) => `<li>${escapeHtml(o)}</li>`)
+          .join("");
+        const optsHtml = opts ? `<ul class="thread-zen-list">${opts}</ul>` : "";
+        return renderBriefMailItemCard(
+          `<p class="thread-zen-par dim">#${escapeHtml(String(d.rank))}</p>
+          <p class="thread-zen-par"><strong>${escapeHtml(d.title)}</strong></p>
+          ${d.impact ? `<p class="thread-zen-par dim">${escapeHtml(d.impact)}</p>` : ""}
+          ${optsHtml}${briefEvidenceButtons(d.evidenceLinks || [])}`
+        );
+      })
+      .join("") || `<p class="thread-zen-par dim">—</p>`;
+
+  const actionsBody =
+    [...(b.recommendedActions || [])]
+      .sort((a, x) => Number(a.rank) - Number(x.rank))
+      .map((a) => {
+        const due = a.suggestedDue ? `<span class="dim"> · ${escapeHtml(a.suggestedDue)}</span>` : "";
+        const pr = a.priority ? `<span class="label inbox-brief-prio">${escapeHtml(a.priority)}</span> ` : "";
+        return renderBriefMailItemCard(
+          `${pr}<p class="thread-zen-par">${escapeHtml(a.action)}</p>
+          <p class="thread-zen-par dim">${escapeHtml(a.suggestedOwner || "")}${due}</p>
+          ${briefEvidenceButtons(a.evidenceLinks || [])}`
+        );
+      })
+      .join("") || `<p class="thread-zen-par dim">—</p>`;
+
+  const risksBody =
+    (b.risks || [])
+      .map((r) => {
+        const sev = r.severity ? ` <span class="dim">(${escapeHtml(r.severity)})</span>` : "";
+        return renderBriefMailItemCard(
+          `<p class="thread-zen-par"><strong>${escapeHtml(r.label)}</strong>${sev}</p>
+          ${r.detail ? `<p class="thread-zen-par dim">${escapeHtml(r.detail)}</p>` : ""}
+          ${briefEvidenceButtons(r.evidenceLinks || [])}`
+        );
+      })
+      .join("") || `<p class="thread-zen-par dim">—</p>`;
+
+  const ambBody =
+    (b.ambiguities || [])
+      .map((a) => {
+        return renderBriefMailItemCard(
+          `<p class="thread-zen-par"><strong>${escapeHtml(a.question)}</strong></p>
+          ${a.whyItMatters ? `<p class="thread-zen-par dim">${escapeHtml(a.whyItMatters)}</p>` : ""}
+          ${briefEvidenceButtons(a.evidenceLinks || [])}`
+        );
+      })
+      .join("") || `<p class="thread-zen-par dim">—</p>`;
+
+  const inner = `
+    <p class="thread-zen-par dim inbox-brief-meta">Confiance ${confPct}% · priorité <strong>${bucket}</strong>${mode ? ` · mode ${mode}` : ""}</p>
+    ${verif}
+    ${sec("Ce qui change", changesBody)}
+    ${sec("Décisions", decisionsBody)}
+    ${sec("Actions recommandées", actionsBody)}
+    ${sec("Risques & engagements", risksBody)}
+    ${sec("Ambiguïtés", ambBody)}
+    ${skills}`;
+  return renderBriefMailViewShell(inner, { kicker: "Brief d’action" });
+}
+
+function renderThread() {
+  const thread = state.selectedThread;
+  if (!thread) {
+    return `<section class="thread-view" aria-label="Fil"><div class="pane-header thread-load-empty">Fil indisponible — utilisez « ← Boîte de réception » ou relancez la synchronisation.</div></section>`;
+  }
+  const userMode = state.messageViewMode;
+  /** Derniers reçus en premier ; regroupement visuel si le même expéditeur envoie plusieurs mails d’affilée dans cet ordre. */
+  const msgs = sortMessagesByReceivedDescending(thread.messages);
+  const attachmentCount = msgs.reduce((total, message) => total + message.attachments.length, 0);
+  const participantLinks = threadParticipantsWithEmails(thread.messages);
+  const avCap = 5;
+  const avExtra = participantLinks.length > avCap ? participantLinks.length - avCap : 0;
+  const threadTagsCount = threadTagsForModal(thread.tags ?? []).length;
+  const threadTagsBtnTitle =
+    threadTagsCount > 0 ?
+      `Tags du fil (${threadTagsCount}) — kind, source, domaine…`
+    : "Tags du fil — kind, source, domaine…";
+  const replyTarget = escapeHtml(threadQuickReplyTargetName(msgs));
+  const translationTargetLang = state.appPrefs.general.motherLanguage?.trim() || "fr";
+  const firstParticipantIds = threadParticipantFirstMessageIds(thread.messages);
+  const recipientEventsById = threadRecipientPresenceEventsByMessageId(thread.messages);
+  const zenOut = threadAiSummaryShownInZen() ? (state.aiOutput?.trim() ?? "") : "";
+  const blockReply = threadIsAutoMail(thread);
+  const listRow =
+    state.selectedThreadId ?
+      state.threads.find((t) => String(t.id) === String(state.selectedThreadId))
+    : undefined;
+  const toolbarFollowed = listRow ? threadListFollowed(listRow) : false;
+  const threadUnreadNav = Boolean(listRow?.unread ?? thread?.unread);
+  const curSeenToggleTitle = threadUnreadNav ? "Marquer comme lu" : "Marquer comme non lu";
+  const curSeenToggleIcon = threadUnreadNav ? "read" : "unread";
+  const readingSimple = true;
+  const threadReadingLayoutClass = " thread-reading--reading-layout";
+
+  return `
+    <section class="thread-view thread-reading${threadReadingLayoutClass}" aria-label="Fil de discussion">
+      <header class="thread-reading-head">
+        ${renderViewNavTrail(`<div class="action-bar action-bar--ai" role="toolbar" aria-label="Actions IA">
+              <button type="button" class="icon-pill thread-nav-icon" data-action="summarize" title="Résumer" aria-label="Résumer">${iconSvg("spark")}</button>
+              ${
+                msgs.some((m) => shouldOfferPerMessageTranslate(m, translationTargetLang, thread.tags))
+                  ? `<button type="button" class="icon-pill thread-nav-icon" data-action="llm-translate-thread" title="Traduire tout le fil en un bloc (LLM)" aria-label="Traduire tout le fil">${iconSvg("globe")}</button>`
+                  : ""
+              }
+              <button type="button" class="icon-pill thread-nav-icon${state.aiOpen ? " icon-pill--active" : ""}" data-action="toggle-ai" aria-expanded="${state.aiOpen}" title="${state.aiOpen ? "Masquer le panneau Détails" : "Panneau Détails"}" aria-label="${state.aiOpen ? "Masquer le panneau Détails" : "Panneau Détails"}">${iconSvg("panel")}</button>
+            </div>
+            <div class="action-bar action-bar--util" role="toolbar" aria-label="Actions utilitaires">
+              <button type="button" class="icon-pill thread-nav-sync${state.syncInProgress ? " is-loading" : ""}" data-action="sync-inbox" title="Synchroniser (Ctrl+F5)" aria-label="Synchroniser" ${state.syncInProgress ? "disabled" : ""}>${state.syncInProgress ? `<span class="mini-sync"><span class="spinner" aria-hidden="true"></span></span>` : iconSvg("sync")}</button>
+            </div>`)}
+
+        <div class="thread-reading-hero">
+          <h1 class="thread-reading-title">${escapeHtml(thread.subject)}</h1>
+          <p class="thread-reading-stats dim">
+            ${msgs.length} message${msgs.length === 1 ? "" : "s"}${attachmentCount > 0 ? ` · ${attachmentCount} pièce${attachmentCount === 1 ? "" : "s"} jointe${attachmentCount === 1 ? "" : "s"}` : ""}
+          </p>
+
+          ${participantLinks.length ? `<div class="thread-participants-block">
+              <span class="thread-kicker">Participants</span>
+              <div class="thread-participants-chips">
+                ${participantLinks
+                  .slice(0, avCap)
+                  .map((p) => renderThreadParticipantLink(p, "thread-participant-chip"))
+                  .join("")}
+                ${avExtra ? `<span class="dim thread-participant-more">+${avExtra}</span>` : ""}
+              </div>
+            </div>` : ""}
+
+          <div class="thread-action-bar">
+            <div class="thread-more-actions">
+              <div class="action-bar action-bar--util" role="toolbar" aria-label="Actions utilitaires">
+                <button type="button" class="icon-pill${state.threadTagsModalOpen ? " icon-pill--active" : ""}" data-action="open-thread-tags" title="${escapeAttr(threadTagsBtnTitle)}" aria-label="${escapeAttr(threadTagsBtnTitle)}" aria-expanded="${state.threadTagsModalOpen}">${iconSvg("tags")}</button>
+                <button type="button" class="icon-pill" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}" title="Recalculer les tags" aria-label="Recalculer les tags">${iconSvg("sync")}</button>
+                <button type="button" class="icon-pill inbox-thread-follow-toggle ${toolbarFollowed ? "inbox-thread-follow-toggle--on" : ""}" data-action="toggle-thread-follow" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}" title="${escapeAttr(toolbarFollowed ? "Retirer du suivi" : "Suivre ce fil")}" aria-label="${escapeAttr(toolbarFollowed ? "Retirer du suivi" : "Suivre ce fil")}" aria-pressed="${toolbarFollowed}">${iconSvg(toolbarFollowed ? "starFilled" : "starOutline")}</button>
+                ${
+                  ENABLE_CLEAN_MESSAGE_VIEW ?
+                    `${iconThreadMessageViewToggle(userMode)}`
+                  : ""
+                }
+              </div>
+              <div class="action-bar action-bar--ops" role="toolbar" aria-label="Actions opérationnelles">
+                <button type="button" class="icon-pill" data-action="thread-archive-cur" title="Archiver" aria-label="Archiver">${iconSvg("archive")}</button>
+                <button type="button" class="icon-pill" data-action="thread-unarchive-cur" title="Désarchiver vers Inbox" aria-label="Désarchiver">${iconSvg("move")}</button>
+                ${
+                  blockReply
+                    ? ""
+                    : `<button type="button" class="icon-pill" data-action="reply" title="Répondre" aria-label="Répondre">${iconSvg("reply")}</button>`
+                }
+                <button type="button" class="icon-pill inbox-seen-toggle ${threadUnreadNav ? "inbox-seen-toggle--is-unread" : ""}" data-action="toggle-thread-seen-cur" title="${escapeAttr(curSeenToggleTitle)}" aria-label="${escapeAttr(curSeenToggleTitle)}">${iconSvg(curSeenToggleIcon)}</button>
+                <button type="button" class="icon-pill danger" data-action="thread-trash-cur" title="Corbeille" aria-label="Corbeille">${iconSvg("trash")}</button>
+                <button type="button" class="icon-pill" data-action="thread-move-cur" title="Déplacer" aria-label="Déplacer">${iconSvg("move")}</button>
+                ${
+                  blockReply
+                    ? ""
+                    : `<button type="button" class="icon-pill" data-action="reply-all" title="Répondre à tous" aria-label="Répondre à tous">${iconSvg("replyAll")}</button>`
+                }
+                <button type="button" class="icon-pill" data-action="forward" title="Transférer" aria-label="Transférer">${iconSvg("forward")}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      ${zenOut ? `<aside class="thread-zen surface-sm" aria-label="Résumé">
+          <div class="thread-zen-top">
+            <span class="thread-zen-brand" aria-hidden="true">${iconSvg("spark")}</span>
+            <span class="thread-kicker thread-kicker-strong">Résumé</span>
+          </div>
+          <div class="thread-zen-body">${zenSummaryHtmlFragments(zenOut)}</div>
+        </aside>` : ""}
+
+      <div class="thread-messages thread-messages-reading">
+        ${msgs
+          .map((message, i) => {
+            const prev = msgs[i - 1];
+            const sameSenderAsPrev =
+              Boolean(prev) && normalizeThreadSenderLabel(prev!.sender) === normalizeThreadSenderLabel(message.sender);
+            const showMeta = !sameSenderAsPrev;
+            const showAvatar = !sameSenderAsPrev;
+            const daySeparator = renderDaySeparator(prev?.receivedAt, message.receivedAt);
+            const laneTree = threadTreeLaneRight(thread, message);
+            const isMine = isOwnSender(message.sender);
+            const isRoot = laneTree.isRoot;
+            const isSolo = msgs.length === 1;
+            const laneRight = laneTree.laneRight;
+            const accentVars = senderAccentVars(message.sender);
+            const isoWhen = receivedAtIsoDatetime(message.receivedAt);
+            const eff = effectiveMessageViewMode(message, userMode);
+            const showsHtmlBubble =
+              eff === "original"
+                ? Boolean(message.htmlBody)
+                : Boolean(message.cleanedHtmlBody?.trim());
+            const seSenderRaw = message.senderEmail?.trim() ?? "";
+            /** Liste côté client + drapeaux renvoyés par open_thread après enrichissement SQLite. */
+            const nlListedHere =
+              Boolean(message.isNewsletter) || newsletterEmailListed(seSenderRaw);
+            const suppressAutoEnvelope = threadSuppressAutoEnvelopeMeta(thread, message, nlListedHere);
+            const nlRuleRow = renderThreadNlRuleButton(seSenderRaw, nlListedHere);
+            const participantFirst =
+              suppressAutoEnvelope ? "" : renderThreadParticipantFirstBadge(message, firstParticipantIds);
+            const recipientPresenceHtml = suppressAutoEnvelope
+              ? ""
+              : renderThreadRecipientPresenceNote(recipientEventsById.get(message.messageId));
+            const offerMsgTranslate = shouldOfferPerMessageTranslate(message, translationTargetLang, thread.tags);
+            const inlineTr = renderMessageInlineTranslation(message, translationTargetLang, offerMsgTranslate);
+            const htmlForDisplay = showsHtmlBubble ? messageHtmlForDisplay(message, eff) : null;
+            const unsubLinks = htmlForDisplay ? extractUnsubscribeLinksFromHtml(htmlForDisplay) : [];
+            const headActionsHtml = renderThreadMsgHeadActions(message, nlRuleRow, thread.tags);
+            const headMainHtml =
+              showMeta ?
+                readingSimple
+                  ? `${renderMessageSenderLink(message)}
+                        <span class="thread-msg-head-sep" aria-hidden="true">·</span>
+                        <time class="thread-msg-time"${isoWhen ? ` datetime="${escapeAttr(isoWhen)}"` : ""}>${escapeHtml(formatThreadReadingWhen(message.receivedAt))}</time>`
+                  : `<time class="thread-msg-time"${isoWhen ? ` datetime="${escapeAttr(isoWhen)}"` : ""}>${escapeHtml(formatThreadReadingWhen(message.receivedAt))}</time>
+                        <span class="thread-msg-head-sep" aria-hidden="true">·</span>
+                        ${renderMessageSenderLink(message)}`
+              : `<time class="thread-msg-time thread-msg-time--inline"${isoWhen ? ` datetime="${escapeAttr(isoWhen)}"` : ""}>${escapeHtml(formatThreadReadingWhen(message.receivedAt))}</time>`;
+            const anchorId = threadMessageAnchorId(message.messageId, i);
+            const anchorName = message.messageId.trim() || anchorId;
+            return `
+              ${daySeparator}
+              ${participantFirst}
+              ${recipientPresenceHtml}
+              <a class="thread-msg-anchor" name="${escapeAttr(anchorName)}" id="${escapeAttr(anchorId)}" aria-hidden="true"></a>
+              <article class="message thread-msg ${isMine ? "mine" : ""} ${laneRight ? "thread-msg--lane-right" : ""} ${isRoot ? "thread-msg--root" : ""} ${isSolo ? "thread-msg--solo" : ""} ${showsHtmlBubble ? "has-html" : ""} ${showMeta ? "thread-msg--head" : "compact"}" style="${accentVars}">
+                ${showAvatar ? `<span class="avatar thread-msg-avatar">${initials(message.sender)}</span>` : `<span class="avatar avatar-spacer" aria-hidden="true"></span>`}
+                <div class="message-stack">
+                  <header class="message-head-row${showMeta ? "" : " message-head-row--compact"}">
+                    <div class="thread-msg-head-main">${headMainHtml}</div>
+                    ${headActionsHtml}
+                  </header>
+                  <div class="thread-msg-card mail-security-tier ${mailSecurityTierClass(normalizedMailSecurity(message))}">
+                    ${renderMessageBody(message, eff, unsubLinks)}
+                    ${inlineTr}
+                    ${
+                      message.attachments.length > 1
+                        ? `<div class="thread-attach-bulk-row">
+                        <button type="button" class="ghost-button thread-attach-bulk-btn" data-action="download-all-attachments" data-msg-id="${escapeAttr(message.messageId)}" title="Enregistrer toutes les pièces jointes de ce message dans Téléchargements">
+                          ${iconSvg("download")}<span>Tout télécharger (${message.attachments.length})</span>
+                        </button>
+                      </div>`
+                        : ""
+                    }
+                    ${renderThreadMessageAttachmentSection(message)}
+                    ${""}
+                  </div>
+                </div>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+
+      ${
+        blockReply
+          ? ""
+          : `<div class="thread-quick-zone">
+        <div class="thread-quick-reveal-bar">
+          <button
+            type="button"
+            class="thread-quick-reveal surface-sm${state.threadQuickReplyOpen ? " is-open" : ""}"
+            data-action="toggle-thread-quick-reply"
+            aria-expanded="${state.threadQuickReplyOpen ? "true" : "false"}"
+            aria-controls="thread-quick-panel"
+            title="${state.threadQuickReplyOpen ? "Masquer la réponse rapide" : "Afficher la réponse rapide"}"
+          >
+            ${iconSvg("reply")}
+            <span class="thread-quick-reveal-label">Répondre à <strong>${replyTarget}</strong></span>
+            <span class="thread-quick-reveal-chevron" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="thread-quick-panel" class="thread-quick-panel${state.threadQuickReplyOpen ? " is-open" : ""}">
+          <div class="thread-quick-panel-inner">
+            <footer class="quick-reply thread-quick-footer">
+              <div class="thread-quick-sheet surface-sm">
+                <p class="thread-quick-kicker"><span>Répondre à</span> <strong>${replyTarget}</strong></p>
+                <input
+                  type="text"
+                  class="thread-quick-field"
+                  placeholder="Écrivez votre réponse…"
+                  data-quick-reply
+                  autocomplete="off"
+                  ${state.threadQuickReplyOpen ? "" : " tabindex=\"-1\""}
+                />
+                <div class="thread-quick-bottom">
+                  <div class="thread-quick-links">
+                    <button type="button" class="thread-linkish" data-action="quick-reply-compose" title="Composer">Composer</button>
+                    <span class="thread-quick-div" aria-hidden="true"></span>
+                    <button type="button" class="thread-linkish" data-action="forward" title="Transférer">Transférer</button>
+                  </div>
+                  <div class="thread-quick-send">
+                    <button type="button" class="ghost-button thread-quick-secondary" data-action="quick-reply-send-all">Tous</button>
+                    <button type="button" class="primary-button thread-quick-primary" data-action="quick-reply-send">Envoyer la réponse</button>
+                  </div>
+                </div>
+              </div>
+            </footer>
+          </div>
+        </div>
+      </div>`
+      }
+    </section>
+  `;
+}
+
+function renderMailSecurityPop(message: CleanedMessageView, opts?: { compact?: boolean }): string {
+  const ms = normalizedMailSecurity(message);
+  // UX: ne pas afficher de badge quand tout va bien (évite "RAS" omniprésent et inutile).
+  if (ms.severity === "ok") return "";
+  const label = ms.severity === "attention" ? t("security.attention") : t("security.suspicion");
+  const chipClass =
+    ms.severity === "attention" ? "mail-security-hit--attention" : "mail-security-hit--suspicion";
+  const hasLlmHint =
+    Boolean(ms.llmBudget) || (ms.findings?.some((f) => f.kind === "llmIntent") ?? false);
+  const iaPill = hasLlmHint
+    ? `<span class="mail-security-ia-pill" title="${escapeAttr(t("security.iaHint"))}">IA</span>`
+    : "";
+  const mid = message.messageId?.trim();
+  const iaSecurityOn = isAiFeatureEnabled(state.appPrefs.ai, "featureSecurityLlmEnabled");
+  const iaPending = Boolean(
+    mid &&
+      iaSecurityOn &&
+      securityLlmAugmentBusy[mid] &&
+      !securityLlmAugmentCache[mid] &&
+      !securityLlmAugmentFailed[mid]
+  );
+  const displayFindings = mailSecurityFindingsForDisplay(message, ms);
+  const findings =
+    displayFindings.map(
+      (f) =>
+        `<li class="mail-security-finding mail-security-finding--${escapeAttr(String(f.severity))}">${escapeHtml(f.messageFr)}${
+          f.kind === "llmIntent" ?
+            ` <span class="dim mail-security-kind-ia" title="${escapeAttr(t("security.iaContribution"))}">(IA)</span>`
+          : ""
+        }</li>`
+    ) ?? [];
+  const findingsBlock = findings.length
+    ? `<ul class="mail-security-findings" role="list">${findings.join("")}</ul>`
+    : iaPending
+      ? `<p class="mail-security-panel__pending dim">${escapeHtml(t("security.iaPending"))}</p>`
+      : "";
+  const senderEmail = (message.senderEmail || "").trim();
+  const tid = state.selectedThreadId ?? "";
+  const sourceMb = (state.selectedMailbox || "INBOX").trim();
+  const actions =
+    opts?.compact || isVirtualMailbox(sourceMb)
+      ? ""
+      : `<div class="mail-security-panel__actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+          <button type="button" class="ghost-button" data-action="security-move-junk" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${escapeAttr(sourceMb)}">${escapeHtml(t("security.moveJunk"))}</button>
+          <button type="button" class="ghost-button" data-action="security-filter-search" title="Filtrer les mails à score de sécurité élevé">Filtrer #security</button>
+          ${
+            senderEmail.includes("@")
+              ? `<button type="button" class="ghost-button" data-action="security-mark-newsletter" data-sender-email="${escapeAttr(senderEmail)}">${escapeHtml(t("security.markNewsletter"))}</button>`
+              : ""
+          }
+        </div>`;
+  const wrap = opts?.compact ? "mail-security-pop mail-security-pop--compact" : "mail-security-pop";
+  return `<details class="${wrap}">
+  <summary class="mail-security-hit ${chipClass}" title="${escapeAttr(t("security.chipTitle", { label }))}" aria-label="${escapeAttr(t("security.chipAria", { label }))}">
+    <span class="mail-security-hit__ico" aria-hidden="true">${iconSvg("shield")}</span>
+    ${iaPill}
+  </summary>
+  <div class="mail-security-panel">
+    <p class="mail-security-panel__lead">${escapeHtml(ms.summaryFr)}</p>
+    ${findingsBlock ? `<p class="mail-security-panel__kicker">${escapeHtml(t("security.detail"))}</p>${findingsBlock}` : ""}
+    ${actions}
+  </div>
+</details>`;
+}
+
+function renderMessageBody(message: CleanedMessageView, mode: MessageViewMode, unsubLinks?: MailUnsubscribeLink[]) {
+  const unsubBar =
+    unsubLinks === undefined
+      ? ""
+      : renderMailUnsubscribeBar(unsubLinks);
+  if (mode === "original") {
+    if (message.htmlBody)
+      return `${unsubBar}<div class="message-html" ${mailHtmlMountAttrs(message.messageId, message.htmlBody)}></div>`;
+    return `<div class="message-text">${escapeHtml(message.sourceText)}</div>`;
+  }
+  // clean: HTML nettoyé côté Rust quand disponible, sinon texte (signatures / citations)
+  const cleanHtml = message.cleanedHtmlBody?.trim();
+  if (cleanHtml) {
+    return `${unsubBar}<div class="message-html message-html--clean" ${mailHtmlMountAttrs(message.messageId, cleanHtml)}></div>`;
+  }
+  return `<div class="message-text">${escapeHtml(message.cleanedText || message.sourceText)}</div>`;
+}
+
+function renderDaySeparator(prevReceivedAt: string | undefined, curReceivedAt: string) {
+  const cur = parseMaybeDate(curReceivedAt);
+  if (!cur) return "";
+  const prev = prevReceivedAt ? parseMaybeDate(prevReceivedAt) : null;
+  if (prev && dayKey(prev) === dayKey(cur)) return "";
+
+  const today = new Date();
+  const label =
+    dayKey(cur) === dayKey(today)
+      ? "Aujourd’hui"
+      : dayKey(cur) === dayKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1))
+        ? "Hier"
+        : cur.toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "short" });
+
+  return `<div class="day-separator"><span>${escapeHtml(label)}</span></div>`;
+}
+
+function renderComposerHistoriquePane(): string {
+  if (!isTauriRuntime()) {
+    return `<aside class="composer-history-pane composer-history-pane--disabled" aria-label="Historique du brouillon">
+      <p class="composer-history-pane__hint dim">L’historique local des versions est disponible dans l’app bureau (Tauri).</p>
+    </aside>`;
+  }
+  const revs = state.draftRevisions;
+  const expanded = state.draftVersionsListExpanded;
+  const n = revs.length;
+  const summaryLabel =
+    n === 0 ? "Aucune version" : n === 1 ? "1 version" : `${n} versions`;
+
+  const rows =
+    revs.length ?
+      revs
+        .map(
+          (rev) => `<li class="composer-history-pane__rev">
+              <button type="button" class="composer-history-pane__icon-action" data-action="compare-draft-revision" data-revision-id="${escapeAttr(rev.id)}" title="Comparer avec le brouillon actuel">
+                ⇄
+              </button>
+              <button type="button" class="composer-history-pane__icon-action" data-action="restore-draft-revision" data-revision-id="${escapeAttr(rev.id)}" title="Restaurer cette version">
+                ↩
+              </button>
+              <span class="composer-history-pane__stamp dim">${escapeHtml(formatDraftRevisionStamp(rev.createdAt))}</span>
+            </li>`
+        )
+        .join("")
+    : "";
+
+  const listBlock =
+    expanded || n === 0
+      ? `<ul class="composer-history-pane__list" role="list">${
+          n ? rows : `<li class="composer-history-pane__empty dim">Pas encore de snapshot (éditez quelques secondes puis revenez).</li>`
+        }</ul>`
+      : "";
+
+  const comparisonBlock =
+    state.draftDiffRevisionId
+      ? `
+        <div class="composer-history-pane__detail" role="region" aria-label="Comparaison">
+          <div class="composer-history-pane__detail-head">
+            <span class="composer-history-pane__detail-label dim">Comparaison</span>
+            <button type="button" class="ghost-button composer-history-pane__mode-toggle" data-action="toggle-draft-compare-view" ${
+              state.draftDiffLoading ? "disabled" : ""
+            } title="Basculer aperçu HTML / diff +/−">
+              ${state.draftDiffView === "preview" ? "Diff" : "Aperçu"}
+            </button>
+          </div>
+          ${
+            state.draftDiffLoading
+              ? `<p class="composer-history-pane__microhint dim">Chargement…</p>`
+              : state.draftDiffView === "preview"
+                ? `<div class="preview preview--revision">${sanitizeEmailHtml(state.draftRevisionPreview?.html ?? "").html}</div>`
+                : state.draftDiffLines.length
+                  ? `<pre class="draft-diff__pre draft-diff__pre--composer">${state.draftDiffLines
+                      .map((l) => {
+                        const cls =
+                          l.kind === "add"
+                            ? "draft-diff__line draft-diff__line--add"
+                            : l.kind === "del"
+                              ? "draft-diff__line draft-diff__line--del"
+                              : "draft-diff__line";
+                        const prefix = l.kind === "add" ? "+" : l.kind === "del" ? "-" : " ";
+                        return `<span class="${cls}">${escapeHtml(prefix)} ${escapeHtml(l.text)}</span>`;
+                      })
+                      .join("\n")}</pre>`
+                  : `<p class="composer-history-pane__microhint dim">Aucune différence.</p>`
+          }
+        </div>`
+      : !state.draftDiffRevisionId && n > 0 && !expanded
+        ? `<p class="composer-history-pane__microhint dim">Liste repliée — ouvrir pour choisir une version (⇄ comparer).</p>`
+        : n > 0 && !state.draftDiffRevisionId && expanded
+          ? `<p class="composer-history-pane__microhint dim">⇄ comparer · ↩ restaurer</p>`
+          : "";
+
+  return `<aside class="composer-history-pane" aria-label="Historique du brouillon">
+      <div class="composer-history-pane__bar">
+        <button
+          type="button"
+          class="composer-history-pane__summary"
+          data-action="toggle-draft-versions-expanded"
+          aria-expanded="${expanded}"
+          title="Afficher ou masquer la liste des versions"
+          ${state.draftRevisionsLoading ? "disabled" : ""}
+        >
+          <span class="composer-history-pane__chev" aria-hidden="true">${expanded ? "▾" : "▸"}</span>
+          <span class="composer-history-pane__summary-text">${escapeHtml(summaryLabel)}</span>
+          ${state.draftRevisionsLoading ? `<span class="composer-history-pane__spinner dim" aria-hidden="true"> …</span>` : ""}
+        </button>
+        <button type="button" class="composer-history-pane__mini-refresh" data-action="refresh-draft-history" title="Rafraîchir la liste" aria-label="Rafraîchir la liste" ${
+          state.draftRevisionsLoading ? "disabled" : ""
+        }>↻</button>
+      </div>
+      ${listBlock}
+      ${comparisonBlock}
+    </aside>`;
+}
+
+function renderComposer() {
+  const draft = state.draft;
+  const attachments = draft?.attachmentPaths ?? [];
+  const layout = state.composeLayout;
+  const isHistorique = layout === "historique";
+  const showPreviewPane = layout !== "write" && !isHistorique;
+  const textareaOffscreen = layout === "preview";
+  const forcedCcBcc = draftHasRecipientsExtra(draft);
+  const showCcBccRows = Boolean(state.composeCcBccOpen || forcedCcBcc);
+  const ccBccToggle =
+    forcedCcBcc ?
+      ""
+    : `<button type="button" class="compose-link" data-action="toggle-compose-cc-bcc">${
+        state.composeCcBccOpen ? "Réduire" : "Cc · Cci"
+      }</button>`;
+
+  const ccRows = showCcBccRows ?
+    `<div class="field-row"><label class="compose-field-label">Cc</label><div id="compose-cc-host" class="compose-recipients-host compose-to-cell"></div></div>
+     <div class="field-row"><label class="compose-field-label">Cci</label><div id="compose-bcc-host" class="compose-recipients-host compose-to-cell"></div></div>`
+    : "";
+
+  const correctionPanelHtml =
+    state.composeGrammarSuggestions?.length ?
+      `<aside class="compose-correction-panel surface-sm" role="complementary" aria-label="Correction de texte">
+        <div class="compose-correction-panel__head">
+          <strong>Correction de texte</strong>
+          <button type="button" class="ghost-button compose-correction-dismiss" data-action="compose-grammar-dismiss">Fermer</button>
+        </div>
+        <ul class="compose-correction-list" role="list">
+          ${state.composeGrammarSuggestions
+            .map(
+              (g, i) => `
+            <li class="compose-correction-item" role="listitem">
+              <div class="compose-correction-item__main">
+                <p class="compose-correction-reason dim">${escapeHtml(g.reason)}</p>
+                <p class="compose-correction-diff"><span class="compose-correction-del">${escapeHtml(g.original)}</span> → <strong>${escapeHtml(g.replacement)}</strong></p>
+              </div>
+              <button type="button" class="ghost-button compose-correction-apply" data-action="compose-grammar-apply" data-grammar-i="${i}">Appliquer</button>
+            </li>`
+            )
+            .join("")}
+        </ul>
+      </aside>`
+    : "";
+
+  return `
+    <section class="compose-view composer-mail-shell composer-fullscreen-shell" aria-label="Composer">
+      <header class="compose-fs-header">
+        <div class="compose-fs-hintbar">
+          <p class="compose-fs-layout-hint dim" aria-hidden="true">
+            Markdown · <span class="kbd">M</span> basculer la vue du compositeur
+          </p>
+        </div>
+        <div class="compose-fs-header-row">
+          <button type="button" class="icon-button compose-fs-close" data-action="close-compose" aria-label="Fermer le composer">×</button>
+          <div class="compose-fs-title-block">
+            <span class="compose-fs-kicker">Composer</span>
+            <span class="compose-fs-subtitle dim">${escapeHtml(composeKindTitle(draft?.kind))}</span>
+          </div>
+          <div class="compose-fs-tabs-stack">
+            <nav class="compose-fs-tabs" role="tablist" aria-label="Mode d’affichage du composer">
+              <button type="button" role="tab" aria-selected="${layout === "split"}" class="compose-fs-tab ${layout === "split" ? "is-active" : ""}" data-action="set-compose-layout" data-compose-layout="split">Split</button>
+              <button type="button" role="tab" aria-selected="${layout === "write"}" class="compose-fs-tab ${layout === "write" ? "is-active" : ""}" data-action="set-compose-layout" data-compose-layout="write">Écrire</button>
+              <button type="button" role="tab" aria-selected="${layout === "preview"}" class="compose-fs-tab ${layout === "preview" ? "is-active" : ""}" data-action="set-compose-layout" data-compose-layout="preview">Aperçu</button>
+              <button type="button" role="tab" aria-selected="${layout === "historique"}" class="compose-fs-tab ${layout === "historique" ? "is-active" : ""}" data-action="set-compose-layout" data-compose-layout="historique"${
+                isTauriRuntime() ? "" : " disabled"
+              } title="Comparer les versions locales du brouillon (app bureau)">Historique</button>
+            </nav>
+          </div>
+          ${
+            isTauriRuntime()
+              ? `<button type="button" class="ghost-button compose-fs-save-saved-draft" data-action="save-saved-draft" title="Enregistrer dans la liste Brouillons sauvegardés (barre latérale)">Enregistrer</button>`
+              : ""
+          }
+          <button type="button" class="primary-button compose-fs-send compose-send" data-action="send">Envoyer</button>
+        </div>
+      </header>
+      <div class="compose-workspace">
+        <div class="compose-meta-card surface-sm">
+          <div class="field-row compose-to-row">
+            <label for="compose-to" class="compose-field-label">À</label>
+            <div class="compose-to-cell">
+              <div id="compose-to-host" class="compose-recipients-host"></div>
+              ${ccBccToggle ? `<span class="compose-recipient-extra">${ccBccToggle}</span>` : ""}
+            </div>
+          </div>
+          ${ccRows}
+          <div class="field-row compose-subject-row"><label for="compose-subject" class="compose-field-label">Objet</label><input id="compose-subject" class="compose-subject-input" placeholder="Objet du message" value="${escapeAttr(draft?.subject ?? "")}" /></div>
+          <div class="field-row compose-files-row">
+            <label class="compose-field-label">Fichiers</label>
+            <div class="attachments-row attachments-row--unified">
+              <div class="compose-attachments-chips-scroll" aria-label="Liste des pièces jointes">
+                <div class="attachments-chips compose-attachments-chips" aria-label="Pièces jointes">
+                ${
+                  attachments.length ?
+                    attachments
+                      .map((p) => {
+                        const base = fileBaseName(p);
+                        return `<span class="attachment-chip surface-sm" title="${escapeAttr(p)}">
+              <span class="chip-icon" aria-hidden="true">${iconSvg("attachment")}</span>
+              <span class="chip-name">${escapeHtml(base)}</span>
+              <button class="chip-remove" data-action="remove-attachment" data-path="${escapeAttr(p)}" aria-label="Retirer ${escapeAttr(base)}" title="Retirer">×</button>
+            </span>`;
+                      })
+                      .join("")
+                  : `<span class="dim compose-attachments-empty">Aucune pièce jointe</span>`
+                }
+                </div>
+              </div>
+              <div class="attachments-actions">
+                <button class="ghost-button composer-accent-outline" type="button" data-action="pick-attachments" title="Ajouter des pièces jointes">Ajouter…</button>
+                <button class="ghost-button" type="button" data-action="clear-attachments" title="Vider la liste" ${attachments.length ? "" : "disabled"}>Effacer</button>
+              </div>
+            </div>
+            <input id="compose-attachments" value="${escapeAttr(attachmentPathsJoinedForHiddenField(attachments))}" style="display:none" />
+          </div>
+          <div class="composer-advanced composer-advanced--footnote">
+            <button
+              type="button"
+              class="composer-advanced-micro"
+              data-action="toggle-compose-advanced"
+              aria-expanded="${state.composeAdvancedOpen}"
+            >
+              <span class="composer-advanced-chevron" aria-hidden="true">${state.composeAdvancedOpen ? "▾" : "▸"}</span>
+              <span>${state.composeAdvancedOpen ? "Masquer les options techniques" : "Options techniques"}</span>
+              <span class="composer-advanced-micro-hint dim">multipart HTML</span>
+            </button>
+            ${
+              state.composeAdvancedOpen
+                ? `<div class="composer-advanced-body composer-advanced-body--footnote">
+                    <div class="field-row field-row--tight-top field-row--advanced">
+                      <label for="compose-send-html" class="dim">HTML</label>
+                      <label class="composer-checkbox-inline">
+                        <input id="compose-send-html" type="checkbox" ${draft?.sendHtml ? "checked" : ""} />
+                        <span class="dim composer-checkbox-help">Envoyer en multipart (texte brut + HTML)</span>
+                      </label>
+                    </div>
+                  </div>`
+                : ""
+            }
+          </div>
+        </div>
+      <div class="compose-editor-sheet">
+        <div class="compose-secondary-toolbar">
+          <div
+            class="compose-toolbar-voice"
+            title="Dictée : Whisper transcrit l’audio. Les boutons Style déterminent le ton si « Réécrire avec le style » est activé dans IA → Dictée (réécriture LLM après dictée)."
+          >
+            <span class="composer-toolbar-caption dim">Dictée</span>
+            <div class="tone-inline tone-inline--voice">
+              <span class="composer-toolbar-caption dim composer-toolbar-caption--sub">Style</span>
+              ${tones
+                .map(
+                  (tone) =>
+                    `<button type="button" class="tone-button ${tone === state.tone ? "active" : ""}" data-tone="${tone}" title="Style par défaut pour Réécriture IA (${toneLabelsFr[tone]})">${escapeHtml(toneLabelsFr[tone])}</button>`
+                )
+                .join("")}
+            </div>
+            <div class="compose-mic-cluster">
+              <button
+                class="mic-button ${state.micState}"
+                type="button"
+                data-action="mic"
+                title="${escapeAttr(composeMicButtonTitle())}"
+                aria-label="${escapeAttr(micAriaLabel("compose"))}"
+                aria-pressed="${state.micState === "recording"}"
+              >
+                <span class="mic-button__ico" aria-hidden="true">${iconSvg("mic")}</span>
+              </button>
+            </div>
+          </div>
+          <div class="md-toolbar md-toolbar-rich" role="toolbar" aria-label="Mise en forme Markdown">
+            <button type="button" class="ghost-button md-button" data-md="bold" title="Gras (Ctrl+B)">Gras</button>
+            <button type="button" class="ghost-button md-button" data-md="italic" title="Italique (Ctrl+I)">Italique</button>
+            <button type="button" class="ghost-button md-button md-button-underline" data-md="underline" title="Souligné (Ctrl+U)">Soul.</button>
+            <span class="md-toolbar-sep" aria-hidden="true"></span>
+            <button type="button" class="ghost-button md-button" data-md="h1" title="Titre 1 (#)">Titre 1</button>
+            <button type="button" class="ghost-button md-button" data-md="h2" title="Titre 2 (##)">Titre 2</button>
+            <button type="button" class="ghost-button md-button" data-md="h3" title="Titre 3 (###)">Titre 3</button>
+            <span class="md-toolbar-sep" aria-hidden="true"></span>
+            <button type="button" class="ghost-button md-button" data-md="ul" title="Liste à puces">Puces</button>
+            <button type="button" class="ghost-button md-button" data-md="ol" title="Liste numérotée">Num.</button>
+            <button type="button" class="ghost-button md-button" data-md="link" title="Lien (Ctrl+K)">Lien</button>
+            <button type="button" class="ghost-button md-button" data-md="image" title="Image (URL Markdown)">Image</button>
+            <button type="button" class="ghost-button md-button" data-md="table" title="Tableau Markdown">Tableau</button>
+            <span class="md-toolbar-sep" aria-hidden="true"></span>
+            <button type="button" class="ghost-button md-button" data-md="code" title="Code">&lt;&gt;</button>
+            <button type="button" class="ghost-button md-button" data-md="quote" title="Citation">Citation</button>
+            <span class="md-toolbar-sep" aria-hidden="true"></span>
+            <button type="button" class="ghost-button md-button" data-md="undo" title="Annuler">Annuler</button>
+            <button type="button" class="ghost-button md-button" data-md="redo" title="Refaire">Refaire</button>
+          </div>
+          <div class="compose-llm-strip dim" role="group" aria-label="Brouillon · réécriture IA" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:11px">
+            <span>Réécriture ·</span>
+            <button
+              type="button"
+              class="ghost-button md-button"
+              data-action="compose-ai-rewrite-selected-tone"
+              title="Réécrire tout le texte avec le style choisi à gauche (Dictée · Réécriture)"
+            >
+              Style sélectionné
+            </button>
+            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Formal" title="Ton formel (LLM)">Formel</button>
+            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Casual" title="Ton décontracté">Décontracté</button>
+            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Concise" title="Concis">Concis</button>
+            <span class="md-toolbar-sep" aria-hidden="true"></span>
+            <button type="button" class="ghost-button md-button" data-action="compose-ai-grammar" title="Orthographe & formulation (LLM)">Correction</button>
+            ${
+              isAiFeatureEnabled(state.appPrefs.ai, "featureQuickReplyComposeEnabled")
+                ? `<span class="md-toolbar-sep" aria-hidden="true"></span>
+            <button type="button" class="ghost-button md-button" data-action="llm-quick-replies-compose" title="Suggestions de réponses (sans fil ouvert)">Réponses rapides</button>`
+                : ""
+            }
+          </div>
+        </div>
+        ${correctionPanelHtml}
+        <div class="composer-body composer-body--${isHistorique ? "historique" : layout}">
+          <textarea
+            id="compose-body"
+            class="${textareaOffscreen ? "composer-source-offscreen" : ""}"
+            placeholder="Rédiger en Markdown…"
+            ${textareaOffscreen ? 'tabindex="-1" aria-hidden="true"' : ""}
+          >${escapeHtml(state.composeBody)}</textarea>
+          ${isHistorique ? renderComposerHistoriquePane() : showPreviewPane ? `<div class="preview">${state.preview?.html ?? ""}</div>` : ""}
+          <div class="drop-hint" aria-hidden="true">
+            <strong>Déposez des fichiers dans cette fenêtre</strong>
+            <span>Pièces jointes : glisser-déposer depuis l’explorateur (chemins locaux, app bureau).</span>
+          </div>
+        </div>
+      </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderSettingsGeneralPanel(): string {
+  const ml = state.appPrefs.general.motherLanguage;
+  const globalBook = Boolean(state.appPrefs.general.addressBookGlobalScope);
+  const activitySuggestions = state.appPrefs.general.activitySuggestionsEnabled !== false;
+  const defaultLf = defaultListFilterFromPrefs();
+  const prefAccId = defaultAccountIdFromPrefs() ?? "";
+  const accountOptions =
+    state.accounts.length ?
+      `<option value="" ${!prefAccId ? "selected" : ""}>Premier compte de la liste</option>${state.accounts
+        .map((a) => {
+          const label = (a.displayName || a.email || a.id).trim();
+          return `<option value="${escapeAttr(a.id)}" ${prefAccId === a.id ? "selected" : ""}>${escapeHtml(label)}</option>`;
+        })
+        .join("")}`
+    : `<option value="" selected>— Aucun compte configuré —</option>`;
+  return wrapSettingsPage(`
+    <div class="settings-card settings-general surface-sm">
+      <section class="settings-general-section" aria-labelledby="settings-general-lang-heading">
+        <h3 id="settings-general-lang-heading" class="thread-kicker settings-form-kicker">${escapeHtml(t("settings.general.languageHeading"))}</h3>
+        ${settingsExplainHtml(t("settings.general.languageExplain"))}
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-mother-language">${escapeHtml(t("settings.general.motherLanguage"))}</label>
+          <select class="settings-ctl settings-ctl-select" id="prefs-mother-language">
+            <option value="fr" ${ml === "fr" ? "selected" : ""}>${escapeHtml(t("settings.general.langFr"))}</option>
+            <option value="fr-FR" ${ml === "fr-FR" ? "selected" : ""}>${escapeHtml(t("settings.general.langFrFR"))}</option>
+            <option value="en" ${ml === "en" ? "selected" : ""}>${escapeHtml(t("settings.general.langEn"))}</option>
+            <option value="en-US" ${ml === "en-US" ? "selected" : ""}>${escapeHtml(t("settings.general.langEnUS"))}</option>
+            <option value="pt" ${ml === "pt" ? "selected" : ""}>${escapeHtml(t("settings.general.langPt"))}</option>
+            <option value="pt-BR" ${ml === "pt-BR" ? "selected" : ""}>${escapeHtml(t("settings.general.langPtBR"))}</option>
+            <option value="es" ${ml === "es" ? "selected" : ""}>${escapeHtml(t("settings.general.langEs"))}</option>
+            <option value="de" ${ml === "de" ? "selected" : ""}>${escapeHtml(t("settings.general.langDe"))}</option>
+            <option value="it" ${ml === "it" ? "selected" : ""}>${escapeHtml(t("settings.general.langIt"))}</option>
+          </select>
+        </div>
+        <div class="settings-general-option">
+          <label class="settings-checkbox settings-general-option__label">
+            <input type="checkbox" id="prefs-address-book-global" ${globalBook ? "checked" : ""} />
+            <span>${escapeHtml(t("settings.general.globalAddressBook"))}</span>
+          </label>
+          ${settingsExplainHtml(t("settings.general.globalAddressBookExplain"))}
+        </div>
+        <div class="settings-general-option">
+          <label class="settings-checkbox settings-general-option__label">
+            <input type="checkbox" id="prefs-activity-suggestions" ${activitySuggestions ? "checked" : ""} />
+            <span>${escapeHtml(t("settings.general.activitySuggestions"))}</span>
+          </label>
+          ${settingsExplainHtml(t("settings.general.activitySuggestionsExplain"))}
+        </div>
+      </section>
+
+      <hr class="settings-section-divider" />
+
+      <section class="settings-general-section" aria-labelledby="settings-general-archive-heading">
+        <h3 id="settings-general-archive-heading" class="thread-kicker settings-form-kicker">Archivage</h3>
+        ${settingsExplainHtml("Hiérarchique : Archive/AAAA/MM-mois (locale app). Plat : dossier serveur (Gmail All Mail, Archive…).")}
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-archive-layout">Mode</label>
+          <select class="settings-ctl settings-ctl-select" id="prefs-archive-layout">
+            <option value="hierarchical" ${(state.appPrefs.general.archiveLayout ?? "hierarchical") === "hierarchical" ? "selected" : ""}>Hiérarchique</option>
+            <option value="flat" ${state.appPrefs.general.archiveLayout === "flat" ? "selected" : ""}>Plat (serveur)</option>
+          </select>
+        </div>
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-archive-root">Racine IMAP</label>
+          <input class="settings-ctl" id="prefs-archive-root" type="text" value="${escapeAttr(state.appPrefs.general.archiveRoot ?? "Archive")}" />
+        </div>
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-stale-inbox-days">Inbox stale (jours)</label>
+          <input class="settings-ctl" id="prefs-stale-inbox-days" type="number" min="1" max="3650" value="${escapeAttr(String(state.appPrefs.general.staleInboxDays ?? 90))}" />
+        </div>
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-hybrid-weight">Poids lexical hybride (0–1)</label>
+          <input class="settings-ctl" id="prefs-hybrid-weight" type="number" min="0" max="1" step="0.05" value="${escapeAttr(String(state.appPrefs.general.hybridLexicalWeight ?? 0.55))}" />
+        </div>
+        <div class="settings-general-option">
+          <label class="settings-checkbox settings-general-option__label">
+            <input type="checkbox" id="prefs-auto-archive-enabled" ${state.appPrefs.general.autoArchiveEnabled ? "checked" : ""} />
+            <span>Archivage automatique (règles opt-in)</span>
+          </label>
+        </div>
+      </section>
+
+      <hr class="settings-section-divider" />
+
+      <section class="settings-general-section" aria-labelledby="settings-general-startup-heading">
+        <h3 id="settings-general-startup-heading" class="thread-kicker settings-form-kicker">Démarrage</h3>
+        ${settingsExplainHtml(
+          "Compte mail ouvert par défaut au lancement de RustyMail (utile si vous avez plusieurs comptes IMAP). « Premier compte » = le premier de la liste dans Paramètres → Comptes."
+        )}
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-default-account">Compte au démarrage</label>
+          <select class="settings-ctl settings-ctl-select" id="prefs-default-account">${accountOptions}</select>
+        </div>
+      </section>
+
+      <hr class="settings-section-divider" />
+
+      <section class="settings-general-section" aria-labelledby="settings-general-inbox-heading">
+        <h3 id="settings-general-inbox-heading" class="thread-kicker settings-form-kicker">Liste des mails</h3>
+        ${settingsExplainHtml(
+          "Filtre affiché par défaut à l’ouverture d’un dossier IMAP (puces Tout, Non lus, Suivis, Priorité, Auto)."
+        )}
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-default-list-filter">Vue principale par défaut</label>
+          <select class="settings-ctl settings-ctl-select" id="prefs-default-list-filter">
+            <option value="all" ${defaultLf === "all" ? "selected" : ""}>Tout</option>
+            <option value="unread" ${defaultLf === "unread" ? "selected" : ""}>Non lus</option>
+            <option value="starred" ${defaultLf === "starred" ? "selected" : ""}>Suivis (tous dossiers)</option>
+            <option value="focused" ${defaultLf === "focused" ? "selected" : ""}>Priorité (hors expéditeurs auto)</option>
+            <option value="auto" ${defaultLf === "auto" ? "selected" : ""}>Auto (newsletters / expéditeurs auto)</option>
+          </select>
+        </div>
+      </section>
+
+      <div class="settings-form-footer settings-general-footer">
+        <button type="button" class="primary-button" data-action="save-general-prefs">${escapeHtml(t("common.save"))}</button>
+      </div>
+    </div>
+  `);
+}
+
+function renderSettingsAddressBookPanel(): string {
+  const acc = currentAccount();
+  const rows = addressBookRowsCache;
+  const editing = addressBookEditEmail;
+  const editRow = editing ? rows.find((r) => r.email === editing) : undefined;
+  return wrapSettingsPage(`
+    <div class="settings-card settings-card--span settings-address-book surface-sm">
+      <h3 class="thread-kicker">Carnet d’adresses</h3>
+      ${settingsExplainHtml("Contacts issus des messages et entrées manuelles. Les favoris remontent en tête des suggestions @.")}
+      ${
+        !acc
+          ? `<p class="dim">Sélectionnez un compte dans la barre latérale.</p>`
+          : `
+        <div class="settings-form-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="search" class="settings-ctl" id="address-book-search" placeholder="Rechercher…" value="${escapeAttr(addressBookListQuery)}" />
+          <button type="button" class="ghost-button" data-action="address-book-refresh">Actualiser</button>
+          <button type="button" class="ghost-button" data-action="reindex-address-book">Réindexer depuis les mails</button>
+          <button type="button" class="ghost-button" data-action="address-book-export-vcard">Exporter vCard</button>
+          <button type="button" class="ghost-button" data-action="address-book-import-vcard">Importer vCard</button>
+        </div>
+        <div class="address-book-table-wrap">
+          <table class="address-book-table">
+            <thead><tr><th></th><th>Nom</th><th>E-mail</th><th>Notes</th><th></th></tr></thead>
+            <tbody>
+              ${rows
+                .map(
+                  (r) => `
+                <tr>
+                  <td><button type="button" class="address-book-star${r.isFavorite ? " is-on" : ""}" data-action="address-book-toggle-fav" data-email="${escapeAttr(r.email)}" title="Favori">${r.isFavorite ? "★" : "☆"}</button></td>
+                  <td>${escapeHtml(r.displayName || "—")}</td>
+                  <td class="mono">${escapeHtml(r.email)}</td>
+                  <td class="dim">${escapeHtml(r.notes || "")}</td>
+                  <td>
+                    <button type="button" class="ghost-button" data-action="address-book-edit" data-email="${escapeAttr(r.email)}">Modifier</button>
+                    ${r.source === "manual" ? `<button type="button" class="ghost-button" data-action="address-book-delete" data-email="${escapeAttr(r.email)}">Supprimer</button>` : ""}
+                  </td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="settings-form-panel">
+          <h4>${editing ? "Modifier le contact" : "Nouveau contact manuel"}</h4>
+          <div class="settings-form-row"><label>E-mail</label><input class="settings-ctl" id="ab-edit-email" value="${escapeAttr(editRow?.email ?? "")}" ${editing ? "readonly" : ""} /></div>
+          <div class="settings-form-row"><label>Nom affiché</label><input class="settings-ctl" id="ab-edit-name" value="${escapeAttr(editRow?.displayName ?? "")}" /></div>
+          <div class="settings-form-row"><label>Notes</label><textarea class="settings-ctl" id="ab-edit-notes" rows="2">${escapeHtml(editRow?.notes ?? "")}</textarea></div>
+          <label class="settings-checkbox"><input type="checkbox" id="ab-edit-fav" ${editRow?.isFavorite ? "checked" : ""} /> Favori</label>
+          <div class="settings-form-footer">
+            <button type="button" class="primary-button" data-action="address-book-save">${editing ? "Enregistrer" : "Ajouter"}</button>
+            ${editing ? `<button type="button" class="ghost-button" data-action="address-book-cancel-edit">Annuler</button>` : ""}
+          </div>
+        </div>`
+      }
+    </div>`);
+}
+
+function renderSettingsAiPanel(): string {
+  return wrapSettingsPage(`
+    <div class="settings-card settings-card--span settings-ai">
+      ${renderSettingsAiHub(buildSettingsAiPanelDeps())}
+    </div>
+  `);
+}
+
+function renderSettingsAiModal(): string {
+  const modalId = state.settingsAiModal;
+  if (!modalId) return "";
+  const deps = buildSettingsAiPanelDeps();
+  const title = settingsAiModalTitle(modalId);
+  const mother = state.appPrefs.general.motherLanguage?.trim() || "fr";
+  const bodyHtml = renderSettingsAiModalBodyWithPrompts(
+    modalId,
+    deps,
+    state.promptCatalog,
+    state.promptCatalogLoadError,
+    mother,
+  );
+  return renderSettingsAiModalShell(modalId, title, bodyHtml, deps);
+}
+
+function renderSettingsAppearancePanel(): string {
+  const ai = state.appPrefs.ai;
+  return wrapSettingsPage(`
+    <div class="settings-card settings-appearance surface-sm">
+      <h2 class="thread-kicker settings-form-kicker" style="margin:0 0 10px">Apparence</h2>
+      ${settingsExplainHtml(
+        "Réglages visuels de l’application (indépendants de la configuration LLM). Pour l’instant : largeur du panneau droit <strong>Détails</strong> / <strong>Brief d’action</strong> (variable CSS <code>--ai-width</code>)."
+      )}
+      <div class="settings-form-row">
+        <label class="compose-field-label" for="prefs-ai-panel-width">Largeur panneau droit (px)</label>
+        <input class="settings-ctl" type="number" id="prefs-ai-panel-width" min="260" max="640" step="10" value="${escapeAttr(String(ai.aiPanelWidthPx))}" autocomplete="off" />
+      </div>
+      <div class="settings-form-footer" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-weak)">
+        <button type="button" class="primary-button" data-action="save-ai-prefs">Enregistrer l’apparence</button>
+      </div>
+    </div>
+  `);
+}
+
+function renderSettingsAutoSendersPanel(): string {
+  const rows = state.newsletterRules
+    .map((r) => {
+      const label = formatNewsletterRuleInput(r);
+      return `
+      <div class="settings-newsletter-row surface-sm">
+        <code class="settings-newsletter-domain">${escapeHtml(label)}</code>
+        <button type="button" class="ghost-button settings-newsletter-remove" data-action="newsletter-domain-remove" data-rule="${escapeAttr(label)}">Supprimer</button>
+      </div>`;
+    })
+    .join("");
+  return wrapSettingsPage(`
+    <div class="settings-card settings-card--span settings-newsletters surface-sm">
+      <h2 class="thread-kicker settings-form-kicker" style="margin:0 0 10px">Expéditeurs automatiques</h2>
+      ${settingsExplainHtml(
+        "Messages type <strong>noreply</strong>, confirmations, envois marketing ou ESP (<code>*.mailchimp.com</code>, etc.) : définissez ici qui est traité comme <strong>expéditeur automatique</strong>. Une règle peut être un domaine entier (<code>*.exemple.com</code>), ou une adresse précise (<code>order-update@amazon.fr</code>) pour laisser passer le SAV sur le même domaine. Les actions <strong>Répondre</strong> et <strong>Répondre à tous</strong> sont masquées quand le dernier message entrant correspond à une règle."
+      )}
+      <div class="settings-form-panel settings-newsletter-add">
+        <div class="settings-form-row settings-newsletter-add-row">
+          <label class="compose-field-label" for="newsletter-domain-input">Règle</label>
+          <input class="settings-ctl" type="text" id="newsletter-domain-input" placeholder="noreply@banque.fr · *.sendgrid.net · substack.com" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          <button type="button" class="primary-button" data-action="newsletter-domain-add">Ajouter</button>
+        </div>
+      </div>
+      <div class="settings-newsletter-list" aria-label="Règles expéditeurs automatiques">
+        ${rows || `<p class="dim settings-account-list-empty">Aucune règle affichée (exemples par défaut en base au premier lancement Tauri).</p>`}
+      </div>
+    </div>
+  `);
+}
+
+function renderSettingsAccountsPanel(): string {
+  const persisted = settingsDraftProfile();
+  const isNew = state.settingsSelectedAccountId === "new";
+  const merged = mergedProfileForAccountsForm();
+  const scratch = state.accountFormOAuthPrefill ?? accountsFormIdentityScratch;
+  const authKindEffective: MailAuthKind = isNew ? state.accountFormAuthKind : (persisted?.authKind ?? "password");
+  const wizardBusy = isNew && state.accountOAuthWizardPhase != null && state.accountOAuthWizardPhase !== "error";
+  const showOAuthWizardLanding =
+    isNew &&
+    !state.accountPasswordSetupExpanded &&
+    authKindEffective === "password" &&
+    !state.oauthLockedEmail &&
+    state.accountOAuthWizardPhase == null;
+  const hint =
+    wizardBusy ?
+      "Configuration automatique du compte en cours…"
+    : showOAuthWizardLanding ?
+      "Choisissez <strong>Google</strong> ou <strong>Microsoft</strong> — le reste est automatique."
+    : isNew && state.accountPasswordSetupExpanded ?
+      "Compte IMAP classique : e-mail, mot de passe, puis <strong>Enregistrer</strong>."
+    : isNew ?
+      ""
+    : `Modification du compte <strong>${escapeHtml(persisted?.email ?? "")}</strong> — vous pouvez mettre à jour les serveurs sans changer le mot de passe.`;
+
+  const listRows = state.accounts
+    .map(
+      (a) => `
+        <button type="button" class="settings-account-row ${a.id === state.settingsSelectedAccountId ? "settings-account-row--active" : ""}"
+          data-action="settings-select-account" data-account-id="${escapeAttr(a.id)}">
+          <span class="settings-account-row-main">${escapeHtml(a.displayName || a.email)}</span>
+          <span class="settings-account-row-sub dim">${escapeHtml(a.email)}</span>
+        </button>`
+    )
+    .join("");
+
+  return wrapSettingsPage(`
+    <div class="settings-card settings-card--span settings-accounts-grid">
+      <aside class="settings-account-list" aria-label="Comptes configurés">
+        <div class="settings-account-list-title dim">Mes comptes</div>
+        ${listRows || `<p class="dim settings-account-list-empty">Aucun compte — ajoutez-en un.</p>`}
+        <button type="button" class="ghost-button settings-add-account" data-action="settings-new-account">+ Ajouter un compte</button>
+      </aside>
+      <div class="settings-account-editor">
+        ${hint ? settingsExplainHtml(hint) : ""}
+        ${renderAccountFormMarkup(merged, {
+          statusFallbackText:
+            "Le mot de passe est conservé dans le trousseau du système uniquement · les serveurs sont enregistrés en local (SQLite).",
+          accountMessage: state.accountMessage,
+          isNewAccount: isNew,
+          serversPanelOpen: !isNew || state.accountServersPanelOpen,
+          identityScratch: scratch,
+          persistedAccount: persisted,
+          authKindEffective,
+          showOAuthConnect: false,
+          oauthLockedEmail: state.oauthLockedEmail,
+          showOAuthWizardLanding: Boolean(isTauriRuntime() && showOAuthWizardLanding),
+          oauthWizardPhase: state.accountOAuthWizardPhase,
+          oauthWizardMessage: state.accountOAuthWizardMessage,
+          oauthWizardError: state.accountOAuthWizardError,
+          oauthGoogleConfigured: state.oauthGoogleConfigured,
+          oauthMicrosoftConfigured: state.oauthMicrosoftConfigured,
+        })}
+      </div>
+    </div>
+  `);
+}
+
+function renderSettingsShortcutsPanel(): string {
+  const mod = navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl";
+  const rows: ShortcutRow[] = [
+    { keys: `${mod}+T`, summary: "Recherche globale", detail: "Ouvre la modale de recherche (partout dans l’app). Reappuyer pour fermer.", scope: "Global" },
+    {
+      keys: `${mod}+F5`,
+      summary: "Synchroniser IMAP",
+      detail: "Relance la synchronisation du dossier courant (ou des dossiers principaux). F5 seul recharge l’application.",
+      scope: "Global",
+    },
+    { keys: "Échap", summary: "Fermer / retour", detail: "Ferme la modale de recherche, les dialogues, le panneau IA, puis navigation arrière.", scope: "Global" },
+    { keys: "/", summary: "Focus recherche", detail: "Affiche la liste et focus la barre de recherche ; ouvre la modale si la barre est absente.", scope: "Global" },
+    { keys: "n", summary: "Nouveau message", detail: "Ouvre le compositeur (sans Ctrl — ne pas confondre avec Ctrl+C copier).", scope: "Hors champ texte" },
+    { keys: "r", summary: "Répondre", detail: "Répondre au fil ouvert.", scope: "Fil" },
+    { keys: "s", summary: "Résumer le fil", detail: "Synthèse IA du fil courant.", scope: "Fil" },
+    { keys: "t", summary: "Traduire le fil", detail: "Traduction IA (sans Ctrl — ne pas confondre avec Ctrl+T).", scope: "Fil" },
+    { keys: "Tab", summary: "Panneau IA", detail: "Affiche ou masque le panneau latéral IA.", scope: "Fil" },
+    { keys: "m", summary: "Aperçu compositeur", detail: "Bascule l’aperçu HTML en rédaction.", scope: "Compositeur" },
+    { keys: "Entrée", summary: "Valider la recherche", detail: "Applique critères @, #, texte. Depuis la modale : retour à la liste avec résultats.", scope: "Recherche" },
+    { keys: "Tab", summary: "Autocomplétion recherche", detail: "Insère la suggestion @contact ou #dossier / #tag (sans lancer la recherche).", scope: "Recherche" },
+    { keys: "Boutons 4 / 5", summary: "Navigation souris", detail: "Précédent / suivant (comme le navigateur), si aucune modale ouverte.", scope: "Global" },
+  ];
+  const tableRows = rows
+    .map(
+      (r) => `
+        <tr>
+          <td class="shortcuts-table__keys"><kbd>${escapeHtml(r.keys)}</kbd></td>
+          <td><strong>${escapeHtml(r.summary)}</strong>${r.detail ? `<br><span class="dim">${escapeHtml(r.detail)}</span>` : ""}</td>
+          <td class="dim shortcuts-table__scope">${escapeHtml(r.scope ?? "")}</td>
+        </tr>`
+    )
+    .join("");
+  return wrapSettingsPage(`
+    <article class="settings-card settings-card--span surface-sm">
+      <h3 class="thread-kicker">Raccourcis clavier</h3>
+      ${settingsExplainHtml("Raccourcis actifs dans l’interface principale. Dans un champ de saisie (ou zone éditable), seuls Échap, Ctrl+T (recherche) et Ctrl+F5 (sync IMAP) s’appliquent. Les raccourcis à une touche ignorent Ctrl, Alt et Cmd (copier, coller, etc.). F5 seul recharge l’application.")}
+      <div class="shortcuts-table-wrap">
+        <table class="shortcuts-table">
+          <thead>
+            <tr><th scope="col">Raccourci</th><th scope="col">Action</th><th scope="col">Contexte</th></tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    </article>
+  `);
+}
+
+function renderSettingsStoragePanel(): string {
+  if (!isTauriRuntime()) {
+    return wrapSettingsPage(
+      `<article class="settings-card surface-sm"><p class="dim" style="margin:0">Chemins disque : disponibles dans l’application bureau Tauri.</p></article>`
+    );
+  }
+  if (state.settingsPathsLoadError && !state.lastAppPaths) {
+    return wrapSettingsPage(`<article class="settings-card surface-sm">
+      <p style="margin:0">${escapeHtml(state.settingsPathsLoadError)}</p>
+      <button type="button" class="ghost-button settings-storage-refresh" data-action="settings-reload-paths">Recharger les chemins</button>
+    </article>`);
+  }
+  const p = state.lastAppPaths;
+  if (!p) {
+    return wrapSettingsPage(`<article class="settings-card surface-sm">
+      <p class="dim" style="margin:0">Chargement des chemins…</p>
+      <button type="button" class="ghost-button settings-storage-refresh" data-action="settings-reload-paths">Rafraîchir</button>
+    </article>`);
+  }
+  const sections: Array<{ heading: string; hint: string; rows: Array<[string, string]> }> = [
+    {
+      heading: "Courrier & cache local",
+      hint: "Messages synchronisés, fils de discussion, pièces jointes indexées.",
+      rows: [["Base SQLite", p.dbPath]],
+    },
+    {
+      heading: "Configuration application",
+      hint: "Préférences UI, comptes, options IA (hors trousseau).",
+      rows: [["Fichier JSON des préférences", p.prefsPath]],
+    },
+    {
+      heading: "Modèles IA sur disque",
+      hint: "Téléchargements locaux pour la recherche sémantique et llama-server.",
+      rows: [
+        ["Embeddings sémantiques (MiniLM ONNX)", p.modelsDir],
+        ["Cache modèles LLM (fichiers GGUF)", p.llmModelsDir],
+      ],
+    },
+  ];
+  return wrapSettingsPage(`<article class="settings-card settings-card--span surface-sm settings-storage-panel">
+    <header class="settings-storage-head">
+      <h3 class="thread-kicker settings-form-kicker settings-card__title">Chemins disque</h3>
+      <p class="dim settings-card__lead">Emplacements renvoyés par la commande Tauri <code>app_paths</code> (dossier de données de l’app).</p>
+      <button type="button" class="ghost-button settings-storage-refresh" data-action="settings-reload-paths">Rafraîchir</button>
+    </header>
+    ${sections
+      .map(
+        (sec) => `
+    <section class="settings-storage-section" aria-label="${escapeAttr(sec.heading)}">
+      <h4 class="settings-storage-section__title">${escapeHtml(sec.heading)}</h4>
+      <p class="dim settings-storage-section__hint">${escapeHtml(sec.hint)}</p>
+      <div class="settings-storage-paths">
+        ${sec.rows
+          .map(
+            ([label, path]) => `
+        <div class="settings-storage-path">
+          <div class="settings-storage-path__label">${escapeHtml(label)}</div>
+          <code class="settings-path-code">${escapeHtml(path)}</code>
+        </div>`
+          )
+          .join("")}
+      </div>
+    </section>`
+      )
+      .join('<hr class="settings-section-divider settings-storage-section-divider" />')}
+  </article>`);
+}
+
+function renderSettingsDeveloperPanel(): string {
+  return wrapSettingsPage(
+    `
+    <article class="settings-card surface-sm" aria-labelledby="settings-dev-stack-heading">
+      <h3 id="settings-dev-stack-heading" class="thread-kicker settings-form-kicker settings-card__title">Pile technique</h3>
+      <p class="dim settings-card__lead">Aperçu pour développeurs du client mail RustyMail.</p>
+      <ul class="settings-card__list">
+        <li><strong>Shell</strong> — Tauri 2, Rust (<code>crates/rustymail-*</code>, binaire <code>src-tauri</code>)</li>
+        <li><strong>UI</strong> — Vite, TypeScript, CSS (<code>dompurify</code> pour HTML mail)</li>
+        <li><strong>Données</strong> — SQLite + WAL (<code>rusqlite</code>), JSON prefs, trousseau OS</li>
+        <li><strong>Mail</strong> — IMAP (<code>async-imap</code>), SMTP (<code>lettre</code>), pièces jointes</li>
+        <li><strong>Recherche</strong> — lexical + mode hybrid / sémantique (<code>rustymail-semantic</code>, ONNX MiniLM)</li>
+        <li><strong>IA</strong> — OpenRouter ou serveur compatible OpenAI, llama-server, dictée Whisper</li>
+      </ul>
+      <p class="dim" style="margin:12px 0 0;font-size:12px;line-height:1.5">Détails : <code>README.md</code> et <code>docs/</code>.</p>
+    </article>
+    <article class="settings-card surface-sm" aria-labelledby="settings-dev-demo-heading">
+      <h3 id="settings-dev-demo-heading" class="thread-kicker settings-form-kicker settings-card__title">Données démo (pro fictif)</h3>
+      <p class="dim settings-card__lead">
+        <strong>Essayer</strong> — crée ou réinitialise <code>playground@demo.rustymail.app</code> (conversations pro en local, IMAP factice) pour tester le <strong>Brief d’action</strong>.
+      </p>
+      <p class="dim" style="margin:0 0 4px;font-size:13px;line-height:1.55">
+        <strong>Passer à un vrai compte</strong> — supprimez la démo puis ajoutez un compte IMAP dans <strong>Paramètres → Comptes</strong>.
+      </p>
+      <div class="settings-card__actions">
+        <button type="button" class="primary-button" data-action="demo-reset-playground">Réinitialiser la boîte démo pro</button>
+        <button type="button" class="ghost-button btn-danger-soft" data-action="demo-remove-playground">Supprimer la boîte démo</button>
+      </div>
+    </article>
+  `,
+    2
+  );
+}
+
+function renderSettings() {
+  const tabAccounts = state.settingsTab === "accounts";
+  const tabGeneral = state.settingsTab === "general";
+  const tabAppearance = state.settingsTab === "appearance";
+  const tabAutoSenders = state.settingsTab === "autoSenders";
+  const tabAi = state.settingsTab === "ai";
+  const tabAddressBook = state.settingsTab === "addressBook";
+  const tabStorage = state.settingsTab === "storage";
+  const tabShortcuts = state.settingsTab === "shortcuts";
+  const tabDeveloper = state.settingsTab === "developer";
+  let settingsBody = "";
+  switch (state.settingsTab) {
+    case "accounts":
+      settingsBody = renderSettingsAccountsPanel();
+      break;
+    case "general":
+      settingsBody = renderSettingsGeneralPanel();
+      break;
+    case "appearance":
+      settingsBody = renderSettingsAppearancePanel();
+      break;
+    case "autoSenders":
+      settingsBody = renderSettingsAutoSendersPanel();
+      break;
+    case "ai":
+      settingsBody = renderSettingsAiPanel();
+      break;
+    case "addressBook":
+      settingsBody = renderSettingsAddressBookPanel();
+      break;
+    case "storage":
+      settingsBody = renderSettingsStoragePanel();
+      break;
+    case "shortcuts":
+      settingsBody = renderSettingsShortcutsPanel();
+      break;
+    case "developer":
+      settingsBody = renderSettingsDeveloperPanel();
+      break;
+    default:
+      settingsBody = renderSettingsAccountsPanel();
+  }
+  return `
+    <section class="settings-root compose-view thread-view thread-reading" aria-label="${escapeAttr(t("settings.title"))}">
+      <header class="thread-reading-head" aria-label="${escapeAttr(t("settings.title"))}">
+        ${renderViewNavTrail()}
+        <div class="thread-reading-hero">
+          <h1 class="thread-reading-title">${escapeHtml(t("settings.title"))}</h1>
+        </div>
+      </header>
+      <div class="settings-tabbar" role="tablist" aria-label="${escapeAttr(t("settings.sectionsAria"))}">
+        <button type="button" role="tab" class="settings-tab ${tabAccounts ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="accounts" aria-selected="${tabAccounts}">${escapeHtml(t("settings.tabs.accounts"))}</button>
+        <button type="button" role="tab" class="settings-tab ${tabGeneral ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="general" aria-selected="${tabGeneral}">${escapeHtml(t("settings.tabs.general"))}</button>
+        <button type="button" role="tab" class="settings-tab ${tabAppearance ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="appearance" aria-selected="${tabAppearance}">${escapeHtml(t("settings.tabs.appearance"))}</button>
+        <button type="button" role="tab" class="settings-tab ${tabAutoSenders ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="autoSenders" aria-selected="${tabAutoSenders}"
+          title="noreply, notifications, newsletters, ESP…">${escapeHtml(t("settings.tabs.autoSenders"))}</button>
+        <button type="button" role="tab" class="settings-tab ${tabAi ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="ai" aria-selected="${tabAi}">${escapeHtml(t("settings.tabs.ai"))}</button>
+        <button type="button" role="tab" class="settings-tab ${tabAddressBook ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="addressBook" aria-selected="${tabAddressBook}">${escapeHtml(t("settings.tabs.addressBook"))}</button>
+        <button type="button" role="tab" class="settings-tab ${tabStorage ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="storage" aria-selected="${tabStorage}"
+          title="SQLite, JSON, modèles…">${escapeHtml(t("settings.tabs.storage"))}</button>
+        <button type="button" role="tab" class="settings-tab ${tabShortcuts ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="shortcuts" aria-selected="${tabShortcuts}"
+          title="Raccourcis clavier">${escapeHtml(t("settings.tabs.shortcuts"))}</button>
+        <button type="button" role="tab" class="settings-tab ${tabDeveloper ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="developer" aria-selected="${tabDeveloper}"
+          title="Dépôt, crates, libs">${escapeHtml(t("settings.tabs.developer"))}</button>
+      </div>
+      <div class="settings-body">
+        ${settingsBody}
+      </div>
+    </section>
+  `;
+}
+
+function renderThreadQaBlockHtml(): string {
+  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadQaEnabled")) return "";
+  const dictationMic =
+    isTauriRuntime() && state.appPrefs.ai.dictationEnabled
+      ? `<div class="ai-qa-mic-cluster compose-mic-cluster" title="${escapeAttr(threadQaMicButtonTitle())}">
+          <button
+            class="mic-button ${state.micState}"
+            type="button"
+            data-action="mic-thread-qa"
+            aria-label="${escapeAttr(micAriaLabel("thread-qa"))}"
+            aria-pressed="${state.micState === "recording"}"
+          >
+            <span class="mic-button__ico" aria-hidden="true">${iconSvg("mic")}</span>
+          </button>
+        </div>`
+      : "";
+  return `<div class="ai-qa-block surface-sm">
+        <p class="dim ai-qa-block__title">Questions sur le fil</p>
+        <label class="dim ai-qa-block__label" for="thread-qa-input">Votre question</label>
+        <div class="ai-qa-input-row">
+          <textarea id="thread-qa-input" class="settings-ctl ai-qa-input" rows="2" placeholder="Ex. Quelles dates ont été proposées ? (dictée possible)">${escapeHtml(state.threadQaDraft)}</textarea>
+          ${dictationMic}
+        </div>
+        <div class="ai-qa-block__actions">
+          <button type="button" class="ghost-button ghost-button-sm" data-action="llm-qa-thread">Poser la question</button>
+          ${
+            state.threadQaAnswer || state.threadQaStreamText
+              ? `<button type="button" class="ghost-button ghost-button-sm" data-action="llm-qa-clear">Effacer</button>`
+              : ""
+          }
+        </div>
+        ${
+          state.threadQaStreamText.trim()
+            ? `<div class="ai-qa-answer ai-qa-answer--stream"><p class="ai-qa-answer__text">${formatPlainTextWithLinks(state.threadQaStreamText)}</p></div>`
+            : ""
+        }
+        ${
+          state.threadQaAnswer
+            ? `<div class="ai-qa-answer">
+          <p class="ai-qa-answer__text">${formatPlainTextWithLinks(state.threadQaAnswer.answer)}</p>
+          ${
+            state.threadQaAnswer.evidenceMessageIds.length
+              ? `<p class="dim ai-qa-block__evidence-label">Messages sources</p>
+          <div class="ai-qa-evidence">${state.threadQaAnswer.evidenceMessageIds
+            .map(
+              (mid) =>
+                `<button type="button" class="ghost-button ghost-button-sm ai-qa-evidence__btn" data-action="qa-open-message" data-msg-id="${escapeAttr(mid)}">${escapeHtml(mid.slice(0, 24))}${mid.length > 24 ? "…" : ""}</button>`
+            )
+            .join("")}</div>`
+              : ""
+          }
+        </div>`
+            : ""
+        }
+      </div>`;
+}
+
+function renderThreadSummaryPanelHtml(): string {
+  /** Même contenu que `thread-zen` dans la colonne fil — ne pas dupliquer dans Détails. */
+  if (threadAiSummaryShownInZen()) return "";
+  if (!threadAiSummaryForCurrentThread()) return "";
+  const tid = String(state.aiThreadScope);
+  const row = state.threads.find((t) => String(t.id) === tid);
+  const subject = state.selectedThread?.subject || row?.subject || "Fil";
+  return `
+    <div class="ai-thread-summary surface-sm" aria-label="Synthèse du fil">
+      <div class="ai-thread-summary__head">
+        <span class="thread-kicker thread-kicker-strong">Résumé</span>
+      </div>
+      <p class="dim ai-thread-summary__subject">${escapeHtml(subject)}</p>
+      <div class="thread-zen-body ai-thread-summary__body">${zenSummaryHtmlFragments(state.aiOutput!.trim())}</div>
+    </div>`;
+}
+
+function renderAgentTelemetryHtml(session: NonNullable<typeof state.agentSession>): string {
+  if (!session.telemetry.length) return "";
+  const rows = session.telemetry
+    .map((t) => {
+      const label = assistSkillLabel(t.skill);
+      const lat = t.latencyMs > 0 ? `${t.latencyMs} ms` : "—";
+      const status =
+        t.status === "ok"
+          ? "OK"
+          : t.status === "skipped"
+            ? "Ignoré"
+            : t.status === "blocked"
+              ? "Bloqué"
+              : t.status === "error"
+              ? "Erreur"
+              : t.status;
+      const detail = t.message ? `<span class="dim"> · ${escapeHtml(t.message)}</span>` : "";
+      return `<li><span>${escapeHtml(label)}</span><span class="dim">${escapeHtml(status)} · ${lat}</span>${detail}</li>`;
+    })
+    .join("");
+  return `<details class="agent-panel__telemetry" open><summary>Exécution</summary><ul>${rows}</ul></details>`;
+}
+
+function renderAgentPrepareReplyPanelHtml(): string {
+  const s = state.agentSession;
+  if (!s || !threadIdsMatch(s.threadId, state.selectedThreadId)) return "";
+  const stepLabel = agentStepProgressLabel(s);
+  const modeSelect = `
+    <label class="agent-panel__mode dim">
+      Mode
+      <select class="settings-ctl" data-action="agent-set-mode" ${s.busy ? "disabled" : ""}>
+        <option value="quick" ${s.assistMode === "quick" ? "selected" : ""}>${escapeHtml(assistModeLabel("quick"))}</option>
+        <option value="deep" ${s.assistMode === "deep" ? "selected" : ""}>${escapeHtml(assistModeLabel("deep"))}</option>
+        <option value="strictSafe" ${s.assistMode === "strictSafe" ? "selected" : ""}>${escapeHtml(assistModeLabel("strictSafe"))}</option>
+      </select>
+    </label>`;
+  const intentBlock = s.intent
+    ? `<p class="agent-panel__intent">${escapeHtml(s.intent.intent)}</p><p class="dim">Ton : ${escapeHtml(s.intent.toneHint)}</p>`
+    : "";
+  const factsBlock =
+    s.facts?.facts?.length ?
+      `<ul class="agent-panel__facts">${s.facts.facts
+        .slice(0, 8)
+        .map((f) => `<li><span class="dim">${escapeHtml(f.kind)}</span> ${escapeHtml(f.text)}</li>`)
+        .join("")}</ul>`
+    : "";
+  const clarificationBlock =
+    s.step === "clarification" && s.clarificationQuestions.length ?
+      `<div class="agent-panel__clarification"><p><strong>Précisions utiles</strong></p><ul>${s.clarificationQuestions
+        .map((q) => `<li>${escapeHtml(q)}</li>`)
+        .join("")}</ul></div>`
+    : "";
+  const safetyBlock =
+    s.safetyFlags.length || s.consistencyIssues.length ?
+      `<div class="agent-panel__warnings">${[
+        ...s.consistencyIssues.map((i) => `<p class="agent-warn">⚠ ${escapeHtml(i)}</p>`),
+        ...s.safetyFlags.map((f) => `<p class="agent-warn dim">${escapeHtml(assistSafetyFlagLabel(f))}</p>`),
+      ].join("")}</div>`
+    : "";
+  const draftBlock =
+    (s.step === "draftReply" || s.draft.trim()) && (s.draft.trim() || s.busy) ?
+      `<textarea class="settings-ctl agent-panel__draft" id="agent-draft-text" rows="6" ${s.busy ? 'aria-busy="true"' : ""}>${escapeHtml(s.draft)}</textarea>`
+    : "";
+  const actionsBlock =
+    s.recommendations.filter((r) => r.kind === "action").length ?
+      `<div class="agent-panel__actions-list"><p class="dim"><strong>Actions</strong></p><ul>${s.recommendations
+        .filter((r) => r.kind === "action")
+        .map(
+          (r) =>
+            `<li>${escapeHtml(r.label)}${r.detail ? `<span class="dim"> · ${escapeHtml(r.detail)}</span>` : ""}</li>`,
+        )
+        .join("")}</ul></div>`
+    : "";
+  const slotsBlock =
+    s.slots.length ?
+      `<ul class="agent-panel__slots">${s.slots.map((sl) => `<li><button type="button" class="ghost-button" data-action="agent-append-slot" data-slot="${escapeAttr(sl)}">${escapeHtml(sl)}</button></li>`).join("")}</ul>`
+    : "";
+  const skillToggles = getAssistSkillUi().map((sk) => {
+    const on = agentSkillEnabled(sk.id);
+    const dis = s.busy || sk.id === "analyzeIntent" || sk.id === "draftReply";
+    return `<label class="agent-skill-toggle"><input type="checkbox" data-action="agent-toggle-skill" data-skill="${sk.id}" ${on ? "checked" : ""} ${dis ? "disabled" : ""}/> ${escapeHtml(sk.label)}</label>`;
+  }).join("");
+  const skillsBlock = `<details class="agent-panel__skills"><summary>Skills</summary><div class="agent-skill-toggles">${skillToggles}</div></details>`;
+  return `
+    <div class="agent-panel surface-sm">
+      <div class="agent-panel__head">
+        <strong>Assistant réponse</strong>
+        <span class="dim">${stepLabel}</span>
+        ${modeSelect}
+      </div>
+      ${s.busy ? `<p class="dim">Génération…</p>` : ""}
+      ${s.step === "analyzeIntent" ? intentBlock : ""}
+      ${skillsBlock}
+      ${factsBlock}
+      ${actionsBlock}
+      ${clarificationBlock}
+      ${safetyBlock}
+      ${draftBlock}
+      ${s.step === "suggestSlots" ? slotsBlock : ""}
+      ${renderAgentTelemetryHtml(s)}
+      <div class="agent-panel__actions">
+        <button type="button" class="ghost-button" data-action="agent-prepare-cancel">Annuler</button>
+        ${
+          s.step === "draftReply" && s.draft.trim()
+            ? `<button type="button" class="ghost-button" data-action="agent-insert-compose">Insérer dans compose</button>`
+            : ""
+        }
+        ${
+          s.step !== "suggestSlots" &&
+          !s.busy &&
+          (s.step === "clarification" || s.step !== "draftReply" || agentOfferSlotsStep(s))
+            ? `<button type="button" class="primary-button" data-action="agent-prepare-continue">${
+                s.step === "clarification"
+                  ? "Générer le brouillon quand même"
+                  : s.step === "draftReply"
+                    ? "Créneaux alternatifs"
+                    : "Continuer"
+              }</button>`
+            : ""
+        }
+        ${
+          s.step === "suggestSlots" && s.slots.length
+            ? `<button type="button" class="ghost-button" data-action="agent-append-all-slots">Ajouter au message</button>`
+            : ""
+        }
+      </div>
+    </div>`;
+}
+
+function renderAiPanel() {
+  if (mailboxDigestSlotInList()) {
+    const digestMboxTitle = escapeHtml(state.selectedMailbox || "INBOX");
+    const accountId = currentAccount()?.id?.trim() ?? "";
+    const mailboxKey = state.selectedMailbox || "INBOX";
+    const k = `${accountId}|${mailboxKey}`;
+    const keyMatches = state.mailboxDigestKey === k;
+    const banner = state.mailboxBriefBannerHtml.trim();
+    const brief = state.mailboxActionBrief;
+    const hasBrief = Boolean(brief && keyMatches);
+    const hasBanner = Boolean(banner);
+    const hasRenderable = hasBrief || hasBanner;
+    let digestBody = "";
+    if (state.mailboxDigestRefreshing && !hasRenderable) {
+      digestBody = `<div class="inbox-brief-body">${renderBriefMailViewShell(
+        `<p class="thread-zen-par dim" role="status">Génération du brief d’action…</p>`,
+        { kicker: "Brief d’action" }
+      )}</div>`;
+    } else if (hasBrief) {
+      digestBody = `<div class="inbox-brief-body">${renderActionBriefHtml(brief!)}</div>`;
+    } else if (keyMatches && hasBanner) {
+      digestBody = `<div class="inbox-brief-body">${banner}</div>`;
+    } else if (state.mailboxDigestKey && !keyMatches) {
+      digestBody = `<div class="inbox-brief-body">${renderBriefMailViewShell(
+        `<p class="thread-zen-par dim" role="status">Changement de dossier — actualisation du brief…</p>`,
+        { kicker: "Brief d’action" }
+      )}</div>`;
+    } else {
+      digestBody = `<div class="inbox-brief-body">${renderBriefMailViewShell(
+        `<p class="thread-zen-par dim">Le brief se charge automatiquement après chaque synchronisation ou chargement des conversations.</p>`,
+        { kicker: "Brief d’action" }
+      )}</div>`;
+    }
+    const busyLine =
+      state.mailboxDigestRefreshing && keyMatches && hasRenderable
+        ? `<p class="inbox-digest-busy dim" style="margin:0 14px 8px" aria-live="polite">Mise à jour…</p>`
+        : "";
+    const modeSel = state.mailboxBriefMode;
+    const briefModeApplied = state.mailboxActionBrief?.mode?.trim();
+    const ctxHint =
+      state.llmRuntimeStatus?.llamaServerNCtx ??
+      state.appPrefs.ai.localLlmContextSize ??
+      null;
+    const modeTitle =
+      modeSel === "auto"
+        ? `Auto : Quick / Decision / Deep selon la fenêtre de contexte${ctxHint ? ` (≈ ${ctxHint} jetons)` : ""}`
+        : `Plafond ${modeSel} ; le mode effectif peut être réduit si le contexte est petit`;
+    return `
+    <aside class="ai-panel ai-panel--digest-slot" aria-label="Brief d'action du dossier">
+      <header class="pane-header ai-panel-digest-head" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div>
+          <strong>Brief d'action</strong>
+          <small class="dim" style="display:block;margin-top:3px">${briefModeApplied ? `${escapeHtml(briefModeApplied)} · ` : ""}${digestMboxTitle}</small>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+          <label class="dim" style="font-size:11px;display:flex;align-items:center;gap:4px">Mode
+            <select class="settings-ctl" data-action="mailbox-brief-mode" title="${escapeAttr(modeTitle)}" style="font-size:11px;padding:2px 6px;min-width:0">
+              <option value="auto" ${modeSel === "auto" ? "selected" : ""}>Auto</option>
+              <option value="quick" ${modeSel === "quick" ? "selected" : ""}>Quick</option>
+              <option value="decision" ${modeSel === "decision" ? "selected" : ""}>Decision</option>
+              <option value="deep" ${modeSel === "deep" ? "selected" : ""}>Deep</option>
+            </select>
+          </label>
+          <button type="button" class="ghost-button inbox-digest-dismiss" data-action="llm-inbox-digest" title="Relancer le brief du dossier">Rafraîchir</button>
+          <button type="button" class="icon-button" data-action="dismiss-mailbox-digest" aria-label="Fermer le brief">×</button>
+        </div>
+      </header>
+      ${busyLine}
+      <div class="ai-panel-digest-scroll inbox-brief-scroll">
+        ${digestBody}
+      </div>
+    </aside>`;
+  }
+
+  const threadReading = state.view === "thread" && state.selectedThread;
+  const thread = threadReading ? state.selectedThread : undefined;
+  const participantLinks = thread ? threadParticipantsWithEmails(thread.messages) : [];
+  const detailsTagCount = thread ? threadTagsForModal(thread.tags ?? []).length : 0;
+  return `
+    <aside class="ai-panel" aria-label="Détails">
+      <header class="pane-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div><strong>Détails</strong><small class="dim" style="display:block;margin-top:3px">${threadReading ? "Conversation" : "Lecture d’un fil requise"}</small></div>
+        <button type="button" class="icon-button" data-action="toggle-ai" aria-label="Fermer le panneau Détails">×</button>
+      </header>
+      <div class="ai-panel-body-scroll">
+
+      ${
+        threadReading && thread
+          ? `
+            <div class="details-block">
+              <div class="details-row"><span class="dim">Sujet</span><strong style="font-weight:700">${escapeHtml(thread.subject)}</strong></div>
+              <div class="details-row"><span class="dim">Participants</span><span>${participantLinks.map((p) => renderThreadParticipantLink(p)).join("") || '<span class="dim">—</span>'}</span></div>
+              ${
+                ENABLE_CLEAN_MESSAGE_VIEW
+                  ? `<div class="details-row"><span class="dim">Vue</span><span class="label" style="background:rgba(173,188,216,.06);color:var(--text)">${state.messageViewMode === "clean" ? "Lisible (auto)" : "Tout brut"}</span></div>`
+                  : ""
+              }
+              <div class="details-row"><span class="dim">Tags</span><span><button type="button" class="ghost-button thread-tags-details-link" data-action="open-thread-tags">${detailsTagCount ? `Voir les tags (${detailsTagCount})` : "Voir les tags"}</button></span></div>
+            </div>
+          `
+          : `
+            <div class="details-block details-block-muted">
+              <p class="dim" style="margin:0;line-height:1.5;font-size:12px">
+                Les détails du fil et les actions associées sont disponibles après ouverture d’une conversation.
+              </p>
+            </div>
+          `
+      }
+
+      ${threadReading && thread ? `<div class="ai-actions" style="margin-top:8px">
+        <button class="ai-action surface-sm" data-action="summarize"><span>[S]</span><span><strong>Aperçu du fil</strong><small class="dim" style="display:block">Résumé LLM · streaming</small></span></button>
+        ${
+          shouldOfferThreadTranslate(thread, state.appPrefs.general.motherLanguage?.trim() || "fr")
+            ? `<button class="ai-action surface-sm" data-action="llm-translate-thread"><span>[T]</span><span><strong>Traduire le fil</strong><small class="dim" style="display:block">Tout le fil en un bloc (langue mère · LLM)</small></span></button>`
+            : ""
+        }
+        ${
+          threadIsAutoMail(thread)
+            ? ""
+            : `<button class="ai-action surface-sm" data-action="llm-quick-replies-thread"><span>[Q]</span><span><strong>Réponses rapides</strong><small class="dim" style="display:block">Propositions LLM · injecter dans le compositeur</small></span></button>${
+                isAiFeatureEnabled(state.appPrefs.ai, "featureAgentPrepareReplyEnabled")
+                  ? `<button class="ai-action surface-sm" data-action="agent-prepare-start"><span>[A]</span><span><strong>Assistant réponse</strong><small class="dim" style="display:block">Faits · brouillon · cohérence</small></span></button>`
+                  : ""
+              }`
+        }
+      </div>` : ""}
+      ${threadReading && thread && !threadIsAutoMail(thread) ? renderAgentPrepareReplyPanelHtml() : ""}
+      ${threadReading && thread ? renderThreadQaBlockHtml() : ""}
+
+      ${
+        threadReading &&
+        !threadIsAutoMail(thread) &&
+        state.quickReplySuggestions.length &&
+        threadIdsMatch(state.aiThreadScope, state.selectedThreadId)
+          ? `<div class="ai-quick-replies" role="list">${state.quickReplySuggestions
+              .map(
+                (s, i) => `
+            <div class="ai-quick-reply-card surface-sm" role="listitem">
+              <div class="ai-quick-reply-card__tone dim">${escapeHtml(s.tone)}</div>
+              <p class="ai-quick-reply-card__text">${escapeHtml(s.text)}</p>
+              ${s.rationale?.trim() ? `<p class="ai-quick-reply-card__why dim">${escapeHtml(s.rationale.trim())}</p>` : ""}
+              <div class="ai-quick-reply-card__actions">
+                <button type="button" class="ghost-button ai-quick-reply-card__btn" data-action="quick-reply-compose" data-qr-index="${i}">Composer</button>
+                <button type="button" class="ghost-button ai-quick-reply-card__btn" data-action="quick-reply-copy" data-qr-index="${i}">Copier</button>
+              </div>
+            </div>`
+              )
+              .join("")}</div>`
+          : ""
+      }
+      ${renderThreadSummaryPanelHtml()}
+      </div>
+    </aside>
+  `;
 }
 
 registerRender(render);

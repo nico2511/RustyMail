@@ -1,29 +1,40 @@
 # Front-end (`src/`)
 
-Le monolithe historique (`main.ts` ~20k lignes) est découpé en couches. La logique UI reste volumineuse dans `application.ts` ; la prochaine étape est de la répartir dans `modules/` sans casser les appels croisés.
+Découpage progressif du monolithe historique. **`application.ts` reste le cœur** (logique + `wireEvents`) ; on en retire des morceaux autonomes au fil des itérations.
 
 ## Point d’entrée
 
 | Fichier | Rôle |
 | ------- | ---- |
-| `main.ts` | Boot : importe `application`, lance `boot()` |
-| `app/application.ts` | Comportement UI (render, wireEvents, sync, compose, IA…) |
-| `app/state.ts` | État global `state` (unique source de vérité) |
-| `app/dispatch.ts` | `render()` / `registerRender()` (évite imports circulaires) |
-| `app/dom.ts` | Racine `#app` |
-| `app/types/` | Types TypeScript partagés (mail, modales, `State`) |
+| `main.ts` | Lance `boot()` |
+| `app/application.ts` | Comportement UI (sync, compose, IA, événements…) |
+| `app/state.ts` | État global `state` |
+| `app/dispatch.ts` | `render()` / `registerRender()` |
+| `app/dom.ts` | Élément racine `#app` |
+| `app/types/` | Types TypeScript |
 
-## Modules déjà extraits (hors `application.ts`)
+## Modules extraits (dégraissage en cours)
 
-Composants et domaines autonomes : `navigation.ts`, `contactsView.ts`, `organizationView*.ts`, `accountSetup.ts`, `searchQueryState.ts`, `ipc_bridge.ts`, etc.
+| Dossier | Contenu |
+| ------- | ------- |
+| `app/lib/toast.ts` | Notifications toast |
+| `app/lib/domForm.ts` | Lecture champs formulaire DOM |
+| `app/lib/textFormat.ts` | Liens / texte IA |
+| `app/lib/tags.ts` | `initials`, tags bruit |
+| `app/lib/iconSvg.ts` | Icônes SVG inline |
+| `app/lib/htmlMessage.ts` | Base64 / montage HTML mail |
+| `app/modals/promptConfirm.ts` | Modales prompt + confirm |
+| `app/core/composeTone.ts` | Tons compositeur |
 
-## Conventions pour la suite
+Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.mjs`.
 
-1. **Nouveau code** : fichier dédié sous `app/` ou à la racine `src/` selon le domaine, types dans `app/types/`.
-2. **Pas de logique métier mail** dans le front : uniquement Tauri `invoke`.
-3. **Couleurs / layout** : tokens dans `styles/tokens.css`, composants dans `styles.css` (découpage progressif).
-4. **Découper `application.ts`** par domaine (`mail`, `compose`, `render`, `events`) avec fonctions **exportées** et imports explicites (éviter le registre global).
+## Prochaines extractions (ordre suggéré)
+
+1. Constantes timeouts → `app/core/timeouts.ts`
+2. Digest dossier → `app/mail/mailboxDigest.ts`
+3. **`render*.ts`** → plusieurs fichiers sous `app/ui/render/` avec pont `renderDeps` (registre rempli par `application.ts`) — évite les imports circulaires
+4. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
 
 ## Tests
 
-`npm run verify:ts` · `npm test` (utilitaires / navigation / mailboxKinds).
+`npm run verify:ts` · `npm test`
