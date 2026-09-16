@@ -52,7 +52,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `settingsRender.ts` | Paramètres (onglets, modale IA réglages) |
 | `aiPanelRender.ts` | Panneau Détails / brief dossier / agent IA |
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
-| `wireEvents.ts` | `wireEvents()` + `handleAction()` (pont `registerWireEventsBridge()`) |
+| `wireEvents.ts` | `wireEvents()` (câblage DOM) |
+| `wireEvents/handleAction*.ts` | `handleAction()` découpé (settings, thread/compose, org/dossiers, inbox/recherche) |
+| `wireEvents/deps.ts` | Imports partagés + accès pont (refs compte, carnet, etc.) |
 | `wireEventsBridge.ts` | Registre runtime des handlers laissés dans `application.ts` |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
@@ -63,7 +65,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Réduire le pont **`registerWireEventsBridge()`** (imports directs + petits modules domaine)
-2. Découper **`handleAction`** par domaine (`inbox`, `compose`, `settings`, `org`)
+1. Réduire le pont **`registerWireEventsBridge()`** (handlers → modules métier exportés)
+2. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
 
 `npm run verify:ts` · `npm test`

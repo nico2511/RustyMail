@@ -11490,6 +11490,24 @@ const discoveredServersFormSnapRef = {
   },
 };
 
+const skipAccountIdentityCaptureOnceRef = {
+  get current() {
+    return skipAccountIdentityCaptureOnce;
+  },
+  set current(v: boolean) {
+    skipAccountIdentityCaptureOnce = v;
+  },
+};
+
+const addressBookEditEmailRef = {
+  get current() {
+    return addressBookEditEmail;
+  },
+  set current(v: string | null) {
+    addressBookEditEmail = v;
+  },
+};
+
 registerWireEventsBridge({
   groupCollapsedQuotesByAttribution,
   syncPreviewOpenFromComposeLayout,
@@ -11669,7 +11687,14 @@ registerWireEventsBridge({
   micAction,
   render,
   goBack,
+  safeInvoke,
+  DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
+  LIST_FILTER_VALUES,
+  ENABLE_CLEAN_MESSAGE_VIEW,
+  addressBookRowsCache: () => addressBookRowsCache,
   discoveredServersFormSnapRef,
+  skipAccountIdentityCaptureOnceRef,
+  addressBookEditEmailRef,
   AI_PREFS_IMMEDIATE_CHECKBOX_IDS,
   composeInteractionsAbortRef,
 });
