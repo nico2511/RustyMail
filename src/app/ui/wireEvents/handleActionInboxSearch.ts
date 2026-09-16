@@ -88,6 +88,8 @@ import {
   onThreadToggleFollow,
   openMoveDialog,
   confirmMoveDialog,
+  syncInbox,
+  mailboxManageAction,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -319,7 +321,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       await (app()["saveAccount"] as (...a: unknown[]) => unknown)();
       return true;
     case "sync-inbox":
-      void (app()["syncInbox"] as (...a: unknown[]) => unknown)({ background: state.view === "thread" });
+      void syncInbox({ background: state.view === "thread" });
       return true;
     case "empty-trash-mailbox":
       void onEmptyTrashMailbox();
@@ -599,16 +601,16 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       render();
       return true;
     case "mb-create":
-      await (app()["mailboxManageAction"] as (...a: unknown[]) => unknown)("create");
+      await mailboxManageAction("create");
       return true;
     case "mb-rename":
-      await (app()["mailboxManageAction"] as (...a: unknown[]) => unknown)("rename");
+      await mailboxManageAction("rename");
       return true;
     case "mb-delete":
-      await (app()["mailboxManageAction"] as (...a: unknown[]) => unknown)("delete");
+      await mailboxManageAction("delete");
       return true;
     case "mb-subscribe":
-      await (app()["mailboxManageAction"] as (...a: unknown[]) => unknown)("subscribe");
+      await mailboxManageAction("subscribe");
       return true;
     case "save-saved-draft": {
       void (async () => {

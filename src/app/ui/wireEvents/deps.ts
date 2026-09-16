@@ -91,7 +91,8 @@ export { threadIdsMatch } from "../lib/threadIdsMatch";
 export { applyListFilter, loadMailView, loadMailboxUnread, loadThreadsForSearchContext } from "../mail/mailListView";
 export { render } from "../dispatch";
 export { goBack, navigateToInbox } from "../mail/appNavActions";
-export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
+export { syncInbox } from "../mail/syncInboxAction";
+export { mailboxManageAction } from "../mail/mailboxManageAction";
 export {
   confirmMoveDialog,
   onThreadMove,
@@ -137,6 +138,7 @@ export {
   runFluxAffinerFromSearchView,
 } from "../mail/searchViewBatch";
 export { bulkTrashVisibleThreads } from "../mail/bulkTrashList";
+export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";
