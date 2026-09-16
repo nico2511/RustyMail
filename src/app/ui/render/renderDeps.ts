@@ -1,5 +1,7 @@
+import type { Account } from "../../../accountSetup";
 import type { CleanedMessageView } from "../../types";
 import type { SavedSearchListItem } from "../../../savedSearches";
+import type { StatusBarProgressJob } from "../../../statusBarProgress";
 
 /** Callbacks laissés dans application.ts pour éviter les imports circulaires depuis les modules render. */
 export type RenderDeps = {
@@ -18,6 +20,10 @@ export type RenderDeps = {
   searchViewCanOpenOrganizer: () => boolean;
   searchViewCanAffinerFlux: () => boolean;
   sourceMailboxForThread: (threadId: string) => string;
+  gatherStatusBarProgressJobs: () => StatusBarProgressJob[];
+  currentAccount: () => Account | undefined;
+  activeMessageTranslationJobCount: () => number;
+  activeSecurityLlmAugmentCount: () => number;
 };
 
 let deps: RenderDeps | null = null;

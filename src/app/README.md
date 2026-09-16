@@ -41,16 +41,19 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `searchBadgeChip.ts` | Puce critère de recherche |
 | `searchRender.ts` | Barre recherche, badges, modale, actions vue enregistrée |
 | `modalsRender.ts` | Déplacer, mailbox, citations, compose, image, split send, reprise brouillon |
+| `statusFooterRender.ts` | Barre d’état globale, chips activité, progression inline |
+| `aiQuickPanelRender.ts` | Panneau rapide fonctionnalités IA (sidebar + barre) |
+| `aiFeatureTogglesRender.ts` | HTML toggles IA (compact / paramètres) |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
-Libs associées : `searchBadgeLabel.ts`, `searchScopeLabels.ts`, `searchListFilterLabels.ts`, `savedViewBatch.ts`, `newsletterRuleFormat.ts`, `threadTagsModal.ts`.
+Libs associées : `attachmentSize.ts`, `searchBadgeLabel.ts`, …
 
 Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.mjs`, `tools/degrade-extract-batch3.mjs`.
 
 ## Prochaines extractions (ordre suggéré)
 
-1. **`render/modals*.ts`** — move, compose close, resume draft, split send, etc.
+1. **`render/sidebarRender.ts`** — `renderSidebar` (gros mais relativement isolé)
 2. **`render/`** — liste, fil, compose, paramètres (par lots)
 3. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
 

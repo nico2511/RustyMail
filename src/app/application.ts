@@ -134,16 +134,26 @@ import {
 } from "./mail/idleAiCachePrefetch";
 import { formatNewsletterRuleInput } from "./lib/newsletterRuleFormat";
 import { formatAttachmentSizeKb } from "./lib/attachmentSize";
+import { settingsExplainHtml } from "./lib/settingsExplainHtml";
 import { SAVED_VIEW_BATCH_MAX } from "./lib/savedViewBatch";
 import { tagToSearchDraft, threadTagsForModal } from "./lib/threadTagsModal";
 import { registerRenderDeps } from "./ui/render/renderDeps";
 import {
   renderAccountsRecoveryBanner,
+  renderAddressBookSidebarCountPill,
   renderDefaultAccountPromptBanner,
   renderFolderSidebarCountPill,
   renderInboxChipBadge,
   renderViewNavTrail,
 } from "./ui/render/listChrome";
+import {
+  renderAiQuickPanelOverlay,
+  renderSidebarAiQuickTrigger,
+} from "./ui/render/aiQuickPanelRender";
+import {
+  renderBackgroundActivityChips,
+  renderGlobalStatusFooter,
+} from "./ui/render/statusFooterRender";
 import { renderActionBriefHtml } from "./ui/render/actionBriefHtml";
 import {
   renderInboxSearchContextBlock,
@@ -251,7 +261,6 @@ import {
 } from "../composeRecipientChips";
 
 import {
-  AI_FEATURE_TOGGLE_GROUPS,
   type AiFeatureKey,
   isAiFeatureEnabled,
   setAllAiFeatures,
@@ -1979,18 +1988,6 @@ const LIST_FILTER_VALUES: State["listFilter"][] = ["all", "unread", "starred", "
 function defaultListFilterFromPrefs(): State["listFilter"] {
   const raw = state.appPrefs.general.defaultListFilter;
   return LIST_FILTER_VALUES.includes(raw as State["listFilter"]) ? (raw as State["listFilter"]) : "all";
-}
-
-function settingsExplainHtml(inner: string, kind: "lead" | "field" | "toggle" = "lead"): string {
-  if (kind === "toggle") {
-    return `<span class="settings-explain settings-explain--toggle"><span class="settings-explain__content">${inner}</span></span>`;
-  }
-  const tag = kind === "field" ? "p" : "aside";
-  const role = kind === "lead" ? ' role="note"' : "";
-  const kicker = kind === "lead" ? '<span class="settings-explain__kicker">À savoir</span>' : "";
-  return `<${tag} class="settings-explain settings-explain--${kind}"${role}><span class="settings-explain__mark" aria-hidden="true">${
-    kind === "field" ? "·" : "i"
-  }</span><span class="settings-explain__content">${kicker}${inner}</span></${tag}>`;
 }
 
 function wrapSettingsPage(content: string, columns: 1 | 2 = 1): string {
@@ -5808,45 +5805,6 @@ function setSearchViewBatchJob(job: SearchViewBatchJob | null, renderNow = true)
   state.searchViewBatchJob = job;
   if (renderNow) render();
   else scheduleStatusBarProgressPaint();
-}
-
-function searchViewBatchActivityChipHtml(): string {
-  const tip = searchViewBatchJobStatusText();
-  if (!tip) return "";
-  const short = tip.replace(/…+$/, "").trim();
-  const label = short.length > 34 ? `${short.slice(0, 32)}…` : short;
-  return `<span class="inbox-footer-chip inbox-footer-chip--busy inbox-footer-chip--affiner" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> ${escapeHtml(label)}</span>`;
-}
-
-function organizationV2ActivityChipHtml(): string {
-  if (!state.organizationV2.scanning && !state.organizationV2.applying) return "";
-  const tip = (
-    state.organizationV2.applyMessage ||
-    (state.organizationV2.scanning ? "Analyse Organiser V2…" : "Application Organiser V2…")
-  ).trim();
-  const short = tip.replace(/…+$/, "").trim();
-  const label = state.organizationV2.scanning
-    ? "Organiser V2"
-    : short.length > 34
-      ? `${short.slice(0, 32)}…`
-      : short || "Organiser V2";
-  return `<span class="inbox-footer-chip inbox-footer-chip--busy inbox-footer-chip--org" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> ${escapeHtml(label)}</span>`;
-}
-
-function organizationActivityChipHtml(): string {
-  if (!state.organization.scanning && !state.organization.applying) return "";
-  const tip = (
-    state.organization.applyMessage ||
-    (state.organization.scanning ? "Analyse de la boîte (structure, doublons, tags)…" : "Traitement organisation…")
-  ).trim();
-  let label = "Organiser";
-  if (state.organization.scanning) {
-    label = "Analyse compte";
-  } else {
-    const short = tip.replace(/…+$/, "").trim();
-    label = short.length > 36 ? `${short.slice(0, 34)}…` : short;
-  }
-  return `<span class="inbox-footer-chip inbox-footer-chip--busy inbox-footer-chip--org" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> ${escapeHtml(label)}</span>`;
 }
 
 function inboxListFooterInnerHtml(draftBoxVirtual: boolean, total: number): string {
@@ -14674,53 +14632,6 @@ function micAriaLabel(target: MicDictationTarget = "compose") {
       : "Dictée — clic sur le micro";
 }
 
-function renderAiFeatureTogglesHtml(layout: "settings" | "compact" = "compact"): string {
-  const ai = state.appPrefs.ai;
-  if (layout === "settings") {
-    return AI_FEATURE_TOGGLE_GROUPS.map(
-      (group, idx) => `
-      ${idx > 0 ? '<hr class="settings-section-divider settings-ai-features-divider" />' : ""}
-      <fieldset class="settings-ai-features-group ai-feature-group">
-        <legend class="ai-feature-group__title">${escapeHtml(group.title)}</legend>
-        <div class="ai-feature-group__items">
-          ${group.items
-            .map(
-              (item) => `
-          <label class="settings-form-check ai-feature-toggle">
-            <input type="checkbox" data-ai-feature="${escapeAttr(item.key)}" ${ai[item.key] ? "checked" : ""} />
-            <span class="settings-form-check-text">
-              <span class="settings-form-check-title">${escapeHtml(item.label)}</span>
-              <span class="dim settings-ai-feature-desc">${escapeHtml(item.description)}</span>
-            </span>
-          </label>`
-            )
-            .join("")}
-        </div>
-      </fieldset>`
-    ).join("");
-  }
-  return AI_FEATURE_TOGGLE_GROUPS.map(
-    (group) => `
-      <fieldset class="ai-feature-group">
-        <legend class="ai-feature-group__title">${escapeHtml(group.title)}</legend>
-        <div class="ai-feature-group__items">
-          ${group.items
-            .map(
-              (item) => `
-            <label class="settings-form-check ai-feature-toggle">
-              <input type="checkbox" data-ai-feature="${escapeAttr(item.key)}" ${ai[item.key] ? "checked" : ""} />
-              <span class="settings-form-check-text">
-                <span class="settings-form-check-title">${escapeHtml(item.label)}</span>
-                ${settingsExplainHtml(escapeHtml(item.description), "toggle")}
-              </span>
-            </label>`
-            )
-            .join("")}
-        </div>
-      </fieldset>`
-  ).join("");
-}
-
 function render() {
   syncMailboxDigestPanelWithFeaturePref();
   accountsFormIdentityScratch = undefined;
@@ -14842,51 +14753,6 @@ function render() {
   });
 }
 
-function renderAiQuickPanelOverlay(): string {
-  if (!state.aiQuickPanelOpen) return "";
-  return `
-    <div class="ai-quick-panel-backdrop" data-action="toggle-ai-quick-panel" aria-hidden="true"></div>
-    <div class="ai-quick-panel ai-quick-panel--overlay surface-sm modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Fonctionnalités IA">
-      <div class="ai-quick-panel__head">
-        <strong>Fonctionnalités IA</strong>
-        <div class="ai-quick-panel__head-actions">
-          <div class="ai-quick-panel__bulk">
-            <button type="button" class="ghost-button ghost-button-sm" data-action="ai-features-all-on">Tout activer</button>
-            <button type="button" class="ghost-button ghost-button-sm" data-action="ai-features-all-off">Tout désactiver</button>
-          </div>
-          <button type="button" class="icon-pill" data-action="toggle-ai-quick-panel" aria-label="Fermer">${iconSvg("close")}</button>
-        </div>
-      </div>
-      <div class="ai-quick-panel__body">${renderAiFeatureTogglesHtml()}</div>
-      <p class="dim ai-quick-panel__hint">Les changements sont enregistrés immédiatement. Paramètres détaillés → IA & dictée → Fonctionnalités.</p>
-    </div>`;
-}
-
-function renderSidebarAiQuickTrigger(): string {
-  return `<div class="sidebar-footer-ai">
-      <button
-        type="button"
-        class="folder-button sidebar-ai-trigger ${state.aiQuickPanelOpen ? "sidebar-ai-trigger--open" : ""}"
-        data-action="toggle-ai-quick-panel"
-        aria-expanded="${state.aiQuickPanelOpen ? "true" : "false"}"
-        title="Activer ou désactiver les fonctionnalités IA"
-      >
-        <span class="folder-icon">IA</span>
-        <span class="folder-name">Fonctionnalités IA</span>
-      </button>
-    </div>`;
-}
-
-function renderStatusBarAiQuickTrigger(): string {
-  return `<button
-      type="button"
-      class="status-bar-ai-trigger ghost-button"
-      data-action="toggle-ai-quick-panel"
-      aria-expanded="${state.aiQuickPanelOpen ? "true" : "false"}"
-      title="Activer ou désactiver les fonctionnalités IA"
-    >IA</button>`;
-}
-
 function renderSidebar() {
   const account = currentAccount();
   const accountLabel = account?.email ?? "No account configured";
@@ -14982,13 +14848,6 @@ function renderSidebar() {
   `;
 }
 
-function renderAddressBookSidebarCountPill(): string {
-  const n = state.addressBookSidebarCount;
-  if (n == null || n < 0) return "";
-  const title = `${n} contact${n === 1 ? "" : "s"} dans le carnet`;
-  return `<span class="folder-count folder-count-wrap" title="${escapeAttr(title)}"><span class="folder-count-num">${n}</span></span>`;
-}
-
 function renderMain() {
   if (state.view === "thread") return renderThread();
   if (state.view === "compose") return renderComposer();
@@ -15027,113 +14886,6 @@ function renderMain() {
     });
   }
   return renderList();
-}
-
-function renderStatusBarProgressInline(): string {
-  const jobs = gatherStatusBarProgressJobs();
-  return renderStatusBarProgressInlineHtml(jobs, escapeHtml, escapeAttr);
-}
-
-function renderBackgroundActivityChips(opts: { digestSlot: boolean }): string {
-  const chips: string[] = [];
-  const orgChip = organizationActivityChipHtml();
-  if (orgChip) chips.push(orgChip);
-  const orgV2Chip = organizationV2ActivityChipHtml();
-  if (orgV2Chip) chips.push(orgV2Chip);
-  const affinerChip = searchViewBatchActivityChipHtml();
-  if (affinerChip) chips.push(affinerChip);
-  if (state.syncInProgress) {
-    const tip = (state.syncMessage || "Synchronisation IMAP en cours").trim();
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> IMAP</span>`
-    );
-  }
-  if (state.llmPrefetchPercent != null) {
-    chips.push(
-      `<span class="inbox-footer-chip" title="Téléchargement ou préparation du modèle LLM">LLM ${state.llmPrefetchPercent}%</span>`
-    );
-  }
-  if (state.idleAiCachePrefetchBusy) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Préremplissage du cache IA (synthèses / traductions de fil) pendant une période calme"><span class="spinner spinner--tiny" aria-hidden="true"></span> Cache IA</span>`
-    );
-  }
-  if (opts.digestSlot && state.mailboxDigestRefreshing) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Brief d’action du dossier en cours"><span class="spinner spinner--tiny" aria-hidden="true"></span> Brief</span>`
-    );
-  }
-  if (state.llmJobLabel) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(state.llmJobLabel)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> ${escapeHtml(state.llmJobLabel)}</span>`
-    );
-  }
-  const nMsgTr = activeMessageTranslationJobCount();
-  if (nMsgTr > 0) {
-    const tip =
-      nMsgTr === 1 ?
-        "Traduction LLM d’un message en cours"
-      : `${nMsgTr} traductions de messages en cours`;
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(tip)}"><span class="spinner spinner--tiny" aria-hidden="true"></span> Trad. msg${nMsgTr > 1 ? ` (${nMsgTr})` : ""}</span>`
-    );
-  }
-  const nSec = activeSecurityLlmAugmentCount();
-  if (nSec > 0) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="${escapeAttr(
-        nSec === 1 ? "Analyse sécurité IA (complément LLM) en cours" : `${nSec} analyses sécurité IA en cours`
-      )}"><span class="spinner spinner--tiny" aria-hidden="true"></span> Sécurité${nSec > 1 ? ` (${nSec})` : ""}</span>`
-    );
-  }
-  if (state.agentSession?.busy && !state.llmJobLabel) {
-    chips.push(
-      `<span class="inbox-footer-chip inbox-footer-chip--busy" title="Assistant « Préparer une réponse » — transition"><span class="spinner spinner--tiny" aria-hidden="true"></span> Assistant</span>`
-    );
-  }
-  return chips.join("");
-}
-
-function renderGlobalStatusFooter(): string {
-  const st = state.status;
-  const coreReady = isTauriRuntime() && Boolean(state.capabilities?.mailCore);
-  const dotClass = coreReady ? "status-dot status-dot--ok" : "status-dot status-dot--idle";
-  const modeLabel = isTauriRuntime() ? "Tauri" : "Navigateur";
-  const coreLabel = !isTauriRuntime() ? "hors Tauri" : coreReady ? "cœur prêt" : "cœur off";
-  const readLabel =
-    !isTauriRuntime() ? "—" : state.capabilities?.readabilityModules ? "lisibilité OK" : "lisibilité off";
-  const chips = renderBackgroundActivityChips({ digestSlot: true });
-  const chipBlock = chips ? `<span class="status-bar-chip-group" role="status" aria-live="polite">${chips}</span>` : "";
-  const acc = currentAccount();
-  const email = acc?.email?.trim() ?? "";
-  const accShort = email.length > 36 ? `${email.slice(0, 34)}…` : email;
-  const accBlock = accShort
-    ? `<span class="status-bar-account dim" title="${escapeAttr(email)}">${escapeHtml(accShort)}</span>`
-    : `<span class="status-bar-account dim">Aucun compte</span>`;
-  const composeAiQuick =
-    state.view === "compose" ?
-      `<div class="status-bar-compose-ai">${renderStatusBarAiQuickTrigger()}</div>`
-    : "";
-  const progressInline = renderStatusBarProgressInline();
-  return `
-    <footer class="status-bar-wrap">
-      ${composeAiQuick}
-      <footer class="status-bar">
-        <span class="${dotClass}" title="${coreReady ? "Noyau mail prêt" : "Noyau mail indisponible ou navigateur"}"></span>
-        <span class="status-bar-app">${escapeHtml(st?.appName ?? "RustyMail")} ${escapeHtml(st?.version ?? "0.1.1")}</span>
-        <span class="status-bar-sep" aria-hidden="true">·</span>
-        <span class="dim status-bar-compact">${escapeHtml(modeLabel)} · ${escapeHtml(coreLabel)} · ${escapeHtml(readLabel)}</span>
-        ${progressInline}
-        ${chipBlock}
-        ${
-          state.llmJobLabel
-            ? `<button type="button" class="ghost-button status-bar-llm-cancel" data-action="llm-cancel-job" title="Annuler l’opération IA en cours">Annuler IA</button>`
-            : ""
-        }
-        <span class="status-bar-spacer" aria-hidden="true"></span>
-        ${accBlock}
-      </footer>
-    </footer>`;
 }
 
 function renderList(mode: "full" | "threads-only" | "filters-only" = "full") {
@@ -17364,6 +17116,10 @@ registerRenderDeps({
   searchViewCanOpenOrganizer,
   searchViewCanAffinerFlux,
   sourceMailboxForThread,
+  gatherStatusBarProgressJobs,
+  currentAccount,
+  activeMessageTranslationJobCount,
+  activeSecurityLlmAugmentCount,
 });
 
 initMailboxDigest({

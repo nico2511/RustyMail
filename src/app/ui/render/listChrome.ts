@@ -84,3 +84,10 @@ export function renderAccountsRecoveryBanner(): string {
       </div>
     </div>`;
 }
+
+export function renderAddressBookSidebarCountPill(): string {
+  const n = state.addressBookSidebarCount;
+  if (n == null || n < 0) return "";
+  const title = `${n} contact${n === 1 ? "" : "s"} dans le carnet`;
+  return `<span class="folder-count folder-count-wrap" title="${escapeAttr(title)}"><span class="folder-count-num">${n}</span></span>`;
+}
