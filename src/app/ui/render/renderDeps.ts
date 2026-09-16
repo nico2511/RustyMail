@@ -24,6 +24,16 @@ export type RenderDeps = {
   currentAccount: () => Account | undefined;
   activeMessageTranslationJobCount: () => number;
   activeSecurityLlmAugmentCount: () => number;
+  activityTrackingEnabled: () => boolean;
+  renderThread: () => string;
+  renderComposer: () => string;
+  renderSettings: () => string;
+  renderContactsListPage: (accountTitle: string) => string;
+  renderContactDetailPage: () => string;
+  renderOrganizationPage: () => string;
+  renderOrganizationV2Page: () => string;
+  renderFolderManagerPage: () => string;
+  renderList: (mode?: "full" | "threads-only" | "filters-only") => string;
 };
 
 let deps: RenderDeps | null = null;
