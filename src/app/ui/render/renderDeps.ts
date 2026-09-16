@@ -18,6 +18,7 @@ import type {
 import type { SavedSearchListItem } from "../../../savedSearches";
 import type { StatusBarProgressJob } from "../../../statusBarProgress";
 import type { SettingsAiPanelDeps } from "../../../settingsAiPanel";
+import type { AssistSkillId } from "../../../assistAgent";
 
 /** Callbacks laissés dans application.ts pour éviter les imports circulaires depuis les modules render. */
 export type RenderDeps = {
@@ -117,6 +118,17 @@ export type RenderDeps = {
   addressBookEditEmail: () => string | null;
   addressBookListQuery: () => string;
   accountsFormIdentityScratch: () => { displayName: string; email: string } | undefined;
+  threadQaMicButtonTitle: () => string;
+  threadAiSummaryForCurrentThread: () => boolean;
+  threadIdsMatch: (a: string | null | undefined, b: string | null | undefined) => boolean;
+  agentStepProgressLabel: (session: NonNullable<State["agentSession"]>) => string;
+  agentSkillEnabled: (skill: AssistSkillId) => boolean;
+  agentOfferSlotsStep: (session: NonNullable<State["agentSession"]>) => boolean;
+  shouldOfferThreadTranslate: (
+    thread: { messages: CleanedMessageView[]; tags?: Tag[] },
+    motherLangRaw: string,
+  ) => boolean;
+  sortUnsubscribeLinks: (links: string[]) => string[];
 };
 
 let deps: RenderDeps | null = null;
