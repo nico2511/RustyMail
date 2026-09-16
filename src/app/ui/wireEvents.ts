@@ -74,6 +74,7 @@ import { openThread } from "../mail/openThreadView";
 import { commitSearchQuery } from "../mail/searchCommitQuery";
 import { syncSearchBarChrome } from "../mail/searchBarUi";
 import { refreshSearchTagCatalog } from "../mail/searchTagCatalog";
+import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
 import { app } from "./wireEventsBridge";
 export function wireEvents() {
   const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
@@ -81,7 +82,7 @@ export function wireEvents() {
   composeAbortRef.current = new AbortController();
   const composeSig = composeAbortRef.current.signal;
   (app()["wireComposeRecipientChips"] as (...a: unknown[]) => unknown)();
-  (app()["wireAtAutocompleteFields"] as (...a: unknown[]) => unknown)();
+  wireAtAutocompleteFields();
 
   document.querySelector<HTMLTextAreaElement>("#thread-qa-input")?.addEventListener(
     "input",

@@ -171,7 +171,6 @@ import {
   folderManagerBrowsingPanel,
 } from "./mail/searchQueryContext";
 import {
-  applyHashAutocompleteHitToState,
   launchContactMailSearch,
   launchDomainMailSearch,
   launchTagMailSearch,
@@ -209,6 +208,9 @@ import {
   refreshSearchTagCatalog,
   registerSearchTagCatalogDeps,
 } from "./mail/searchTagCatalog";
+import {
+  registerSearchAtAutocompleteWireDeps,
+} from "./mail/searchAtAutocompleteWire";
 import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
   cancelMailboxDigestLiveDebounce,
@@ -297,12 +299,6 @@ import {
   type OAuthAccountWizardPhase,
   type SecurityMode,
 } from "../accountSetup";
-
-import { attachAtAutocomplete } from "../atAutocomplete";
-
-import { attachHashAutocomplete, isHashAutocompletePanelOpen, type InboxFilterHit } from "../hashAutocomplete";
-
-import { isAtAutocompletePanelOpen } from "../atAutocomplete";
 
 import { parseSearchBarDraft } from "../searchBarParse";
 
@@ -482,10 +478,6 @@ let composeChipsCc: ComposeRecipientChipsHandle | null = null;
 let composeChipsBcc: ComposeRecipientChipsHandle | null = null;
 
 const composeRecipientPendingInput: Partial<Record<ComposeRecipientField, string>> = {};
-
-let atAutocompleteDetach: (() => void) | null = null;
-
-let hashAutocompleteDetach: (() => void) | null = null;
 
 let addressBookListQuery = "";
 
@@ -8784,110 +8776,6 @@ function wireComposeRecipientChips(): void {
   composeChipsBcc = mountField("#compose-bcc-host", "bcc");
 }
 
-function wireAtAutocompleteFields(): void {
-  atAutocompleteDetach?.();
-  hashAutocompleteDetach?.();
-  atAutocompleteDetach = null;
-  hashAutocompleteDetach = null;
-  if (!isTauriRuntime()) return;
-  const accountId = currentAccount()?.id;
-  const addressAutocompleteOn = () =>
-    isAiFeatureEnabled(state.appPrefs.ai, "featureAddressAutocompleteEnabled");
-  const detachers: Array<() => void> = [];
-  document.querySelectorAll<HTMLInputElement>("#search-input, #search-modal-input").forEach((searchIn) => {
-    detachers.push(
-      attachAtAutocomplete({
-        input: searchIn,
-        accountId,
-        mode: "search",
-        isTauri: true,
-        isFeatureEnabled: addressAutocompleteOn,
-        onSearchPick: () => {
-          state.searchDraft = searchIn.value;
-          syncSearchBarChrome();
-        },
-      })
-    );
-    detachers.push(
-      attachHashAutocomplete({
-        input: searchIn,
-        getNewsletterRules: () => state.newsletterRules,
-        getMailboxes: () => state.mailboxes,
-        getAccounts: () =>
-          state.accounts.map((a) => ({
-            id: a.id,
-            email: a.email,
-            displayName: a.displayName,
-          })),
-        getTags: () =>
-          state.searchTagCatalog.map((t) => ({
-            family: String(t.family).toLowerCase(),
-            value: t.value,
-          })),
-        onPrefetchTags: () => refreshSearchTagCatalog(),
-        onApplyHit: (hit) => {
-          applyHashAutocompleteHitToState(hit);
-          syncSearchBarChrome();
-        },
-      })
-    );
-  });
-  if (document.querySelector("#search-input, #search-modal-input")) {
-    void refreshSearchTagCatalog();
-  }
-  const chipSpecs: Array<{
-    host: string;
-    chips: () => ComposeRecipientChipsHandle | null;
-    field: "to" | "cc" | "bcc";
-  }> = [
-    { host: "#compose-to-host", chips: () => composeChipsTo, field: "to" },
-    { host: "#compose-cc-host", chips: () => composeChipsCc, field: "cc" },
-    { host: "#compose-bcc-host", chips: () => composeChipsBcc, field: "bcc" },
-  ];
-  for (const spec of chipSpecs) {
-    const el = document
-      .querySelector<HTMLElement>(spec.host)
-      ?.querySelector<HTMLInputElement>(".compose-recipients-input");
-    if (!el) continue;
-    detachers.push(
-      attachAtAutocomplete({
-        input: el,
-        accountId,
-        mode: "compose",
-        isTauri: true,
-        isFeatureEnabled: addressAutocompleteOn,
-        composeChipMode: true,
-        onComposePick: (email, displayName) => {
-          const handle = spec.chips();
-          handle?.addRecipient(email, displayName);
-          if (state.draft) state.draft[spec.field] = handle?.getRecipients() ?? state.draft[spec.field];
-          scheduleDraftRevisionSave();
-        },
-      })
-    );
-  }
-  const composeBody = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  if (composeBody) {
-    detachers.push(
-      attachAtAutocomplete({
-        input: composeBody,
-        accountId,
-        mode: "mention",
-        isTauri: true,
-        isFeatureEnabled: addressAutocompleteOn,
-        onMentionPick: () => {
-          scheduleDraftRevisionSave();
-        },
-      })
-    );
-  }
-  if (detachers.length) {
-    atAutocompleteDetach = () => {
-      for (const d of detachers) d();
-    };
-  }
-}
-
 function mouseNavBlockedByOverlay(): boolean {
   return Boolean(
     state.quoteFoldModal ||
@@ -9460,7 +9348,6 @@ registerWireEventsBridge({
   agentPrepareReplyContinue,
   discoverMailServersAction,
   normalizeMailHrefForOpen,
-  wireAtAutocompleteFields,
   resumeOrphanDraftSession,
   onOrgV2UnignoreMailboxUi,
   confirmThenRunOrgV2Apply,
@@ -9756,6 +9643,15 @@ registerBulkTrashListDeps({
   clearStatusBarJob,
   loadMailboxUnread,
   loadMailView,
+});
+
+registerSearchAtAutocompleteWireDeps({
+  composeChipsHandle: (field) => {
+    if (field === "to") return composeChipsTo;
+    if (field === "cc") return composeChipsCc;
+    return composeChipsBcc;
+  },
+  scheduleDraftRevisionSave,
 });
 
 initMailboxDigest({
