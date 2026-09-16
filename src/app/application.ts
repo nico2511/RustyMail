@@ -154,6 +154,7 @@ import {
   resetManualSearchNlFilters,
   resetSearchStructuralModifiers,
   searchDraftDiffersFromCommitted,
+  searchNlAssist,
   toastSearchBarResult,
 } from "./mail/searchCommitQuery";
 import {
@@ -166,7 +167,16 @@ import {
   searchMailboxForQuery,
   searchQueryMailboxForList,
   searchQueryUsesThreadsApi,
+  usesSearchContextLoader,
+  folderManagerBrowsingPanel,
 } from "./mail/searchQueryContext";
+import {
+  applyHashAutocompleteHitToState,
+  launchContactMailSearch,
+  launchDomainMailSearch,
+  launchTagMailSearch,
+  registerSearchLaunchDeps,
+} from "./mail/searchLaunchQueries";
 import {
   closeSearchModal,
   openSearchModal,
@@ -190,7 +200,15 @@ import {
   registerSearchViewBatchDeps,
   runFluxAffinerFromSearchView,
 } from "./mail/searchViewBatch";
+import {
+  bulkTrashVisibleThreads,
+  registerBulkTrashListDeps,
+} from "./mail/bulkTrashList";
 import { searchThreads } from "./mail/searchThreadsRun";
+import {
+  refreshSearchTagCatalog,
+  registerSearchTagCatalogDeps,
+} from "./mail/searchTagCatalog";
 import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
   cancelMailboxDigestLiveDebounce,
@@ -2155,10 +2173,6 @@ async function loadAccountsFromBackend(options?: { silent?: boolean; timeoutMs?:
   }
 }
 
-function folderManagerBrowsingPanel(): boolean {
-  return Boolean(folderManagerPanelMailbox()) && !isSearchActive();
-}
-
 function resetFolderManagerPanelSearchState(): void {
   state.listFilter = defaultListFilterFromPrefs();
 }
@@ -2194,27 +2208,6 @@ function resolveAccountIdFromRef(ref: string): string | null {
       (a.displayName ?? "").toLowerCase().includes(q)
   );
   return hit?.id ?? null;
-}
-
-async function refreshSearchTagCatalog(): Promise<void> {
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId || !isTauriRuntime()) {
-    state.searchTagCatalog = [];
-    return;
-  }
-  try {
-    const rows = await withTimeout(
-      invoke<Array<{ family: string; value: string }>>("list_search_tags", { accountId }),
-      BOOT_INVOKE_TIMEOUT_MS
-    );
-    state.searchTagCatalog = (rows ?? []).map((t) => ({
-      family: tagFamilyForInvoke(String(t.family ?? "entity")),
-      value: String(t.value ?? "").trim(),
-    })).filter((t) => t.value.length > 0);
-  } catch (error) {
-    console.error("list_search_tags", error);
-    state.searchTagCatalog = [];
-  }
 }
 
 function canSaveSearchView(): boolean {
@@ -2552,112 +2545,6 @@ async function onThreadMove(
     toast(tauriErrorMessage(err));
     render();
   }
-}
-
-async function bulkTrashVisibleThreads(): Promise<void> {
-  if (!isTauriRuntime()) {
-    toast("Corbeille : IMAP requiert l’app Tauri.");
-    return;
-  }
-  const account = currentAccount();
-  if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
-    return;
-  }
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast("Corbeille : actions IMAP uniquement.");
-    return;
-  }
-  if (mailboxKind(state.selectedMailbox || "") === "trash") {
-    toast("Utilisez « Vider la corbeille » dans ce dossier.");
-    return;
-  }
-  if (isSearchActive()) {
-    toast("Tout supprimer : désactivé pendant une recherche. Retirez les filtres de recherche d’abord.");
-    return;
-  }
-  const visible = threadsVisibleInList();
-  if (!visible.length) {
-    toast("Aucune conversation à supprimer dans cette vue.");
-    return;
-  }
-  const lf = state.listFilter;
-  const filterLabel =
-    lf === "unread"
-      ? "Non lus"
-      : lf === "focused"
-        ? "Priorité"
-        : lf === "auto"
-          ? "Auto"
-          : lf === "starred"
-            ? "Suivis"
-            : "Tout";
-  const ok = await openConfirmModal({
-    title: "Tout mettre à la corbeille ?",
-    body: `Déplacer vers la corbeille toutes les conversations actuellement affichées dans « ${filterLabel} » (${visible.length}).`,
-    danger: true,
-    confirmLabel: "Tout supprimer",
-  });
-  if (!ok) return;
-
-  const prevThreads = state.threads;
-  const prevSelectedId = state.selectedThreadId;
-  const prevView = state.view;
-  const prevOrgReport = state.organization.report;
-
-  const ids = visible.map((t) => String(t.id));
-  markThreadsRecentlyRemoved(ids);
-  state.threads = state.threads.filter((t) => !ids.includes(String(t.id)));
-  if (state.view === "thread" && state.selectedThreadId && ids.includes(String(state.selectedThreadId))) {
-    state.view = "list";
-    state.selectedThread = undefined;
-    state.selectedThreadId = undefined;
-  }
-  if (state.view === "organization" && state.organization.report) {
-    state.organization.report = optimisticOrgRemoveThreads(state.organization.report, ids);
-  }
-  render();
-
-  let moved = 0;
-  const errors: string[] = [];
-  const total = ids.length;
-  upsertStatusBarJob({ id: "bulk-trash", label: "Corbeille (lot)", done: 0, total }, true);
-  try {
-    for (let i = 0; i < ids.length; i++) {
-      const tid = ids[i]!;
-      try {
-        const mailbox = sourceMailboxForThread(tid);
-        await withTimeout(
-          invoke<string>("move_thread_trash", { accountId: account.id, mailbox, threadId: tid }),
-          MAIL_ACTION_TIMEOUT_MS
-        );
-        moved++;
-      } catch (err) {
-        errors.push(`${tid}: ${tauriErrorMessage(err)}`);
-      }
-      upsertStatusBarJob({ id: "bulk-trash", label: "Corbeille (lot)", done: i + 1, total });
-    }
-  } finally {
-    clearStatusBarJob("bulk-trash");
-  }
-
-  if (errors.length) {
-    // On restaure l’état pour éviter une vue incohérente.
-    clearThreadsRecentlyRemoved(ids);
-    state.threads = prevThreads;
-    state.selectedThreadId = prevSelectedId;
-    state.view = prevView;
-    state.organization.report = prevOrgReport;
-    toast(`Échec corbeille (lot) : ${errors[0]}${errors.length > 1 ? "…" : ""}`);
-    render();
-    return;
-  }
-
-  toast(`${moved} conversation${moved === 1 ? "" : "s"} déplacée${moved === 1 ? "" : "s"} dans la corbeille.`);
-  void loadMailboxUnread();
-  // Recharge pour recalculer compteurs + cohérence.
-  await loadMailView(false);
-  render();
 }
 
 async function onEmptyTrashMailbox() {
@@ -3252,38 +3139,6 @@ function threadReadingIsSimpleLayout(): boolean {
 function aiSidePanelExpandedForShell(): boolean {
   if (state.view === "contacts" || state.view === "contact") return false;
   return state.aiOpen || mailboxDigestSlotInList();
-}
-
-function launchTagMailSearch(tag: Tag): void {
-  const draft = tagToSearchDraft(tag);
-  if (!draft) {
-    toast("Ce tag n’est pas utilisable pour la recherche.");
-    return;
-  }
-  navReset();
-  state.view = "list";
-  state.threadTagsModalOpen = false;
-  state.searchModalOpen = false;
-  state.searchAccountOverrideId = null;
-  state.searchMailboxPath = null;
-  state.searchTags = [];
-  state.searchNewsletterRule = null;
-  state.searchLanguageFilter = null;
-  state.searchSenders = [];
-  state.search = "";
-  state.searchDraft = draft;
-  state.listFilter = "all";
-  state.searchNlMode = null;
-  state.searchScope = "account";
-  state.searchModifiersTouched = true;
-  clearThreadAiSummaryState();
-  document.querySelectorAll<HTMLInputElement>("#search-input, #search-modal-input").forEach((el) => {
-    el.value = draft;
-  });
-  resetSearchStructuralModifiers();
-  applyParsedSearchBarToState(parseSearchBarDraft(draft, state.newsletterRules));
-  render();
-  void searchThreads();
 }
 
 async function refreshOrganizationReport(): Promise<void> {
@@ -4084,34 +3939,6 @@ async function openContactDetailView(email: string, opts?: { skipHistory?: boole
   render();
 }
 
-function launchContactMailSearch(opts: {
-  email: string;
-  listFilter?: State["listFilter"];
-  text?: string;
-  hybrid?: boolean;
-}) {
-  const email = opts.email.trim().toLowerCase();
-  if (!email) return;
-  navReset();
-  state.view = "list";
-  state.searchModalOpen = false;
-  state.searchAccountOverrideId = null;
-  state.searchMailboxPath = null;
-  state.searchTags = [];
-  state.searchNewsletterRule = null;
-  state.searchLanguageFilter = null;
-  state.searchSenders = [email];
-  state.search = opts.text?.trim() ?? "";
-  state.searchDraft = state.search;
-  state.listFilter = opts.listFilter ?? "all";
-  state.searchNlMode = opts.hybrid ? "hybrid" : null;
-  state.searchScope = "account";
-  state.searchModifiersTouched = true;
-  state.selectedContactEmail = undefined;
-  render();
-  void searchThreads();
-}
-
 async function loadAddressBookSidebarCount(): Promise<void> {
   if (!isTauriRuntime()) {
     state.addressBookSidebarCount = null;
@@ -4130,57 +3957,6 @@ async function loadAddressBookSidebarCount(): Promise<void> {
   }
 }
 
-async function launchDomainMailSearch(domain: string): Promise<void> {
-  const dom = domain.trim().toLowerCase().replace(/^@+/, "");
-  if (!dom) return;
-  const acc = currentAccount();
-  if (!acc?.id || !isTauriRuntime()) {
-    toast("Recherche domaine : compte ou Tauri requis.");
-    return;
-  }
-  try {
-    const senders = await invoke<string[]>("list_sender_emails_for_domain_cmd", {
-      accountId: acc.id,
-      domain: dom,
-    });
-    const emails = (senders ?? []).map((s) => s.trim().toLowerCase()).filter((s) => s.includes("@"));
-    if (!emails.length) {
-      toast(`Aucun expéditeur local pour @${dom}.`);
-      return;
-    }
-    navReset();
-    state.view = "list";
-    state.searchModalOpen = false;
-    state.searchAccountOverrideId = null;
-    state.searchMailboxPath = null;
-    state.searchTags = [];
-    state.searchNewsletterRule = null;
-    state.searchLanguageFilter = null;
-    state.searchSenders = emails;
-    state.search = "";
-    state.searchDraft = "";
-    state.listFilter = "all";
-    state.searchNlMode = null;
-    state.searchScope = "account";
-    state.searchModifiersTouched = true;
-    state.selectedContactEmail = undefined;
-    render();
-    void searchThreads();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-}
-
-function usesSearchContextLoader(): boolean {
-  if (state.view === "folderManager" && folderManagerBrowsingPanel()) return false;
-  if (isSavedDraftsVirtualMailbox(listMailboxForPanel())) return false;
-  if (isSearchActive()) return true;
-  return (
-    state.searchScope === "account" &&
-    (state.listFilter !== "all" || state.searchNewsletterRule !== null)
-  );
-}
-
 function threadMatchesNewsletterRule(thread: ThreadListItem, rule: NewsletterRuleRow): boolean {
   for (const p of thread.participants) {
     const matched = firstMatchingNewsletterRule(p);
@@ -4193,123 +3969,6 @@ function threadMatchesNewsletterRule(thread: ThreadListItem, rule: NewsletterRul
     }
   }
   return false;
-}
-
-function applyHashAutocompleteHitToState(hit: InboxFilterHit): void {
-  state.searchModifiersTouched = true;
-  const searchIn = document.querySelector<HTMLInputElement>("#search-input");
-  if (searchIn) state.searchDraft = searchIn.value;
-
-  if (hit.id.startsWith("mailbox:")) {
-    const raw = hit.id.slice(8);
-    state.searchMailboxPath = resolveSearchMailboxPath(raw) ?? raw;
-    state.searchScope = "mailbox";
-    return;
-  }
-  if (hit.id.startsWith("account:")) {
-    const id = hit.id.slice(8);
-    state.searchAccountOverrideId = id;
-    state.selectedAccountId = id;
-    state.searchScope = "account";
-    return;
-  }
-  if (hit.id.startsWith("tag:")) {
-    const body = hit.id.slice(4);
-    const sep = body.indexOf("\0");
-    if (sep >= 0) {
-      mergeSearchBarTag({ family: body.slice(0, sep), value: body.slice(sep + 1) });
-    }
-    return;
-  }
-  if (hit.id === "scope:account") {
-    state.searchScope = "account";
-    state.searchMailboxPath = null;
-    return;
-  }
-  if (hit.id === "scope:mailbox") {
-    state.searchScope = "mailbox";
-    state.searchMailboxPath = null;
-  }
-}
-
-async function applyInboxFilterFromHashHit(hit: InboxFilterHit): Promise<void> {
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) return;
-  applyHashAutocompleteHitToState(hit);
-  if (hit.id.startsWith("mailbox:")) {
-    toast(`Dossier : ${state.searchMailboxPath}`);
-    if (hasSearchBarCriteria()) {
-      await applySearchBarQuery();
-      toastSearchBarResult();
-    }
-    render();
-    return;
-  }
-  if (hit.id.startsWith("account:")) {
-    const id = hit.id.slice(8);
-    state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: id }, [], BOOT_INVOKE_TIMEOUT_MS);
-    ensureValidSelectedMailbox();
-    const acc = state.accounts.find((a) => a.id === id);
-    toast(`Compte : ${acc?.email ?? id}`);
-    void refreshSearchTagCatalog();
-    if (hasSearchBarCriteria()) {
-      await applySearchBarQuery();
-      toastSearchBarResult();
-    }
-    render();
-    return;
-  }
-  if (hit.id.startsWith("tag:")) {
-    const body = hit.id.slice(4);
-    const sep = body.indexOf("\0");
-    if (sep >= 0) {
-      toast(`Tag : ${body.slice(0, sep)}:${body.slice(sep + 1)}`);
-      if (hasSearchBarCriteria()) {
-        await applySearchBarQuery();
-        toastSearchBarResult();
-      }
-    }
-    render();
-    return;
-  }
-  if (hit.id.startsWith("scope:")) {
-    toast(
-      state.searchScope === "account"
-        ? "Portée : tout le compte (tous dossiers synchronisés)"
-        : `Portée : ${threadMailboxListLabel(state.selectedMailbox || "INBOX").full}`
-    );
-    if (hasSearchBarCriteria()) {
-      await applySearchBarQuery();
-      toastSearchBarResult();
-    }
-    render();
-    return;
-  }
-  resetManualSearchNlFilters();
-  state.searchSenders = [];
-  state.search = "";
-  state.searchDraft = "";
-  if (hit.id.startsWith("list:")) {
-    state.searchNewsletterRule = null;
-    const kind = hit.id.slice(5) as State["listFilter"];
-    state.listFilter = kind;
-    await applySearchBarQuery();
-    toastSearchBarResult();
-    render();
-    return;
-  }
-  if (hit.id.startsWith("rule:")) {
-    const body = hit.id.slice(5);
-    const sep = body.indexOf("\0");
-    if (sep < 0) return;
-    state.searchNewsletterRule = {
-      domain: body.slice(0, sep),
-      localPart: body.slice(sep + 1),
-    };
-    state.listFilter = "all";
-    await applySearchBarQuery();
-    toastSearchBarResult();
-    render();
-  }
 }
 
 function threadsVisibleInList(): ThreadListItem[] {
@@ -8649,85 +8308,6 @@ async function composeAiGrammar() {
   if (ran === null) return;
 }
 
-async function searchNlAssist() {
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureSearchNlEnabled")) {
-    toast("Recherche en langage naturel désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
-    return;
-  }
-  if (!isTauriRuntime()) return void toast("Recherche NL : Tauri requis.");
-  const phrase =
-    (
-      await openTextPromptModal({
-        title: "Recherche en langage naturel",
-        body: "Décrivez ce que vous cherchez ; la requête sera traduite puis appliquée à la barre de recherche.",
-        label: "Description",
-        defaultValue: "",
-      })
-    )?.trim() ?? "";
-  if (!phrase) return;
-  const accountId = state.selectedAccountId?.trim();
-  if (!accountId) {
-    toast("Sélectionnez un compte avant la recherche en langage naturel.");
-    return;
-  }
-  const ran = await withLlmQueue("Recherche NL", async (signal) => {
-    if (signal.aborted) return;
-    const sq = await withTimeout(
-      invoke<{
-        text?: string | null;
-        sender?: string | null;
-        senders?: string[];
-        tags?: Tag[];
-        mode?: string | null;
-        accountId?: string | null;
-        mailbox?: string | null;
-        language?: string | null;
-      }>("llm_search_nl", { accountId, phrase }),
-      LLM_INVOKE_TIMEOUT_MS
-    );
-    if (signal.aborted) return;
-    applySearchQueryFromNl(sq);
-    if (!state.search.trim() && !state.searchSenders.length && !state.searchTags.length && phrase) {
-      const fb = extractNlSearchFallbackText(phrase);
-      if (fb) {
-        state.search = fb;
-        state.searchDraft = fb;
-        state.searchNlMode = "lexical";
-      }
-    }
-    if (
-      !state.search.trim() &&
-      !state.searchSenders.length &&
-      !state.searchTags.length &&
-      !state.searchLanguageFilter?.trim()
-    ) {
-      toast(
-        "Recherche NL : aucun critère exploitable. Reformulez avec des mots-clés (ex. facture, Amazon) ou un expéditeur."
-      );
-      return;
-    }
-    await searchThreads();
-    const n = threadsVisibleInList().length;
-    const bits = [
-      state.search ? `texte: ${state.search}` : "",
-      state.searchSenders.length ? `de: ${state.searchSenders.join(", ")}` : "",
-      state.searchTags.length ? `${state.searchTags.length} tag(s)` : "",
-      state.searchNlMode ? `mode: ${state.searchNlMode}` : "",
-      state.searchLanguageFilter ? `langue: ${state.searchLanguageFilter}` : "",
-    ].filter(Boolean);
-    if (n === 0) {
-      toast(
-        bits.length
-          ? `Aucun résultat — ${bits.join(" · ")}. Essayez un mot plus court (ex. facture) ou #compte.`
-          : "Aucun résultat pour cette recherche NL."
-      );
-    } else {
-      toast(bits.length ? `Recherche appliquée — ${bits.join(" · ")}` : "Recherche appliquée.");
-    }
-  });
-  if (ran === null) return;
-}
-
 async function micAction(opts?: MicActionOpts) {
   if (state.micState === "idle") {
     micDictationTarget = micTargetFromView(opts?.target);
@@ -9889,16 +9469,12 @@ registerWireEventsBridge({
   llmQuickRepliesComposeUi,
   pickImapMailboxFallback,
   applyContextSliderIndex,
-  launchContactMailSearch,
-  usesSearchContextLoader,
   decodeHtmlEntitiesLoose,
   draftHasRecipientsExtra,
   saveDraftToSavedListNow,
   persistDefaultAccountId,
   loadAccountsFromBackend,
-  refreshSearchTagCatalog,
   refreshLlmRuntimeStatus,
-  bulkTrashVisibleThreads,
   fmConfirmArchiveMailbox,
   openOrganizationMailbox,
   prepareForwardToMessage,
@@ -9907,7 +9483,6 @@ registerWireEventsBridge({
   onOrgV2IgnoreMailboxUi,
   openOrganizationV2View,
   fmConfirmDeleteMailbox,
-  launchDomainMailSearch,
   refreshAddressBookList,
   agentPrepareReplyStart,
   pickImgSrcForLightbox,
@@ -9927,7 +9502,6 @@ registerWireEventsBridge({
   openOrganizationView,
   orgV2DismissProposal,
   llmTranslateThreadUi,
-  launchTagMailSearch,
   switchActiveAccount,
   loadNewsletterRules,
   onEmptyTrashMailbox,
@@ -9965,7 +9539,6 @@ registerWireEventsBridge({
   sendQuickReply,
   prepareForward,
   computePreview,
-  searchNlAssist,
   bytesToBase64,
   switchMailbox,
   runOrgV2Apply,
@@ -10164,6 +9737,25 @@ registerSearchViewBatchDeps({
   activeSavedSearchItem,
   refreshMailboxesAfterImapChange,
   setSearchViewBatchJob,
+});
+
+registerSearchLaunchDeps({
+  clearThreadAiSummaryState,
+  resolveSearchMailboxPath,
+  ensureValidSelectedMailbox,
+  refreshSearchTagCatalog,
+  tagFamilyForInvoke,
+});
+
+registerSearchTagCatalogDeps({ tagFamilyForInvoke });
+
+registerBulkTrashListDeps({
+  threadsVisibleInList,
+  sourceMailboxForThread,
+  upsertStatusBarJob,
+  clearStatusBarJob,
+  loadMailboxUnread,
+  loadMailView,
 });
 
 initMailboxDigest({

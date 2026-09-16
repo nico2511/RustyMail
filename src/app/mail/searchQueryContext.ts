@@ -7,8 +7,12 @@ import {
 } from "../../searchQueryState";
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import { currentAccount } from "../core/accountContext";
-import { folderManagerPanelMailbox } from "./mailboxPanelContext";
+import { folderManagerPanelMailbox, listMailboxForPanel } from "./mailboxPanelContext";
 import { state } from "../state";
+
+export function folderManagerBrowsingPanel(): boolean {
+  return Boolean(folderManagerPanelMailbox()) && !isSearchActive();
+}
 
 let resolveSearchMailboxPathImpl: (requested: string) => string | null = () => null;
 
@@ -77,6 +81,16 @@ export function searchQueryMailboxForList(): string {
   const panelMb = folderManagerPanelMailbox();
   if (panelMb) return panelMb;
   return state.selectedMailbox?.trim() || "INBOX";
+}
+
+export function usesSearchContextLoader(): boolean {
+  if (state.view === "folderManager" && folderManagerBrowsingPanel()) return false;
+  if (isSavedDraftsVirtualMailbox(listMailboxForPanel())) return false;
+  if (isSearchActive()) return true;
+  return (
+    state.searchScope === "account" &&
+    (state.listFilter !== "all" || state.searchNewsletterRule !== null)
+  );
 }
 
 export function buildSearchQueryFromCurrentState() {

@@ -41,8 +41,9 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/searchCommitQuery.ts` | `commitSearchQuery`, barre, NL + `registerSearchCommitDeps()` |
 | `app/mail/searchBarUi.ts` | Modale recherche, `syncSearchBarChrome` |
 | `app/mail/savedSearchViews.ts` | Vues enregistrées (CRUD, marquer vu, suggestions) + `registerSavedSearchViewsDeps()` |
+| `app/mail/searchLaunchQueries.ts` | Lancements recherche (tag, contact, domaine, hash) + `registerSearchLaunchDeps()` |
+| `app/mail/searchTagCatalog.ts` | `refreshSearchTagCatalog` + `registerSearchTagCatalogDeps()` |
 | `app/mail/searchViewBatch.ts` | Actions lot recherche / vue (lu, archive, Affiner) + `registerSearchViewBatchDeps()` |
-| `app/mail/mailListView.ts` | `loadMailView` + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
 | `app/core/accountContext.ts` | `currentAccount()` |

@@ -63,6 +63,8 @@ import {
   commitSearchQuery,
   closeSearchModal,
   openSearchModal,
+  launchTagMailSearchFromRawFamily,
+  searchNlAssist,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -175,7 +177,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       const family = element?.dataset.tagFamily?.trim();
       const value = element?.dataset.tagValue?.trim();
       if (!family || !value) return true;
-      (app()["launchTagMailSearch"] as (...a: unknown[]) => unknown)({ family: (app()["tagFamilyForInvoke"] as (...a: unknown[]) => unknown)(family), value });
+      launchTagMailSearchFromRawFamily(family, value);
       return true;
     }
     case "close-image-modal":
@@ -606,7 +608,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       commitSearchQuery({ fromModal: true });
       return true;
     case "search-nl-assist":
-      void (app()["searchNlAssist"] as (...a: unknown[]) => unknown)();
+      void searchNlAssist();
       return true;
     case "llm-cancel-job":
       (app()["cancelLlmQueueJob"] as (...a: unknown[]) => unknown)();

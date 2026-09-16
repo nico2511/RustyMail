@@ -97,7 +97,14 @@ export {
   commitSearchQuery,
   resetManualSearchNlFilters,
   searchDraftDiffersFromCommitted,
+  searchNlAssist,
 } from "../mail/searchCommitQuery";
+export {
+  launchContactMailSearch,
+  launchDomainMailSearch,
+  launchTagMailSearchFromRawFamily,
+} from "../mail/searchLaunchQueries";
+export { usesSearchContextLoader } from "../mail/searchQueryContext";
 export { isSearchActive } from "../mail/searchQueryContext";
 export {
   closeSearchModal,
@@ -118,6 +125,7 @@ export {
   bulkMarkReadSearchViewThreads,
   runFluxAffinerFromSearchView,
 } from "../mail/searchViewBatch";
+export { bulkTrashVisibleThreads } from "../mail/bulkTrashList";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";

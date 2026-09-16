@@ -74,6 +74,11 @@ import {
   bulkMarkReadSearchViewThreads,
   bulkArchiveSearchViewThreads,
   runFluxAffinerFromSearchView,
+  bulkTrashVisibleThreads,
+  launchDomainMailSearch,
+  launchContactMailSearch,
+  usesSearchContextLoader,
+  loadThreadsForSearchContext,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -192,7 +197,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     }
     case "contacts-search-domain": {
       const domain = element?.dataset.domain?.trim();
-      if (domain) void (app()["launchDomainMailSearch"] as (...a: unknown[]) => unknown)(domain);
+      if (domain) void launchDomainMailSearch(domain);
       return true;
     }
     case "contacts-search-all":
@@ -213,7 +218,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
             : action === "contacts-search-auto"
               ? "auto"
               : "all";
-      (app()["launchContactMailSearch"] as (...a: unknown[]) => unknown)({
+      launchContactMailSearch({
         email,
         listFilter: filter,
         text: getContactsKeywordDraft(),
@@ -311,7 +316,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       void (app()["onEmptyTrashMailbox"] as (...a: unknown[]) => unknown)();
       return true;
     case "bulk-trash-visible":
-      void (app()["bulkTrashVisibleThreads"] as (...a: unknown[]) => unknown)();
+      void bulkTrashVisibleThreads();
       return true;
     case "save-saved-search":
       void saveCurrentSearchView();
@@ -360,7 +365,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       void markActiveSavedSearchSeen({ toast: true });
       return true;
     case "load-more":
-      if ((app()["usesSearchContextLoader"] as (...a: unknown[]) => unknown)()) await (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(true);
+      if (usesSearchContextLoader()) await loadThreadsForSearchContext(true);
       else await loadMailView(true);
       (app()["render"] as (...a: unknown[]) => unknown)();
       return true;
