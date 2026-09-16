@@ -141,7 +141,7 @@ export { bulkTrashVisibleThreads } from "../mail/bulkTrashList";
 export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
 export { state } from "../state";
 export { callApp } from "./callApp";
-export { callApp } from "./callApp";
+export { app } from "../wireEventsBridge";
 export {
   agentInsertDraftIntoCompose,
   agentPrepareReplyContinue,
