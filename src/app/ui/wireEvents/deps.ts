@@ -89,6 +89,8 @@ export {
 export { currentAccount } from "../core/accountContext";
 export { threadIdsMatch } from "../lib/threadIdsMatch";
 export { applyListFilter, loadMailView, loadMailboxUnread } from "../mail/mailListView";
+export { searchThreads } from "../mail/searchThreadsRun";
+export { fetchOpenThreadOrNotify } from "../mail/fetchOpenThread";
 export { state } from "../state";
 export { app } from "../wireEventsBridge";
 export { callApp } from "./callApp";

@@ -32,6 +32,8 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/core/timeouts.ts` | Constantes délais Tauri / debounces IA & digest |
 | `app/lib/tauriRuntime.ts` | Détection runtime Tauri |
 | `app/ui/briefMailShell.ts` | Coquille HTML brief dossier |
+| `app/mail/mailboxDigest.ts` | Brief d’action dossier (debounce, fetch, bouton toolbar) |
+| `app/mail/idleAiCachePrefetch.ts` | Préchargement cache LLM au idle |
 | `app/mail/mailListView.ts` | Chargement liste (`loadMailView`, compteurs, filtres) + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |

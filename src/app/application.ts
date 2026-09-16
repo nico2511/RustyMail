@@ -140,6 +140,13 @@ import {
   registerMailListDeps,
   reloadCurrentThreadList,
 } from "./mail/mailListView";
+import { fetchOpenThreadOrNotify } from "./mail/fetchOpenThread";
+import {
+  buildSearchQueryFromCurrentState,
+  registerSearchQueryContext,
+  searchAccountIdForQuery,
+} from "./mail/searchQueryContext";
+import { registerSearchThreadsRunDeps, searchThreads } from "./mail/searchThreadsRun";
 import { renderBriefMailViewShell } from "./ui/briefMailShell";
 import {
   cancelMailboxDigestLiveDebounce,
@@ -501,7 +508,6 @@ async function rewriteDictatedSegmentWithTone(raw: string): Promise<string> {
   }
 }
 
-let searchThreadsGeneration = 0;
 
 let threadActivityOpen: {
   threadId: string;
@@ -713,25 +719,6 @@ function threadMessageAnchorId(messageId: string, index: number): string {
   const tail = raw ? encodeURIComponent(raw).replace(/%/g, "_") : "empty";
   const base = `msg-${index}-${tail}`;
   return base.length > 240 ? base.slice(0, 240) : base;
-}
-
-async function fetchOpenThreadOrNotify(
-  threadId: string,
-  opts?: { quiet?: boolean }
-): Promise<DiscussionThreadView | null> {
-  const tid = threadId.trim();
-  if (!tid) return null;
-  if (!isTauriRuntime()) {
-    if (!opts?.quiet) toast("Ouvrir un fil : lancez l’app Tauri.");
-    return null;
-  }
-  try {
-    return await withTimeout(invoke<DiscussionThreadView>("open_thread", { threadId: tid }), BOOT_INVOKE_TIMEOUT_MS);
-  } catch (error) {
-    console.error("open_thread", error);
-    if (!opts?.quiet) toast(`Impossible d’ouvrir le fil : ${tauriErrorMessage(error)}`);
-    return null;
-  }
 }
 
 function currentThreadIdForReply(): string | undefined {
@@ -2296,15 +2283,6 @@ function searchMailboxForQuery(): string | null {
     return m && !isSavedDraftsVirtualMailbox(m) ? m : "INBOX";
   }
   return null;
-}
-
-function searchAccountIdForQuery(): string {
-  return (
-    state.searchAccountOverrideId?.trim() ||
-    state.selectedAccountId?.trim() ||
-    currentAccount()?.id?.trim() ||
-    ""
-  );
 }
 
 function tagFamilyForInvoke(family: string): Tag["family"] {
@@ -4362,29 +4340,6 @@ async function loadAddressBookSidebarCount(): Promise<void> {
   } catch {
     state.addressBookSidebarCount = null;
   }
-}
-
-function buildSearchQueryFromCurrentState() {
-  const archiveRoot = (state.appPrefs.general.archiveRoot ?? "Archive").trim() || "Archive";
-  const mailboxPrefixRaw = state.searchMailboxPrefix?.trim();
-  const mailboxPrefix =
-    mailboxPrefixRaw?.toLowerCase() === "archive" ? archiveRoot : mailboxPrefixRaw || null;
-  return buildSearchQueryPayload({
-    search: state.search,
-    searchTags: state.searchTags,
-    searchSenders: state.searchSenders,
-    searchNlMode: state.searchNlMode,
-    searchLanguageFilter: state.searchLanguageFilter,
-    accountId: searchAccountIdForQuery(),
-    mailbox: searchMailboxForQuery(),
-    semanticSearchEnabled: state.appPrefs.ai.semanticSearchEnabled,
-    semanticModelAvailable: state.semanticModelAvailable,
-    relativeDays: state.searchRelativeDays,
-    hasAttachment: state.searchHasAttachment,
-    minSecurityScore: state.searchMinSecurityScore,
-    mailboxPrefix,
-    hybridLexicalWeight: state.appPrefs.general.hybridLexicalWeight ?? null,
-  });
 }
 
 function syncCommitSearchDraftForSave(): void {
@@ -8155,106 +8110,6 @@ async function maybeAutoSummarizeThreadOnOpen(
   await summarizeThread();
 }
 
-function restoreSearchInputSelection(selStart: number, selEnd: number, genAtCapture: number) {
-  const apply = () => {
-    if (genAtCapture !== searchThreadsGeneration) return;
-    const inp = document.querySelector<HTMLInputElement>("#search-input");
-    if (!inp) return;
-    inp.focus();
-    const len = inp.value.length;
-    try {
-      inp.setSelectionRange(Math.min(selStart, len), Math.min(selEnd, len));
-    } catch {
-      /* type=search */
-    }
-  };
-  requestAnimationFrame(() => requestAnimationFrame(apply));
-}
-
-async function searchThreads() {
-  const gen = ++searchThreadsGeneration;
-
-  const inputBefore = document.querySelector<HTMLInputElement>("#search-input");
-  const searchHadFocus = document.activeElement === inputBefore;
-  let selStart = state.searchDraft.length;
-  let selEnd = selStart;
-  if (searchHadFocus && inputBefore) {
-    try {
-      const a = inputBefore.selectionStart;
-      const b = inputBefore.selectionEnd;
-      if (typeof a === "number" && a >= 0) selStart = a;
-      if (typeof b === "number" && b >= 0) selEnd = b;
-    } catch {
-      /* Safari / certains navigateurs avec type=search */
-    }
-  }
-
-  if (isTauriRuntime() && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    await loadMailView(false);
-    const q = state.search.trim().toLowerCase();
-    if (q) {
-      state.threads = state.threads.filter((t) => {
-        const subj = t.subject.toLowerCase();
-        const who = (t.participants[0] ?? "").toLowerCase();
-        return subj.includes(q) || who.includes(q);
-      });
-    }
-    if (gen !== searchThreadsGeneration) return;
-    render();
-    if (!searchHadFocus) return;
-    restoreSearchInputSelection(selStart, selEnd, gen);
-    return;
-  }
-
-  const accountId = searchAccountIdForQuery();
-  if (!accountId) {
-    state.threads = [];
-    if (gen !== searchThreadsGeneration) return;
-    render();
-    if (!searchHadFocus) return;
-    restoreSearchInputSelection(selStart, selEnd, gen);
-    return;
-  }
-  const query = buildSearchQueryFromCurrentState();
-  state.threads = filterRecentlyRemovedThreads(
-    await safeInvoke<ThreadListItem[]>(
-      "search_threads",
-      {
-        query,
-      },
-      []
-    ),
-  );
-
-  if (gen !== searchThreadsGeneration) {
-    return;
-  }
-
-  // Historique local (cmd Tauri `record_search_history_cmd` — no-op silencieux si absente).
-  if (isTauriRuntime() && hasCommittedSearchCriteria(committedSearchCriteriaSnapshot())) {
-    void recordSearchHistory(
-      accountId,
-      state.searchDraft.trim() || state.search.trim(),
-      JSON.stringify(query),
-    ).catch((e) => {
-      // TODO(backend): enregistrer `record_search_history_cmd` / `list_search_history_cmd` / `clear_search_history_cmd`
-      // invoke shape: recordSearchHistory(accountId, queryText, queryJson)
-      //   → invoke("record_search_history_cmd", { payload: { accountId, queryText, queryJson } })
-      // listSearchHistory(accountId, limit)
-      //   → invoke("list_search_history_cmd", { payload: { accountId, limit } })
-      // clearSearchHistory(accountId)
-      //   → invoke("clear_search_history_cmd", { payload: { accountId } })
-      console.debug("record_search_history_cmd", e);
-    });
-  }
-
-  render();
-
-  // Recréé par `render()` : replacer la sélection après layout (double rAF).
-  if (!searchHadFocus) return;
-  restoreSearchInputSelection(selStart, selEnd, gen);
-}
-
 async function deleteSettingsAccount() {
   if (!isTauriRuntime()) {
     toast("La suppression du compte requiert l’app Tauri (npm run tauri:dev).");
@@ -11186,7 +11041,6 @@ registerWireEventsBridge({
   usesSearchContextLoader,
   decodeHtmlEntitiesLoose,
   draftHasRecipientsExtra,
-  fetchOpenThreadOrNotify,
   saveDraftToSavedListNow,
   persistDefaultAccountId,
   loadAccountsFromBackend,
@@ -11272,7 +11126,6 @@ registerWireEventsBridge({
   switchMailbox,
   runOrgV2Apply,
   fmSyncMailbox,
-  searchThreads,
   llmQaThreadUi,
   onThreadMove,
   onThreadSeen,
@@ -11411,6 +11264,9 @@ registerMailListDeps({
   searchThreads,
   loadThreadsForSearchContext,
 });
+
+registerSearchQueryContext({ effectiveSearchMailboxPath });
+registerSearchThreadsRunDeps({ committedSearchCriteriaSnapshot });
 
 initMailboxDigest({
   withTimeout,

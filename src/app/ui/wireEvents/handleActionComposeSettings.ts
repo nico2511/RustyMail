@@ -3,6 +3,7 @@ import {
   app,
   currentAccount,
   loadMailView,
+  searchThreads,
   applyListFilter,
   threadIdsMatch,
   state,
@@ -527,7 +528,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             1_800_000
           );
           toast(`Index sémantique : ${stats.indexed} ligne(s), ${stats.errors} erreur(s).`);
-          await (app()["searchThreads"] as (...a: unknown[]) => unknown)();
+          await searchThreads();
           await (app()["refreshSemanticEmbeddingCounts"] as (...a: unknown[]) => unknown)();
         } catch (e) {
           toast(tauriErrorMessage(e));
