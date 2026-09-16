@@ -88,7 +88,10 @@ export {
 } from "../modals/promptConfirm";
 export { currentAccount } from "../core/accountContext";
 export { threadIdsMatch } from "../lib/threadIdsMatch";
-export { applyListFilter, loadMailView, loadMailboxUnread } from "../mail/mailListView";
+export { applyListFilter, loadMailView, loadMailboxUnread, loadThreadsForSearchContext } from "../mail/mailListView";
+export { render } from "../dispatch";
+export { goBack, navigateToInbox } from "../mail/appNavActions";
+export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
 export { searchThreads } from "../mail/searchThreadsRun";
 export { fetchOpenThreadOrNotify } from "../mail/fetchOpenThread";
 export { openThread } from "../mail/openThreadView";

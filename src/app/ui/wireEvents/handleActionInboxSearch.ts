@@ -79,6 +79,10 @@ import {
   launchContactMailSearch,
   usesSearchContextLoader,
   loadThreadsForSearchContext,
+  render,
+  goBack,
+  navigateToInbox,
+  onEmptyTrashMailbox,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -94,28 +98,28 @@ import {
 export async function tryHandleInboxSearch(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
     case "contacts-back-list":
-      if (navCanGoBack()) void (app()["goBack"] as (...a: unknown[]) => unknown)();
+      if (navCanGoBack()) void goBack();
       else {
         state.view = "contacts";
         state.selectedContactEmail = undefined;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       }
       return true;
     case "contacts-back-inbox":
-      (app()["navigateToInbox"] as (...a: unknown[]) => unknown)();
+      navigateToInbox();
       return true;
     case "contacts-refresh-list": {
       const acc = currentAccount();
       if (acc?.id) {
         void loadContactsList(acc.id, { reset: true })
           .then(() => (app()["loadAddressBookSidebarCount"] as (...a: unknown[]) => unknown)())
-          .then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+          .then(() => render());
       }
       return true;
     }
     case "contacts-load-more": {
       const acc = currentAccount();
-      if (acc?.id) void loadContactsList(acc.id).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+      if (acc?.id) void loadContactsList(acc.id).then(() => render());
       return true;
     }
     case "contacts-open-detail": {
@@ -153,7 +157,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       state.composeLayout = "split";
       (app()["syncPreviewOpenFromComposeLayout"] as (...a: unknown[]) => unknown)();
       state.preview = undefined;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "contacts-toggle-fav": {
@@ -173,7 +177,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
             },
           });
           await loadContactDetail(acc.id, email);
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -190,7 +194,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       if (!acc?.id || !email) return true;
       void (async () => {
         await loadContactProfile(acc.id!, email);
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
         toast("Profil IA chargé.");
       })();
       return true;
@@ -278,7 +282,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     case "agent-prepare-cancel":
       void (app()["stopAgentTelemetry"] as (...a: unknown[]) => unknown)().then(() => {
         state.agentSession = null;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       });
       return true;
     case "agent-insert-compose":
@@ -313,7 +317,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       void (app()["syncInbox"] as (...a: unknown[]) => unknown)({ background: state.view === "thread" });
       return true;
     case "empty-trash-mailbox":
-      void (app()["onEmptyTrashMailbox"] as (...a: unknown[]) => unknown)();
+      void onEmptyTrashMailbox();
       return true;
     case "bulk-trash-visible":
       void bulkTrashVisibleThreads();
@@ -367,7 +371,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     case "load-more":
       if (usesSearchContextLoader()) await loadThreadsForSearchContext(true);
       else await loadMailView(true);
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "clear-search-text":
       state.search = "";
@@ -375,7 +379,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       if (!isSearchActive()) {
         void clearSearchAndReloadInbox();
       } else {
-        void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        void loadThreadsForSearchContext(false).then(() => render());
       }
       return true;
     case "clear-search-list-filter":
@@ -383,9 +387,9 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       if (state.search.trim()) {
         void searchThreads();
       } else if (isSearchActive()) {
-        void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        void loadThreadsForSearchContext(false).then(() => render());
       } else {
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       }
       return true;
     case "clear-search-nl-filters":
@@ -395,7 +399,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       } else if (state.search.trim()) {
         void searchThreads();
       } else {
-        void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        void loadThreadsForSearchContext(false).then(() => render());
       }
       return true;
     case "clear-search-sender":
@@ -405,7 +409,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       } else if (state.search.trim() || state.searchTags.length > 0) {
         void searchThreads();
       } else {
-        void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        void loadThreadsForSearchContext(false).then(() => render());
       }
       return true;
     case "clear-search-sender-one": {
@@ -413,7 +417,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       if (email) state.searchSenders = state.searchSenders.filter((s) => s.toLowerCase() !== email);
       if (!isSearchActive()) void clearSearchAndReloadInbox();
       else if (state.search.trim() || state.searchSenders.length || state.searchTags.length) void searchThreads();
-      else void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+      else void loadThreadsForSearchContext(false).then(() => render());
       return true;
     }
     case "clear-search-mailbox":
@@ -426,13 +430,13 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       if (searchInClear) searchInClear.value = state.searchDraft;
       if (!isSearchActive()) void clearSearchAndReloadInbox();
       else if (state.search.trim() || state.searchSenders.length || state.searchTags.length) void searchThreads();
-      else void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+      else void loadThreadsForSearchContext(false).then(() => render());
       return true;
     case "clear-search-account":
       state.searchAccountOverrideId = null;
       if (!isSearchActive()) void clearSearchAndReloadInbox();
       else if (state.search.trim() || state.searchSenders.length || state.searchTags.length) void searchThreads();
-      else void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+      else void loadThreadsForSearchContext(false).then(() => render());
       return true;
     case "clear-search-tag-one": {
       const raw = element?.dataset.tag?.trim().toLowerCase();
@@ -441,7 +445,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       }
       if (!isSearchActive()) void clearSearchAndReloadInbox();
       else if (state.search.trim() || state.searchSenders.length || state.searchTags.length) void searchThreads();
-      else void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+      else void loadThreadsForSearchContext(false).then(() => render());
       return true;
     }
     case "clear-search-newsletter-rule":
@@ -449,7 +453,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       if (state.search.trim()) {
         void searchThreads();
       } else {
-        void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        void loadThreadsForSearchContext(false).then(() => render());
       }
       return true;
     case "toggle-search-scope":
@@ -462,9 +466,9 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       );
       if (isSearchActive()) {
         if (state.search.trim() || state.searchSenders.length) void searchThreads();
-        else void (app()["loadThreadsForSearchContext"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        else void loadThreadsForSearchContext(false).then(() => render());
       } else {
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       }
       return true;
     case "list-filter-all":
@@ -517,7 +521,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           const out = await withTimeout(moveThreadUnarchive(acc.id, tid), MAIL_ACTION_TIMEOUT_MS);
           toast(out.message || "Désarchivé vers Inbox.");
           await openThread(tid, { skipHistory: true, preserveAi: true });
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (err) {
           toast(tauriErrorMessage(err));
         }
@@ -576,18 +580,18 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     case "close-move":
       state.moveOpen = false;
       state.moveThreadId = undefined;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "confirm-move":
       await (app()["confirmMoveDialog"] as (...a: unknown[]) => unknown)();
       return true;
     case "open-mailbox-manage":
       state.mailboxManageOpen = true;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "close-mailbox-manage":
       state.mailboxManageOpen = false;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "mb-create":
       await (app()["mailboxManageAction"] as (...a: unknown[]) => unknown)("create");
@@ -639,10 +643,10 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
           await (app()["refreshSavedDraftsMailboxCount"] as (...a: unknown[]) => unknown)();
           state.selectedThreadId = state.threads[0]?.id;
           state.selectedThread = undefined;
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (e) {
           toast(tauriErrorMessage(e));
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         }
       })();
       return true;

@@ -203,6 +203,10 @@ import {
   bulkTrashVisibleThreads,
   registerBulkTrashListDeps,
 } from "./mail/bulkTrashList";
+import { registerAppNavActionsDeps } from "./mail/appNavActions";
+import {
+  registerEmptyTrashMailboxDeps,
+} from "./mail/emptyTrashMailbox";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -2486,54 +2490,6 @@ async function onThreadMove(
     state.selectedThreadId = prevSelectedId;
     state.view = prevView;
     state.organization.report = prevOrgReport;
-    toast(tauriErrorMessage(err));
-    render();
-  }
-}
-
-async function onEmptyTrashMailbox() {
-  if (!isTauriRuntime()) {
-    toast("Vider la corbeille : disponible dans l’app Tauri.");
-    return;
-  }
-  const account = currentAccount();
-  if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
-    return;
-  }
-  const mailbox = state.selectedMailbox || "";
-  if (mailboxKind(mailbox) !== "trash") {
-    toast("Ouvrez d’abord le dossier corbeille.");
-    return;
-  }
-  if (state.threads.length === 0) {
-    toast("La corbeille est déjà vide.");
-    return;
-  }
-  const ok = await openConfirmModal({
-    title: "Vider la corbeille ?",
-    body: "Supprimer définitivement tous les messages de ce dossier corbeille ? Cette action est irréversible côté serveur.",
-    danger: true,
-    confirmLabel: "Tout supprimer",
-  });
-  if (!ok) return;
-  try {
-    const msg = await withTimeout(
-      invoke<string>("empty_trash_mailbox_cmd", { accountId: account.id, mailbox, destructiveAck: "empty-trash" }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-    toast(msg);
-    if (state.view === "thread") {
-      state.view = "list";
-      state.selectedThread = undefined;
-      state.selectedThreadId = undefined;
-    }
-    await loadMailView();
-    await loadMailboxUnread();
-    state.selectedThreadId = state.threads[0]?.id;
-    render();
-  } catch (err) {
-    console.error("empty_trash_mailbox_cmd", err);
     toast(tauriErrorMessage(err));
     render();
   }
@@ -9343,7 +9299,6 @@ registerWireEventsBridge({
   llmTranslateThreadUi,
   switchActiveAccount,
   loadNewsletterRules,
-  onEmptyTrashMailbox,
   mailboxManageAction,
   orgV2SnoozeProposal,
   applyMarkdownAction,
@@ -9602,6 +9557,16 @@ registerSearchAtAutocompleteWireDeps({
     return composeChipsBcc;
   },
   scheduleDraftRevisionSave,
+});
+
+registerEmptyTrashMailboxDeps({
+  loadMailView: () => loadMailView(),
+  loadMailboxUnread,
+});
+
+registerAppNavActionsDeps({
+  goBack,
+  navigateToInbox,
 });
 
 initMailboxDigest({

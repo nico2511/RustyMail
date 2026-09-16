@@ -48,6 +48,8 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/searchViewBatch.ts` | Actions lot recherche / vue (lu, archive, Affiner) + `registerSearchViewBatchDeps()` |
 | `app/lib/tagFamilyForInvoke.ts` | Normalisation famille tag pour invoke Rust |
 | `app/mail/bulkTrashList.ts` | Corbeille lot (liste visible) + `registerBulkTrashListDeps()` |
+| `app/mail/emptyTrashMailbox.ts` | Vider corbeille dossier + `registerEmptyTrashMailboxDeps()` |
+| `app/mail/appNavActions.ts` | `goBack` / `navigateToInbox` (facade deps) + `registerAppNavActionsDeps()` |
 | `app/mail/mailListView.ts` | `loadMailView` + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |

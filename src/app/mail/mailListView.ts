@@ -43,6 +43,11 @@ export function registerMailListDeps(next: Partial<MailListDeps>): void {
   mailListDeps = { ...mailListDeps, ...next };
 }
 
+/** Liste threads en contexte recherche / vue enregistrée (impl. enregistrée via registerMailListDeps). */
+export async function loadThreadsForSearchContext(append = false): Promise<void> {
+  await mailListDeps.loadThreadsForSearchContext(append);
+}
+
 function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
   const { threads, threadOffsetReset } = mergeServerThreadPage(state.threads, page, append);
   state.threads = threads;
