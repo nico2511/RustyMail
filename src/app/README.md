@@ -49,6 +49,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `listRender.ts` | Liste inbox (`renderList`, lignes fil) |
 | `threadViewRender.ts` | Vue fil (`renderThread`, messages, sécurité) |
 | `composerRender.ts` | Compositeur (`renderComposer`, historique brouillon) |
+| `settingsRender.ts` | Paramètres (onglets, modale IA réglages) |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
@@ -58,7 +59,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. **`render/`** — fil, compose, paramètres, panneau IA (par lots)
+1. **`aiPanelRender.ts`** — panneau IA / fil (QA, résumé, agent)
 2. **`wireEvents`** → `app/ui/wireEvents.ts` en dernier (très couplé)
 
 `npm run verify:ts` · `npm test`

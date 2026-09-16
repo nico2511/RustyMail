@@ -1,5 +1,6 @@
 import type { Account } from "../../../accountSetup";
 import type {
+  AddressBookRow,
   CleanedMessageView,
   Draft,
   MailSecurityFinding,
@@ -8,6 +9,7 @@ import type {
   MessageViewMode,
   MicDictationTarget,
   NewsletterRuleRow,
+  State,
   Tag,
   ThreadListItem,
   ThreadParticipantLink,
@@ -15,6 +17,7 @@ import type {
 } from "../../types";
 import type { SavedSearchListItem } from "../../../savedSearches";
 import type { StatusBarProgressJob } from "../../../statusBarProgress";
+import type { SettingsAiPanelDeps } from "../../../settingsAiPanel";
 
 /** Callbacks laissés dans application.ts pour éviter les imports circulaires depuis les modules render. */
 export type RenderDeps = {
@@ -106,6 +109,14 @@ export type RenderDeps = {
     input: string,
     opts?: { allowRemoteImages?: boolean; relocateUnsubscribe?: boolean; stripOutlookNoise?: boolean },
   ) => { html: string; unsubscribeLinks: MailUnsubscribeLink[] };
+  defaultListFilterFromPrefs: () => State["listFilter"];
+  settingsDraftProfile: () => Account | undefined;
+  mergedProfileForAccountsForm: () => Account | undefined;
+  buildSettingsAiPanelDeps: () => SettingsAiPanelDeps;
+  addressBookRowsCache: () => AddressBookRow[];
+  addressBookEditEmail: () => string | null;
+  addressBookListQuery: () => string;
+  accountsFormIdentityScratch: () => { displayName: string; email: string } | undefined;
 };
 
 let deps: RenderDeps | null = null;
