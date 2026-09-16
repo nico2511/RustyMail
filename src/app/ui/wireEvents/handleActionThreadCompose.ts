@@ -161,7 +161,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       const msg = state.selectedThread.messages.find((x) => x.messageId === mid);
       const raw = msg?.collapsedQuotes ?? [];
       if (!raw.length) return true;
-      const merged = (app()["groupCollapsedQuotesByAttribution"] as (...a: unknown[]) => unknown)(raw);
+      const merged = callApp("groupCollapsedQuotesByAttribution", raw);
       if (!merged.length) return true;
       state.quoteFoldModal = {
         senderLabel: (msg?.sender ?? "").trim() || mid,
@@ -203,39 +203,39 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       render();
       return true;
     case "reply":
-      await (app()["prepareReply"] as (...a: unknown[]) => unknown)();
+      await callApp("prepareReply");
       return true;
     case "reply-one":
-      await (app()["prepareReplyToMessage"] as (...a: unknown[]) => unknown)(element?.dataset.msgId ?? "");
+      await callApp("prepareReplyToMessage", element?.dataset.msgId ?? "");
       return true;
     case "reply-all":
-      await (app()["prepareReplyAll"] as (...a: unknown[]) => unknown)();
+      await callApp("prepareReplyAll");
       return true;
     case "forward":
-      await (app()["prepareForward"] as (...a: unknown[]) => unknown)();
+      await callApp("prepareForward");
       return true;
     case "forward-one":
-      await (app()["prepareForwardToMessage"] as (...a: unknown[]) => unknown)(element?.dataset.msgId ?? "");
+      await callApp("prepareForwardToMessage", element?.dataset.msgId ?? "");
       return true;
     case "download-all-attachments": {
       const mid = element?.dataset.msgId?.trim();
-      if (mid) void (app()["downloadAllAttachmentsForMessage"] as (...a: unknown[]) => unknown)(mid);
+      if (mid) void callApp("downloadAllAttachmentsForMessage", mid);
       return true;
     }
     case "contacts-entity-open": {
       const href = element?.dataset.href?.trim();
-      if (href) void (app()["openExternalFromMailHref"] as (...a: unknown[]) => unknown)(href);
+      if (href) void callApp("openExternalFromMailHref", href);
       return true;
     }
     case "contacts-entity-mailto": {
       const email = element?.dataset.email?.trim();
-      if (email) void (app()["openExternalFromMailHref"] as (...a: unknown[]) => unknown)(`mailto:${email}`);
+      if (email) void callApp("openExternalFromMailHref", `mailto:${email}`);
       return true;
     }
     case "mail-unsubscribe-open": {
-      const href = (app()["decodeHtmlEntitiesLoose"] as (...a: unknown[]) => unknown)(element?.dataset.href?.trim() ?? "");
-      const normalized = (app()["normalizeMailHrefForOpen"] as (...a: unknown[]) => unknown)(href);
-      if (normalized) void (app()["openExternalFromMailHref"] as (...a: unknown[]) => unknown)(normalized);
+      const href = callApp("decodeHtmlEntitiesLoose", element?.dataset.href?.trim() ?? "");
+      const normalized = callApp("normalizeMailHrefForOpen", href);
+      if (normalized) void callApp("openExternalFromMailHref", normalized);
       else toast("Lien de désabonnement invalide.");
       return true;
     }
@@ -245,7 +245,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void (async () => {
         try {
           await withTimeout(invoke("add_newsletter_rule", { input: email }), MAIL_ACTION_TIMEOUT_MS);
-          await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
+          await callApp("loadNewsletterRules");
           toast(t("toast.newsletterRuleAdded"));
           render();
         } catch (e) {
@@ -301,7 +301,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     }
     case "close-compose":
-      void (app()["finalizeCloseComposeFromUser"] as (...a: unknown[]) => unknown)();
+      void callApp("finalizeCloseComposeFromUser");
       return true;
     case "close-close-compose-modal":
       state.closeComposeModal = null;
@@ -311,19 +311,19 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void (async () => {
         state.closeComposeModal = null;
         render();
-        await (app()["discardCurrentDraftSession"] as (...a: unknown[]) => unknown)();
-        await (app()["leaveComposeViewAfterClose"] as (...a: unknown[]) => unknown)();
+        await callApp("discardCurrentDraftSession");
+        await callApp("leaveComposeViewAfterClose");
       })();
       return true;
     case "save-and-close-compose": {
       void (async () => {
         state.closeComposeModal = null;
         render();
-        const ok = await (app()["saveDraftToSavedListNow"] as (...a: unknown[]) => unknown)({ silentToast: true });
+        const ok = await callApp("saveDraftToSavedListNow", { silentToast: true });
         if (ok) {
           toast("Conservé dans « Sauvés », compositeur fermé.");
-          (app()["clearDraftSession"] as (...a: unknown[]) => unknown)();
-          await (app()["leaveComposeViewAfterClose"] as (...a: unknown[]) => unknown)();
+          callApp("clearDraftSession");
+          await callApp("leaveComposeViewAfterClose");
         }
       })();
       return true;
@@ -334,27 +334,27 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "resume-orphan-draft": {
       const sid = element?.dataset.sessionId ?? "";
-      void (app()["resumeOrphanDraftSession"] as (...a: unknown[]) => unknown)(sid);
+      void callApp("resumeOrphanDraftSession", sid);
       return true;
     }
     case "dismiss-orphan-draft": {
       const sid = element?.dataset.sessionId ?? "";
-      void (app()["dismissOrphanDraftSession"] as (...a: unknown[]) => unknown)(sid);
+      void callApp("dismissOrphanDraftSession", sid);
       return true;
     }
     case "toggle-sidebar":
       if (state.view === "compose") return true;
       state.sidebarCollapsed = !state.sidebarCollapsed;
-      (app()["writeSidebarCollapsedPreference"] as (...a: unknown[]) => unknown)(state.sidebarCollapsed);
+      callApp("writeSidebarCollapsedPreference", state.sidebarCollapsed);
       render();
       return true;
     case "leave-saved-drafts-mailbox":
       void (async () => {
-        await (app()["switchMailbox"] as (...a: unknown[]) => unknown)((app()["pickImapMailboxFallback"] as (...a: unknown[]) => unknown)());
+        await callApp("switchMailbox", callApp("pickImapMailboxFallback"));
       })();
       return true;
     case "refresh-draft-history":
-      void (app()["refreshDraftRevisions"] as (...a: unknown[]) => unknown)(60);
+      void callApp("refreshDraftRevisions", 60);
       return true;
     case "toggle-draft-versions-expanded":
       if (!isTauriRuntime()) return true;
@@ -364,7 +364,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "compare-draft-revision": {
       const revisionId = element?.dataset.revisionId?.trim() ?? "";
       if (!revisionId) return true;
-      void (app()["computeDraftDiffAgainstRevision"] as (...a: unknown[]) => unknown)(revisionId);
+      void callApp("computeDraftDiffAgainstRevision", revisionId);
       return true;
     }
     case "toggle-draft-compare-view":
@@ -394,19 +394,19 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
             return;
           }
           state.draft = restored;
-          (app()["loadComposeMarkdownIntoEditor"] as (...a: unknown[]) => unknown)(restored.markdownBody);
+          callApp("loadComposeMarkdownIntoEditor", restored.markdownBody);
           enterComposeView({ skipHistory: true });
           state.composeLayout = wasHistoriqueLayout ? "historique" : "split";
           syncPreviewOpenFromComposeLayout();
-          (app()["resetMarkdownEditorHistory"] as (...a: unknown[]) => unknown)();
+          callApp("resetMarkdownEditorHistory");
           render();
           if (wasHistoriqueLayout) {
-            void (app()["refreshDraftRevisions"] as (...a: unknown[]) => unknown)(60);
-            void (app()["computeDraftDiffAgainstRevision"] as (...a: unknown[]) => unknown)(revisionId);
+            void callApp("refreshDraftRevisions", 60);
+            void callApp("computeDraftDiffAgainstRevision", revisionId);
           } else {
-            window.setTimeout(() => void (app()["computePreview"] as (...a: unknown[]) => unknown)(), 0);
+            window.setTimeout(() => void callApp("computePreview"), 0);
           }
-          (app()["scheduleDraftRevisionSave"] as (...a: unknown[]) => unknown)(450);
+          callApp("scheduleDraftRevisionSave", 450);
         } catch (error) {
           console.error("draft_revision_restore", error);
           toast(`Restauration impossible: ${tauriErrorMessage(error)}`);
@@ -415,7 +415,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     }
     case "toggle-preview":
-      await (app()["cycleComposeLayout"] as (...a: unknown[]) => unknown)();
+      await callApp("cycleComposeLayout");
       return true;
     case "set-compose-layout": {
       const raw = element?.dataset.composeLayout?.trim();
@@ -424,9 +424,9 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       state.composeLayout = raw;
       syncPreviewOpenFromComposeLayout();
       render();
-      if (raw === "historique") void (app()["refreshDraftRevisions"] as (...a: unknown[]) => unknown)(60);
+      if (raw === "historique") void callApp("refreshDraftRevisions", 60);
       if (state.composeLayout !== "write" && state.composeLayout !== "historique") {
-        window.setTimeout(() => void (app()["computePreview"] as (...a: unknown[]) => unknown)(), 0);
+        window.setTimeout(() => void callApp("computePreview"), 0);
       }
       return true;
     }
@@ -435,13 +435,13 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       render();
       return true;
     case "toggle-compose-cc-bcc": {
-      if ((app()["draftHasRecipientsExtra"] as (...a: unknown[]) => unknown)(state.draft)) return true;
+      if (callApp("draftHasRecipientsExtra", state.draft)) return true;
       state.composeCcBccOpen = !state.composeCcBccOpen;
       render();
       return true;
     }
     case "send":
-      await (app()["sendDraft"] as (...a: unknown[]) => unknown)();
+      await callApp("sendDraft");
       return true;
     case "cancel-split-send":
       state.splitSendConfirm = null;
@@ -449,22 +449,22 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       render();
       return true;
     case "confirm-split-send":
-      void (app()["confirmAndExecuteSplitSend"] as (...a: unknown[]) => unknown)();
+      void callApp("confirmAndExecuteSplitSend");
       return true;
     case "pick-attachments":
-      await (app()["pickAttachments"] as (...a: unknown[]) => unknown)();
+      await callApp("pickAttachments");
       return true;
     case "clear-attachments":
-      (app()["clearAttachments"] as (...a: unknown[]) => unknown)();
+      callApp("clearAttachments");
       return true;
     case "remove-attachment":
-      (app()["removeAttachment"] as (...a: unknown[]) => unknown)(element?.dataset.path ?? "");
+      callApp("removeAttachment", element?.dataset.path ?? "");
       return true;
     case "quick-reply-send":
-      await (app()["sendQuickReply"] as (...a: unknown[]) => unknown)("reply");
+      await callApp("sendQuickReply", "reply");
       return true;
     case "quick-reply-send-all":
-      await (app()["sendQuickReply"] as (...a: unknown[]) => unknown)("reply-all");
+      await callApp("sendQuickReply", "reply-all");
       return true;
     case "quick-reply-compose": {
       const qrRaw = element?.dataset.qrIndex;
@@ -473,36 +473,36 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         const s = state.quickReplySuggestions[idx];
         if (!s?.text) return true;
         state.composeGrammarSuggestions = null;
-        await (app()["prepareReply"] as (...a: unknown[]) => unknown)();
+        await callApp("prepareReply");
         const add = `${s.text.trim()}\n\n`;
         state.composeBody = `${add}${state.composeBody}`;
         state.composeCanonicalBody = state.composeBody;
         const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
         if (ta) ta.value = state.composeBody;
-        void (app()["computePreview"] as (...a: unknown[]) => unknown)();
+        void callApp("computePreview");
         toast("Texte inséré dans le compositeur.");
         render();
       } else {
-        await (app()["prepareReply"] as (...a: unknown[]) => unknown)();
+        await callApp("prepareReply");
       }
       return true;
     }
     case "summarize":
-      await (app()["summarizeThread"] as (...a: unknown[]) => unknown)();
+      await callApp("summarizeThread");
       return true;
     case "llm-translate-thread":
-      void (app()["llmTranslateThreadUi"] as (...a: unknown[]) => unknown)();
+      void callApp("llmTranslateThreadUi");
       return true;
     case "llm-translate-message": {
       const mid = element?.dataset.msgId?.trim();
-      if (mid) void (app()["llmTranslateMessageUi"] as (...a: unknown[]) => unknown)(mid, element?.dataset.llmTranslateRefresh === "1");
+      if (mid) void callApp("llmTranslateMessageUi", mid, element?.dataset.llmTranslateRefresh === "1");
       return true;
     }
     case "llm-quick-replies-thread":
-      void (app()["llmQuickRepliesThreadUi"] as (...a: unknown[]) => unknown)();
+      void callApp("llmQuickRepliesThreadUi");
       return true;
     case "llm-inbox-digest":
-      void (app()["llmInboxDigestUi"] as (...a: unknown[]) => unknown)();
+      void callApp("llmInboxDigestUi");
       return true;
     case "demo-reset-playground": {
       if (!isTauriRuntime()) {
@@ -512,7 +512,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       try {
         const msg = await invoke<string>("demo_reset_playground_mailbox");
         toast(msg);
-        const ok = await (app()["loadAccountsFromBackend"] as (...a: unknown[]) => unknown)({ silent: false });
+        const ok = await callApp("loadAccountsFromBackend", { silent: false });
         if (!ok) toast("Rechargement des comptes incomplet — vérifie la liste.");
         const DEMO = "playground@demo.rustymail.app";
         if (state.accounts.some((a) => a.id === DEMO)) {
@@ -546,7 +546,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         const msg = await invoke<string>("demo_remove_playground_mailbox");
         toast(msg);
         const DEMO = "playground@demo.rustymail.app";
-        const ok = await (app()["loadAccountsFromBackend"] as (...a: unknown[]) => unknown)({ silent: false });
+        const ok = await callApp("loadAccountsFromBackend", { silent: false });
         if (!ok) toast("Rechargement des comptes incomplet — vérifie la liste.");
         if (state.selectedAccountId === DEMO) {
           state.selectedAccountId = state.accounts[0]?.id ?? "";
@@ -574,19 +574,19 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       if (mailboxDigestSlotInList()) {
         dismissMailboxDigestPanel();
       } else {
-        void (app()["llmInboxDigestUi"] as (...a: unknown[]) => unknown)();
+        void callApp("llmInboxDigestUi");
       }
       return true;
     case "compose-ai-rewrite": {
       const st = element?.dataset.rewriteStyle ?? "Formal";
-      void (app()["composeAiRewrite"] as (...a: unknown[]) => unknown)(st);
+      void callApp("composeAiRewrite", st);
       return true;
     }
     case "compose-ai-rewrite-selected-tone":
-      void (app()["composeAiRewrite"] as (...a: unknown[]) => unknown)(composeRewriteStyleFromTone());
+      void callApp("composeAiRewrite", composeRewriteStyleFromTone());
       return true;
     case "compose-ai-grammar":
-      void (app()["composeAiGrammar"] as (...a: unknown[]) => unknown)();
+      void callApp("composeAiGrammar");
       return true;
     case "compose-grammar-dismiss":
       state.composeGrammarSuggestions = null;
@@ -605,7 +605,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       state.composeBody = next;
       state.composeCanonicalBody = next;
       if (ta) ta.value = next;
-      void (app()["computePreview"] as (...a: unknown[]) => unknown)();
+      void callApp("computePreview");
       toast("Remplacement appliqué (première occurrence).");
       render();
       return true;
@@ -623,11 +623,11 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void searchNlAssist();
       return true;
     case "llm-cancel-job":
-      (app()["cancelLlmQueueJob"] as (...a: unknown[]) => unknown)();
+      callApp("cancelLlmQueueJob");
       toast("Annulation demandée…");
       return true;
     case "llm-qa-thread":
-      void (app()["llmQaThreadUi"] as (...a: unknown[]) => unknown)();
+      void callApp("llmQaThreadUi");
       return true;
     case "llm-qa-clear":
       state.threadQaAnswer = null;
@@ -636,7 +636,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "qa-open-message": {
       const mid = element?.dataset.msgId?.trim();
-      if (mid) (app()["scrollToThreadMessage"] as (...a: unknown[]) => unknown)(mid);
+      if (mid) callApp("scrollToThreadMessage", mid);
       return true;
     }
     case "address-book-refresh":

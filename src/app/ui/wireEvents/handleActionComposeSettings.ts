@@ -1,8 +1,9 @@
 // @ts-nocheck
+import { callApp } from "./callApp";
 import {
-  app,
   currentAccount,
   loadMailView,
+  render,
   searchThreads,
   applyListFilter,
   threadIdsMatch,
@@ -82,17 +83,17 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
   switch (action) {
     case "compose":
       state.aiOpen = false;
-      (app()["clearThreadAiSummaryState"] as (...a: unknown[]) => unknown)();
+      callApp("clearThreadAiSummaryState");
       if (
         state.view === "thread" &&
         state.selectedThreadId?.trim() &&
-        !(app()["threadIsAutoMail"] as (...a: unknown[]) => unknown)(state.selectedThread, state.selectedThreadId)
+        !callApp("threadIsAutoMail", state.selectedThread, state.selectedThreadId)
       ) {
-        void (app()["prepareReply"] as (...a: unknown[]) => unknown)();
+        void callApp("prepareReply");
         return true;
       }
-      (app()["enterComposeView"] as (...a: unknown[]) => unknown)();
-      (app()["startNewDraftSession"] as (...a: unknown[]) => unknown)();
+      callApp("enterComposeView");
+      callApp("startNewDraftSession");
       state.draft = {
         id: "draft-local",
         kind: "New",
@@ -110,21 +111,21 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       state.composeBody = "";
       state.composeCanonicalBody = "";
       state.composeLayout = "split";
-      (app()["syncPreviewOpenFromComposeLayout"] as (...a: unknown[]) => unknown)();
+      callApp("syncPreviewOpenFromComposeLayout");
       state.preview = undefined;
       state.composeAdvancedOpen = false;
       state.composeCcBccOpen = false;
-      (app()["resetMarkdownEditorHistory"] as (...a: unknown[]) => unknown)();
-      (app()["render"] as (...a: unknown[]) => unknown)();
-      window.setTimeout(() => void (app()["computePreview"] as (...a: unknown[]) => unknown)(), 0);
-      (app()["scheduleDraftRevisionSave"] as (...a: unknown[]) => unknown)(350);
+      callApp("resetMarkdownEditorHistory");
+      render();
+      window.setTimeout(() => void callApp("computePreview"), 0);
+      callApp("scheduleDraftRevisionSave", 350);
       return true;
     case "settings":
     case "account":
-      (app()["openSettingsView"] as (...a: unknown[]) => unknown)();
+      callApp("openSettingsView");
       return true;
     case "reload-accounts": {
-      const ok = await (app()["loadAccountsFromBackend"] as (...a: unknown[]) => unknown)({ silent: false });
+      const ok = await callApp("loadAccountsFromBackend", { silent: false });
       if (ok) {
         state.mailboxes = await safeInvoke<string[]>(
           "list_imap_mailboxes",
@@ -132,12 +133,12 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           [],
           BOOT_INVOKE_TIMEOUT_MS
         );
-        (app()["ensureValidSelectedMailbox"] as (...a: unknown[]) => unknown)();
+        callApp("ensureValidSelectedMailbox");
         await loadMailView(false);
-        await (app()["loadMailboxUnread"] as (...a: unknown[]) => unknown)();
+        await callApp("loadMailboxUnread");
         toast(`Compte chargé : ${currentAccount()?.email ?? ""}`);
       }
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "settings-tab": {
@@ -165,16 +166,16 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           state.accountServersPanelOpen = state.settingsSelectedAccountId !== "new";
         }
         state.settingsTab = tab;
-        (app()["render"] as (...a: unknown[]) => unknown)();
-        if (tab === "autoSenders") void (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
-        if (tab === "ai") void (app()["refreshSemanticEmbeddingCounts"] as (...a: unknown[]) => unknown)();
-        if (tab === "addressBook") void (app()["refreshAddressBookList"] as (...a: unknown[]) => unknown)().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
-        if (tab === "storage") void (app()["refreshSettingsPathsFromBackend"] as (...a: unknown[]) => unknown)();
+        render();
+        if (tab === "autoSenders") void callApp("loadNewsletterRules").then(() => render());
+        if (tab === "ai") void callApp("refreshSemanticEmbeddingCounts");
+        if (tab === "addressBook") void callApp("refreshAddressBookList").then(() => render());
+        if (tab === "storage") void callApp("refreshSettingsPathsFromBackend");
       }
       return true;
     }
     case "settings-reload-paths":
-      void (app()["refreshSettingsPathsFromBackend"] as (...a: unknown[]) => unknown)();
+      void callApp("refreshSettingsPathsFromBackend");
       return true;
     case "text-prompt-confirm": {
       const raw = document.querySelector<HTMLInputElement>("#text-prompt-input")?.value ?? "";
@@ -194,18 +195,18 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       const tab = element?.dataset.iaTab;
       if (tab === "semantic") {
         state.settingsAiModal = "semantic";
-        void (app()["refreshSemanticEmbeddingCounts"] as (...a: unknown[]) => unknown)().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+        void callApp("refreshSemanticEmbeddingCounts").then(() => render());
       } else if (tab === "llm") {
-        void (app()["openEnginesAiSettingsModal"] as (...a: unknown[]) => unknown)();
+        void callApp("openEnginesAiSettingsModal");
       } else if (tab === "dictation") {
         state.settingsAiModal = "dictation";
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       } else if (tab === "background") {
         state.settingsAiModal = "background";
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       } else if (tab === "features") {
         state.settingsAiModal = "features-0";
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       }
       return true;
     }
@@ -218,7 +219,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           if (!isTauriRuntime()) {
             state.promptCatalog = null;
             state.promptCatalogLoadError = t("settings.ai.promptsNoCatalog");
-            (app()["render"] as (...a: unknown[]) => unknown)();
+            render();
             return;
           }
           try {
@@ -228,17 +229,17 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             state.promptCatalog = null;
             state.promptCatalogLoadError = tauriErrorMessage(e);
           }
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         })();
-      } else if (modal === "semantic") void (app()["refreshSemanticEmbeddingCounts"] as (...a: unknown[]) => unknown)().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
-      else if (modal === "engines") void (app()["openEnginesAiSettingsModal"] as (...a: unknown[]) => unknown)();
-      else (app()["render"] as (...a: unknown[]) => unknown)();
+      } else if (modal === "semantic") void callApp("refreshSemanticEmbeddingCounts").then(() => render());
+      else if (modal === "engines") void callApp("openEnginesAiSettingsModal");
+      else render();
       return true;
     }
     case "close-settings-ai-modal":
-      (app()["finalizeSettingsAiModalClose"] as (...a: unknown[]) => unknown)();
+      callApp("finalizeSettingsAiModalClose");
       state.settingsAiModal = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "save-default-account-prompt": {
       void (async () => {
@@ -249,10 +250,10 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           return;
         }
         try {
-          await (app()["persistDefaultAccountId"] as (...a: unknown[]) => unknown)(id);
-          await (app()["switchActiveAccount"] as (...a: unknown[]) => unknown)(id);
+          await callApp("persistDefaultAccountId", id);
+          await callApp("switchActiveAccount", id);
           toast("Compte par défaut enregistré.");
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -265,13 +266,13 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       } catch {
         /* ignore */
       }
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "open-settings-default-account":
       state.view = "settings";
       state.settingsTab = "general";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "save-general-prefs": {
       void (async () => {
@@ -289,12 +290,12 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         state.appPrefs.general.addressBookGlobalScope = Boolean(globalCb?.checked);
         const activityCb = document.querySelector<HTMLInputElement>("#prefs-activity-suggestions");
         state.appPrefs.general.activitySuggestionsEnabled = activityCb?.checked !== false;
-        (app()["syncActivityRecordingPrefs"] as (...a: unknown[]) => unknown)();
+        callApp("syncActivityRecordingPrefs");
         if (!state.appPrefs.general.activitySuggestionsEnabled) {
           state.suggestedSavedViews = [];
           clearSuggestionShownKeys();
         } else {
-          void refreshSuggestedSavedViews().then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+          void refreshSuggestedSavedViews().then(() => render());
         }
         const lfSel = document.querySelector<HTMLSelectElement>("#prefs-default-list-filter");
         const lfRaw = lfSel?.value?.trim() ?? "all";
@@ -327,34 +328,34 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           toast(tauriErrorMessage(e));
         }
         if (accVal && state.view === "list") {
-          await (app()["switchActiveAccount"] as (...a: unknown[]) => unknown)(accVal);
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          await callApp("switchActiveAccount", accVal);
+          render();
         } else if (
           state.view === "list" &&
           !isSavedDraftsVirtualMailbox(state.selectedMailbox ?? "") &&
           !isSearchActive() &&
-          state.listFilter !== (app()["defaultListFilterFromPrefs"] as (...a: unknown[]) => unknown)()
+          state.listFilter !== callApp("defaultListFilterFromPrefs")
         ) {
-          await applyListFilter((app()["defaultListFilterFromPrefs"] as (...a: unknown[]) => unknown)());
+          await applyListFilter(callApp("defaultListFilterFromPrefs"));
         } else {
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         }
       })();
       return true;
     }
     case "save-ai-prefs":
-      void (app()["persistAiPrefsFromDom"] as (...a: unknown[]) => unknown)();
+      void callApp("persistAiPrefsFromDom");
       return true;
     case "refresh-llm-runtime-status": {
-      void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
-        (app()["render"] as (...a: unknown[]) => unknown)();
+      void callApp("refreshLlmRuntimeStatus", false).then(() => {
+        render();
         toast("Statut LLM actualisé.");
       });
       return true;
     }
     case "refresh-llm-hardware-rescan": {
-      void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(true).then(() => {
-        (app()["render"] as (...a: unknown[]) => unknown)();
+      void callApp("refreshLlmRuntimeStatus", true).then(() => {
+        render();
         toast("Mémoire de l’ordinateur : nouvelle analyse effectuée.");
       });
       return true;
@@ -369,9 +370,9 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       if (st.recommendedFile?.trim()) {
         state.appPrefs.ai.localLlmGgufFile = st.recommendedFile.trim();
       }
-      void (app()["persistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ silent: true, skipRender: true });
+      void callApp("persistAiPrefsFromDom", { silent: true, skipRender: true });
       toast("Modèle recommandé appliqué.");
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "llm-setup-recommended": {
@@ -380,7 +381,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           toast("Configuration recommandée : lancez l’app Tauri.");
           return;
         }
-        await (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(true);
+        await callApp("refreshLlmRuntimeStatus", true);
         const st = state.llmRuntimeStatus;
         if (st?.recommendedRepo?.trim()) {
           state.appPrefs.ai.localLlmHfRepoId = st.recommendedRepo.trim();
@@ -389,16 +390,16 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           }
           state.appPrefs.ai.localLlmEnabled = true;
         }
-        await (app()["autoDetectLlamaServerBinary"] as (...a: unknown[]) => unknown)({ silent: true, persist: false });
+        await callApp("autoDetectLlamaServerBinary", { silent: true, persist: false });
         try {
           await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
         } catch (e) {
           toast(tauriErrorMessage(e));
           return;
         }
-        await (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false);
+        await callApp("refreshLlmRuntimeStatus", false);
         toast("Configuration recommandée appliquée.");
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -412,7 +413,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         applyEngineConnectionMode(state.appPrefs.ai, "hybrid");
       }
       syncLlmEnginePrefsToDom(state.appPrefs.ai);
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       void (async () => {
         if (mode === "local" || mode === "hybrid") {
           try {
@@ -429,8 +430,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
               ? "Mode Cloud."
               : "Mode Hybride enregistré.",
         );
-        await (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false);
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        await callApp("refreshLlmRuntimeStatus", false);
+        render();
       })();
       return true;
     }
@@ -457,8 +458,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       }
       state.llmPrefetchInFlight = true;
       state.llmPrefetchPercent = 0;
-      (app()["paintLlmPrefetchProgressDom"] as (...a: unknown[]) => unknown)();
-      (app()["paintStatusBarProgressDom"] as (...a: unknown[]) => unknown)();
+      callApp("paintLlmPrefetchProgressDom");
+      callApp("paintStatusBarProgressDom");
       toast("Téléchargement du modèle en arrière-plan — vous pouvez continuer à utiliser l’app.");
       void (async () => {
         try {
@@ -470,11 +471,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         } finally {
           state.llmPrefetchInFlight = false;
           if (state.llmPrefetchPercent == null) {
-            (app()["paintLlmPrefetchProgressDom"] as (...a: unknown[]) => unknown)();
-            (app()["paintStatusBarProgressDom"] as (...a: unknown[]) => unknown)();
+            callApp("paintLlmPrefetchProgressDom");
+            callApp("paintStatusBarProgressDom");
           }
-          void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
-            if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
+          void callApp("refreshLlmRuntimeStatus", false).then(() => {
+            if (state.settingsAiModal === "engines") render();
           });
         }
       })();
@@ -498,7 +499,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -531,7 +532,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           );
           toast(`Index sémantique : ${stats.indexed} ligne(s), ${stats.errors} erreur(s).`);
           await searchThreads();
-          await (app()["refreshSemanticEmbeddingCounts"] as (...a: unknown[]) => unknown)();
+          await callApp("refreshSemanticEmbeddingCounts");
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -539,7 +540,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       return true;
     }
     case "refresh-semantic-embedding-counts": {
-      void (app()["refreshSemanticEmbeddingCounts"] as (...a: unknown[]) => unknown)();
+      void callApp("refreshSemanticEmbeddingCounts");
       return true;
     }
     case "prefetch-whisper-models": {
@@ -555,7 +556,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -571,7 +572,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         let recorder: MediaRecorder | null = null;
         const chunks: Blob[] = [];
         try {
-          stream = await (app()["requestMicStream"] as (...a: unknown[]) => unknown)();
+          stream = await callApp("requestMicStream");
           const mimeOpt =
             typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
               ? "audio/webm;codecs=opus"
@@ -591,8 +592,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           stream.getTracks().forEach((t) => t.stop());
           stream = null;
           recorder = null;
-          const wavBytes = await (app()["mediaBlobToWav16kMonoPcm16"] as (...a: unknown[]) => unknown)(blob);
-          const audioWavBase64 = (app()["bytesToBase64"] as (...a: unknown[]) => unknown)(wavBytes);
+          const wavBytes = await callApp("mediaBlobToWav16kMonoPcm16", blob);
+          const audioWavBase64 = callApp("bytesToBase64", wavBytes);
           toast("Test micro : transcription…");
           const res = await withTimeout(
             invoke<{ durationS: number; rms: number; elapsedMs: number; text?: string | null; error?: { kind: string; seconds?: number; rms?: number; message?: string } | null }>(
@@ -617,7 +618,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             );
           }
         } catch (e) {
-          toast(`Test micro : ${(app()["micPermissionErrorMessage"] as (...a: unknown[]) => unknown)(e)}`);
+          toast(`Test micro : ${callApp("micPermissionErrorMessage", e)}`);
         } finally {
           try {
             recorder?.stop();
@@ -626,7 +627,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           }
           stream?.getTracks().forEach((t) => t.stop());
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -649,8 +650,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           state.dictationApiKeySet = true;
           if (inp) inp.value = "";
           toast("Clé cloud enregistrée (OpenRouter + dictée).");
-          void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
-            if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
+          void callApp("refreshLlmRuntimeStatus", false).then(() => {
+            if (state.settingsAiModal === "engines") render();
           });
         } catch (e) {
           toast(tauriErrorMessage(e));
@@ -670,8 +671,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           state.openrouterApiKeySet = false;
           state.dictationApiKeySet = false;
           toast("Clé cloud supprimée.");
-          void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
-            if (state.settingsAiModal === "engines") (app()["render"] as (...a: unknown[]) => unknown)();
+          void callApp("refreshLlmRuntimeStatus", false).then(() => {
+            if (state.settingsAiModal === "engines") render();
           });
         } catch (e) {
           toast(tauriErrorMessage(e));
@@ -699,7 +700,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -716,7 +717,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -737,11 +738,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           state.openrouterApiKeySet = true;
           if (inp) inp.value = "";
           toast("Clé OpenRouter enregistrée dans le trousseau.");
-          void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+          void callApp("refreshLlmRuntimeStatus", false).then(() => render());
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -755,11 +756,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           await withTimeout(invoke("clear_openrouter_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
           state.openrouterApiKeySet = false;
           toast("Clé OpenRouter supprimée du trousseau.");
-          void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+          void callApp("refreshLlmRuntimeStatus", false).then(() => render());
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -780,11 +781,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           state.llamaServerApiKeySet = true;
           if (inp) inp.value = "";
           toast("Clé llama-server enregistrée dans le trousseau.");
-          void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+          void callApp("refreshLlmRuntimeStatus", false).then(() => render());
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -798,11 +799,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           await withTimeout(invoke("clear_llama_server_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
           state.llamaServerApiKeySet = false;
           toast("Clé llama-server supprimée du trousseau.");
-          void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+          void callApp("refreshLlmRuntimeStatus", false).then(() => render());
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -847,12 +848,12 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             state.appPrefs.ai.llamaServerBinaryPath = "llama-server";
             state.appPrefs.ai.localLlmEnabled = true;
             await invoke("set_app_prefs", { prefs: state.appPrefs });
-            void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+            void callApp("refreshLlmRuntimeStatus", false).then(() => render());
           }
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -874,11 +875,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           state.appPrefs.ai.llamaServerBinaryPath = picked.trim();
           await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
           toast("Chemin llama-server enregistré.");
-          void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => (app()["render"] as (...a: unknown[]) => unknown)());
+          void callApp("refreshLlmRuntimeStatus", false).then(() => render());
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       })();
       return true;
     }
@@ -895,11 +896,11 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           await withTimeout(invoke("add_newsletter_rule", { input: raw }), MAIL_ACTION_TIMEOUT_MS);
-          await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
+          await callApp("loadNewsletterRules");
           const inp = document.querySelector<HTMLInputElement>("#newsletter-domain-input");
           if (inp) inp.value = "";
           toast("Règle enregistrée.");
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (error) {
           toast(tauriErrorMessage(error));
         }
@@ -907,7 +908,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       return true;
     }
     case "newsletter-domain-remove": {
-      const dom = (app()["readNlButtonRule"] as (...a: unknown[]) => unknown)(element);
+      const dom = callApp("readNlButtonRule", element);
       if (!dom) {
         toast("Règle invalide ou manquante.");
         return true;
@@ -919,9 +920,9 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           await withTimeout(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
-          await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
+          await callApp("loadNewsletterRules");
           toast("Règle supprimée.");
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (error) {
           toast(tauriErrorMessage(error));
         }
@@ -929,8 +930,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       return true;
     }
     case "newsletter-msg-add-rule": {
-      const raw = (app()["readNlButtonRule"] as (...a: unknown[]) => unknown)(element);
-      const rule = (app()["normalizeNlRuleInvokeInput"] as (...a: unknown[]) => unknown)(raw);
+      const raw = callApp("readNlButtonRule", element);
+      const rule = callApp("normalizeNlRuleInvokeInput", raw);
       if (!rule) {
         toast("Impossible de lire l’adresse (data-rule vide). Réouvrez le fil ou utilisez les paramètres.");
         return true;
@@ -946,14 +947,14 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           await withTimeout(invoke("add_newsletter_rule", { input: rule }), MAIL_ACTION_TIMEOUT_MS);
-          await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
+          await callApp("loadNewsletterRules");
           if (state.selectedThreadId) {
             const tid = state.selectedThreadId;
-            const refreshed = await (app()["fetchOpenThreadOrNotify"] as (...a: unknown[]) => unknown)(tid);
+            const refreshed = await callApp("fetchOpenThreadOrNotify", tid);
             if (refreshed) state.selectedThread = refreshed;
           }
           toast(`Règle ajoutée : ${rule}`);
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (error) {
           toast(tauriErrorMessage(error));
         }
@@ -961,7 +962,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       return true;
     }
     case "newsletter-msg-remove-rule": {
-      const dom = (app()["readNlButtonRule"] as (...a: unknown[]) => unknown)(element);
+      const dom = callApp("readNlButtonRule", element);
       if (!dom) {
         toast("Règle invalide ou manquante.");
         return true;
@@ -973,14 +974,14 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           await withTimeout(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
-          await (app()["loadNewsletterRules"] as (...a: unknown[]) => unknown)();
+          await callApp("loadNewsletterRules");
           if (state.selectedThreadId) {
             const tid = state.selectedThreadId;
-            const refreshed = await (app()["fetchOpenThreadOrNotify"] as (...a: unknown[]) => unknown)(tid);
+            const refreshed = await callApp("fetchOpenThreadOrNotify", tid);
             if (refreshed) state.selectedThread = refreshed;
           }
           toast(`Règle retirée : ${dom}`);
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         } catch (error) {
           toast(tauriErrorMessage(error));
         }
@@ -998,7 +999,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       state.oauthLockedEmail = null;
       state.accountFormOAuthPrefill = null;
       resetNewAccountSetupState();
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "settings-new-account":
@@ -1007,14 +1008,14 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       state.settingsSelectedAccountId = "new";
       accountFieldTouched.serverFields = false;
       resetNewAccountSetupState();
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "discover-mail-servers":
-      void (app()["discoverMailServersAction"] as (...a: unknown[]) => unknown)();
+      void callApp("discoverMailServersAction");
       return true;
     case "account-toggle-servers":
       state.accountServersPanelOpen = !state.accountServersPanelOpen;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "oauth-google-connect": {
       void (async () => {
@@ -1027,14 +1028,14 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             invoke<OAuthDesktopLoginOutcome>("oauth_google_desktop_login_cmd", {}),
             OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
           );
-          (app()["warnOAuthEphemeralRedirect"] as (...a: unknown[]) => unknown)(o);
+          callApp("warnOAuthEphemeralRedirect", o);
           const email = (o.email ?? "").trim();
           if (!email.includes("@")) {
             toast("OAuth Google : adresse e-mail absente ou invalide.");
             return;
           }
           setSkipAccountIdentityCaptureOnce(true);
-          await (app()["finishOAuthNewAccountAfterLogin"] as (...a: unknown[]) => unknown)("oauthGoogle", email, (o.displayName ?? "").trim());
+          await callApp("finishOAuthNewAccountAfterLogin", "oauthGoogle", email, (o.displayName ?? "").trim());
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -1052,14 +1053,14 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
             invoke<OAuthDesktopLoginOutcome>("oauth_microsoft_desktop_login_cmd", {}),
             OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
           );
-          (app()["warnOAuthEphemeralRedirect"] as (...a: unknown[]) => unknown)(o);
+          callApp("warnOAuthEphemeralRedirect", o);
           const email = (o.email ?? "").trim();
           if (!email.includes("@")) {
             toast("OAuth Microsoft : adresse e-mail absente ou invalide.");
             return;
           }
           setSkipAccountIdentityCaptureOnce(true);
-          await (app()["finishOAuthNewAccountAfterLogin"] as (...a: unknown[]) => unknown)("oauthMicrosoft", email, (o.displayName ?? "").trim());
+          await callApp("finishOAuthNewAccountAfterLogin", "oauthMicrosoft", email, (o.displayName ?? "").trim());
         } catch (e) {
           toast(tauriErrorMessage(e));
         }
@@ -1073,17 +1074,17 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       state.oauthLockedEmail = null;
       state.accountFormOAuthPrefill = null;
       state.accountServersPanelOpen = false;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "oauth-wizard-retry": {
       const retry = state.accountOAuthWizardRetry;
       if (!retry || (retry.authKind !== "oauthGoogle" && retry.authKind !== "oauthMicrosoft")) return true;
       clearAccountOAuthWizard();
-      void (app()["finishOAuthNewAccountAfterLogin"] as (...a: unknown[]) => unknown)(retry.authKind, retry.email, retry.displayName);
+      void callApp("finishOAuthNewAccountAfterLogin", retry.authKind, retry.email, retry.displayName);
       return true;
     }
     case "delete-settings-account":
-      void (app()["deleteSettingsAccount"] as (...a: unknown[]) => unknown)();
+      void callApp("deleteSettingsAccount");
       return true;
     default:
       return false;

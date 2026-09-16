@@ -53,6 +53,7 @@ import { setMailboxLocked } from "../../folderManagerView";
 import { composeRewriteStyleFromTone } from "../core/composeTone";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
+import { currentAccount } from "../core/accountContext";
 import { toast } from "../lib/toast";
 import {
   dismissMailboxDigestPanel,
@@ -77,13 +78,14 @@ import { syncSearchBarChrome } from "../mail/searchBarUi";
 import { refreshSearchTagCatalog } from "../mail/searchTagCatalog";
 import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
 import { render } from "../dispatch";
+import { callApp } from "./callApp";
 import { app } from "./wireEventsBridge";
 export function wireEvents() {
   const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
   composeAbortRef.current?.abort();
   composeAbortRef.current = new AbortController();
   const composeSig = composeAbortRef.current.signal;
-  (app()["wireComposeRecipientChips"] as (...a: unknown[]) => unknown)();
+  callApp("wireComposeRecipientChips", );
   wireAtAutocompleteFields();
 
   document.querySelector<HTMLTextAreaElement>("#thread-qa-input")?.addEventListener(
@@ -129,10 +131,10 @@ export function wireEvents() {
             state.appPrefs.ai.openrouterEnabled = true;
           }
           syncLlmEnginePrefsToDom(state.appPrefs.ai);
-          void (app()["persistEngineCheckboxToggle"] as (...a: unknown[]) => unknown)(next ? "OpenRouter activé." : "OpenRouter désactivé — bascule PC.");
+          void callApp("persistEngineCheckboxToggle", next ? "OpenRouter activé." : "OpenRouter désactivé — bascule PC.");
         } else if (id === "prefs-llama-server-enabled" && t instanceof HTMLInputElement) {
           state.appPrefs.ai.llamaServerEnabled = t.checked;
-          void (app()["persistEngineCheckboxToggle"] as (...a: unknown[]) => unknown)(t.checked ? "llama-server activé." : "llama-server désactivé.");
+          void callApp("persistEngineCheckboxToggle", t.checked ? "llama-server activé." : "llama-server désactivé.");
         }
         return;
       }
@@ -142,7 +144,7 @@ export function wireEvents() {
           state.appPrefs.ai.dictationBackend =
             raw === "cloud" || raw === "local_http" ? raw : "whisper_cpp";
           captureAiPrefsFieldsFromDom(state.appPrefs);
-          (app()["schedulePersistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ skipDomCapture: true });
+          callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
           render();
           return;
         }
@@ -154,7 +156,7 @@ export function wireEvents() {
             if (inp) inp.value = v;
           }
           captureAiPrefsFieldsFromDom(state.appPrefs);
-          (app()["schedulePersistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ skipDomCapture: true });
+          callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
           return;
         }
         if (id === "prefs-local-gguf-preset" && t instanceof HTMLSelectElement) {
@@ -174,16 +176,16 @@ export function wireEvents() {
             }
           }
           captureAiPrefsFieldsFromDom(state.appPrefs);
-          (app()["schedulePersistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ skipDomCapture: true });
+          callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
           return;
         }
         captureAiPrefsFieldsFromDom(state.appPrefs);
-        (app()["schedulePersistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ skipDomCapture: true });
+        callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
         return;
       }
       if (t instanceof HTMLInputElement && t.type === "checkbox" && id.startsWith("prefs-")) {
         captureAiPrefsFieldsFromDom(state.appPrefs);
-        (app()["schedulePersistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ skipDomCapture: true });
+        callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
         return;
       }
       if (t.matches("[data-ai-feature]")) return;
@@ -195,10 +197,10 @@ export function wireEvents() {
         t.type !== "checkbox"
       ) {
         if (id === "prefs-local-llm-ctx-range") {
-          (app()["applyContextSliderIndex"] as (...a: unknown[]) => unknown)(Number.parseInt(t.value, 10));
+          callApp("applyContextSliderIndex", Number.parseInt(t.value, 10));
         }
         captureAiPrefsFieldsFromDom(state.appPrefs);
-        (app()["schedulePersistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ skipDomCapture: true });
+        callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
       }
     },
     { signal: composeSig }
@@ -211,9 +213,9 @@ export function wireEvents() {
       const t = ev.target as HTMLElement | null;
       if (!(t instanceof HTMLInputElement) || t.id !== "prefs-local-llm-ctx-range") return;
       if (!t.closest(".settings-ai-modal-body")) return;
-      (app()["applyContextSliderIndex"] as (...a: unknown[]) => unknown)(Number.parseInt(t.value, 10));
+      callApp("applyContextSliderIndex", Number.parseInt(t.value, 10));
       captureAiPrefsFieldsFromDom(state.appPrefs);
-      (app()["schedulePersistAiPrefsFromDom"] as (...a: unknown[]) => unknown)({ skipDomCapture: true });
+      callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
     },
     { signal: composeSig }
   );
@@ -224,7 +226,7 @@ export function wireEvents() {
     "input",
     (ev) => {
       const q = (ev.currentTarget as HTMLInputElement).value;
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (!acc?.id) return;
       if (contactsSearchDebounce) clearTimeout(contactsSearchDebounce);
       contactsSearchDebounce = window.setTimeout(() => {
@@ -242,7 +244,7 @@ export function wireEvents() {
       const el = contactsListEl;
       const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 120;
       if (!nearBottom) return;
-      const acc = (app()["currentAccount"] as (...a: unknown[]) => unknown)();
+      const acc = currentAccount();
       if (!acc?.id) return;
       void loadContactsList(acc.id).then(() => render());
     },
@@ -273,7 +275,7 @@ export function wireEvents() {
         if (!set.has("analyzeIntent")) set.add("analyzeIntent");
         if (!set.has("draftReply")) set.add("draftReply");
         s.enabledSkills = [...set];
-        void (app()["agentRefreshPlanFromDraft"] as (...a: unknown[]) => unknown)().then(() => render());
+        void callApp("agentRefreshPlanFromDraft", ).then(() => render());
         return;
       }
       if (t?.dataset.action === "mailbox-brief-mode") {
@@ -292,7 +294,7 @@ export function wireEvents() {
       if (!s || s.busy) return;
       s.assistMode = mode;
       s.enabledSkills = defaultEnabledSkillIds(mode);
-      void (app()["agentRefreshPlanFromDraft"] as (...a: unknown[]) => unknown)().then(() => render());
+      void callApp("agentRefreshPlanFromDraft", ).then(() => render());
     },
     { signal: composeSig },
   );
@@ -309,7 +311,7 @@ export function wireEvents() {
           try {
             await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
             toast(next ? "Override CPU autorisé (llama-server)." : "Override CPU désactivé.");
-            void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
+            void callApp("refreshLlmRuntimeStatus", false).then(() => {
               if (state.settingsAiModal === "engines") render();
             });
           } catch (e) {
@@ -332,7 +334,7 @@ export function wireEvents() {
           try {
             await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
             toast(next ? "Lancement llama-server par l’app activé." : "Lancement llama-server par l’app désactivé.");
-            void (app()["refreshLlmRuntimeStatus"] as (...a: unknown[]) => unknown)(false).then(() => {
+            void callApp("refreshLlmRuntimeStatus", false).then(() => {
               if (state.settingsAiModal === "engines") render();
             });
           } catch (e) {
@@ -418,7 +420,7 @@ export function wireEvents() {
       // Boutons avec data-action (fm-select, org-open-mailbox, …) : handleAction uniquement.
       if (el.dataset.action?.trim()) return;
       void (async () => {
-        await (app()["switchMailbox"] as (...a: unknown[]) => unknown)(el.dataset.mailbox || "INBOX");
+        await callApp("switchMailbox", el.dataset.mailbox || "INBOX");
       })();
     });
   });
@@ -457,7 +459,7 @@ export function wireEvents() {
         e.preventDefault();
         const mb = el.dataset.mailbox?.trim();
         const refId = el.dataset.mailboxRefId?.trim();
-        if (mb && refId) void (app()["onOrgDeleteMailboxOne"] as (...a: unknown[]) => unknown)(mb, refId);
+        if (mb && refId) void callApp("onOrgDeleteMailboxOne", mb, refId);
       },
       { signal: composeSig },
     );
@@ -469,7 +471,7 @@ export function wireEvents() {
         e.stopPropagation();
         e.preventDefault();
         const mb = el.dataset.mailbox?.trim();
-        if (mb) void (app()["onOrgSyncMailbox"] as (...a: unknown[]) => unknown)(mb);
+        if (mb) void callApp("onOrgSyncMailbox", mb);
       },
       { signal: composeSig },
     );
@@ -481,7 +483,7 @@ export function wireEvents() {
         e.stopPropagation();
         e.preventDefault();
         const mb = el.dataset.mailbox?.trim();
-        if (mb) void (app()["onOrgV2IgnoreMailboxUi"] as (...a: unknown[]) => unknown)(mb);
+        if (mb) void callApp("onOrgV2IgnoreMailboxUi", mb);
       },
       { signal: composeSig },
     );
@@ -493,7 +495,7 @@ export function wireEvents() {
         e.stopPropagation();
         e.preventDefault();
         const mb = el.dataset.mailbox?.trim();
-        if (mb) void (app()["onOrgV2UnignoreMailboxUi"] as (...a: unknown[]) => unknown)(mb);
+        if (mb) void callApp("onOrgV2UnignoreMailboxUi", mb);
       },
       { signal: composeSig },
     );
@@ -516,17 +518,17 @@ export function wireEvents() {
   document.querySelectorAll<HTMLButtonElement>("[data-att-download][data-msg-id]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      void (app()["onAttachmentAction"] as (...a: unknown[]) => unknown)("download", el.dataset.msgId ?? "", el.dataset.attDownload ?? "");
+      void callApp("onAttachmentAction", "download", el.dataset.msgId ?? "", el.dataset.attDownload ?? "");
     });
   });
   document.querySelectorAll<HTMLButtonElement>("[data-att-open][data-msg-id]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      void (app()["onAttachmentAction"] as (...a: unknown[]) => unknown)("open", el.dataset.msgId ?? "", el.dataset.attOpen ?? "", el.dataset.attName ?? "");
+      void callApp("onAttachmentAction", "open", el.dataset.msgId ?? "", el.dataset.attOpen ?? "", el.dataset.attName ?? "");
     });
   });
   if (state.view === "thread") {
-    (app()["hydrateEmailHtml"] as (...a: unknown[]) => unknown)();
+    callApp("hydrateEmailHtml", );
   }
   document.querySelectorAll(".modal-shell-stop-prop").forEach((shell) => {
     shell.addEventListener("click", (e) => e.stopPropagation());
@@ -582,19 +584,19 @@ export function wireEvents() {
       const a = t.closest("a[href]") as HTMLAnchorElement | null;
       if (a) {
         const raw = a.getAttribute("href")?.trim() ?? "";
-        const normalized = (app()["normalizeMailHrefForOpen"] as (...a: unknown[]) => unknown)(raw);
+        const normalized = callApp("normalizeMailHrefForOpen", raw);
         if (normalized) {
           ev.preventDefault();
-          void (app()["openExternalFromMailHref"] as (...a: unknown[]) => unknown)(normalized);
+          void callApp("openExternalFromMailHref", normalized);
         }
         return;
       }
       if (t.tagName !== "IMG") return;
       const img = t as HTMLImageElement;
-      const src = (app()["pickImgSrcForLightbox"] as (...a: unknown[]) => unknown)(img);
+      const src = callApp("pickImgSrcForLightbox", img);
       if (!src) return;
       const alt = (img.getAttribute("alt") || "").trim();
-      void (app()["resolveSrcForMailImageLightbox"] as (...a: unknown[]) => unknown)(src, null).then((resolved) => {
+      void callApp("resolveSrcForMailImageLightbox", src, null).then((resolved) => {
         state.imageModal = { src: resolved.src, alt, revokeObjectUrl: resolved.revokeObjectUrl ?? null };
         render();
       });
@@ -643,16 +645,16 @@ export function wireEvents() {
   document.querySelector<HTMLSelectElement>("#account-select")?.addEventListener("change", (event) => {
     void (async () => {
       const id = (event.currentTarget as HTMLSelectElement).value || state.accounts[0]?.id || "";
-      await (app()["switchActiveAccount"] as (...a: unknown[]) => unknown)(id);
+      await callApp("switchActiveAccount", id);
       render();
     })();
   });
   document.querySelector<HTMLTextAreaElement>("#compose-body")?.addEventListener(
     "input",
     (event) => {
-      (app()["setComposeFromTextareaValue"] as (...a: unknown[]) => unknown)((event.currentTarget as HTMLTextAreaElement).value);
-      (app()["schedulePreviewUpdate"] as (...a: unknown[]) => unknown)();
-      (app()["scheduleDraftRevisionSave"] as (...a: unknown[]) => unknown)();
+      callApp("setComposeFromTextareaValue", (event.currentTarget as HTMLTextAreaElement).value);
+      callApp("schedulePreviewUpdate", );
+      callApp("scheduleDraftRevisionSave", );
     },
     { signal: composeSig }
   );
@@ -680,9 +682,9 @@ export function wireEvents() {
       const stamp = new Date().toLocaleString();
       const snippet = `${nlBefore}![Capture ${stamp}](${dataUrl})${nlAfter}\n`;
       textarea.setRangeText(snippet, start, end, "end");
-      (app()["loadComposeMarkdownIntoEditor"] as (...a: unknown[]) => unknown)(textarea.value);
+      callApp("loadComposeMarkdownIntoEditor", textarea.value);
       textarea.value = state.composeBody;
-      (app()["schedulePreviewUpdate"] as (...a: unknown[]) => unknown)(0);
+      callApp("schedulePreviewUpdate", 0);
       textarea.focus();
     };
     reader.readAsDataURL(file);
@@ -692,7 +694,7 @@ export function wireEvents() {
   document.querySelector<HTMLInputElement>("#compose-subject")?.addEventListener(
     "input",
     () => {
-      (app()["scheduleDraftRevisionSave"] as (...a: unknown[]) => unknown)();
+      callApp("scheduleDraftRevisionSave", );
     },
     { signal: composeSig }
   );
@@ -704,16 +706,16 @@ export function wireEvents() {
       const key = evk.key.toLowerCase();
       if (key === "b") {
         evk.preventDefault();
-        void (app()["applyMarkdownAction"] as (...a: unknown[]) => unknown)("bold");
+        void callApp("applyMarkdownAction", "bold");
       } else if (key === "i") {
         evk.preventDefault();
-        void (app()["applyMarkdownAction"] as (...a: unknown[]) => unknown)("italic");
+        void callApp("applyMarkdownAction", "italic");
       } else if (key === "k") {
         evk.preventDefault();
-        void (app()["applyMarkdownAction"] as (...a: unknown[]) => unknown)("link");
+        void callApp("applyMarkdownAction", "link");
       } else if (key === "u") {
         evk.preventDefault();
-        void (app()["applyMarkdownAction"] as (...a: unknown[]) => unknown)("underline");
+        void callApp("applyMarkdownAction", "underline");
       }
     },
     { signal: composeSig }
@@ -722,16 +724,16 @@ export function wireEvents() {
     button.addEventListener(
       "click",
       () => {
-        void (app()["applyMarkdownAction"] as (...a: unknown[]) => unknown)(button.dataset.md ?? "");
+        void callApp("applyMarkdownAction", button.dataset.md ?? "");
       },
       { signal: composeSig }
     );
   });
-  (app()["bindComposerDropzone"] as (...a: unknown[]) => unknown)();
+  callApp("bindComposerDropzone", );
   document.querySelector<HTMLInputElement>("[data-quick-reply]")?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      void (app()["sendQuickReply"] as (...a: unknown[]) => unknown)("reply");
+      void callApp("sendQuickReply", "reply");
     }
   });
 

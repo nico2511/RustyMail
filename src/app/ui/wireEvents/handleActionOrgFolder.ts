@@ -1,8 +1,9 @@
 // @ts-nocheck
+import { callApp } from "./callApp";
 import {
-  app,
   currentAccount,
   loadMailView,
+  render,
   applyListFilter,
   threadIdsMatch,
   state,
@@ -75,37 +76,37 @@ import {
 export async function tryHandleOrgFolder(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
     case "open-contacts-view":
-      void (app()["openContactsView"] as (...a: unknown[]) => unknown)();
+      void callApp("openContactsView");
       return true;
     case "open-organization-view":
-      void (app()["openOrganizationView"] as (...a: unknown[]) => unknown)();
+      void callApp("openOrganizationView");
       return true;
     case "open-organization-v2-view":
-      void (app()["openOrganizationV2View"] as (...a: unknown[]) => unknown)();
+      void callApp("openOrganizationV2View");
       return true;
     case "open-folder-manager-view":
       state.mailboxManageOpen = false;
-      void (app()["openFolderManagerView"] as (...a: unknown[]) => unknown)();
+      void callApp("openFolderManagerView");
       return true;
     case "fm-refresh":
-      void (app()["refreshFolderManagerTree"] as (...a: unknown[]) => unknown)();
+      void callApp("refreshFolderManagerTree");
       return true;
     case "fm-create-root":
-      void (app()["fmCreateMailbox"] as (...a: unknown[]) => unknown)();
+      void callApp("fmCreateMailbox");
       return true;
     case "fm-create-child": {
       const parent = element?.dataset.mailbox?.trim();
-      if (parent) void (app()["fmCreateMailbox"] as (...a: unknown[]) => unknown)(parent);
+      if (parent) void callApp("fmCreateMailbox", parent);
       return true;
     }
     case "fm-select": {
       const mb = element?.dataset.mailbox?.trim();
-      if (mb) void (app()["fmSelectMailbox"] as (...a: unknown[]) => unknown)(mb);
+      if (mb) void callApp("fmSelectMailbox", mb);
       return true;
     }
     case "fm-sync": {
       const mb = element?.dataset.mailbox?.trim();
-      if (mb) void (app()["fmSyncMailbox"] as (...a: unknown[]) => unknown)(mb);
+      if (mb) void callApp("fmSyncMailbox", mb);
       return true;
     }
     case "fm-archive": {
@@ -116,13 +117,13 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         (m) => m.toLowerCase() === mb.toLowerCase(),
       );
       state.folderManager.archiveConfirmOpen = true;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "fm-archive-cancel":
       state.folderManager.archiveConfirmOpen = false;
       state.folderManager.pendingArchiveMailbox = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "fm-archive-remember-toggle":
       state.folderManager.archiveRemember = Boolean(
@@ -130,7 +131,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       );
       return true;
     case "fm-archive-confirm":
-      void (app()["fmConfirmArchiveMailbox"] as (...a: unknown[]) => unknown)();
+      void callApp("fmConfirmArchiveMailbox");
       return true;
     case "fm-delete": {
       const mb = element?.dataset.mailbox?.trim();
@@ -138,23 +139,23 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.folderManager.pendingDeleteMailbox = mb;
       state.folderManager.deleteConfirmOpen = true;
       state.folderManager.deleteConfirmChecked = false;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "fm-delete-cancel":
       state.folderManager.deleteConfirmOpen = false;
       state.folderManager.pendingDeleteMailbox = null;
       state.folderManager.deleteConfirmChecked = false;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "fm-delete-check-toggle":
       state.folderManager.deleteConfirmChecked = Boolean(
         document.querySelector<HTMLInputElement>("#fm-delete-check")?.checked,
       );
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "fm-delete-confirm":
-      void (app()["fmConfirmDeleteMailbox"] as (...a: unknown[]) => unknown)();
+      void callApp("fmConfirmDeleteMailbox");
       return true;
     case "fm-toggle-lock": {
       const acc = currentAccount();
@@ -164,7 +165,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       void setMailboxLocked(acc.id, mb, !locked)
         .then(async (list) => {
           if (state.folderManager.report) state.folderManager.report.lockedMailboxes = list;
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         })
         .catch((e) => toast(tauriErrorMessage(e)));
       return true;
@@ -175,12 +176,12 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       const cur = state.folderManager.expandedNodes[key];
       state.folderManager.expandedNodes[key] = cur === true ? false : true;
       saveFolderTreeExpanded(state.folderManager.expandedNodes);
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "fm-open-inbox": {
       const mb = element?.dataset.mailbox?.trim();
-      if (mb) void (app()["openOrganizationMailbox"] as (...a: unknown[]) => unknown)(mb);
+      if (mb) void callApp("openOrganizationMailbox", mb);
       return true;
     }
     case "org-v2-scan": {
@@ -188,20 +189,20 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       if (!acc?.id) return true;
       state.organizationV2.scanning = true;
       state.organizationV2.applyMessage = "Analyse…";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       const includeLlm = Boolean(state.appPrefs.ai.featureOrgProposalsEnabled);
       void orgV2ScanAccount(acc.id, includeLlm)
         .then((report) => {
           state.organizationV2.report = report;
           state.organizationV2.scanning = false;
           state.organizationV2.applyMessage = `${report.proposals.length} action(s).`;
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         })
         .catch((e) => {
           state.organizationV2.scanning = false;
           state.organizationV2.applyMessage = "";
           toast(tauriErrorMessage(e));
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         });
       return true;
     }
@@ -210,30 +211,30 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       if (!accUndo?.id) return true;
       state.organizationV2.applying = true;
       state.organizationV2.applyMessage = "Annulation…";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       void orgUndoLast(accUndo.id)
         .then((p) => {
           state.organizationV2.applying = false;
           state.organizationV2.applyMessage = p.message || "Lot annulé.";
           toast(state.organizationV2.applyMessage);
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         })
         .catch((e) => {
           state.organizationV2.applying = false;
           state.organizationV2.applyMessage = "";
           toast(tauriErrorMessage(e));
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         });
       return true;
     }
     case "org-v2-dismiss": {
       const pid = element?.dataset.proposalId?.trim();
-      if (pid) void (app()["orgV2DismissProposal"] as (...a: unknown[]) => unknown)(pid);
+      if (pid) void callApp("orgV2DismissProposal", pid);
       return true;
     }
     case "org-v2-snooze": {
       const pid = element?.dataset.proposalId?.trim();
-      if (pid) void (app()["orgV2SnoozeProposal"] as (...a: unknown[]) => unknown)(pid);
+      if (pid) void callApp("orgV2SnoozeProposal", pid);
       return true;
     }
     case "org-v2-apply": {
@@ -244,13 +245,13 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         state.organizationV2.trashConfirmOpen = true;
         state.organizationV2.pendingTrashProposalId = proposalId;
         state.organizationV2.pendingTrashActionOverride = null;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
         return;
       }
       if (element?.dataset.deleteMailbox === "1") {
         state.organizationV2.deleteMailboxConfirmOpen = true;
         state.organizationV2.pendingDeleteMailboxProposalId = proposalId;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
         return;
       }
       const applyProposal = state.organizationV2.report?.proposals.find((p) => p.id === proposalId);
@@ -258,21 +259,21 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         toast("Proposition introuvable — relancez l’analyse.");
         return true;
       }
-      void (app()["confirmThenRunOrgV2Apply"] as (...a: unknown[]) => unknown)(acc.id, proposalId);
+      void callApp("confirmThenRunOrgV2Apply", acc.id, proposalId);
       return true;
     }
     case "org-v2-cancel-apply":
       if (state.organizationV2.applying) {
         state.organizationV2.applyCancelRequested = true;
         state.organizationV2.applyMessage = "Arrêt demandé…";
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
       }
       return true;
     case "org-v2-trash-cancel":
       state.organizationV2.trashConfirmOpen = false;
       state.organizationV2.pendingTrashProposalId = null;
       state.organizationV2.pendingTrashActionOverride = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "org-v2-trash-confirm": {
       const acc = currentAccount();
@@ -282,19 +283,19 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.organizationV2.trashConfirmOpen = false;
       state.organizationV2.pendingTrashProposalId = null;
       state.organizationV2.pendingTrashActionOverride = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       const trashProposal = state.organizationV2.report?.proposals.find((p) => p.id === pid);
       if (!trashProposal) {
         toast("Proposition introuvable — relancez l’analyse.");
         return true;
       }
-      void (app()["runOrgV2Apply"] as (...a: unknown[]) => unknown)(acc.id, trashProposal, "bulk-trash-org", override ?? undefined);
+      void callApp("runOrgV2Apply", acc.id, trashProposal, "bulk-trash-org", override ?? undefined);
       return true;
     }
     case "org-v2-delete-mailbox-cancel":
       state.organizationV2.deleteMailboxConfirmOpen = false;
       state.organizationV2.pendingDeleteMailboxProposalId = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "org-v2-delete-mailbox-confirm": {
       const acc = currentAccount();
@@ -302,13 +303,13 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       if (!acc?.id || !pid) return true;
       state.organizationV2.deleteMailboxConfirmOpen = false;
       state.organizationV2.pendingDeleteMailboxProposalId = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       const delMbProposal = state.organizationV2.report?.proposals.find((p) => p.id === pid);
       if (!delMbProposal) {
         toast("Proposition introuvable — relancez l’analyse.");
         return true;
       }
-      void (app()["runOrgV2Apply"] as (...a: unknown[]) => unknown)(acc.id, delMbProposal, undefined, undefined, "delete-mailbox");
+      void callApp("runOrgV2Apply", acc.id, delMbProposal, undefined, undefined, "delete-mailbox");
       return true;
     }
     case "org-v2-ignore-mailbox":
@@ -319,25 +320,25 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       if (!acc?.id) return true;
       state.organization.scanning = true;
       state.organization.applyMessage = "Analyse de la boîte (structure, propositions)…";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       void orgScanAccount(acc.id, Boolean(state.appPrefs.ai.featureOrgProposalsEnabled))
         .then((report) => {
           state.organization.report = report;
           state.organization.scanning = false;
           state.organization.applyMessage = `${report.proposals.length} proposition(s).`;
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         })
         .catch((e) => {
           state.organization.scanning = false;
           state.organization.applyMessage = "";
           toast(tauriErrorMessage(e));
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         });
       return true;
     }
     case "org-open-mailbox": {
       const mb = element?.dataset.mailbox?.trim();
-      if (mb) void (app()["openOrganizationMailbox"] as (...a: unknown[]) => unknown)(mb);
+      if (mb) void callApp("openOrganizationMailbox", mb);
       return true;
     }
     case "org-sync-mailbox":
@@ -350,14 +351,14 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.organization.trashConfirmOpen = true;
       state.organization.pendingTrashProposalId = proposalId;
       state.organization.pendingTrashActionOverride = "trash";
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     }
     case "org-apply-archive": {
       const acc = currentAccount();
       const proposalId = element?.dataset.proposalId?.trim();
       if (!acc?.id || !proposalId) return true;
-      void (app()["confirmThenRunOrgApply"] as (...a: unknown[]) => unknown)(acc.id, proposalId, undefined, "archive");
+      void callApp("confirmThenRunOrgApply", acc.id, proposalId, undefined, "archive");
       return true;
     }
     case "org-apply": {
@@ -369,23 +370,23 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         state.organization.trashConfirmOpen = true;
         state.organization.pendingTrashProposalId = proposalId;
         state.organization.pendingTrashActionOverride = null;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
         return;
       }
       if (element?.dataset.deleteMailbox === "1") {
         state.organization.deleteMailboxConfirmOpen = true;
         state.organization.pendingDeleteMailboxProposalId = proposalId;
-        (app()["render"] as (...a: unknown[]) => unknown)();
+        render();
         return;
       }
-      void (app()["confirmThenRunOrgApply"] as (...a: unknown[]) => unknown)(acc.id, proposalId);
+      void callApp("confirmThenRunOrgApply", acc.id, proposalId);
       return true;
     }
     case "org-trash-cancel":
       state.organization.trashConfirmOpen = false;
       state.organization.pendingTrashProposalId = null;
       state.organization.pendingTrashActionOverride = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "org-trash-confirm": {
       const acc = currentAccount();
@@ -395,14 +396,14 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.organization.trashConfirmOpen = false;
       state.organization.pendingTrashProposalId = null;
       state.organization.pendingTrashActionOverride = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
-      void (app()["runOrgApply"] as (...a: unknown[]) => unknown)(acc.id, pid, "bulk-trash-org", override ?? undefined);
+      render();
+      void callApp("runOrgApply", acc.id, pid, "bulk-trash-org", override ?? undefined);
       return true;
     }
     case "org-delete-mailbox-cancel":
       state.organization.deleteMailboxConfirmOpen = false;
       state.organization.pendingDeleteMailboxProposalId = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       return true;
     case "org-delete-mailbox-confirm": {
       const acc = currentAccount();
@@ -410,8 +411,8 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       if (!acc?.id || !pid) return true;
       state.organization.deleteMailboxConfirmOpen = false;
       state.organization.pendingDeleteMailboxProposalId = null;
-      (app()["render"] as (...a: unknown[]) => unknown)();
-      void (app()["runOrgApply"] as (...a: unknown[]) => unknown)(acc.id, pid, undefined, undefined, "delete-mailbox");
+      render();
+      void callApp("runOrgApply", acc.id, pid, undefined, undefined, "delete-mailbox");
       return true;
     }
     case "org-retag-all": {
@@ -420,20 +421,20 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.organization.applying = true;
       state.organization.applyMessage = "Normalisation des tags en cours…";
       toast("Recalcul des tags sur tout le compte…");
-      (app()["render"] as (...a: unknown[]) => unknown)();
+      render();
       void orgRetagAccount(acc.id, false)
         .then(async (p) => {
           state.organization.applying = false;
           state.organization.applyMessage = p.message;
           toast(p.message);
-          await (app()["refreshOrganizationReport"] as (...a: unknown[]) => unknown)();
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          await callApp("refreshOrganizationReport");
+          render();
         })
         .catch((e) => {
           state.organization.applying = false;
           state.organization.applyMessage = "";
           toast(tauriErrorMessage(e));
-          (app()["render"] as (...a: unknown[]) => unknown)();
+          render();
         });
       return true;
     }
