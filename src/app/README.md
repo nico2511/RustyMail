@@ -209,7 +209,15 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/orgApplyRun.ts` | Appliquer propositions org v1 + `registerOrgApplyRunDeps()` |
 | `app/mail/orgV2ApplyRun.ts` | Appliquer propositions org v2 + `registerOrgV2ApplyRunDeps()` |
 | `app/mail/orgV2ProposalUi.ts` | Ignorer / reporter / mémoire dossiers org v2 |
-| `app/mail/folderManagerActions.ts` | Vue Dossiers IMAP (fm*, arbre) + `registerFolderManagerRunDeps()` |
+| `app/mail/folderManagerActions.ts` | Barrel vue Dossiers IMAP |
+| `app/mail/folderManagerContext.ts` | `registerFolderManagerRunDeps` |
+| `app/mail/folderManagerTreeRun.ts` | Arbre, sélection dossier, ouverture vue |
+| `app/mail/folderManagerCrudRun.ts` | Sync / créer / renommer / déplacer dossier |
+| `app/mail/folderManagerConfirmRun.ts` | Archiver / supprimer dossier (confirm) |
+| `app/mail/threadListActions.ts` | Barrel actions liste fils |
+| `app/mail/threadListActionsContext.ts` | Deps + `sourceMailboxForThread` |
+| `app/mail/threadListMoveRun.ts` | Corbeille, archive, déplacer |
+| `app/mail/threadListReadFollowRun.ts` | Lu/non-lu, suivi |
 | `app/mail/folderManagerDnD.ts` | Glisser-déposer dossiers / fils (vue Dossiers) |
 | `app/lib/sidebarUiPref.ts` | Préférence sidebar repliée (localStorage) |
 | `app/mail/newsletterRuleInput.ts` | Lecture/normalisation règles expéditeurs auto (UI) |
@@ -278,7 +286,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`folderManagerActions`, `threadListActions`, …)
+1. Découper d’autres modules mail > ~350 lignes (`appShellBindings`, `mailboxDigest`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
