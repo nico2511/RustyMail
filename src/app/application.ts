@@ -260,6 +260,20 @@ import {
 import { cancelLlmQueueJob, registerLlmQueueCancelDeps } from "./mail/llmQueueCancel";
 import { cycleComposeLayout, registerCycleComposeLayoutDeps } from "./mail/cycleComposeLayout";
 import { registerComposeSendDraftActionDeps } from "./mail/composeSendDraftAction";
+import { refreshDraftRevisions } from "./mail/composeDraftRevisions";
+import {
+  computeDraftDiffAgainstRevision,
+  registerComposeDraftRevisionDiffDeps,
+} from "./mail/composeDraftRevisionDiff";
+import {
+  dismissOrphanDraftSession,
+  registerComposeOrphanDraftSessionDeps,
+  resumeOrphanDraftSession,
+} from "./mail/composeOrphanDraftSession";
+import { pickAttachments, registerComposePickAttachmentsDeps } from "./mail/composePickAttachments";
+import {
+  registerComposeComposerBridgeDeps,
+} from "./mail/composeComposerBridge";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -717,150 +731,6 @@ function startNewDraftSession() {
   state.draftVersionsListExpanded = false;
 }
 
-function splitLines(input: string): string[] {
-  return String(input ?? "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .split("\n");
-}
-
-function myersDiffLines(a: string[], b: string[]): DraftDiffLine[] {
-  // Myers diff O((N+M)D), returns per-line ops.
-  const n = a.length;
-  const m = b.length;
-  const max = n + m;
-  const offset = max;
-  let v = new Array<number>(2 * max + 1).fill(0);
-  const trace: number[][] = [];
-
-  for (let d = 0; d <= max; d++) {
-    trace.push(v.slice());
-    for (let k = -d; k <= d; k += 2) {
-      const kIndex = k + offset;
-      const down = k === -d || (k !== d && v[kIndex - 1] < v[kIndex + 1]);
-      let x = down ? v[kIndex + 1] : v[kIndex - 1] + 1;
-      let y = x - k;
-      while (x < n && y < m && a[x] === b[y]) {
-        x++;
-        y++;
-      }
-      v[kIndex] = x;
-      if (x >= n && y >= m) {
-        // backtrack
-        const out: DraftDiffLine[] = [];
-        let curX = n;
-        let curY = m;
-        for (let curD = d; curD >= 0; curD--) {
-          const prevV = trace[curD];
-          const curK = curX - curY;
-          const curKIndex = curK + offset;
-          const prevDown =
-            curK === -curD || (curK !== curD && prevV[curKIndex - 1] < prevV[curKIndex + 1]);
-          const prevK = prevDown ? curK + 1 : curK - 1;
-          const prevX = prevDown ? prevV[prevK + offset] : prevV[prevK + offset] + 1;
-          const prevY = prevX - prevK;
-          while (curX > prevX && curY > prevY) {
-            out.push({ kind: "eq", text: a[curX - 1] });
-            curX--;
-            curY--;
-          }
-          if (curD === 0) break;
-          if (prevDown) {
-            // insertion in b
-            out.push({ kind: "add", text: b[curY - 1] });
-            curY--;
-          } else {
-            // deletion from a
-            out.push({ kind: "del", text: a[curX - 1] });
-            curX--;
-          }
-        }
-        out.reverse();
-        return out;
-      }
-    }
-  }
-  // Fallback: no diff found (shouldn't happen)
-  return [
-    ...a.map((t) => ({ kind: "del" as const, text: t })),
-    ...b.map((t) => ({ kind: "add" as const, text: t })),
-  ];
-}
-
-async function computeDraftDiffAgainstRevision(revisionId: string) {
-  const rid = revisionId.trim();
-  const accountId = currentAccount()?.id?.trim() ?? "";
-  if (!isTauriRuntime() || !rid || !accountId) return;
-  if (!state.draft) return;
-  persistDraft();
-
-  state.draftDiffRevisionId = rid;
-  state.draftDiffLoading = true;
-  state.draftDiffLines = [];
-  state.draftDiffOtherBody = "";
-  state.draftRevisionPreview = null;
-  render();
-
-  try {
-    const other = await withTimeout(
-      invoke<Draft | null>("draft_revision_restore", { accountId, revisionId: rid }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-    if (!other) {
-      toast("Cette version n’existe plus.");
-      state.draftDiffLoading = false;
-      render();
-      return;
-    }
-    const curBody = state.draft.markdownBody ?? "";
-    const otherBody = other.markdownBody ?? "";
-    state.draftDiffOtherBody = otherBody;
-    state.draftRevisionPreview = await safeInvoke<DraftPreview>(
-      "preview_draft",
-      { markdownBody: otherBody },
-      {
-        textPlain: otherBody,
-        html: `<p>${escapeHtml(otherBody).replace(/\n/g, "<br />")}</p>`,
-      }
-    );
-    const a = splitLines(curBody);
-    const b = splitLines(otherBody);
-    // Guardrail to avoid UI freeze on extreme cases.
-    if (a.length + b.length > 8000) {
-      toast("Diff trop volumineux : affichez une version plus courte (limite lignes).");
-      state.draftDiffLines = [];
-    } else {
-      state.draftDiffLines = myersDiffLines(a, b);
-    }
-  } catch (error) {
-    console.error("draft_revision_restore (diff)", error);
-    toast(`Diff impossible: ${tauriErrorMessage(error)}`);
-  } finally {
-    state.draftDiffLoading = false;
-    render();
-  }
-}
-
-async function refreshDraftRevisions(limit = 50) {
-  const accountId = currentAccount()?.id?.trim() ?? "";
-  const sessionId = state.draftSessionId?.trim() ?? "";
-  if (!isTauriRuntime() || !accountId || !sessionId) return;
-  state.draftRevisionsLoading = true;
-  render();
-  try {
-    state.draftRevisions = await withTimeout(
-      invoke<DraftRevisionListItem[]>("draft_revision_list", { accountId, sessionId, limit }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-  } catch (error) {
-    console.error("draft_revision_list", error);
-    toast(`Impossible de charger l’historique: ${tauriErrorMessage(error)}`);
-  } finally {
-    state.draftRevisionsLoading = false;
-    render();
-  }
-}
-
 async function saveDraftRevisionNow(): Promise<boolean> {
   const accountId = currentAccount()?.id?.trim() ?? "";
   const sessionId = state.draftSessionId?.trim() ?? "";
@@ -1001,56 +871,6 @@ async function checkOrphanDraftSessionsOnBoot(): Promise<void> {
   } catch (e) {
     console.error("draft_orphan_sessions_list", e);
   }
-}
-
-async function resumeOrphanDraftSession(sessionId: string): Promise<void> {
-  const sid = sessionId.trim();
-  const accountId = currentAccount()?.id?.trim();
-  if (!sid || !accountId || !isTauriRuntime()) return;
-  try {
-    const draft = await withTimeout(
-      invoke<Draft>("draft_orphan_session_open", { accountId, sessionId: sid }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-    state.resumeDraftModal = null;
-    startNewDraftSession();
-    state.draftSessionId = sid;
-    state.draft = draft;
-    loadComposeMarkdownIntoEditor(draft.markdownBody ?? "");
-    enterComposeView();
-    state.composeCcBccOpen = draftHasRecipientsExtra(draft);
-    state.composeLayout = "split";
-    syncPreviewOpenFromComposeLayout();
-    resetMarkdownEditorHistory();
-    // Rattache à « Sauvés » pour les prochains crashs.
-    await upsertSavedDraftSilent();
-    toast("Brouillon repris.");
-    render();
-    window.setTimeout(() => void computePreview(), 0);
-    scheduleDraftRevisionSave(350);
-  } catch (e) {
-    console.error("draft_orphan_session_open", e);
-    toast(`Reprise impossible : ${tauriErrorMessage(e)}`);
-  }
-}
-
-async function dismissOrphanDraftSession(sessionId: string): Promise<void> {
-  const sid = sessionId.trim();
-  const accountId = currentAccount()?.id?.trim();
-  if (!sid || !accountId || !isTauriRuntime()) return;
-  try {
-    await withTimeout(
-      invoke("draft_revision_purge_session", { accountId, sessionId: sid }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-  } catch (e) {
-    console.error("purge orphan", e);
-  }
-  if (state.resumeDraftModal) {
-    const next = state.resumeDraftModal.sessions.filter((s) => s.sessionId !== sid);
-    state.resumeDraftModal = next.length ? { sessions: next } : null;
-  }
-  render();
 }
 
 function composePreviewPaneActive(): boolean {
@@ -5788,25 +5608,6 @@ function fileBaseName(path: string) {
   return last || normalized;
 }
 
-async function pickAttachments() {
-  if (!state.draft) return;
-  if (!isTauriRuntime()) {
-    toast("Ajouter des pièces jointes : disponible seulement dans l’app Tauri.");
-    return;
-  }
-  try {
-    const picked = await withTimeout(invoke<string[]>("pick_attachment_paths", {}), MAIL_ACTION_TIMEOUT_MS);
-    if (!picked.length) return;
-    const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...picked]));
-    state.draft.attachmentPaths = merged;
-    toast(`${picked.length} pièce(s) jointe(s) ajoutée(s).`);
-    render();
-    scheduleDraftRevisionSave(250);
-  } catch (error) {
-    toast(`Picker PJ échoué: ${tauriErrorMessage(error)}`);
-  }
-}
-
 async function mailboxAction(kind: "create" | "rename" | "delete" | "subscribe") {
   const account = currentAccount();
   if (!account) {
@@ -8399,12 +8200,10 @@ const addressBookEditEmailRef = {
 registerWireEventsBridge({
   syncPreviewOpenFromComposeLayout,
   refreshSettingsPathsFromBackend,
-  computeDraftDiffAgainstRevision,
   finishOAuthNewAccountAfterLogin,
   refreshSavedDraftsMailboxCount,
   refreshSemanticEmbeddingCounts,
   resolveSrcForMailImageLightbox,
-  loadComposeMarkdownIntoEditor,
   schedulePersistAiPrefsFromDom,
   finalizeSettingsAiModalClose,
   setComposeFromTextareaValue,
@@ -8416,24 +8215,20 @@ registerWireEventsBridge({
   agentInsertDraftIntoCompose,
   summarizeSenderThreadsLight,
   syncActivityRecordingPrefs,
-  resetMarkdownEditorHistory,
   warnOAuthEphemeralRedirect,
   defaultListFilterFromPrefs,
   ensureValidSelectedMailbox,
   mediaBlobToWav16kMonoPcm16,
   openEnginesAiSettingsModal,
   confirmAndExecuteSplitSend,
-  scheduleDraftRevisionSave,
   micPermissionErrorMessage,
   paintStatusBarProgressDom,
   wireComposeRecipientChips,
-  dismissOrphanDraftSession,
   navigateToBreadcrumbIndex,
   refreshOrganizationReport,
   agentRefreshPlanFromDraft,
   agentPrepareReplyContinue,
   discoverMailServersAction,
-  resumeOrphanDraftSession,
   onOrgV2UnignoreMailboxUi,
   confirmThenRunOrgV2Apply,
   refreshFolderManagerTree,
@@ -8454,14 +8249,12 @@ registerWireEventsBridge({
   agentPrepareReplyStart,
   pickImgSrcForLightbox,
   schedulePreviewUpdate,
-  refreshDraftRevisions,
   openFolderManagerView,
   openContactDetailView,
   onOrgDeleteMailboxOne,
   persistAiPrefsFromDom,
   deleteSettingsAccount,
   llmTranslateMessageUi,
-  startNewDraftSession,
   bindComposerDropzone,
   onThreadToggleFollow,
   openOrganizationView,
@@ -8486,11 +8279,9 @@ registerWireEventsBridge({
   navigateToInbox,
   fmSelectMailbox,
   fmCreateMailbox,
-  pickAttachments,
   summarizeThread,
   openMoveDialog,
   onThreadMoveTo,
-  computePreview,
   bytesToBase64,
   runOrgV2Apply,
   fmSyncMailbox,
@@ -8777,6 +8568,28 @@ registerLlmQueueCancelDeps({
 });
 
 registerComposeSendDraftActionDeps({ sendDraft });
+
+registerComposeComposerBridgeDeps({
+  loadComposeMarkdownIntoEditor,
+  resetMarkdownEditorHistory,
+  computePreview,
+  scheduleDraftRevisionSave,
+});
+
+registerComposeDraftRevisionDiffDeps({ persistDraft });
+
+registerComposeOrphanDraftSessionDeps({
+  startNewDraftSession,
+  enterComposeView,
+  loadComposeMarkdownIntoEditor,
+  syncPreviewOpenFromComposeLayout,
+  resetMarkdownEditorHistory,
+  computePreview,
+  scheduleDraftRevisionSave,
+  upsertSavedDraftSilent,
+});
+
+registerComposePickAttachmentsDeps({ scheduleDraftRevisionSave });
 
 registerComposeThreadReplyDeps({
   loadComposeMarkdownIntoEditor,

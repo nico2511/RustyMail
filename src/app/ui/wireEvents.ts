@@ -80,6 +80,10 @@ import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
 import { normalizeMailHrefForOpen, openExternalFromMailHref } from "../mail/mailLinkOpen";
 import { sendQuickReply } from "../mail/composeSendQuickReply";
 import { switchMailbox } from "../mail/switchMailboxAction";
+import {
+  loadComposeMarkdownIntoEditor,
+  scheduleDraftRevisionSave,
+} from "../mail/composeComposerBridge";
 import { render } from "../dispatch";
 import { callApp } from "./callApp";
 import { app } from "./wireEventsBridge";
@@ -657,7 +661,7 @@ export function wireEvents() {
     (event) => {
       callApp("setComposeFromTextareaValue", (event.currentTarget as HTMLTextAreaElement).value);
       callApp("schedulePreviewUpdate", );
-      callApp("scheduleDraftRevisionSave", );
+      scheduleDraftRevisionSave();
     },
     { signal: composeSig }
   );
@@ -685,7 +689,7 @@ export function wireEvents() {
       const stamp = new Date().toLocaleString();
       const snippet = `${nlBefore}![Capture ${stamp}](${dataUrl})${nlAfter}\n`;
       textarea.setRangeText(snippet, start, end, "end");
-      callApp("loadComposeMarkdownIntoEditor", textarea.value);
+      loadComposeMarkdownIntoEditor(textarea.value);
       textarea.value = state.composeBody;
       callApp("schedulePreviewUpdate", 0);
       textarea.focus();
@@ -697,7 +701,7 @@ export function wireEvents() {
   document.querySelector<HTMLInputElement>("#compose-subject")?.addEventListener(
     "input",
     () => {
-      callApp("scheduleDraftRevisionSave", );
+      scheduleDraftRevisionSave();
     },
     { signal: composeSig }
   );

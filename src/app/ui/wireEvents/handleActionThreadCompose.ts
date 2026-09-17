@@ -29,6 +29,15 @@ import {
   clearAttachments,
   cancelLlmQueueJob,
   sendDraft,
+  resumeOrphanDraftSession,
+  dismissOrphanDraftSession,
+  refreshDraftRevisions,
+  computeDraftDiffAgainstRevision,
+  loadComposeMarkdownIntoEditor,
+  resetMarkdownEditorHistory,
+  computePreview,
+  scheduleDraftRevisionSave,
+  pickAttachments,
   loadMailView,
   loadMailboxUnread,
   render,
@@ -358,12 +367,12 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "resume-orphan-draft": {
       const sid = element?.dataset.sessionId ?? "";
-      void callApp("resumeOrphanDraftSession", sid);
+      void resumeOrphanDraftSession(sid);
       return true;
     }
     case "dismiss-orphan-draft": {
       const sid = element?.dataset.sessionId ?? "";
-      void callApp("dismissOrphanDraftSession", sid);
+      void dismissOrphanDraftSession(sid);
       return true;
     }
     case "toggle-sidebar":
@@ -378,7 +387,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       })();
       return true;
     case "refresh-draft-history":
-      void callApp("refreshDraftRevisions", 60);
+      void refreshDraftRevisions(60);
       return true;
     case "toggle-draft-versions-expanded":
       if (!isTauriRuntime()) return true;
@@ -388,7 +397,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "compare-draft-revision": {
       const revisionId = element?.dataset.revisionId?.trim() ?? "";
       if (!revisionId) return true;
-      void callApp("computeDraftDiffAgainstRevision", revisionId);
+      void computeDraftDiffAgainstRevision(revisionId);
       return true;
     }
     case "toggle-draft-compare-view":
@@ -418,19 +427,19 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
             return;
           }
           state.draft = restored;
-          callApp("loadComposeMarkdownIntoEditor", restored.markdownBody);
+          loadComposeMarkdownIntoEditor(restored.markdownBody);
           enterComposeView({ skipHistory: true });
           state.composeLayout = wasHistoriqueLayout ? "historique" : "split";
           syncPreviewOpenFromComposeLayout();
-          callApp("resetMarkdownEditorHistory");
+          resetMarkdownEditorHistory();
           render();
           if (wasHistoriqueLayout) {
-            void callApp("refreshDraftRevisions", 60);
-            void callApp("computeDraftDiffAgainstRevision", revisionId);
+            void refreshDraftRevisions(60);
+            void computeDraftDiffAgainstRevision(revisionId);
           } else {
-            window.setTimeout(() => void callApp("computePreview"), 0);
+            window.setTimeout(() => void computePreview(), 0);
           }
-          callApp("scheduleDraftRevisionSave", 450);
+          scheduleDraftRevisionSave(450);
         } catch (error) {
           console.error("draft_revision_restore", error);
           toast(`Restauration impossible: ${tauriErrorMessage(error)}`);
@@ -448,9 +457,9 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       state.composeLayout = raw;
       syncPreviewOpenFromComposeLayout();
       render();
-      if (raw === "historique") void callApp("refreshDraftRevisions", 60);
+      if (raw === "historique") void refreshDraftRevisions(60);
       if (state.composeLayout !== "write" && state.composeLayout !== "historique") {
-        window.setTimeout(() => void callApp("computePreview"), 0);
+        window.setTimeout(() => void computePreview(), 0);
       }
       return true;
     }
@@ -476,7 +485,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void callApp("confirmAndExecuteSplitSend");
       return true;
     case "pick-attachments":
-      await callApp("pickAttachments");
+      await pickAttachments();
       return true;
     case "clear-attachments":
       clearAttachments();
@@ -503,7 +512,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         state.composeCanonicalBody = state.composeBody;
         const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
         if (ta) ta.value = state.composeBody;
-        void callApp("computePreview");
+        void computePreview();
         toast("Texte inséré dans le compositeur.");
         render();
       } else {
@@ -629,7 +638,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       state.composeBody = next;
       state.composeCanonicalBody = next;
       if (ta) ta.value = next;
-      void callApp("computePreview");
+      void computePreview();
       toast("Remplacement appliqué (première occurrence).");
       render();
       return true;

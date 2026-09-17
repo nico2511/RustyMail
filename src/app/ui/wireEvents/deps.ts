@@ -157,6 +157,19 @@ export { removeAttachment, clearAttachments } from "../mail/composeAttachmentsAc
 export { cycleComposeLayout } from "../mail/cycleComposeLayout";
 export { cancelLlmQueueJob } from "../mail/llmQueueCancel";
 export { sendDraft } from "../mail/composeSendDraftAction";
+export {
+  computePreview,
+  loadComposeMarkdownIntoEditor,
+  resetMarkdownEditorHistory,
+  scheduleDraftRevisionSave,
+} from "../mail/composeComposerBridge";
+export { refreshDraftRevisions } from "../mail/composeDraftRevisions";
+export { computeDraftDiffAgainstRevision } from "../mail/composeDraftRevisionDiff";
+export {
+  dismissOrphanDraftSession,
+  resumeOrphanDraftSession,
+} from "../mail/composeOrphanDraftSession";
+export { pickAttachments } from "../mail/composePickAttachments";
 export { clearThreadAiSummaryState } from "../mail/threadAiSummaryState";
 export { scrollToThreadMessage } from "../mail/threadScrollToMessage";
 export { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";

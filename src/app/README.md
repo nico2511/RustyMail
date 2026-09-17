@@ -60,6 +60,11 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/threadAutoMail.ts` | Détection fil newsletter / auto |
 | `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
 | `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
+| `app/mail/composeComposerBridge.ts` | Facades éditeur (preview, markdown, révisions) |
+| `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
+| `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |
+| `app/mail/composeOrphanDraftSession.ts` | Reprise / rejet brouillons orphelins |
+| `app/mail/composePickAttachments.ts` | Picker pièces jointes Tauri |
 | `app/mail/composeCloseFlow.ts` | Fermeture compositeur, discard, `clearDraftSession` |
 | `app/mail/composeAttachmentsAction.ts` | Retrait PJ compositeur |
 | `app/mail/cycleComposeLayout.ts` | Cycle split / write / preview / historique |
