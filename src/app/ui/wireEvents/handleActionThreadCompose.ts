@@ -122,6 +122,8 @@ import {
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
+  syncPreviewOpenFromComposeLayout,
+  enterComposeView,
   type OAuthDesktopLoginOutcome,
   type Draft,
   type Tone,

@@ -114,9 +114,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `aiPanelRender.ts` | Panneau Détails / brief dossier / agent IA |
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
-| `wireEvents/handleAction*.ts` | Dispatch actions — inbox sans pont ; compose/settings/org via **`callApp()`** ou imports **`app/mail/*`** |
+| `wireEvents/handleAction*.ts` | Dispatch actions via imports **`deps`** / **`app/mail/*`** (plus de `callApp`) |
+| `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `wireEvents/appWireFacades.ts` | Facades vers handlers restés dans `application.ts` (compose, agents, carnet…) |
-| `wireEvents/callApp.ts` | Appels vers le pont bridge par nom (`callApp("handler")`) |
 | `wireEvents/deps.ts` | Imports partagés + facades mail / wireEvents |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
@@ -127,7 +127,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Extraire d’autres handlers pont (`isSearchActive`, navigation, compose…) hors de `application.ts`
-2. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
+1. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
+2. Extraire encore du corps d’`application.ts` vers facades **`appWireFacades`** / **`app/mail/*`**
 
 `npm run verify:ts` · `npm test`

@@ -1,5 +1,5 @@
-// @ts-nocheck — bridged app() calls; tighten types incrementally.
-/** Event wiring — bridged to application.ts handlers via registerWireEventsBridge(). */
+// @ts-nocheck — DOM wiring; tighten types incrementally.
+/** Event wiring — DOM listeners; business logic via app/mail facades. */
 import { invoke } from "@tauri-apps/api/core";
 import { ipcThrottleMs } from "../../ipc_bridge";
 import { clearSuggestionShownKeys } from "../../activity";
@@ -104,9 +104,9 @@ import {
   resolveSrcForMailImageLightbox,
 } from "../mail/mailContentWireActions";
 import { render } from "../dispatch";
-import { app } from "./wireEventsBridge";
+import { wireEventsContext } from "./wireEvents/wireEventsContext";
 export function wireEvents() {
-  const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
+  const composeAbortRef = wireEventsContext().composeInteractionsAbortRef;
   composeAbortRef.current?.abort();
   composeAbortRef.current = new AbortController();
   const composeSig = composeAbortRef.current.signal;
@@ -146,7 +146,7 @@ export function wireEvents() {
       const t = ev.target as HTMLElement | null;
       if (!t?.closest(".settings-ai-modal-body")) return;
       const id = (t as HTMLInputElement | HTMLSelectElement).id ?? "";
-      if (id && (app()["AI_PREFS_IMMEDIATE_CHECKBOX_IDS"] as Set<string>).has(id)) {
+      if (id && wireEventsContext().AI_PREFS_IMMEDIATE_CHECKBOX_IDS.has(id)) {
         if (id === "prefs-openrouter-enabled" && t instanceof HTMLInputElement) {
           const next = t.checked;
           if (!next) {

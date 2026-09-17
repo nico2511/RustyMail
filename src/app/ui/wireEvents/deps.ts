@@ -248,8 +248,7 @@ export {
   openExternalFromMailHref,
 } from "../mail/mailLinkOpen";
 export { state } from "../state";
-export { callApp } from "./callApp";
-export { app } from "../wireEventsBridge";
+import { wireEventsContext } from "./wireEventsContext";
 export {
   agentInsertDraftIntoCompose,
   agentPrepareReplyContinue,
@@ -277,13 +276,13 @@ export type {
 } from "../../types";
 
 export function setSkipAccountIdentityCaptureOnce(value: boolean): void {
-  (app()["skipAccountIdentityCaptureOnceRef"] as { current: boolean }).current = value;
+  wireEventsContext().skipAccountIdentityCaptureOnceRef.current = value;
 }
 
 export function setAddressBookEditEmail(value: string | null): void {
-  (app()["addressBookEditEmailRef"] as { current: string | null }).current = value;
+  wireEventsContext().addressBookEditEmailRef.current = value;
 }
 
 export function addressBookRowsCache(): unknown[] {
-  return (app()["addressBookRowsCache"] as () => unknown[])();
+  return wireEventsContext().addressBookRowsCache();
 }
