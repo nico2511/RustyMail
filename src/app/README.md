@@ -65,6 +65,7 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
 | `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
 | `app/mail/threadAiWireActions.ts` | Facades IA fil (synthèse, traduction, Q&R…) |
+| `app/mail/threadAiRun.ts` | Cœurs synthèse/traduction fil, Q&R, réponses rapides, hydratation cache |
 | `app/mail/agentWireActions.ts` | Facades agent assist (prepare reply, telemetry, plan) |
 | `app/mail/agentPrepareReplyRun.ts` | Flux assistant réponse (phases LLM, brouillon, insertion compose) |
 | `app/mail/composeAiWireActions.ts` | Facades IA compose + envoi split |
