@@ -380,7 +380,10 @@ import {
   flushThreadActivityClosed,
   syncActivityRecordingPrefs,
 } from "./mail/threadActivityTracking";
-import { bindDraftPersistenceFlush, bindKeyboard, bindMouseNavigation } from "./mail/appShellBindings";
+import {
+  getAddressBookEditEmail,
+  registerAppShellWireContext,
+} from "./mail/appShellRender";
 import { openSavedDraftById } from "./mail/savedDraftOpenRun";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
@@ -604,17 +607,10 @@ import { state } from "./state";
 
 import { registerRender } from "./dispatch";
 
-import { root as appShell } from "./dom";
-
 import type { View, Tone, Tag, Entity, ThreadListItem, Draft, DraftPreview, DraftRevisionListItem, DraftDiffLine, DraftCompareView, MessageViewMode, ComposeLayout, MicState, MailSecuritySignals, CleanedMessageView, DiscussionThreadView, AppStatus, AppPathsView, AppCapabilities, LlmRuntimeStatus, NewsletterRuleRow, InboxFilterCounts, ActionBriefResult, CloseComposeModal, ResumeDraftModal, OrphanDraftSessionItem, State, SearchViewBatchJob, MailboxFolderStatsRow, SavedDraftListItem, SemanticEmbeddingCountsSnapshot, FluxAffinerResult, MailUnsubscribeLink, InlineAttachPayload, ThreadParticipantLink, ThreadRecipientPresenceEvents, TextPromptModalSpec, ConfirmModalSpec, NavigateOpts, OAuthDesktopLoginOutcome, SummaryResult, ActionBriefEvidenceLink, AddressBookRow, ShortcutRow, SavedDraftOpenPayload, LlmTranslationResult } from "./types";
 
 
-let addressBookEditEmail: string | null = null;
-
 let autoThreadSummaryDoneFor: string | null = null;
-
-let skipAccountIdentityCaptureOnce = false;
-
 
 async function flushDraftRevisionPending(): Promise<void> {
   await flushDraftRevisionPendingNow(
@@ -622,179 +618,9 @@ async function flushDraftRevisionPending(): Promise<void> {
   );
 }
 
-let composeInteractionsAbort: AbortController | undefined;
-
 let persistAiPrefsDebounce: ReturnType<typeof setTimeout> | undefined;
 
-const AI_PREFS_IMMEDIATE_CHECKBOX_IDS = new Set([
-  "prefs-openrouter-enabled",
-  "prefs-llama-server-enabled",
-  "prefs-llama-server-cpu-override",
-  "prefs-llama-server-spawn-enabled",
-  "prefs-bg-auto-semantic",
-  "prefs-bg-llm-prefetch",
-  "prefs-bg-idle-ai-cache",
-  "prefs-ai-cloud-fallback",
-  "prefs-semantic-search",
-]);
-
-function render() {
-  syncMailboxDigestPanelWithFeaturePref();
-  if (state.view === "settings" && state.settingsTab === "accounts") {
-    captureAccountsFormIdentityFromDom(skipAccountIdentityCaptureOnce);
-    if (skipAccountIdentityCaptureOnce) {
-      skipAccountIdentityCaptureOnce = false;
-    }
-  } else {
-    captureAccountsFormIdentityFromDom(true);
-  }
-
-  // Preserve scroll positions across full re-render (appShell.innerHTML rebuilds DOM).
-  const prevFolderList = document.querySelector<HTMLElement>(".folder-list");
-  const prevSidebarScrollTop = prevFolderList?.scrollTop ?? 0;
-  const prevSidebarScrollLeft = prevFolderList?.scrollLeft ?? 0;
-  const prevOrgPanel = document.querySelector<HTMLElement>(".organization-panel");
-  const prevOrgScrollTop = prevOrgPanel?.scrollTop ?? 0;
-  const prevAiModalBody = state.settingsAiModal
-    ? document.querySelector<HTMLElement>(".settings-ai-modal-body")
-    : null;
-  const prevAiModalScrollTop = prevAiModalBody?.scrollTop ?? 0;
-
-  const isCompose = state.view === "compose";
-  const aiPanelExpanded = aiSidePanelExpandedForShell();
-  appShell.className = `app-shell ${aiPanelExpanded ? "" : "ai-collapsed"}${isCompose ? " compose-fullscreen-active" : ""}${
-    !isCompose && state.sidebarCollapsed ? " sidebar-collapsed" : ""
-  }`;
-  const panelW =
-    typeof state.appPrefs.ai.aiPanelWidthPx === "number" && Number.isFinite(state.appPrefs.ai.aiPanelWidthPx) ?
-      Math.min(640, Math.max(260, Math.round(state.appPrefs.ai.aiPanelWidthPx)))
-    : 340;
-  appShell.style.setProperty("--ai-width", aiPanelExpanded ? `${panelW}px` : "0px");
-  appShell.innerHTML = `
-    <div class="noise"></div>
-    ${
-      isCompose ?
-        `
-    ${renderComposer()}
-    `
-      : `
-    ${renderSidebar()}
-    <main class="main">${
-      !isCompose && state.sidebarCollapsed ?
-        `<button type="button" class="main-sidebar-reveal" data-action="toggle-sidebar" aria-label="Afficher le menu des dossiers" title="Menu">☰</button>`
-      : ""
-    }${renderMain()}</main>
-    ${aiPanelExpanded ? renderAiPanel() : ""}
-    `
-    }
-    ${renderMoveDialog()}
-    ${renderMailboxManageDialog()}
-    ${renderQuoteFoldDialog()}
-    ${renderThreadTagsDialog()}
-    ${renderCloseComposeDialog()}
-    ${renderResumeDraftDialog()}
-    ${renderImageDialog()}
-    ${renderSplitSendDialog()}
-    ${renderTextPromptModal()}
-    ${renderConfirmModal()}
-    ${renderSearchModal()}
-    ${renderSettingsAiModal()}
-    ${renderAiQuickPanelOverlay()}
-    ${renderGlobalStatusFooter()}
-  `;
-  wireEvents();
-  wireFolderManagerDnD();
-  if (isTextPromptOpen()) {
-    window.requestAnimationFrame(() => {
-      const inp = document.querySelector<HTMLInputElement>("#text-prompt-input");
-      if (inp) {
-        inp.focus();
-        inp.select();
-      }
-    });
-  }
-  if (state.searchModalOpen && !isTextPromptOpen()) {
-    window.requestAnimationFrame(() => {
-      const inp = document.querySelector<HTMLInputElement>("#search-modal-input");
-      if (!inp) return;
-      inp.focus();
-      const len = state.searchDraft.length;
-      try {
-        inp.setSelectionRange(len, len);
-      } catch {
-        /* type=search */
-      }
-    });
-  }
-
-  // Restore sidebar scroll after wiring events/layout.
-  const nextFolderList = document.querySelector<HTMLElement>(".folder-list");
-  if (nextFolderList) {
-    nextFolderList.scrollTop = prevSidebarScrollTop;
-    nextFolderList.scrollLeft = prevSidebarScrollLeft;
-  }
-  const nextOrgPanel = document.querySelector<HTMLElement>(".organization-panel");
-  if (nextOrgPanel && prevOrgScrollTop > 0) {
-    nextOrgPanel.scrollTop = prevOrgScrollTop;
-  }
-  const nextAiModalBody = state.settingsAiModal
-    ? document.querySelector<HTMLElement>(".settings-ai-modal-body")
-    : null;
-  if (nextAiModalBody && prevAiModalScrollTop > 0) {
-    nextAiModalBody.scrollTop = prevAiModalScrollTop;
-  }
-  window.requestAnimationFrame(() => {
-    navApplyPendingScrollRestore();
-    if (nextOrgPanel && prevOrgScrollTop > 0) {
-      nextOrgPanel.scrollTop = prevOrgScrollTop;
-    }
-    if (nextAiModalBody && prevAiModalScrollTop > 0) {
-      nextAiModalBody.scrollTop = prevAiModalScrollTop;
-    }
-  });
-}
-
-
-
-
-
-
-const composeInteractionsAbortRef = {
-  get current() {
-    return composeInteractionsAbort;
-  },
-  set current(v: AbortController | undefined) {
-    composeInteractionsAbort = v;
-  },
-};
-
-const skipAccountIdentityCaptureOnceRef = {
-  get current() {
-    return skipAccountIdentityCaptureOnce;
-  },
-  set current(v: boolean) {
-    skipAccountIdentityCaptureOnce = v;
-  },
-};
-
-const addressBookEditEmailRef = {
-  get current() {
-    return addressBookEditEmail;
-  },
-  set current(v: string | null) {
-    addressBookEditEmail = v;
-  },
-};
-
-registerWireEventsContext({
-  addressBookRowsCache: getAddressBookRowsCache,
-  skipAccountIdentityCaptureOnceRef,
-  addressBookEditEmailRef,
-  AI_PREFS_IMMEDIATE_CHECKBOX_IDS,
-  composeInteractionsAbortRef,
-});
-
-registerRender(render);
+registerAppShellWireContext(getAddressBookRowsCache);
 
 registerRenderDeps({
   navCurrentBreadcrumbSegment,
@@ -882,7 +708,7 @@ registerRenderDeps({
   mergedProfileForAccountsForm,
   buildSettingsAiPanelDeps,
   addressBookRowsCache: getAddressBookRowsCache,
-  addressBookEditEmail: () => addressBookEditEmail,
+  addressBookEditEmail: () => getAddressBookEditEmail(),
   addressBookListQuery: getAddressBookListQuery,
   accountsFormIdentityScratch: getAccountsFormIdentityScratch,
   threadQaMicButtonTitle,
