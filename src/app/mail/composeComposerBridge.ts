@@ -3,6 +3,11 @@ export type ComposeComposerBridgeDeps = {
   resetMarkdownEditorHistory: () => void;
   computePreview: () => void | Promise<void>;
   scheduleDraftRevisionSave: (delayMs?: number) => void;
+  schedulePreviewUpdate: (delayMs?: number) => void;
+  setComposeFromTextareaValue: (textareaValue: string) => void;
+  applyMarkdownAction: (action: string) => void | Promise<void>;
+  bindComposerDropzone: () => void;
+  wireComposeRecipientChips: () => void;
 };
 
 let composeComposerBridgeDeps: ComposeComposerBridgeDeps | null = null;
@@ -30,4 +35,24 @@ export function computePreview(): void | Promise<void> {
 
 export function scheduleDraftRevisionSave(delayMs?: number): void {
   composerBridge().scheduleDraftRevisionSave(delayMs);
+}
+
+export function schedulePreviewUpdate(delayMs?: number): void {
+  composerBridge().schedulePreviewUpdate(delayMs);
+}
+
+export function setComposeFromTextareaValue(textareaValue: string): void {
+  composerBridge().setComposeFromTextareaValue(textareaValue);
+}
+
+export function applyMarkdownAction(action: string): void | Promise<void> {
+  return composerBridge().applyMarkdownAction(action);
+}
+
+export function bindComposerDropzone(): void {
+  composerBridge().bindComposerDropzone();
+}
+
+export function wireComposeRecipientChips(): void {
+  composerBridge().wireComposeRecipientChips();
 }

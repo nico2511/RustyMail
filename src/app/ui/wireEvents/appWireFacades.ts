@@ -18,6 +18,7 @@ export type AppWireFacadesDeps = {
   saveAccount: () => void | Promise<void>;
   saveDraftToSavedListNow: (opts?: { silentToast?: boolean }) => Promise<boolean>;
   refreshSavedDraftsMailboxCount: () => Promise<void>;
+  agentRefreshPlanFromDraft: () => void | Promise<void>;
 };
 
 let appWireFacadesDeps: AppWireFacadesDeps | null = null;
@@ -97,4 +98,8 @@ export function saveDraftToSavedListNow(opts?: { silentToast?: boolean }): Promi
 
 export function refreshSavedDraftsMailboxCount(): Promise<void> {
   return wireFacades().refreshSavedDraftsMailboxCount();
+}
+
+export function agentRefreshPlanFromDraft(): void | Promise<void> {
+  return wireFacades().agentRefreshPlanFromDraft();
 }

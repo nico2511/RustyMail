@@ -65,6 +65,7 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/accountsLoadAction.ts` | Facade `loadAccountsFromBackend()` |
 | `app/mail/settingsWireActions.ts` | Facades paramètres (comptes, LLM, OAuth, micro…) |
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
+| `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
 | `app/mail/composeComposerBridge.ts` | Facades éditeur (preview, markdown, révisions) |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
 | `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |

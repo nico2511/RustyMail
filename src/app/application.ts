@@ -279,6 +279,7 @@ import { registerComposeAiWireActionsDeps } from "./mail/composeAiWireActions";
 import { registerAccountsLoadActionDeps } from "./mail/accountsLoadAction";
 import { registerSettingsWireActionsDeps } from "./mail/settingsWireActions";
 import { registerOrgFolderWireActionsDeps } from "./mail/orgFolderWireActions";
+import { registerMailContentWireActionsDeps } from "./mail/mailContentWireActions";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -8206,40 +8207,23 @@ registerWireEventsBridge({
   syncPreviewOpenFromComposeLayout,
   finishOAuthNewAccountAfterLogin,
   refreshSavedDraftsMailboxCount,
-  resolveSrcForMailImageLightbox,
-  schedulePersistAiPrefsFromDom,
-  setComposeFromTextareaValue,
   loadThreadsForSearchContext,
-  persistEngineCheckboxToggle,
   loadAddressBookSidebarCount,
   agentInsertDraftIntoCompose,
   summarizeSenderThreadsLight,
-  wireComposeRecipientChips,
   navigateToBreadcrumbIndex,
-  agentRefreshPlanFromDraft,
   agentPrepareReplyContinue,
-  onOrgV2UnignoreMailboxUi,
   llmQuickRepliesComposeUi,
-  applyContextSliderIndex,
   saveDraftToSavedListNow,
-  onOrgV2IgnoreMailboxUi,
   openOrganizationV2View,
   refreshAddressBookList,
   agentPrepareReplyStart,
-  pickImgSrcForLightbox,
-  schedulePreviewUpdate,
   openContactDetailView,
-  onOrgDeleteMailboxOne,
-  bindComposerDropzone,
   onThreadToggleFollow,
   mailboxManageAction,
-  applyMarkdownAction,
   stopAgentTelemetry,
-  onAttachmentAction,
   confirmMoveDialog,
   enterComposeView,
-  hydrateEmailHtml,
-  onOrgSyncMailbox,
   navigateToInbox,
   openMoveDialog,
   onThreadMoveTo,
@@ -8528,6 +8512,11 @@ registerComposeComposerBridgeDeps({
   resetMarkdownEditorHistory,
   computePreview,
   scheduleDraftRevisionSave,
+  schedulePreviewUpdate,
+  setComposeFromTextareaValue,
+  applyMarkdownAction,
+  bindComposerDropzone,
+  wireComposeRecipientChips,
 });
 
 registerComposeDraftRevisionDiffDeps({ persistDraft });
@@ -8586,6 +8575,9 @@ registerSettingsWireActionsDeps({
   warnOAuthEphemeralRedirect,
   finishOAuthNewAccountAfterLogin,
   deleteSettingsAccount,
+  schedulePersistAiPrefsFromDom,
+  applyContextSliderIndex,
+  persistEngineCheckboxToggle,
 });
 
 registerOrgFolderWireActionsDeps({
@@ -8606,6 +8598,17 @@ registerOrgFolderWireActionsDeps({
   confirmThenRunOrgApply,
   runOrgApply,
   refreshOrganizationReport,
+  onOrgDeleteMailboxOne,
+  onOrgSyncMailbox,
+  onOrgV2IgnoreMailboxUi,
+  onOrgV2UnignoreMailboxUi,
+});
+
+registerMailContentWireActionsDeps({
+  hydrateEmailHtml,
+  onAttachmentAction,
+  pickImgSrcForLightbox,
+  resolveSrcForMailImageLightbox,
 });
 
 registerComposeThreadReplyDeps({
@@ -8637,6 +8640,7 @@ registerAppWireFacades({
   saveAccount,
   saveDraftToSavedListNow,
   refreshSavedDraftsMailboxCount,
+  agentRefreshPlanFromDraft,
 });
 
 initMailboxDigest({

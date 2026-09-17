@@ -26,6 +26,9 @@ export type SettingsWireActionsDeps = {
     displayName: string,
   ) => void | Promise<void>;
   deleteSettingsAccount: () => void | Promise<void>;
+  schedulePersistAiPrefsFromDom: (opts?: { skipDomCapture?: boolean }) => void;
+  applyContextSliderIndex: (idx: number) => void;
+  persistEngineCheckboxToggle: (message: string) => void | Promise<void>;
 };
 
 let settingsWireActionsDeps: SettingsWireActionsDeps | null = null;
@@ -136,4 +139,16 @@ export function finishOAuthNewAccountAfterLogin(
 
 export function deleteSettingsAccount(): void | Promise<void> {
   return settings().deleteSettingsAccount();
+}
+
+export function schedulePersistAiPrefsFromDom(opts?: { skipDomCapture?: boolean }): void {
+  settings().schedulePersistAiPrefsFromDom(opts);
+}
+
+export function applyContextSliderIndex(idx: number): void {
+  settings().applyContextSliderIndex(idx);
+}
+
+export function persistEngineCheckboxToggle(message: string): void | Promise<void> {
+  return settings().persistEngineCheckboxToggle(message);
 }

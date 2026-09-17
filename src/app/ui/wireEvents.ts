@@ -80,20 +80,37 @@ import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
 import { normalizeMailHrefForOpen, openExternalFromMailHref } from "../mail/mailLinkOpen";
 import { sendQuickReply } from "../mail/composeSendQuickReply";
 import { switchMailbox } from "../mail/switchMailboxAction";
-import { refreshLlmRuntimeStatus, switchActiveAccount } from "../mail/settingsWireActions";
+import { refreshLlmRuntimeStatus, switchActiveAccount, schedulePersistAiPrefsFromDom, applyContextSliderIndex, persistEngineCheckboxToggle } from "../mail/settingsWireActions";
 import {
   loadComposeMarkdownIntoEditor,
   scheduleDraftRevisionSave,
+  schedulePreviewUpdate,
+  setComposeFromTextareaValue,
+  applyMarkdownAction,
+  bindComposerDropzone,
+  wireComposeRecipientChips,
 } from "../mail/composeComposerBridge";
+import { agentRefreshPlanFromDraft } from "./wireEvents/appWireFacades";
+import {
+  onOrgDeleteMailboxOne,
+  onOrgSyncMailbox,
+  onOrgV2IgnoreMailboxUi,
+  onOrgV2UnignoreMailboxUi,
+} from "../mail/orgFolderWireActions";
+import {
+  hydrateEmailHtml,
+  onAttachmentAction,
+  pickImgSrcForLightbox,
+  resolveSrcForMailImageLightbox,
+} from "../mail/mailContentWireActions";
 import { render } from "../dispatch";
-import { callApp } from "./callApp";
 import { app } from "./wireEventsBridge";
 export function wireEvents() {
   const composeAbortRef = app()["composeInteractionsAbortRef"] as { current?: AbortController };
   composeAbortRef.current?.abort();
   composeAbortRef.current = new AbortController();
   const composeSig = composeAbortRef.current.signal;
-  callApp("wireComposeRecipientChips", );
+  wireComposeRecipientChips();
   wireAtAutocompleteFields();
 
   document.querySelector<HTMLTextAreaElement>("#thread-qa-input")?.addEventListener(
@@ -139,10 +156,10 @@ export function wireEvents() {
             state.appPrefs.ai.openrouterEnabled = true;
           }
           syncLlmEnginePrefsToDom(state.appPrefs.ai);
-          void callApp("persistEngineCheckboxToggle", next ? "OpenRouter activé." : "OpenRouter désactivé — bascule PC.");
+          void persistEngineCheckboxToggle(next ? "OpenRouter activé." : "OpenRouter désactivé — bascule PC.");
         } else if (id === "prefs-llama-server-enabled" && t instanceof HTMLInputElement) {
           state.appPrefs.ai.llamaServerEnabled = t.checked;
-          void callApp("persistEngineCheckboxToggle", t.checked ? "llama-server activé." : "llama-server désactivé.");
+          void persistEngineCheckboxToggle(t.checked ? "llama-server activé." : "llama-server désactivé.");
         }
         return;
       }
@@ -152,7 +169,7 @@ export function wireEvents() {
           state.appPrefs.ai.dictationBackend =
             raw === "cloud" || raw === "local_http" ? raw : "whisper_cpp";
           captureAiPrefsFieldsFromDom(state.appPrefs);
-          callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
+          schedulePersistAiPrefsFromDom({ skipDomCapture: true });
           render();
           return;
         }
@@ -164,7 +181,7 @@ export function wireEvents() {
             if (inp) inp.value = v;
           }
           captureAiPrefsFieldsFromDom(state.appPrefs);
-          callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
+          schedulePersistAiPrefsFromDom({ skipDomCapture: true });
           return;
         }
         if (id === "prefs-local-gguf-preset" && t instanceof HTMLSelectElement) {
@@ -184,16 +201,16 @@ export function wireEvents() {
             }
           }
           captureAiPrefsFieldsFromDom(state.appPrefs);
-          callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
+          schedulePersistAiPrefsFromDom({ skipDomCapture: true });
           return;
         }
         captureAiPrefsFieldsFromDom(state.appPrefs);
-        callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
+        schedulePersistAiPrefsFromDom({ skipDomCapture: true });
         return;
       }
       if (t instanceof HTMLInputElement && t.type === "checkbox" && id.startsWith("prefs-")) {
         captureAiPrefsFieldsFromDom(state.appPrefs);
-        callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
+        schedulePersistAiPrefsFromDom({ skipDomCapture: true });
         return;
       }
       if (t.matches("[data-ai-feature]")) return;
@@ -205,10 +222,10 @@ export function wireEvents() {
         t.type !== "checkbox"
       ) {
         if (id === "prefs-local-llm-ctx-range") {
-          callApp("applyContextSliderIndex", Number.parseInt(t.value, 10));
+          applyContextSliderIndex(Number.parseInt(t.value, 10));
         }
         captureAiPrefsFieldsFromDom(state.appPrefs);
-        callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
+        schedulePersistAiPrefsFromDom({ skipDomCapture: true });
       }
     },
     { signal: composeSig }
@@ -221,9 +238,9 @@ export function wireEvents() {
       const t = ev.target as HTMLElement | null;
       if (!(t instanceof HTMLInputElement) || t.id !== "prefs-local-llm-ctx-range") return;
       if (!t.closest(".settings-ai-modal-body")) return;
-      callApp("applyContextSliderIndex", Number.parseInt(t.value, 10));
+      applyContextSliderIndex(Number.parseInt(t.value, 10));
       captureAiPrefsFieldsFromDom(state.appPrefs);
-      callApp("schedulePersistAiPrefsFromDom", { skipDomCapture: true });
+      schedulePersistAiPrefsFromDom({ skipDomCapture: true });
     },
     { signal: composeSig }
   );
@@ -283,7 +300,7 @@ export function wireEvents() {
         if (!set.has("analyzeIntent")) set.add("analyzeIntent");
         if (!set.has("draftReply")) set.add("draftReply");
         s.enabledSkills = [...set];
-        void callApp("agentRefreshPlanFromDraft", ).then(() => render());
+        void agentRefreshPlanFromDraft().then(() => render());
         return;
       }
       if (t?.dataset.action === "mailbox-brief-mode") {
@@ -302,7 +319,7 @@ export function wireEvents() {
       if (!s || s.busy) return;
       s.assistMode = mode;
       s.enabledSkills = defaultEnabledSkillIds(mode);
-      void callApp("agentRefreshPlanFromDraft", ).then(() => render());
+      void agentRefreshPlanFromDraft().then(() => render());
     },
     { signal: composeSig },
   );
@@ -467,7 +484,7 @@ export function wireEvents() {
         e.preventDefault();
         const mb = el.dataset.mailbox?.trim();
         const refId = el.dataset.mailboxRefId?.trim();
-        if (mb && refId) void callApp("onOrgDeleteMailboxOne", mb, refId);
+        if (mb && refId) void onOrgDeleteMailboxOne(mb, refId);
       },
       { signal: composeSig },
     );
@@ -479,7 +496,7 @@ export function wireEvents() {
         e.stopPropagation();
         e.preventDefault();
         const mb = el.dataset.mailbox?.trim();
-        if (mb) void callApp("onOrgSyncMailbox", mb);
+        if (mb) void onOrgSyncMailbox(mb);
       },
       { signal: composeSig },
     );
@@ -491,7 +508,7 @@ export function wireEvents() {
         e.stopPropagation();
         e.preventDefault();
         const mb = el.dataset.mailbox?.trim();
-        if (mb) void callApp("onOrgV2IgnoreMailboxUi", mb);
+        if (mb) void onOrgV2IgnoreMailboxUi(mb);
       },
       { signal: composeSig },
     );
@@ -503,7 +520,7 @@ export function wireEvents() {
         e.stopPropagation();
         e.preventDefault();
         const mb = el.dataset.mailbox?.trim();
-        if (mb) void callApp("onOrgV2UnignoreMailboxUi", mb);
+        if (mb) void onOrgV2UnignoreMailboxUi(mb);
       },
       { signal: composeSig },
     );
@@ -526,17 +543,17 @@ export function wireEvents() {
   document.querySelectorAll<HTMLButtonElement>("[data-att-download][data-msg-id]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      void callApp("onAttachmentAction", "download", el.dataset.msgId ?? "", el.dataset.attDownload ?? "");
+      void onAttachmentAction("download", el.dataset.msgId ?? "", el.dataset.attDownload ?? "");
     });
   });
   document.querySelectorAll<HTMLButtonElement>("[data-att-open][data-msg-id]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      void callApp("onAttachmentAction", "open", el.dataset.msgId ?? "", el.dataset.attOpen ?? "", el.dataset.attName ?? "");
+      void onAttachmentAction("open", el.dataset.msgId ?? "", el.dataset.attOpen ?? "", el.dataset.attName ?? "");
     });
   });
   if (state.view === "thread") {
-    callApp("hydrateEmailHtml", );
+    hydrateEmailHtml();
   }
   document.querySelectorAll(".modal-shell-stop-prop").forEach((shell) => {
     shell.addEventListener("click", (e) => e.stopPropagation());
@@ -601,10 +618,10 @@ export function wireEvents() {
       }
       if (t.tagName !== "IMG") return;
       const img = t as HTMLImageElement;
-      const src = callApp("pickImgSrcForLightbox", img);
+      const src = pickImgSrcForLightbox(img);
       if (!src) return;
       const alt = (img.getAttribute("alt") || "").trim();
-      void callApp("resolveSrcForMailImageLightbox", src, null).then((resolved) => {
+      void resolveSrcForMailImageLightbox(src, null).then((resolved) => {
         state.imageModal = { src: resolved.src, alt, revokeObjectUrl: resolved.revokeObjectUrl ?? null };
         render();
       });
@@ -660,8 +677,8 @@ export function wireEvents() {
   document.querySelector<HTMLTextAreaElement>("#compose-body")?.addEventListener(
     "input",
     (event) => {
-      callApp("setComposeFromTextareaValue", (event.currentTarget as HTMLTextAreaElement).value);
-      callApp("schedulePreviewUpdate", );
+      setComposeFromTextareaValue((event.currentTarget as HTMLTextAreaElement).value);
+      schedulePreviewUpdate();
       scheduleDraftRevisionSave();
     },
     { signal: composeSig }
@@ -692,7 +709,7 @@ export function wireEvents() {
       textarea.setRangeText(snippet, start, end, "end");
       loadComposeMarkdownIntoEditor(textarea.value);
       textarea.value = state.composeBody;
-      callApp("schedulePreviewUpdate", 0);
+      schedulePreviewUpdate(0);
       textarea.focus();
     };
     reader.readAsDataURL(file);
@@ -714,16 +731,16 @@ export function wireEvents() {
       const key = evk.key.toLowerCase();
       if (key === "b") {
         evk.preventDefault();
-        void callApp("applyMarkdownAction", "bold");
+        void applyMarkdownAction("bold");
       } else if (key === "i") {
         evk.preventDefault();
-        void callApp("applyMarkdownAction", "italic");
+        void applyMarkdownAction("italic");
       } else if (key === "k") {
         evk.preventDefault();
-        void callApp("applyMarkdownAction", "link");
+        void applyMarkdownAction("link");
       } else if (key === "u") {
         evk.preventDefault();
-        void callApp("applyMarkdownAction", "underline");
+        void applyMarkdownAction("underline");
       }
     },
     { signal: composeSig }
@@ -732,12 +749,12 @@ export function wireEvents() {
     button.addEventListener(
       "click",
       () => {
-        void callApp("applyMarkdownAction", button.dataset.md ?? "");
+        void applyMarkdownAction(button.dataset.md ?? "");
       },
       { signal: composeSig }
     );
   });
-  callApp("bindComposerDropzone", );
+  bindComposerDropzone();
   document.querySelector<HTMLInputElement>("[data-quick-reply]")?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
