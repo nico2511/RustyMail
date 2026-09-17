@@ -600,7 +600,6 @@ import {
 } from "../folderManagerView";
 
 import {
-  saveFolderTreeExpanded,
   splitMailboxSegments,
 } from "../mailboxTree";
 
