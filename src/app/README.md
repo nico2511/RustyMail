@@ -54,7 +54,8 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/appNavActions.ts` | Facades `goBack` / `navigateToInbox` / fil d’Ariane |
 | `app/mail/mailboxManageAction.ts` | CRUD dossier IMAP (modale gérer) + `registerMailboxManageActionDeps()` |
 | `app/mail/threadActivityTracking.ts` | Activité fil / recherche (suggestions vues enregistrées) |
-| `app/mail/syncInboxAction.ts` | Facade `syncInbox()` + `registerSyncInboxActionDeps()` |
+| `app/mail/syncInboxAction.ts` | Facade `syncInbox()` |
+| `app/mail/syncInboxRun.ts` | Sync IMAP multi-dossiers, refresh après push IDLE, focus watch |
 | `app/mail/composeThreadReply.ts` | Répondre / transférer depuis un fil + `registerComposeThreadReplyDeps()` |
 | `app/mail/mailLinkOpen.ts` | Liens mail (normalisation href, ouverture externe) |
 | `app/mail/collapsedQuotesGroup.ts` | Regroupement citations repliées (modale fil) |
