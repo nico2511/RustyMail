@@ -3,36 +3,8 @@ import { currentAccount } from "../core/accountContext";
 import { toast } from "../lib/toast";
 import { openConfirmModal } from "../modals/promptConfirm";
 import { state } from "../state";
-
-export type OrgDeleteMailboxOneDeps = {
-  runOrgApply: (
-    accountId: string,
-    proposalId: string,
-    trashAck?: string,
-    actionOverride?: import("../../organizationView").OrgActionOverride | null,
-    deleteMailboxAck?: string,
-    threadIds?: string[] | null,
-  ) => Promise<void>;
-  runOrgV2Apply: (
-    accountId: string,
-    proposal: OrgProposal,
-    trashAck?: string,
-    actionOverride?: import("../../organizationView").OrgActionOverride | null,
-    deleteMailboxAck?: string,
-    threadIds?: string[] | null,
-  ) => Promise<void>;
-};
-
-let orgDeleteMailboxOneDeps: OrgDeleteMailboxOneDeps | null = null;
-
-export function registerOrgDeleteMailboxOneDeps(deps: OrgDeleteMailboxOneDeps): void {
-  orgDeleteMailboxOneDeps = deps;
-}
-
-function deleteOneDeps(): OrgDeleteMailboxOneDeps {
-  if (!orgDeleteMailboxOneDeps) throw new Error("registerOrgDeleteMailboxOneDeps not called");
-  return orgDeleteMailboxOneDeps;
-}
+import { runOrgApply } from "./orgApplyRun";
+import { runOrgV2Apply } from "./orgV2ApplyRun";
 
 function findEmptyMailboxesProposal(): OrgProposal | undefined {
   return (
@@ -59,11 +31,10 @@ export async function onOrgDeleteMailboxOne(mailbox: string, mailboxRefId: strin
     toast("Proposition introuvable — relancez l’analyse.");
     return;
   }
-  const d = deleteOneDeps();
   const useV2 = Boolean(state.organizationV2.report?.proposals.some((p) => p.id === "empty-mailboxes"));
   if (useV2) {
-    await d.runOrgV2Apply(acc.id, proposal, undefined, undefined, "delete-mailbox", [refId]);
+    await runOrgV2Apply(acc.id, proposal, undefined, undefined, "delete-mailbox", [refId]);
     return;
   }
-  await d.runOrgApply(acc.id, "empty-mailboxes", undefined, undefined, "delete-mailbox", [refId]);
+  await runOrgApply(acc.id, "empty-mailboxes", undefined, undefined, "delete-mailbox", [refId]);
 }

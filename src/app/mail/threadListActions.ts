@@ -19,9 +19,10 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 
+import { refreshOrganizationReport } from "./orgOrganizationReportRefresh";
+
 export type ThreadListActionsDeps = {
   loadMailboxUnread: () => Promise<void>;
-  refreshOrganizationReport: () => Promise<void>;
 };
 
 let threadListActionsDeps: ThreadListActionsDeps | null = null;
@@ -88,7 +89,7 @@ export async function onThreadMove(
     void d.loadMailboxUnread();
     if (!state.selectedThreadId) state.selectedThreadId = state.threads[0]?.id;
     render();
-    if (state.view === "organization") void d.refreshOrganizationReport();
+    if (state.view === "organization") void refreshOrganizationReport();
   } catch (err) {
     console.error(cmd, err);
     clearThreadsRecentlyRemoved([threadId]);
@@ -161,7 +162,7 @@ export async function onThreadMoveTo(threadId: string, destMailbox: string): Pro
     void d.loadMailboxUnread();
     if (!state.selectedThreadId) state.selectedThreadId = state.threads[0]?.id;
     render();
-    if (state.view === "organization") void d.refreshOrganizationReport();
+    if (state.view === "organization") void refreshOrganizationReport();
   } catch (err) {
     console.error("move_thread_mailbox", err);
     clearThreadsRecentlyRemoved([tid]);

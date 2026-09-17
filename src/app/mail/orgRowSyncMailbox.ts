@@ -8,21 +8,7 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { state } from "../state";
 import { loadMailboxUnread, reloadCurrentThreadList } from "./mailListView";
-
-export type OrgRowSyncMailboxDeps = {
-  refreshOrganizationReport: () => Promise<void>;
-};
-
-let orgRowSyncMailboxDeps: OrgRowSyncMailboxDeps | null = null;
-
-export function registerOrgRowSyncMailboxDeps(deps: OrgRowSyncMailboxDeps): void {
-  orgRowSyncMailboxDeps = deps;
-}
-
-function rowSyncDeps(): OrgRowSyncMailboxDeps {
-  if (!orgRowSyncMailboxDeps) throw new Error("registerOrgRowSyncMailboxDeps not called");
-  return orgRowSyncMailboxDeps;
-}
+import { refreshOrganizationReport } from "./orgOrganizationReportRefresh";
 
 export async function onOrgSyncMailbox(mailbox: string): Promise<void> {
   const mb = mailbox.trim();
@@ -49,7 +35,7 @@ export async function onOrgSyncMailbox(mailbox: string): Promise<void> {
     );
     const n = (outcome.results ?? []).reduce((s, r) => s + (r.fetchedUids ?? 0), 0);
     toast(n > 0 ? `${n} message(s) importé(s) · ${mb}` : `Dossier à jour · ${mb}`);
-    await rowSyncDeps().refreshOrganizationReport();
+    await refreshOrganizationReport();
     if (state.view === "list" && state.selectedMailbox === mb) {
       await reloadCurrentThreadList(false);
     }
