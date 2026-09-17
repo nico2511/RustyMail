@@ -132,6 +132,5 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 ## Prochaines extractions (ordre suggéré)
 
 1. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
-2. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
 
 `npm run verify:ts` · `npm test`
