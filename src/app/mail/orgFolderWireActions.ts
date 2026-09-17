@@ -1,8 +1,8 @@
 import type { OrgProposal } from "../../organizationView";
 import type { OrgActionOverride } from "../../organizationView";
+import { openContactsView as openContactsViewImpl } from "./contactsViewNavigation";
 
 export type OrgFolderWireActionsDeps = {
-  openContactsView: () => void | Promise<void>;
   openOrganizationView: () => void | Promise<void>;
   openFolderManagerView: () => void | Promise<void>;
   refreshFolderManagerTree: () => void | Promise<void>;
@@ -54,8 +54,8 @@ function orgFolder(): OrgFolderWireActionsDeps {
   return orgFolderWireActionsDeps;
 }
 
-export function openContactsView(): void | Promise<void> {
-  return orgFolder().openContactsView();
+export function openContactsView(): Promise<void> {
+  return openContactsViewImpl();
 }
 
 export function openOrganizationView(): void | Promise<void> {

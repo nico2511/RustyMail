@@ -225,8 +225,16 @@ import { registerThreadScrollToMessageDeps } from "./mail/threadScrollToMessage"
 import { writeSidebarCollapsedPreference } from "./lib/sidebarUiPref";
 import { draftHasRecipientsExtra } from "./mail/composeDraftRecipients";
 import {
-  registerSwitchMailboxActionDeps,
+  registerSwitchMailboxRunDeps,
+  switchMailbox,
 } from "./mail/switchMailboxAction";
+import { loadAddressBookSidebarCount } from "./mail/loadAddressBookSidebarCount";
+import { openContactDetailView } from "./mail/addressBookWireActions";
+import {
+  collectUnsubscribeLinksFromDoc,
+  hideRelocatedUnsubscribeInDoc,
+  linkLooksLikeUnsubscribe,
+} from "./mail/mailUnsubscribeLinks";
 import { attachmentPathsJoinedForHiddenField } from "./mail/composeAttachmentPaths";
 import {
   clearDraftSession,
@@ -631,47 +639,6 @@ async function flushDraftRevisionPending(): Promise<void> {
 }
 
 let composeInteractionsAbort: AbortController | undefined;
-
-async function switchMailbox(nextMailbox: string) {
-  if (state.view === "folderManager") return;
-  // Sidebar navigation while reading a thread should return to list view.
-  // Otherwise we can stay on `view=thread` with no loaded thread and show "Fil indisponible…".
-  if (
-    state.view === "thread" ||
-    state.view === "contacts" ||
-    state.view === "contact" ||
-    state.view === "settings" ||
-    state.view === "organization" ||
-    state.view === "organizationV2" ||
-    state.view === "compose"
-  ) {
-    navReset();
-    state.view = "list";
-    state.selectedThread = undefined;
-    state.selectedThreadId = undefined;
-    state.selectedContactEmail = undefined;
-    state.aiOpen = false;
-    clearThreadAiSummaryState();
-  }
-  state.selectedMailbox = nextMailbox || "INBOX";
-  notifyImapWatchFocusedMailbox(state.selectedMailbox);
-  exitSearchModeForMailboxBrowse();
-  state.searchScope = "mailbox";
-  state.listFilter = defaultListFilterFromPrefs();
-  resetMailboxDigestForNavigation();
-  invalidateIdleAiCachePrefetch();
-  await loadMailView(false);
-  cancelMailboxDigestLiveDebounce();
-  if (mailboxDigestSlotInList()) {
-    void enqueueMailboxDigestRefreshWhenIdle(false);
-  }
-  await refreshSavedDraftsMailboxCount();
-  if (!state.threads.some((t) => t.id === state.selectedThreadId)) {
-    state.selectedThreadId = state.threads[0]?.id;
-    state.selectedThread = undefined;
-  }
-  render();
-}
 
 async function loadBootDeferredPrefs(): Promise<void> {
   if (!isTauriRuntime()) return;
@@ -1656,66 +1623,6 @@ async function openOrganizationMailbox(mailbox: string) {
   render();
 }
 
-async function openContactsView() {
-  const acc = currentAccount();
-  if (!acc?.id) {
-    toast("Configurez un compte pour le carnet.");
-    return;
-  }
-  beginNavigation("contacts", { resetStack: true });
-  state.view = "contacts";
-  state.selectedContactEmail = undefined;
-  clearContactProfile();
-  state.mailboxDigestPanelOpen = false;
-  state.aiOpen = false;
-  clearThreadAiSummaryState();
-  render();
-  try {
-    await loadContactsList(acc.id, { reset: true });
-    await loadAddressBookSidebarCount();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-  render();
-}
-
-async function openContactDetailView(email: string, opts?: { skipHistory?: boolean }) {
-  const acc = currentAccount();
-  if (!acc?.id) return;
-  const em = email.trim().toLowerCase();
-  if (!em) return;
-  beginNavigation("contact", { skipHistory: opts?.skipHistory });
-  state.view = "contact";
-  state.selectedContactEmail = em;
-  clearContactProfile();
-  render();
-  try {
-    await loadContactDetail(acc.id, em);
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-  recordActivity({ eventType: "contact_opened", senderEmail: em });
-  render();
-}
-
-async function loadAddressBookSidebarCount(): Promise<void> {
-  if (!isTauriRuntime()) {
-    state.addressBookSidebarCount = null;
-    return;
-  }
-  const acc = currentAccount();
-  if (!acc?.id) {
-    state.addressBookSidebarCount = null;
-    return;
-  }
-  try {
-    const n = await invoke<number>("count_address_contacts_scoped_cmd", { accountId: acc.id });
-    state.addressBookSidebarCount = Math.max(0, Math.floor(Number(n)) || 0);
-  } catch {
-    state.addressBookSidebarCount = null;
-  }
-}
-
 function activeSecurityLlmAugmentCount(): number {
   let n = 0;
   for (const v of Object.values(securityLlmAugmentBusy)) {
@@ -1793,126 +1700,6 @@ async function onOrgDeleteMailboxOne(mailbox: string, mailboxRefId: string): Pro
     return;
   }
   await runOrgApply(acc.id, "empty-mailboxes", undefined, undefined, "delete-mailbox", [refId]);
-}
-
-
-function unsubscribeHrefScore(hrefRaw: string): number {
-  const href = decodeHtmlEntitiesLoose(hrefRaw.trim());
-  const low = href.toLowerCase();
-  let score = 0;
-  if (/^https?:\/\//i.test(href)) score += 30;
-  if (/^mailto:/i.test(href)) score += 10;
-  if (/unsubscribe|opt[-_]?out|optout|desinscri|desabonner/i.test(low)) score += 80;
-  if (/\/un\/|\/unsub\b|\/opt-?out\b|\/manage-subscription/i.test(low)) score += 70;
-  if (/list-unsubscribe|list-manage|subscription|preferences/i.test(href)) score += 25;
-  if (/unsub\.aspx/i.test(href)) score += 35;
-  // De-prioritize generic click-tracking / “view online” redirectors.
-  if (/\/ats\/show\.aspx/i.test(low)) score -= 60;
-  if (/(\/click|\/redirect|\/track|\/open)\b/i.test(low)) score -= 20;
-  if (/utm_/i.test(low)) score -= 5;
-  return score;
-}
-
-function sortUnsubscribeLinks(links: string[]): string[] {
-  return [...links].sort((a, b) => unsubscribeHrefScore(b) - unsubscribeHrefScore(a));
-}
-
-function linkLooksLikeUnsubscribe(anchor: HTMLAnchorElement): boolean {
-  const href = (anchor.getAttribute("href") || "").trim();
-  const hrefLc = href.toLowerCase();
-  const text = (anchor.textContent || "").trim().toLowerCase();
-  const title = (anchor.getAttribute("title") || "").trim().toLowerCase();
-  const blob = `${hrefLc} ${text} ${title}`;
-  if (
-    /\bunsubscribe\b|opt\s*-?\s*out|optout|d[ée]sinscri|d[ée]sabonner|d[ée]sinscription|list-unsubscribe|list-manage|subscription\s*center|one\s*-?\s*click|email\s*preferences|communication\s*preferences|advertising\s*preferences/i.test(
-      blob
-    )
-  ) {
-    return true;
-  }
-  if (/unsubscribe|opt[-_]out|optout|subscription|preferences\/email|email-preference|list-manage|\/u\/\d+\/unsub/i.test(hrefLc)) {
-    return true;
-  }
-  if (/^mailto:/i.test(hrefLc) && /unsubscribe|d[ée]sinscri|opt[-_]out/i.test(blob)) return true;
-  try {
-    const base =
-      typeof window !== "undefined" && window.location?.origin ? window.location.origin : "https://local.invalid";
-    const u = new URL(href, base);
-    const path = `${u.pathname}${u.search}`.toLowerCase();
-    if (/unsubscribe|optout|opt_out|subscription|preferences|list-manage/i.test(path)) return true;
-    if (/\/un\/|\/unsub\b|\/opt-?out\b|\/manage-subscription/i.test(path)) return true;
-  } catch {
-    /* ignore */
-  }
-  if (
-    /^(ici|here|cliquez ici|click here)$/i.test(text) &&
-    /\bd[ée]s(inscri|abonner)|unsubscribe|opt\s*-?\s*out/i.test(blob)
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function unsubscribeLinkLabel(anchor: HTMLAnchorElement): string {
-  const text = (anchor.textContent || "").replace(/\s+/g, " ").trim();
-  if (text.length >= 3 && text.length <= 80) return text;
-  const title = (anchor.getAttribute("title") || "").replace(/\s+/g, " ").trim();
-  if (title.length >= 3 && title.length <= 80) return title;
-  const href = (anchor.getAttribute("href") || "").trim();
-  if (/^mailto:/i.test(href)) return "Se désinscrire (courriel)";
-  return "Se désinscrire";
-}
-
-function collectUnsubscribeLinksFromDoc(doc: Document): MailUnsubscribeLink[] {
-  const seen = new Set<string>();
-  const out: MailUnsubscribeLink[] = [];
-  doc.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((a) => {
-    if (!linkLooksLikeUnsubscribe(a)) return;
-    const href = normalizeMailHrefForOpen(a.getAttribute("href") || "");
-    if (!href || seen.has(href)) return;
-    seen.add(href);
-    out.push({ href, label: unsubscribeLinkLabel(a) });
-  });
-  return out;
-}
-
-function blockIsMostlyUnsubscribe(el: Element): boolean {
-  const text = (el.textContent || "").replace(/\s+/g, " ").trim();
-  if (!text) return true;
-  const links = el.querySelectorAll<HTMLAnchorElement>("a.mail-unsubscribe-link");
-  if (!links.length) return false;
-  const linkText = [...links].map((a) => (a.textContent || "").trim()).join(" ");
-  const rest = text.replace(linkText, "").replace(/\s+/g, " ").trim();
-  return !rest || /^[|·•\-–—\s]+$/.test(rest);
-}
-
-function hideRelocatedUnsubscribeInDoc(doc: Document): void {
-  doc.querySelectorAll<HTMLAnchorElement>("a.mail-unsubscribe-link").forEach((a) => {
-    a.classList.add("mail-unsubscribe-link--relocated");
-    const p = a.closest("p");
-    if (p && blockIsMostlyUnsubscribe(p)) {
-      p.classList.add("mail-unsubscribe-section--relocated");
-    }
-    const row = a.closest("tr");
-    if (row && blockIsMostlyUnsubscribe(row)) {
-      row.classList.add("mail-unsubscribe-section--relocated");
-    }
-    const cell = a.closest("td, th");
-    if (cell && blockIsMostlyUnsubscribe(cell)) {
-      cell.classList.add("mail-unsubscribe-section--relocated");
-    }
-  });
-  doc.querySelectorAll("article.rm-amazon-digest, article.rm-deblock-digest").forEach((article) => {
-    const h3 = article.querySelector(":scope > h3");
-    if (!h3 || !/désabon|unsub/i.test(h3.textContent || "")) return;
-    h3.classList.add("mail-unsubscribe-section--relocated");
-    let sib = h3.nextElementSibling;
-    while (sib && (sib.tagName === "TABLE" || sib.tagName === "P")) {
-      sib.classList.add("mail-unsubscribe-section--relocated");
-      if (sib.tagName === "TABLE") break;
-      sib = sib.nextElementSibling;
-    }
-  });
 }
 
 function extractUnsubscribeLinksFromHtml(raw: string): MailUnsubscribeLink[] {
@@ -5569,7 +5356,6 @@ registerRenderDeps({
   zenSummaryHtmlFragments,
   parseMaybeDate,
   dayKey,
-  unsubscribeHrefScore,
   isSecurityLlmAugmentPending,
   draftHasRecipientsExtra,
   attachmentPathsJoinedForHiddenField,
@@ -5592,7 +5378,6 @@ registerRenderDeps({
   agentSkillEnabled,
   agentOfferSlotsStep,
   shouldOfferThreadTranslate,
-  sortUnsubscribeLinks,
 });
 
 registerMailListDeps({
@@ -5684,7 +5469,7 @@ registerThreadScrollToMessageDeps({
   sortMessagesByReceivedDescending,
 });
 
-registerSwitchMailboxActionDeps({ switchMailbox });
+registerSwitchMailboxRunDeps({ loadMailView });
 
 registerComposeCloseFlowDeps({
   persistDraft,
@@ -5755,7 +5540,6 @@ registerSettingsWireActionsDeps({
 });
 
 registerOrgFolderWireActionsDeps({
-  openContactsView,
   openOrganizationView,
   openFolderManagerView,
   refreshFolderManagerTree,
@@ -5811,8 +5595,6 @@ registerComposeAssistWireActionsDeps({
 });
 
 registerAddressBookWireActionsDeps({
-  openContactDetailView,
-  loadAddressBookSidebarCount,
   refreshAddressBookList,
 });
 
@@ -5824,7 +5606,6 @@ registerSwitchActiveAccountDeps({
   loadMailView,
   loadMailboxUnread,
   refreshSavedDraftsMailboxCount,
-  loadAddressBookSidebarCount,
   refreshSavedSearches,
   refreshSuggestedSavedViews,
 });

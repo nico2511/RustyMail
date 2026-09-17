@@ -136,7 +136,11 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
 | `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |
 | `app/mail/mailboxImapFallback.ts` | Dossier IMAP par défaut (`pickImapMailboxFallback`) |
-| `app/mail/switchMailboxAction.ts` | Facade `switchMailbox()` + `registerSwitchMailboxActionDeps()` |
+| `app/mail/switchMailboxAction.ts` | Facade `switchMailbox()` ; `registerSwitchMailboxRunDeps({ loadMailView })` |
+| `app/mail/switchMailboxRun.ts` | Changement de dossier IMAP (sidebar) |
+| `app/mail/contactsViewNavigation.ts` | Carnet : `openContactsView`, `openContactDetailView` |
+| `app/mail/loadAddressBookSidebarCount.ts` | Compteur contacts sidebar |
+| `app/mail/mailUnsubscribeLinks.ts` | Détection / tri liens désinscription HTML |
 | `app/lib/sidebarUiPref.ts` | Préférence sidebar repliée (localStorage) |
 | `app/mail/newsletterRuleInput.ts` | Lecture/normalisation règles expéditeurs auto (UI) |
 | `app/mail/threadAiSummaryState.ts` | Reset état synthèse / agent fil |

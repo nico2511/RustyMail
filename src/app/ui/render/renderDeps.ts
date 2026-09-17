@@ -87,7 +87,6 @@ export type RenderDeps = {
   zenSummaryHtmlFragments: (text: string) => string;
   parseMaybeDate: (value: string) => Date | null;
   dayKey: (date: Date) => string;
-  unsubscribeHrefScore: (hrefRaw: string) => number;
   isSecurityLlmAugmentPending: (messageId: string) => boolean;
   draftHasRecipientsExtra: (draft?: Draft) => boolean;
   attachmentPathsJoinedForHiddenField: (paths: string[]) => string;
@@ -116,7 +115,6 @@ export type RenderDeps = {
     thread: { messages: CleanedMessageView[]; tags?: Tag[] },
     motherLangRaw: string,
   ) => boolean;
-  sortUnsubscribeLinks: (links: string[]) => string[];
 };
 
 let deps: RenderDeps | null = null;

@@ -14,6 +14,7 @@ import { initials } from "../../lib/tags";
 import { state } from "../../state";
 import { newsletterEmailListed } from "../../mail/newsletterRulesMatch";
 import { cleanThreadListPreview } from "../../mail/mailListPreviewClean";
+import { sortUnsubscribeLinks } from "../../mail/mailUnsubscribeLinks";
 import { renderDeps } from "./renderDeps";
 import { renderThreadNlRuleButton } from "./threadViewRender";
 
@@ -84,7 +85,7 @@ export function renderOrgThreadSampleRow(ref: OrgThreadRef, proposal: OrgProposa
     const isUnsubCard =
       proposal.kind === "unsubscribeNewsletter" || proposal.kind === "unsubscribeTransactional";
     if (!isUnsubCard) return "";
-    const links = d.sortUnsubscribeLinks((ref.unsubscribeLinks ?? []).filter(Boolean)).slice(0, 3);
+    const links = sortUnsubscribeLinks((ref.unsubscribeLinks ?? []).filter(Boolean)).slice(0, 3);
     if (!links.length) return `<div class="org-unsub-col dim" title="Aucun lien de désinscription indexé">—</div>`;
     const primary = links[0];
     const extra = links.length > 1 ? ` (+${links.length - 1})` : "";

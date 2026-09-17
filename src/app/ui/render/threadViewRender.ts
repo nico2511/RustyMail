@@ -21,6 +21,7 @@ import type {
   ThreadParticipantLink,
   ThreadRecipientPresenceEvents,
 } from "../../types";
+import { unsubscribeHrefScore } from "../../mail/mailUnsubscribeLinks";
 import { renderViewNavTrail } from "./listChrome";
 import { renderDeps } from "./renderDeps";
 
@@ -39,7 +40,7 @@ function iconThreadMessageViewToggle(userMode: MessageViewMode): string {
 
 function renderMailUnsubscribeBar(links: MailUnsubscribeLink[]): string {
   if (!links.length) return "";
-  const sorted = [...links].sort((a, b) => renderDeps().unsubscribeHrefScore(b.href) - renderDeps().unsubscribeHrefScore(a.href));
+  const sorted = [...links].sort((a, b) => unsubscribeHrefScore(b.href) - unsubscribeHrefScore(a.href));
   const btns = sorted
     .map(
       (l) =>

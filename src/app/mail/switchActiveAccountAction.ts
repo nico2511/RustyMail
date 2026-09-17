@@ -9,12 +9,12 @@ import {
 } from "./mailboxDigest";
 import { syncActivityRecordingPrefs } from "./threadActivityTracking";
 import { defaultListFilterFromPrefs, ensureValidSelectedMailbox } from "./accountDefaultPrefs";
+import { loadAddressBookSidebarCount } from "./loadAddressBookSidebarCount";
 
 export type SwitchActiveAccountDeps = {
   loadMailView: (append?: boolean) => Promise<void>;
   loadMailboxUnread: () => Promise<void>;
   refreshSavedDraftsMailboxCount: () => Promise<void>;
-  loadAddressBookSidebarCount: () => Promise<void>;
   refreshSavedSearches: (force?: boolean) => Promise<void>;
   refreshSuggestedSavedViews: () => Promise<void>;
 };
@@ -51,7 +51,7 @@ export async function switchActiveAccount(accountId: string): Promise<void> {
   }
   await d.loadMailboxUnread();
   await d.refreshSavedDraftsMailboxCount();
-  await d.loadAddressBookSidebarCount();
+  await loadAddressBookSidebarCount();
   await d.refreshSavedSearches(true);
   syncActivityRecordingPrefs();
   await d.refreshSuggestedSavedViews();
