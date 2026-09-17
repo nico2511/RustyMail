@@ -194,7 +194,12 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadAiSummaryState.ts` | Reset état synthèse / agent fil |
 | `app/mail/threadMessageAnchor.ts` | Id DOM ancre message fil |
 | `app/mail/threadScrollToMessage.ts` | Scroll + surbrillance message + `registerThreadScrollToMessageDeps()` |
-| `app/mail/mailListView.ts` | `loadMailView`, `loadThreadsForSearchContext` + `registerMailListDeps()` |
+| `app/mail/mailListView.ts` | Barrel loaders liste / sidebar |
+| `app/mail/mailListViewContext.ts` | `registerMailListDeps`, fusion pages threads |
+| `app/mail/mailListMailboxLoadRun.ts` | `loadMailView` (unifiée, brouillons, dossier) |
+| `app/mail/mailListSearchContextRun.ts` | `loadThreadsForSearchContext` |
+| `app/mail/mailListSidebarRun.ts` | Compteurs filtre inbox + non-lus sidebar |
+| `app/mail/mailListRouterRun.ts` | `reloadCurrentThreadList`, `applyListFilter` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
 | `app/core/accountContext.ts` | `currentAccount()` |
@@ -251,7 +256,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`mailListView`, `savedSearchViews`, …)
+1. Découper d’autres modules mail > ~350 lignes (`savedSearchViews`, `syncInboxRun`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
