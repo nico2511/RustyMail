@@ -261,13 +261,19 @@ import {
 } from "./mail/composeOrphanDraftSession";
 import { pickAttachments, registerComposePickAttachmentsDeps } from "./mail/composePickAttachments";
 import {
-  registerComposeComposerBridgeDeps,
   loadComposeMarkdownIntoEditor,
   resetMarkdownEditorHistory,
-  setComposeFromTextareaValue,
   computePreview,
   schedulePreviewUpdate,
+  scheduleDraftRevisionSave,
 } from "./mail/composeComposerBridge";
+import {
+  clearDraftRevisionDebounceTimer,
+  flushDraftRevisionPending as flushDraftRevisionPendingNow,
+  registerComposeDraftRevisionAutosaveDeps,
+} from "./mail/composeDraftRevisionAutosave";
+import { persistDraft } from "./mail/composePersistDraft";
+import { composeChipsHandle } from "./mail/composeRecipientChipsWire";
 import {
   composePreviewPaneActive,
   registerComposeDraftPreviewDeps,
@@ -418,13 +424,6 @@ import {
 } from "../activity";
 
 import {
-  mountComposeRecipientChips,
-  type ComposeRecipientChipsHandle,
-  type ComposeRecipientField,
-  type RecipientChip,
-} from "../composeRecipientChips";
-
-import {
   type AiFeatureKey,
   isAiFeatureEnabled,
   setAllAiFeatures,
@@ -561,14 +560,6 @@ import { root as appShell } from "./dom";
 import type { View, Tone, Tag, Entity, ThreadListItem, Draft, DraftPreview, DraftRevisionListItem, DraftDiffLine, DraftCompareView, MicDictationTarget, MessageViewMode, ComposeLayout, MicState, MailSecuritySignals, CleanedMessageView, DiscussionThreadView, AppStatus, AppPathsView, AppCapabilities, LlmRuntimeStatus, NewsletterRuleRow, InboxFilterCounts, ActionBriefResult, CloseComposeModal, ResumeDraftModal, OrphanDraftSessionItem, State, SearchViewBatchJob, MailboxFolderStatsRow, SavedDraftListItem, SemanticEmbeddingCountsSnapshot, FluxAffinerResult, MailUnsubscribeLink, SplitPlan, InlineAttachPayload, ThreadParticipantLink, ThreadRecipientPresenceEvents, TextPromptModalSpec, ConfirmModalSpec, NavigateOpts, OAuthDesktopLoginOutcome, SummaryResult, ActionBriefEvidenceLink, AddressBookRow, ShortcutRow, SavedDraftOpenPayload, SendDraftOutcome, SplitSendResult, LlmTranslationResult, MicActionOpts } from "./types";
 
 let llmQueueAbort: AbortController | null = null;
-
-let composeChipsTo: ComposeRecipientChipsHandle | null = null;
-
-let composeChipsCc: ComposeRecipientChipsHandle | null = null;
-
-let composeChipsBcc: ComposeRecipientChipsHandle | null = null;
-
-const composeRecipientPendingInput: Partial<Record<ComposeRecipientField, string>> = {};
 
 let addressBookListQuery = "";
 
@@ -727,26 +718,10 @@ async function upsertSavedDraftSilent(): Promise<boolean> {
   }
 }
 
-function scheduleDraftRevisionSave(delayMs = DRAFT_REVISION_DEBOUNCE_MS) {
-  if (!isTauriRuntime()) return;
-  if (!state.draft || !state.draftSessionId) return;
-  if (draftRevisionDebounceTimer !== null) {
-    window.clearTimeout(draftRevisionDebounceTimer);
-  }
-  draftRevisionDebounceTimer = window.setTimeout(() => {
-    draftRevisionDebounceTimer = null;
-    void saveDraftRevisionNow();
-  }, Math.max(150, delayMs));
-}
-
 async function flushDraftRevisionPending(): Promise<void> {
-  if (draftRevisionDebounceTimer !== null) {
-    window.clearTimeout(draftRevisionDebounceTimer);
-    draftRevisionDebounceTimer = null;
-  }
-  if (state.view === "compose" && state.draft && state.draftSessionId) {
-    await saveDraftRevisionNow();
-  }
+  await flushDraftRevisionPendingNow(
+    () => state.view === "compose" && Boolean(state.draft && state.draftSessionId),
+  );
 }
 
 function composeDraftHasMeaningfulContent(): boolean {
@@ -825,10 +800,6 @@ let micStream: MediaStream | null = null;
 let micDictationTarget: MicDictationTarget = "compose";
 
 let micPttKeyHeld = false;
-
-let draftRevisionDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-const DRAFT_REVISION_DEBOUNCE_MS = 1800;
 
 function composePushToTalkTargetCode(): string {
   return (state.appPrefs.ai.whisperPttKeyCode ?? "").trim();
@@ -996,11 +967,7 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-let composerDropAbort: AbortController | undefined;
-
 let composeInteractionsAbort: AbortController | undefined;
-
-let composeDragDepth = 0;
 
 function warnOAuthEphemeralRedirect(outcome: OAuthDesktopLoginOutcome): void {
   if (!outcome.ephemeralRedirect) return;
@@ -6968,176 +6935,6 @@ async function micAction(opts?: MicActionOpts) {
   }
 }
 
-function persistDraft() {
-  if (!state.draft) return;
-  const shell = document.querySelector(".composer-mail-shell");
-  const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  if (ta) setComposeFromTextareaValue(ta.value);
-  state.draft.markdownBody = state.composeCanonicalBody;
-  state.draft.subject =
-    shell?.querySelector<HTMLInputElement>("#compose-subject")?.value ??
-    document.querySelector<HTMLInputElement>("#compose-subject")?.value ??
-    state.draft.subject;
-  const sendHtmlEl =
-    shell?.querySelector<HTMLInputElement>("#compose-send-html") ??
-    document.querySelector<HTMLInputElement>("#compose-send-html");
-  if (sendHtmlEl) state.draft.sendHtml = sendHtmlEl.checked;
-  const toEl = shell?.querySelector<HTMLInputElement>("#compose-to") ?? document.querySelector<HTMLInputElement>("#compose-to");
-  const ccEl = shell?.querySelector<HTMLInputElement>("#compose-cc") ?? document.querySelector<HTMLInputElement>("#compose-cc");
-  const bccEl = shell?.querySelector<HTMLInputElement>("#compose-bcc") ?? document.querySelector<HTMLInputElement>("#compose-bcc");
-  if (composeChipsTo) state.draft.to = composeChipsTo.getRecipients();
-  else if (toEl) state.draft.to = parseEmailList(toEl.value);
-  if (composeChipsCc) state.draft.cc = composeChipsCc.getRecipients();
-  else if (ccEl) state.draft.cc = parseEmailList(ccEl.value);
-  if (composeChipsBcc) state.draft.bcc = composeChipsBcc.getRecipients();
-  else if (bccEl) state.draft.bcc = parseEmailList(bccEl.value);
-  // Pièces jointes : pilots uniquement par state.draft (+ pick natif / glisser). Ne pas splitter par virgule
-  // depuis le champ caché (les virgules sont valides dans les noms fichiers sous Windows → chemins coupés avant envoi).
-}
-
-function bindComposerDropzone() {
-  composerDropAbort?.abort();
-  composerDropAbort = undefined;
-  composeDragDepth = 0;
-  if (state.view !== "compose") return;
-  // Bureau Tauri (surtout Windows) : le drop HTML5 ne reçoit pas les chemins disque ;
-  // c’est `getCurrentWebview().onDragDropEvent` qui les fournit (`bindTauriFileDrop`).
-  if (isTauriRuntime()) return;
-  const shell = document.querySelector<HTMLElement>(".composer-mail-shell");
-  const composeBody = document.querySelector<HTMLElement>(".composer-mail-shell .composer-body");
-  if (!shell || !composeBody) return;
-
-  composerDropAbort = new AbortController();
-  const { signal } = composerDropAbort;
-
-  const clearOverlay = () => {
-    composeDragDepth = 0;
-    shell.classList.remove("composer-mail-shell--drag-over");
-    composeBody.classList.remove("drag-over");
-  };
-
-  const bumpOverlay = () => {
-    shell.classList.add("composer-mail-shell--drag-over");
-    composeBody.classList.add("drag-over");
-  };
-
-  const onDragEnter = (event: DragEvent) => {
-    event.preventDefault();
-    composeDragDepth += 1;
-    bumpOverlay();
-  };
-
-  const onDragLeave = () => {
-    composeDragDepth = Math.max(0, composeDragDepth - 1);
-    if (composeDragDepth <= 0) clearOverlay();
-  };
-
-  const onDragOver = (event: DragEvent) => {
-    event.preventDefault();
-    const dt = event.dataTransfer;
-    if (dt && Array.from(dt.types).includes("Files")) dt.dropEffect = "copy";
-  };
-
-  const onDrop = (event: DragEvent) => {
-    event.preventDefault();
-    clearOverlay();
-    if (!state.draft) return;
-    const dropped = extractDroppedPaths(event.dataTransfer);
-    if (!dropped.length) {
-      toast(
-        "Aucun chemin de fichier local lu. Glissez depuis l’explorateur ou le bureau (mode Tauri ou Electron), pas depuis une page web."
-      );
-      return;
-    }
-    const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...dropped]));
-    state.draft.attachmentPaths = merged;
-    const attachmentsField = document.querySelector<HTMLInputElement>("#compose-attachments");
-    if (attachmentsField) attachmentsField.value = attachmentPathsJoinedForHiddenField(merged);
-    toast(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
-    render();
-  };
-
-  shell.addEventListener("dragenter", onDragEnter, { signal });
-  shell.addEventListener("dragleave", onDragLeave, { signal });
-  // Capture : certains enfants (aperçu, zone fichier) peuvent faire échouer le drop sinon.
-  shell.addEventListener("dragover", onDragOver, { signal, capture: true });
-  shell.addEventListener("drop", onDrop, { signal, capture: true });
-}
-
-function extractDroppedPaths(dataTransfer: DataTransfer | null): string[] {
-  if (!dataTransfer) return [];
-  const files = Array.from(dataTransfer.files ?? []);
-  return files
-    .map((file) => {
-      const localPath = (file as File & { path?: string }).path;
-      if (typeof localPath === "string" && localPath.trim()) return localPath.trim();
-      return "";
-    })
-    .filter(Boolean);
-}
-
-function parseEmailList(value: string): Array<{ email: string; name?: string | null }> {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const m = part.match(/^(.+?)\s*<([^>]+)>$/);
-      if (m) {
-        const email = m[2].trim();
-        const name = m[1].trim().replace(/^["']|["']$/g, "");
-        return { email, name: name || null };
-      }
-      return { email: part };
-    });
-}
-
-function wireComposeRecipientChips(): void {
-  if (composeChipsTo) composeRecipientPendingInput.to = composeChipsTo.getPendingInput();
-  if (composeChipsCc) composeRecipientPendingInput.cc = composeChipsCc.getPendingInput();
-  if (composeChipsBcc) composeRecipientPendingInput.bcc = composeChipsBcc.getPendingInput();
-  composeChipsTo?.detach();
-  composeChipsCc?.detach();
-  composeChipsBcc?.detach();
-  composeChipsTo = composeChipsCc = composeChipsBcc = null;
-  if (state.view !== "compose" || !state.draft) {
-    delete composeRecipientPendingInput.to;
-    delete composeRecipientPendingInput.cc;
-    delete composeRecipientPendingInput.bcc;
-    return;
-  }
-
-  const mountField = (
-    hostSel: string,
-    field: ComposeRecipientField
-  ): ComposeRecipientChipsHandle | null => {
-    const host = document.querySelector<HTMLElement>(hostSel);
-    if (!host) return null;
-    const initial: RecipientChip[] = state.draft![field] ?? [];
-    const pendingInput = composeRecipientPendingInput[field];
-    return mountComposeRecipientChips({
-      container: host,
-      field,
-      initial,
-      pendingInput,
-      isTauri: isTauriRuntime(),
-      onChange: (recipients) => {
-        if (!state.draft) return;
-        state.draft[field] = recipients;
-        scheduleDraftRevisionSave();
-      },
-      onPendingInputChange: (raw) => {
-        if (raw.trim()) composeRecipientPendingInput[field] = raw;
-        else delete composeRecipientPendingInput[field];
-      },
-    });
-  };
-
-  composeChipsTo = mountField("#compose-to-host", "to");
-  composeChipsCc = mountField("#compose-cc-host", "cc");
-  composeChipsBcc = mountField("#compose-bcc-host", "bcc");
-}
-
 function mouseNavBlockedByOverlay(): boolean {
   return Boolean(
     state.quoteFoldModal ||
@@ -7851,11 +7648,7 @@ registerBulkTrashListDeps({
 });
 
 registerSearchAtAutocompleteWireDeps({
-  composeChipsHandle: (field) => {
-    if (field === "to") return composeChipsTo;
-    if (field === "cc") return composeChipsCc;
-    return composeChipsBcc;
-  },
+  composeChipsHandle,
   scheduleDraftRevisionSave,
 });
 
@@ -7893,12 +7686,7 @@ registerComposeCloseFlowDeps({
   persistDraft,
   flushDraftRevisionPending,
   composeDraftHasMeaningfulContent,
-  clearDraftRevisionDebounce: () => {
-    if (draftRevisionDebounceTimer !== null) {
-      window.clearTimeout(draftRevisionDebounceTimer);
-      draftRevisionDebounceTimer = null;
-    }
-  },
+  clearDraftRevisionDebounce: clearDraftRevisionDebounceTimer,
   refreshSavedDraftsMailboxCount,
   threadReadingIsSimpleLayout,
 });
@@ -7927,10 +7715,12 @@ registerComposeDraftPreviewDeps({
   sanitizePreviewHtml: (htmlRaw) => sanitizeEmailHtml(htmlRaw, { relocateUnsubscribe: false }).html,
 });
 
-registerComposeComposerBridgeDeps({
-  scheduleDraftRevisionSave,
-  bindComposerDropzone,
-  wireComposeRecipientChips,
+registerComposeDraftRevisionAutosaveDeps({
+  canScheduleDraftRevisionSave: () =>
+    isTauriRuntime() && Boolean(state.draft && state.draftSessionId),
+  saveDraftRevisionNow: () => {
+    void saveDraftRevisionNow();
+  },
 });
 
 registerComposeDraftRevisionDiffDeps({ persistDraft });

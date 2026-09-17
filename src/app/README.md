@@ -70,9 +70,13 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/settingsWireActions.ts` | Facades paramètres (comptes, LLM, OAuth, micro…) |
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
 | `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
-| `app/mail/composeComposerBridge.ts` | Facades éditeur (preview, markdown, dropzone, chips, révisions) |
+| `app/mail/composeComposerBridge.ts` | Ré-exports éditeur compositeur (markdown, preview, PJ, chips) |
 | `app/mail/composeMarkdownEditor.ts` | Corps markdown compositeur + barre d’outils |
 | `app/mail/composeDraftPreview.ts` | Aperçu brouillon (`preview_draft`) + debounce |
+| `app/mail/composePersistDraft.ts` | Lecture DOM → `state.draft` avant envoi / preview |
+| `app/mail/composeRecipientChipsWire.ts` | Chips À/Cc/Cci + `composeChipsHandle` |
+| `app/mail/composeHtmlDropzone.ts` | Glisser-déposer PJ (navigateur) |
+| `app/mail/composeDraftRevisionAutosave.ts` | Debounce révisions locales + `scheduleDraftRevisionSave` |
 | `app/mail/newsletterRulesMatch.ts` | Correspondance expéditeur ↔ règle newsletter |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
 | `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |
