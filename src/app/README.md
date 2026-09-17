@@ -60,6 +60,9 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/threadAutoMail.ts` | Détection fil newsletter / auto |
 | `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
 | `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
+| `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |
+| `app/mail/mailboxImapFallback.ts` | Dossier IMAP par défaut (`pickImapMailboxFallback`) |
+| `app/mail/switchMailboxAction.ts` | Facade `switchMailbox()` + `registerSwitchMailboxActionDeps()` |
 | `app/lib/sidebarUiPref.ts` | Préférence sidebar repliée (localStorage) |
 | `app/mail/newsletterRuleInput.ts` | Lecture/normalisation règles expéditeurs auto (UI) |
 | `app/mail/threadAiSummaryState.ts` | Reset état synthèse / agent fil |

@@ -79,6 +79,7 @@ import { refreshSearchTagCatalog } from "../mail/searchTagCatalog";
 import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
 import { normalizeMailHrefForOpen, openExternalFromMailHref } from "../mail/mailLinkOpen";
 import { sendQuickReply } from "../mail/composeSendQuickReply";
+import { switchMailbox } from "../mail/switchMailboxAction";
 import { render } from "../dispatch";
 import { callApp } from "./callApp";
 import { app } from "./wireEventsBridge";
@@ -422,7 +423,7 @@ export function wireEvents() {
       // Boutons avec data-action (fm-select, org-open-mailbox, …) : handleAction uniquement.
       if (el.dataset.action?.trim()) return;
       void (async () => {
-        await callApp("switchMailbox", el.dataset.mailbox || "INBOX");
+        await switchMailbox(el.dataset.mailbox || "INBOX");
       })();
     });
   });

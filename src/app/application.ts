@@ -240,6 +240,11 @@ import {
   normalizeNlRuleInvokeInput,
 } from "./mail/newsletterRuleInput";
 import { writeSidebarCollapsedPreference } from "./lib/sidebarUiPref";
+import { draftHasRecipientsExtra } from "./mail/composeDraftRecipients";
+import { pickImapMailboxFallback } from "./mail/mailboxImapFallback";
+import {
+  registerSwitchMailboxActionDeps,
+} from "./mail/switchMailboxAction";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -950,13 +955,6 @@ function composeDraftHasMeaningfulContent(): boolean {
   if (d.to.length > 0 || d.cc.length > 0 || d.bcc.length > 0) return true;
   if ((d.attachmentPaths?.length ?? 0) > 0) return true;
   return false;
-}
-
-function pickImapMailboxFallback(): string {
-  if (state.mailboxes.includes("INBOX")) return "INBOX";
-  const sys = pickSystemMailboxes(state.mailboxes);
-  if (sys[0]?.name) return sys[0].name;
-  return state.mailboxes[0] ?? "INBOX";
 }
 
 async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }): Promise<boolean> {
@@ -5080,12 +5078,6 @@ function isOwnSender(sender: string) {
   return Boolean((byEmail && s === byEmail) || (byName && s === byName) || s === "sarah chen");
 }
 
-function draftHasRecipientsExtra(draft?: Draft): boolean {
-  if (!draft) return false;
-  const hasEmails = (list: Draft["to"]) => list.some((x) => Boolean(x.email?.trim()));
-  return hasEmails(draft.cc) || hasEmails(draft.bcc);
-}
-
 function composeKindTitle(kind?: Draft["kind"]): string {
   switch (kind) {
     case "Reply":
@@ -8571,9 +8563,7 @@ registerWireEventsBridge({
   confirmThenRunOrgV2Apply,
   refreshFolderManagerTree,
   llmQuickRepliesComposeUi,
-  pickImapMailboxFallback,
   applyContextSliderIndex,
-  draftHasRecipientsExtra,
   saveDraftToSavedListNow,
   persistDefaultAccountId,
   loadAccountsFromBackend,
@@ -8632,7 +8622,6 @@ registerWireEventsBridge({
   onThreadMoveTo,
   computePreview,
   bytesToBase64,
-  switchMailbox,
   runOrgV2Apply,
   fmSyncMailbox,
   llmQaThreadUi,
@@ -8885,12 +8874,13 @@ registerThreadScrollToMessageDeps({
   sortMessagesByReceivedDescending,
 });
 
+registerSwitchMailboxActionDeps({ switchMailbox });
+
 registerComposeThreadReplyDeps({
   loadComposeMarkdownIntoEditor,
   resetMarkdownEditorHistory,
   computePreview,
   scheduleDraftRevisionSave,
-  draftHasRecipientsExtra,
   formatThreadReadingWhen,
   enterComposeView,
   startNewDraftSession,

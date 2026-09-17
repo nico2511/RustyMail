@@ -6,13 +6,13 @@ import { toast } from "../lib/toast";
 import { withTimeout, tauriErrorMessage } from "../lib/tauriCommand";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { draftHasRecipientsExtra } from "./composeDraftRecipients";
 
 export type ComposeThreadReplyDeps = {
   loadComposeMarkdownIntoEditor: (markdown: string) => void;
   resetMarkdownEditorHistory: () => void;
   computePreview: () => void | Promise<void>;
   scheduleDraftRevisionSave: (delayMs?: number) => void;
-  draftHasRecipientsExtra: (draft?: Draft) => boolean;
   formatThreadReadingWhen: (receivedAt: string) => string;
   enterComposeView: (opts?: { skipHistory?: boolean }) => void;
   startNewDraftSession: () => void;
@@ -41,7 +41,7 @@ function afterDraftPreparedForCompose(): void {
   const d = replyDeps();
   d.enterComposeView();
   d.startNewDraftSession();
-  state.composeCcBccOpen = d.draftHasRecipientsExtra(state.draft);
+  state.composeCcBccOpen = draftHasRecipientsExtra(state.draft);
   state.composeLayout = "split";
   d.syncPreviewOpenFromComposeLayout();
   d.resetMarkdownEditorHistory();

@@ -16,6 +16,10 @@ import {
   sendQuickReply,
   writeSidebarCollapsedPreference,
   scrollToThreadMessage,
+  draftHasRecipientsExtra,
+  pickImapMailboxFallback,
+  switchMailbox,
+  saveDraftToSavedListNow,
   loadMailView,
   loadMailboxUnread,
   render,
@@ -330,7 +334,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void (async () => {
         state.closeComposeModal = null;
         render();
-        const ok = await callApp("saveDraftToSavedListNow", { silentToast: true });
+        const ok = await saveDraftToSavedListNow({ silentToast: true });
         if (ok) {
           toast("Conservé dans « Sauvés », compositeur fermé.");
           callApp("clearDraftSession");
@@ -361,7 +365,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "leave-saved-drafts-mailbox":
       void (async () => {
-        await callApp("switchMailbox", callApp("pickImapMailboxFallback"));
+        await switchMailbox(pickImapMailboxFallback());
       })();
       return true;
     case "refresh-draft-history":
@@ -446,7 +450,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       render();
       return true;
     case "toggle-compose-cc-bcc": {
-      if (callApp("draftHasRecipientsExtra", state.draft)) return true;
+      if (draftHasRecipientsExtra(state.draft)) return true;
       state.composeCcBccOpen = !state.composeCcBccOpen;
       render();
       return true;

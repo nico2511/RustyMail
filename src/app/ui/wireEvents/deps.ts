@@ -144,6 +144,9 @@ export { downloadAllAttachmentsForMessage } from "../mail/downloadAllAttachments
 export { loadNewsletterRules } from "../mail/newsletterRulesLoad";
 export { threadIsAutoMail } from "../mail/threadAutoMail";
 export { sendQuickReply } from "../mail/composeSendQuickReply";
+export { draftHasRecipientsExtra } from "../mail/composeDraftRecipients";
+export { pickImapMailboxFallback } from "../mail/mailboxImapFallback";
+export { switchMailbox } from "../mail/switchMailboxAction";
 export { clearThreadAiSummaryState } from "../mail/threadAiSummaryState";
 export { scrollToThreadMessage } from "../mail/threadScrollToMessage";
 export { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";
