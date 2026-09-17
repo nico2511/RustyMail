@@ -61,6 +61,7 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
 | `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
 | `app/mail/threadAiWireActions.ts` | Facades IA fil (synthèse, traduction, Q&R…) |
+| `app/mail/agentWireActions.ts` | Facades agent assist (prepare reply, telemetry, plan) |
 | `app/mail/composeAiWireActions.ts` | Facades IA compose + envoi split |
 | `app/mail/accountsLoadAction.ts` | Facade `loadAccountsFromBackend()` |
 | `app/mail/settingsWireActions.ts` | Facades paramètres (comptes, LLM, OAuth, micro…) |

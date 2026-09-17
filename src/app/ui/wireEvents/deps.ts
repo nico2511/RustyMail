@@ -185,6 +185,13 @@ export {
 } from "../mail/threadAiWireActions";
 export { loadAccountsFromBackend } from "../mail/accountsLoadAction";
 export {
+  agentInsertDraftIntoCompose,
+  agentPrepareReplyContinue,
+  agentPrepareReplyStart,
+  agentRefreshPlanFromDraft,
+  stopAgentTelemetry,
+} from "../mail/agentWireActions";
+export {
   autoDetectLlamaServerBinary,
   bytesToBase64,
   defaultListFilterFromPrefs,
@@ -251,9 +258,6 @@ export { state } from "../state";
 import { wireEventsContext } from "./wireEventsContext";
 export {
   agentInsertDraftIntoCompose,
-  agentPrepareReplyContinue,
-  agentPrepareReplyStart,
-  enterComposeView,
   llmQuickRepliesComposeUi,
   loadAddressBookSidebarCount,
   micAction,
@@ -264,9 +268,9 @@ export {
   saveAccount,
   saveDraftToSavedListNow,
   startNewDraftSession,
-  stopAgentTelemetry,
   summarizeSenderThreadsLight,
   syncPreviewOpenFromComposeLayout,
+  enterComposeView,
 } from "./appWireFacades";
 export type {
   Draft,

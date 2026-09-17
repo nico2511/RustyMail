@@ -279,6 +279,7 @@ import { registerComposeAiWireActionsDeps } from "./mail/composeAiWireActions";
 import { registerAccountsLoadActionDeps } from "./mail/accountsLoadAction";
 import { registerSettingsWireActionsDeps } from "./mail/settingsWireActions";
 import { registerOrgFolderWireActionsDeps } from "./mail/orgFolderWireActions";
+import { registerAgentWireActionsDeps } from "./mail/agentWireActions";
 import { registerMailContentWireActionsDeps } from "./mail/mailContentWireActions";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
@@ -335,7 +336,7 @@ import {
 } from "./ui/render/threadViewRender";
 import { renderComposer } from "./ui/render/composerRender";
 import { renderOrgThreadSampleRow } from "./ui/render/orgSampleRowRender";
-import { registerWireEventsBridge } from "./ui/wireEventsBridge";
+import { registerWireEventsContext } from "./ui/wireEventsBridge";
 import { registerAppWireFacades } from "./ui/wireEvents/appWireFacades";
 import { wireEvents, handleAction } from "./ui/wireEvents";
 import { renderAiPanel } from "./ui/render/aiPanelRender";
@@ -8203,7 +8204,7 @@ const addressBookEditEmailRef = {
   },
 };
 
-registerWireEventsBridge({
+registerWireEventsContext({
   addressBookRowsCache: () => addressBookRowsCache,
   skipAccountIdentityCaptureOnceRef,
   addressBookEditEmailRef,
@@ -8594,6 +8595,14 @@ registerComposeThreadReplyDeps({
   syncPreviewOpenFromComposeLayout,
 });
 
+registerAgentWireActionsDeps({
+  agentPrepareReplyStart,
+  agentPrepareReplyContinue,
+  stopAgentTelemetry,
+  agentInsertDraftIntoCompose,
+  agentRefreshPlanFromDraft,
+});
+
 registerAppWireFacades({
   enterComposeView,
   startNewDraftSession,
@@ -8602,17 +8611,12 @@ registerAppWireFacades({
   openOrganizationV2View,
   loadAddressBookSidebarCount,
   refreshAddressBookList,
-  agentPrepareReplyStart,
-  agentPrepareReplyContinue,
-  stopAgentTelemetry,
-  agentInsertDraftIntoCompose,
   summarizeSenderThreadsLight,
   llmQuickRepliesComposeUi,
   micAction,
   saveAccount,
   saveDraftToSavedListNow,
   refreshSavedDraftsMailboxCount,
-  agentRefreshPlanFromDraft,
 });
 
 initMailboxDigest({

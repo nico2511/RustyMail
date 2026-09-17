@@ -90,7 +90,7 @@ import {
   bindComposerDropzone,
   wireComposeRecipientChips,
 } from "../mail/composeComposerBridge";
-import { agentRefreshPlanFromDraft } from "./wireEvents/appWireFacades";
+import { agentRefreshPlanFromDraft } from "../mail/agentWireActions";
 import {
   onOrgDeleteMailboxOne,
   onOrgSyncMailbox,
