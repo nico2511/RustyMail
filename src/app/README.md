@@ -73,6 +73,11 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/settingsWireActions.ts` | Facades paramètres (comptes, LLM, OAuth, micro…) |
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
 | `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
+| `app/mail/mailAttachmentActions.ts` | Téléchargement / ouverture PJ (confirm risque) |
+| `app/mail/savedDraftOpenRun.ts` | Ouvrir un brouillon enregistré dans le composeur |
+| `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |
+| `app/mail/loadBootDeferredPrefs.ts` | Prefs différées au boot + abonnements modèles / prefetch |
+| `app/mail/appBootRun.ts` | Séquence `boot()` (status, comptes, sync initiale, listeners) |
 | `app/mail/mailEmailHtmlSanitize.ts` | DOMPurify + liens/images + `sanitizeEmailHtml()` |
 | `app/mail/mailHtmlShadowHydrate.ts` | Shadow DOM message HTML + lightbox CID |
 | `app/mail/threadMessageSort.ts` | Tri messages fil, dates (`parseMaybeDate`, `dayKey`) |
