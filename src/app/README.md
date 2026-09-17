@@ -31,7 +31,12 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/core/timeouts.ts` | Constantes délais Tauri / debounces IA & digest |
 | `app/lib/tauriRuntime.ts` | Détection runtime Tauri |
 | `app/ui/briefMailShell.ts` | Coquille HTML brief dossier |
-| `app/mail/mailboxDigest.ts` | Brief d’action dossier (debounce, fetch, bouton toolbar) |
+| `app/mail/mailboxDigest.ts` | Barrel brief d’action dossier |
+| `app/mail/mailboxDigestContext.ts` | `initMailboxDigest`, feature flag, gen requêtes |
+| `app/mail/mailboxDigestScheduleRun.ts` | Debounce / idle refresh |
+| `app/mail/mailboxDigestPanelRun.ts` | Ouvrir / fermer panneau, éligibilité |
+| `app/mail/mailboxDigestFetchRun.ts` | `llm_inbox_digest`, bannières erreur |
+| `app/mail/mailboxDigestRenderRun.ts` | Bouton toolbar Brief |
 | `app/mail/idleAiCachePrefetch.ts` | Préchargement cache LLM au idle |
 | `app/mail/searchQueryContext.ts` | Payload recherche, `isSearchActive`, critères engagés, dossier effectif |
 | `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` |
@@ -119,6 +124,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |
 | `app/mail/loadBootDeferredPrefs.ts` | Prefs différées au boot + abonnements modèles / prefetch |
 | `app/mail/appBootRun.ts` | Séquence `boot()` (status, comptes, sync initiale, listeners) |
+| `app/mail/appShellBindings.ts` | Barrel raccourcis clavier / souris / flush brouillon |
+| `app/mail/appShellInputGuards.ts` | Overlays bloquant navigation / raccourcis |
+| `app/mail/appShellKeyboardRun.ts` | `bindKeyboard` |
+| `app/mail/appShellMouseNavRun.ts` | Boutons souris retour / avant |
+| `app/mail/appShellDraftFlushRun.ts` | Flush révisions brouillon (visibility) |
 | `app/mail/mailEmailHtmlSanitize.ts` | DOMPurify + liens/images + `sanitizeEmailHtml()` |
 | `app/mail/mailHtmlShadowHydrate.ts` | Shadow DOM message HTML + lightbox CID |
 | `app/mail/threadMessageSort.ts` | Tri messages fil, dates (`parseMaybeDate`, `dayKey`) |
@@ -286,7 +296,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`appShellBindings`, `mailboxDigest`, …)
+1. Découper d’autres modules mail > ~350 lignes (`appShellRender`, `loadBootDeferredPrefs`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
