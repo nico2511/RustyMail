@@ -18,7 +18,7 @@ import type { SavedSearchListItem } from "../../../savedSearches";
 import type { SettingsAiPanelDeps } from "../../../settingsAiPanel";
 import type { AssistSkillId } from "../../../assistAgent";
 
-/** Callbacks laissés dans application.ts pour éviter les imports circulaires depuis les modules render. */
+/** Callbacks wired at startup via appRenderRegistry (avoids circular imports from render modules). */
 export type RenderDeps = {
   navCurrentBreadcrumbSegment: () => string | null;
   normalizeThreadSenderLabel: (sender: string) => string;

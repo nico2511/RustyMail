@@ -224,7 +224,6 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
 | `app/mail/accountSettingsRun.ts` | Save/delete compte, OAuth auto, détection serveurs IMAP/SMTP |
-| `wireEvents/deps.ts` | Barrel réexport (compat) — les `handleAction*` importent les barrels domaine directement |
 | `wireEvents/depsCore.ts` | invoke, toast, state, render, loaders, nav, modales — réexporte `depsContext` |
 | `wireEvents/depsSearchMail.ts` | inbox, recherche, agent, carnet, entrée compose |
 | `wireEvents/depsComposeThread.ts` | compose, fil, LLM compose |
@@ -239,7 +238,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Retirer `deps.ts` si plus aucun import (grep) ou le garder comme façade publique
+1. Mettre à jour les scripts `tools/degrade-extract-*.mjs` (cibles `app/mail/*` au lieu de `application.ts`)
 2. Autres extractions ciblées si un module mail repasse ~400 lignes
 
 `npm run verify:ts` · `npm test`

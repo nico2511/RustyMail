@@ -1,4 +1,4 @@
-/** Wire-events context mutators (extracted from deps.ts). */
+/** Wire-events context mutators (domain deps barrel). */
 import { wireEventsContext } from "./wireEventsContext";
 import type { AddressBookRow } from "../../types";
 
