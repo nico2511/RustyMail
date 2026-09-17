@@ -52,7 +52,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/savedSearchListRun.ts` | Liste / refresh / marquer vue active vue |
 | `app/mail/savedSearchCrudRun.ts` | Enregistrer, appliquer, supprimer une vue |
 | `app/mail/savedSearchSuggestionsRun.ts` | Suggestions de vues (activité) |
-| `app/mail/searchLaunchQueries.ts` | Lancements recherche (tag, contact, domaine, hash) + `registerSearchLaunchDeps()` |
+| `app/mail/searchLaunchQueries.ts` | Barrel lancements recherche |
+| `app/mail/searchLaunchContext.ts` | `registerSearchLaunchDeps` |
+| `app/mail/searchLaunchPresetsRun.ts` | Tag, contact, domaine |
+| `app/mail/searchLaunchHashAutocompleteRun.ts` | Hits `#` autocomplete + filtres inbox |
 | `app/mail/searchTagCatalog.ts` | `refreshSearchTagCatalog` + `registerSearchTagCatalogDeps()` |
 | `app/mail/searchAtAutocompleteWire.ts` | Câblage `@` / `#` (recherche + compose) + `registerSearchAtAutocompleteWireDeps()` |
 | `app/mail/searchViewContext.ts` | Critères vue enregistrée / contexte recherche inbox + `registerSearchViewContextDeps()` |
@@ -91,7 +94,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadAiWireQuickReplyRun.ts` | Réponses rapides fil / compose |
 | `app/mail/threadAiWireQaDigestRun.ts` | Q&A fil + brief dossier |
 | `app/mail/agentWireActions.ts` | Facades agent assist (prepare reply, telemetry, plan) |
-| `app/mail/agentPrepareReplyRun.ts` | Assistant réponse — phases LLM (start / continue / plan) |
+| `app/mail/agentPrepareReplyRun.ts` | Barrel assistant réponse |
+| `app/mail/agentPrepareReplyStartRun.ts` | `agentPrepareReplyStart` |
+| `app/mail/agentPrepareReplyPipelineRun.ts` | Phases LLM (facts, draft stream, cohérence, plan) |
+| `app/mail/agentPrepareReplyContinueRun.ts` | `agentPrepareReplyContinue` |
 | `app/mail/agentAssistSessionHelpers.ts` | Session assist (payload, télémetrie, merge reco) |
 | `app/mail/agentInsertDraftRun.ts` | Insertion brouillon agent dans le composeur |
 | `app/mail/agentSchedulingDraftFormat.ts` | Format créneaux dans le corps de réponse |
@@ -272,7 +278,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`agentPrepareReplyRun`, `searchLaunchQueries`, …)
+1. Découper d’autres modules mail > ~350 lignes (`folderManagerActions`, `threadListActions`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
