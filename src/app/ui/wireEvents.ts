@@ -80,6 +80,7 @@ import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
 import { normalizeMailHrefForOpen, openExternalFromMailHref } from "../mail/mailLinkOpen";
 import { sendQuickReply } from "../mail/composeSendQuickReply";
 import { switchMailbox } from "../mail/switchMailboxAction";
+import { refreshLlmRuntimeStatus, switchActiveAccount } from "../mail/settingsWireActions";
 import {
   loadComposeMarkdownIntoEditor,
   scheduleDraftRevisionSave,
@@ -318,7 +319,7 @@ export function wireEvents() {
           try {
             await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
             toast(next ? "Override CPU autorisé (llama-server)." : "Override CPU désactivé.");
-            void callApp("refreshLlmRuntimeStatus", false).then(() => {
+            void refreshLlmRuntimeStatus(false).then(() => {
               if (state.settingsAiModal === "engines") render();
             });
           } catch (e) {
@@ -341,7 +342,7 @@ export function wireEvents() {
           try {
             await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
             toast(next ? "Lancement llama-server par l’app activé." : "Lancement llama-server par l’app désactivé.");
-            void callApp("refreshLlmRuntimeStatus", false).then(() => {
+            void refreshLlmRuntimeStatus(false).then(() => {
               if (state.settingsAiModal === "engines") render();
             });
           } catch (e) {
@@ -652,7 +653,7 @@ export function wireEvents() {
   document.querySelector<HTMLSelectElement>("#account-select")?.addEventListener("change", (event) => {
     void (async () => {
       const id = (event.currentTarget as HTMLSelectElement).value || state.accounts[0]?.id || "";
-      await callApp("switchActiveAccount", id);
+      await switchActiveAccount(id);
       render();
     })();
   });

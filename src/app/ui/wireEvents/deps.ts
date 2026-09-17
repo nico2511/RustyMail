@@ -184,6 +184,50 @@ export {
   summarizeThread,
 } from "../mail/threadAiWireActions";
 export { loadAccountsFromBackend } from "../mail/accountsLoadAction";
+export {
+  autoDetectLlamaServerBinary,
+  bytesToBase64,
+  defaultListFilterFromPrefs,
+  deleteSettingsAccount,
+  discoverMailServersAction,
+  ensureValidSelectedMailbox,
+  finalizeSettingsAiModalClose,
+  finishOAuthNewAccountAfterLogin,
+  mediaBlobToWav16kMonoPcm16,
+  micPermissionErrorMessage,
+  openEnginesAiSettingsModal,
+  openSettingsView,
+  paintLlmPrefetchProgressDom,
+  paintStatusBarProgressDom,
+  persistAiPrefsFromDom,
+  persistDefaultAccountId,
+  refreshLlmRuntimeStatus,
+  refreshSemanticEmbeddingCounts,
+  refreshSettingsPathsFromBackend,
+  requestMicStream,
+  switchActiveAccount,
+  syncActivityRecordingPrefs,
+  warnOAuthEphemeralRedirect,
+} from "../mail/settingsWireActions";
+export {
+  confirmThenRunOrgApply,
+  confirmThenRunOrgV2Apply,
+  fmConfirmArchiveMailbox,
+  fmConfirmDeleteMailbox,
+  fmCreateMailbox,
+  fmSelectMailbox,
+  fmSyncMailbox,
+  openContactsView,
+  openFolderManagerView,
+  openOrganizationMailbox,
+  openOrganizationView,
+  orgV2DismissProposal,
+  orgV2SnoozeProposal,
+  refreshFolderManagerTree,
+  refreshOrganizationReport,
+  runOrgApply,
+  runOrgV2Apply,
+} from "../mail/orgFolderWireActions";
 export { clearThreadAiSummaryState } from "../mail/threadAiSummaryState";
 export { scrollToThreadMessage } from "../mail/threadScrollToMessage";
 export { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";

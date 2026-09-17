@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { callApp } from "./callApp";
 import {
   currentAccount,
   decodeHtmlEntitiesLoose,
