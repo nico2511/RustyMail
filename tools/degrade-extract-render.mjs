@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import ts from "typescript";
+import { readExtractSource, resolveExtractSource } from "./extract-source.mjs";
 
-const APP = "src/app/application.ts";
+const APP = resolveExtractSource();
 const OUT = "src/app/ui/render/views.ts";
-const src = fs.readFileSync(APP, "utf8");
+const src = readExtractSource(APP);
 const sf = ts.createSourceFile(APP, src, ts.ScriptTarget.Latest, true);
 
 const importEnd = sf.statements.findIndex((st) => !ts.isImportDeclaration(st) && !ts.isImportEqualsDeclaration(st));
@@ -22,6 +23,11 @@ for (const st of sf.statements) {
     continue;
   }
   keep.push(st.getText(sf));
+}
+
+if (renderChunks.length === 0) {
+  console.log(`No render* functions in ${APP}; extraction already applied or use --source=`);
+  process.exit(0);
 }
 
 const header = appImports
@@ -60,4 +66,4 @@ if (!app.includes('./ui/render/views')) {
 
 fs.writeFileSync(APP, app);
 console.log("Extracted", renderChunks.length, "render functions ->", OUT);
-console.log("application.ts lines:", app.split("\n").length);
+console.log(`${APP} lines:`, app.split("\n").length);

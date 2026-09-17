@@ -234,11 +234,11 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 
 Libs associées : `attachmentSize.ts`, `searchBadgeLabel.ts`, …
 
-Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.mjs`, `tools/degrade-extract-batch3.mjs`.
+Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegistry.ts`, `--source=` ou `RUSTYMAIL_EXTRACT_SOURCE`), `tools/extract-application-fns.mjs`, `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.mjs`, `tools/degrade-extract-batch3.mjs`.
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Mettre à jour les scripts `tools/degrade-extract-*.mjs` (cibles `app/mail/*` au lieu de `application.ts`)
-2. Autres extractions ciblées si un module mail repasse ~400 lignes
+1. Autres extractions ciblées si un module mail repasse ~400 lignes
+2. Conserver `application.ts` comme façade legacy ou le retirer si plus référencé
 
 `npm run verify:ts` · `npm test`

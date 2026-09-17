@@ -1,10 +1,15 @@
 import fs from "node:fs";
 import ts from "typescript";
+import {
+  insertImportAfterImports,
+  readExtractSource,
+  resolveExtractSource,
+} from "./extract-source.mjs";
 
-const APP = "src/app/application.ts";
+const APP = resolveExtractSource();
 
 function extractFunctions(names, outFile, extraHeader = "") {
-  const src = fs.readFileSync(APP, "utf8");
+  const src = readExtractSource(APP);
   const sf = ts.createSourceFile(APP, src, ts.ScriptTarget.Latest, true);
   const nameSet = new Set(names);
   const chunks = [];
@@ -25,7 +30,7 @@ function extractFunctions(names, outFile, extraHeader = "") {
   const importLine = `import { ${names.join(", ")} } from "${rel}";\n`;
   let app = fs.readFileSync(APP, "utf8");
   if (!app.includes(importLine.trim())) {
-    app = app.replace('import "../styles.css";', importLine + 'import "../styles.css";');
+    app = insertImportAfterImports(app, importLine);
     fs.writeFileSync(APP, app);
   }
   console.log(outFile, chunks.length);

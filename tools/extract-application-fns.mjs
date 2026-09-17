@@ -1,21 +1,32 @@
 /**
- * Extrait des fonctions (ou blocs let) de app/application.ts vers un module,
+ * Extrait des fonctions (ou blocs let) d’un module source vers un fichier cible,
  * ajoute les exports/imports, retire le corps du fichier source.
  *
- * Usage: node tools/extract-application-fns.mjs <target.ts> fn1 fn2 ...
+ * Usage:
+ *   node tools/extract-application-fns.mjs [--source=src/app/mail/foo.ts] <target.ts> fn1 fn2 ...
+ *
+ * Source par défaut : app/mail/appModuleRegistry.ts (RUSTYMAIL_EXTRACT_SOURCE pour override).
  */
 import fs from "node:fs";
 import ts from "typescript";
+import {
+  insertImportAfterImports,
+  readExtractSource,
+  resolveExtractSource,
+} from "./extract-source.mjs";
 
-const APP = "src/app/application.ts";
-const target = process.argv[2];
-const names = new Set(process.argv.slice(3));
+const APP = resolveExtractSource();
+const cliArgs = process.argv.slice(2).filter((a) => !a.startsWith("--source="));
+const target = cliArgs[0];
+const names = new Set(cliArgs.slice(1));
 if (!target || names.size === 0) {
-  console.error("Usage: node tools/extract-application-fns.mjs <target.ts> fn1 fn2 ...");
+  console.error(
+    "Usage: node tools/extract-application-fns.mjs [--source=path] <target.ts> fn1 fn2 ...",
+  );
   process.exit(1);
 }
 
-const src = fs.readFileSync(APP, "utf8");
+const src = readExtractSource(APP);
 const sf = ts.createSourceFile(APP, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 
 const extracted = [];
@@ -23,7 +34,7 @@ const keep = [];
 
 for (const st of sf.statements) {
   if (ts.isFunctionDeclaration(st) && st.name && names.has(st.name.text)) {
-    let text = st.getText(sf);
+    let text = st.getText(src);
     if (!text.startsWith("export ")) {
       text = text.replace(/^async function /, "export async function ").replace(/^function /, "export function ");
     }
@@ -31,7 +42,7 @@ for (const st of sf.statements) {
     continue;
   }
   if (ts.isVariableStatement(st)) {
-    const text = st.getText(sf);
+    const text = st.getText(src);
     const isModalState =
       names.has("__modal_state__") &&
       (text.includes("textPromptModal") || text.includes("confirmModal") || text.includes("textPromptResolver"));
@@ -40,11 +51,11 @@ for (const st of sf.statements) {
       continue;
     }
   }
-  keep.push(st.getText(sf));
+  keep.push(st.getText(src));
 }
 
 if (extracted.length === 0) {
-  console.error("Nothing extracted for", [...names].join(", "));
+  console.error(`Nothing extracted from ${APP} for`, [...names].join(", "));
   process.exit(1);
 }
 
@@ -59,14 +70,9 @@ fs.writeFileSync(APP, keep.join("\n\n") + "\n");
 const importPath = rel.replace(/^src\//, "./").replace(/\.ts$/, "");
 const importNames = [...names].filter((n) => n !== "__modal_state__");
 if (importNames.length) {
-  const appSrc = fs.readFileSync(APP, "utf8");
   const exportList = importNames.join(", ");
   const importLine = `import { ${exportList} } from "${importPath}";\n`;
-  if (!appSrc.includes(importLine.trim())) {
-    const idx = appSrc.indexOf('import "../styles.css"');
-    const insertAt = idx >= 0 ? idx : appSrc.indexOf("\n", appSrc.lastIndexOf("from "../mailboxTree\"")) + 1;
-    fs.writeFileSync(APP, appSrc.slice(0, insertAt) + importLine + appSrc.slice(insertAt));
-  }
+  fs.writeFileSync(APP, insertImportAfterImports(fs.readFileSync(APP, "utf8"), importLine));
 }
 
-console.log(`Extracted ${extracted.length} block(s) -> ${rel}`);
+console.log(`Extracted ${extracted.length} block(s) from ${APP} -> ${rel}`);

@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import ts from "typescript";
+import { insertImportAfterImports, readExtractSource, resolveExtractSource } from "./extract-source.mjs";
 
-const APP = "src/app/application.ts";
-const src = fs.readFileSync(APP, "utf8");
+const APP = resolveExtractSource();
+const src = readExtractSource(APP);
 const sf = ts.createSourceFile(APP, src, ts.ScriptTarget.Latest, true);
 
 const importEnd = sf.statements.findIndex((st) => !ts.isImportDeclaration(st) && !ts.isImportEqualsDeclaration(st));
@@ -71,6 +72,18 @@ for (const st of sf.statements) {
   keep.push(st.getText(sf));
 }
 
+const extractedCount =
+  buckets.toast.length +
+  buckets.domForm.length +
+  buckets.textFormat.length +
+  buckets.tags.length +
+  buckets.iconSvg.length +
+  buckets.modals.length;
+if (extractedCount === 0) {
+  console.log(`No matching lib/modal symbols in ${APP}; extraction already applied or use --source=`);
+  process.exit(0);
+}
+
 fs.mkdirSync("src/app/lib", { recursive: true });
 fs.mkdirSync("src/app/modals", { recursive: true });
 
@@ -118,7 +131,7 @@ import {
 } from "./modals/promptConfirm";
 `;
 
-app = app.replace('import "../styles.css";', newImports + 'import "../styles.css";');
+app = insertImportAfterImports(app, newImports);
 
 app = app.replace(/if \(textPromptModal\)/g, "if (isTextPromptOpen())");
 app = app.replace(/if \(state\.searchModalOpen && !textPromptModal\)/g, "if (state.searchModalOpen && !isTextPromptOpen())");
@@ -128,5 +141,5 @@ app = app.replace(
 );
 
 fs.writeFileSync(APP, app);
-console.log("Removed from application.ts:", [...fnNames].join(", "));
-console.log("New application lines:", app.split("\n").length);
+console.log(`Removed from ${APP}:`, [...fnNames].join(", "));
+console.log(`New ${APP} lines:`, app.split("\n").length);
