@@ -77,6 +77,10 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/threadLangGuess.ts` | Heuristiques langue + offres traduction |
 | `app/mail/threadViewUiHelpers.ts` | Participants fil, zen summary, mode vue message |
 | `app/mail/mailSecurityDisplay.ts` | Signaux sécurité + enrichissement LLM async |
+| `app/mail/composeFormLabels.ts` | Libellés compose (type brouillon, horodatage révision) |
+| `app/mail/settingsAccountsFormState.ts` | Scratch identité formulaire comptes (DOM) |
+| `app/mail/settingsRenderHelpers.ts` | Profil comptes + bloc stats sémantiques + deps panneau IA |
+| `app/mail/threadAiStreamDom.ts` | Peinture stream IA fil/QA/agent + libellés assist |
 | `app/mail/composeComposerBridge.ts` | Ré-exports éditeur compositeur (markdown, preview, PJ, chips) |
 | `app/mail/composeMarkdownEditor.ts` | Corps markdown compositeur + barre d’outils |
 | `app/mail/composeDraftPreview.ts` | Aperçu brouillon (`preview_draft`) + debounce |
