@@ -76,8 +76,12 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailAttachmentActions.ts` | Téléchargement / ouverture PJ (confirm risque) |
 | `app/mail/appShellRender.ts` | Rendu DOM shell + enregistrement `render` / wireEvents context |
 | `app/ui/wireEvents/depsContext.ts` | Mutateurs contexte wireEvents (capture compte, carnet) |
-| `app/mail/appModuleRegistry.ts` | Enregistrement `register*Deps` wire + init digest / prefetch idle |
-| `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` → `registerRenderDeps` (vues org, liste, fil, compose, réglages) |
+| `app/mail/appModuleRegistry.ts` | Orchestrateur `registerAllAppModules()` (~20 lignes) |
+| `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` → `registerRenderDeps` |
+| `app/mail/appSearchWireRegistry.ts` | Liste + recherche + vues enregistrées / batch |
+| `app/mail/appThreadWireRegistry.ts` | Ouverture fil, actions liste, changement boîte |
+| `app/mail/appComposeWireRegistry.ts` | Compose, brouillons, file LLM |
+| `app/mail/appAccountOrgWireRegistry.ts` | Compte, réglages, org/dossiers, nav + services digest/prefetch |
 | `app/mail/savedDraftOpenRun.ts` | Ouvrir un brouillon enregistré dans le composeur |
 | `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |
 | `app/mail/loadBootDeferredPrefs.ts` | Prefs différées au boot + abonnements modèles / prefetch |
@@ -220,7 +224,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
 | `app/mail/accountSettingsRun.ts` | Save/delete compte, OAuth auto, détection serveurs IMAP/SMTP |
-| `wireEvents/deps.ts` | Barrel réexport (`depsCore`, `depsSearchMail`, `depsComposeThread`, `depsSettingsAccount`, `depsOrgFolder`) |
+| `wireEvents/deps.ts` | Barrel réexport (compat) — les `handleAction*` importent les barrels domaine directement |
 | `wireEvents/depsCore.ts` | invoke, toast, state, render, loaders, nav, modales — réexporte `depsContext` |
 | `wireEvents/depsSearchMail.ts` | inbox, recherche, agent, carnet, entrée compose |
 | `wireEvents/depsComposeThread.ts` | compose, fil, LLM compose |
@@ -235,7 +239,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Extraire d’autres sous-registres wire (search, compose) si `appModuleRegistry` regrossit
-2. Pointer les `handleAction*` vers les barrels domaine `deps*` au lieu du barrel global
+1. Retirer `deps.ts` si plus aucun import (grep) ou le garder comme façade publique
+2. Autres extractions ciblées si un module mail repasse ~400 lignes
 
 `npm run verify:ts` · `npm test`

@@ -1,7 +1,6 @@
 import {
   currentAccount,
   loadMailView,
-  searchThreads,
   applyListFilter,
   state,
   toast,
@@ -11,6 +10,17 @@ import {
   MAIL_ACTION_TIMEOUT_MS,
   openConfirmModal,
   navCanGoBack,
+  withTimeout,
+  tauriErrorMessage,
+  usesSearchContextLoader,
+  loadThreadsForSearchContext,
+  render,
+  goBack,
+  navigateToInbox,
+  isSearchActive,
+} from "./depsCore";
+import {
+  searchThreads,
   dismissMailboxDigestPanel,
   loadContactsList,
   getContactDetail,
@@ -20,12 +30,9 @@ import {
   loadContactProfile,
   isAiFeatureEnabled,
   threadMailboxListLabel,
-  withTimeout,
-  tauriErrorMessage,
   openThread,
   clearSearchAndReloadInbox,
   resetManualSearchNlFilters,
-  isSearchActive,
   saveCurrentSearchView,
   applySavedSearchView,
   deleteSavedSearchView,
@@ -38,11 +45,6 @@ import {
   bulkTrashVisibleThreads,
   launchDomainMailSearch,
   launchContactMailSearch,
-  usesSearchContextLoader,
-  loadThreadsForSearchContext,
-  render,
-  goBack,
-  navigateToInbox,
   onEmptyTrashMailbox,
   onThreadMove,
   onThreadSeen,
@@ -68,7 +70,7 @@ import {
   refreshAddressBookList,
   saveDraftToSavedListNow,
   refreshSavedDraftsMailboxCount,
-} from "./deps";
+} from "./depsSearchMail";
 import type { Tag, ThreadListItem } from "../../types";
 
 export async function tryHandleInboxSearch(action: string, element?: HTMLElement): Promise<boolean> {

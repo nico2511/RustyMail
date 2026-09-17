@@ -4,13 +4,15 @@ import {
   state,
   toast,
   t,
+  tauriErrorMessage,
+} from "./depsCore";
+import {
   saveFolderTreeExpanded,
   setMailboxLocked,
   orgV2ScanAccount,
   orgUndoLast,
   orgScanAccount,
   orgRetagAccount,
-  tauriErrorMessage,
   openOrganizationV2View,
   openContactsView,
   openOrganizationView,
@@ -29,7 +31,7 @@ import {
   confirmThenRunOrgApply,
   runOrgApply,
   refreshOrganizationReport,
-} from "./deps";
+} from "./depsOrgFolder";
 import type { OrgApplyProgress, OrgProposal, OrgScanReport } from "../../../organizationView";
 import type { OrgV2ScanReport } from "../../../organizationViewV2";
 
