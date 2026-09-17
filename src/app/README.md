@@ -117,6 +117,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
 | `wireEvents/handleActionInboxSearch.ts` | Inbox / recherche / fil / agents — **typé** |
 | `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — **typé** (+ fix `return true` sur modales) |
+| `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes / prefs IA — **typé** |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
@@ -132,7 +133,8 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Retirer `@ts-nocheck` sur **`handleActionComposeSettings`** et **`handleActionThreadCompose`**
+| `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes / prefs IA — **typé** |
+| `wireEvents/handleActionThreadCompose.ts` | Compose / fil — encore `@ts-nocheck` |
 2. Typage progressif de **`deps.ts`**
 
 `npm run verify:ts` · `npm test`

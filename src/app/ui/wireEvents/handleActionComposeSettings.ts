@@ -1,11 +1,9 @@
-// @ts-nocheck
 import {
   currentAccount,
   loadMailView,
   render,
   searchThreads,
   applyListFilter,
-  threadIdsMatch,
   state,
   toast,
   invoke,
@@ -14,47 +12,16 @@ import {
   MAIL_ACTION_TIMEOUT_MS,
   BOOT_INVOKE_TIMEOUT_MS,
   OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
-  openConfirmModal,
   finishConfirmModal,
   finishTextPromptModal,
   accountFieldTouched,
-  setAllAiFeatures,
-  normalizeAiPrefsMerged,
-  navCanGoBack,
-  composeRewriteStyleFromTone,
-  mailboxDigestSlotInList,
-  dismissMailboxDigestPanel,
-  enqueueMailboxDigestRefreshWhenIdle,
   ipcThrottleMs,
   clearSuggestionShownKeys,
   setLocale,
   isSavedDraftsVirtualMailbox,
-  captureAiPrefsFieldsFromDom,
   syncLlmEnginePrefsToDom,
   applyEngineConnectionMode,
   normalizeSettingsAiModalId,
-  defaultEnabledSkillIds,
-  invalidateIdleAiCachePrefetch,
-  scheduleIdleAiCachePrefetch,
-  loadContactsList,
-  isContactsListLoading,
-  contactsListHasMore,
-  getContactDetail,
-  getContactsKeywordDraft,
-  setContactsKeywordDraft,
-  loadContactDetail,
-  loadContactProfile,
-  isAiFeatureEnabled,
-  markThreadsRecentlyRemoved,
-  clearThreadsRecentlyRemoved,
-  mailboxKind,
-  threadMailboxListLabel,
-  saveFolderTreeExpanded,
-  setMailboxLocked,
-  orgV2ScanAccount,
-  orgUndoLast,
-  orgScanAccount,
-  orgRetagAccount,
   clearDiscoveredServerSnap,
   resetNewAccountSetupState,
   clearAccountOAuthWizard,
@@ -62,20 +29,12 @@ import {
   tauriErrorMessage,
   safeInvoke,
   setSkipAccountIdentityCaptureOnce,
-  setAddressBookEditEmail,
-  addressBookRowsCache,
   isSearchActive,
   refreshSuggestedSavedViews,
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   LIST_FILTER_VALUES,
-  ENABLE_CLEAN_MESSAGE_VIEW,
   type OAuthDesktopLoginOutcome,
-  type Draft,
-  type Tone,
   type PromptCatalogItem,
-  type AssistMode,
-  type AssistSkillId,
-  type State,
   prepareReply,
   threadIsAutoMail,
   loadNewsletterRules,
@@ -116,6 +75,8 @@ import {
   finishOAuthNewAccountAfterLogin,
   deleteSettingsAccount,
 } from "./deps";
+import type { State } from "../../types";
+import type { Account } from "../../../accountSetup";
 
 export async function tryHandleComposeSettings(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -197,7 +158,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
           state.aiOpen = false;
           clearDiscoveredServerSnap();
           state.settingsSelectedAccountId =
-            state.selectedAccountId && state.accounts.some((a) => a.id === state.selectedAccountId)
+            state.selectedAccountId && state.accounts.some((a: Account) => a.id === state.selectedAccountId)
               ? state.selectedAccountId
               : (state.accounts[0]?.id ?? "new");
           accountFieldTouched.serverFields = false;
@@ -300,7 +261,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
     }
     case "dismiss-default-account-prompt": {
       try {
-        window.localStorage.setItem(DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY(), "1");
+        window.localStorage.setItem(DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY, "1");
       } catch {
         /* ignore */
       }
@@ -337,7 +298,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         const lfSel = document.querySelector<HTMLSelectElement>("#prefs-default-list-filter");
         const lfRaw = lfSel?.value?.trim() ?? "all";
-        state.appPrefs.general.defaultListFilter = LIST_FILTER_VALUES().includes(lfRaw as State["listFilter"])
+        state.appPrefs.general.defaultListFilter = LIST_FILTER_VALUES.includes(lfRaw as State["listFilter"])
           ? (lfRaw as State["listFilter"])
           : "all";
         const archLayout = document.querySelector<HTMLSelectElement>("#prefs-archive-layout");
@@ -611,6 +572,10 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         const chunks: Blob[] = [];
         try {
           stream = await requestMicStream();
+          if (!stream) {
+            toast("Micro inaccessible.");
+            return;
+          }
           const mimeOpt =
             typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
               ? "audio/webm;codecs=opus"
