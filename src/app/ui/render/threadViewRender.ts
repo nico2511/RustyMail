@@ -11,6 +11,7 @@ import { threadTagsForModal } from "../../lib/threadTagsModal";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
 import { canonicalEmailForNlMatch } from "../../mail/searchAccountResolve";
+import { firstMatchingNewsletterRule, newsletterEmailListed } from "../../mail/newsletterRulesMatch";
 import type {
   CleanedMessageView,
   MailSecuritySignals,
@@ -76,7 +77,7 @@ export function renderThreadNlRuleButton(seSenderRaw: string, nlListedHere: bool
   const seNorm = canonicalEmailForNlMatch(seSenderRaw);
   if (!seNorm) return "";
   if (nlListedHere) {
-    const matched = renderDeps().firstMatchingNewsletterRule(seSenderRaw);
+    const matched = firstMatchingNewsletterRule(seSenderRaw);
     const key = matched ? formatNewsletterRuleInput(matched) : (seNorm as string);
     const tip = `Expéditeur auto (activé) — cliquer pour désactiver · ${key}`;
     return `<button type="button" class="icon-pill icon-pill-sm thread-auto-sender thread-auto-sender--on" data-action="newsletter-msg-remove-rule" data-rule="${escapeAttr(key)}" title="${escapeAttr(tip)}" aria-label="${escapeAttr(tip)}"><span class="thread-auto-sender__glyph" aria-hidden="true">A</span></button>`;
@@ -341,7 +342,7 @@ export function renderThread() {
             const seSenderRaw = message.senderEmail?.trim() ?? "";
             /** Liste côté client + drapeaux renvoyés par open_thread après enrichissement SQLite. */
             const nlListedHere =
-              Boolean(message.isNewsletter) || renderDeps().newsletterEmailListed(seSenderRaw);
+              Boolean(message.isNewsletter) || newsletterEmailListed(seSenderRaw);
             const suppressAutoEnvelope = renderDeps().threadSuppressAutoEnvelopeMeta(thread, message, nlListedHere);
             const nlRuleRow = renderThreadNlRuleButton(seSenderRaw, nlListedHere);
             const participantFirst =

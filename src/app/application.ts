@@ -15,11 +15,6 @@ import {
 } from "../recentlyRemovedThreads";
 
 import {
-  collapseLargeDataImageMarkdown,
-  expandInlineImagePlaceholders,
-} from "../composeMarkdownImages";
-
-import {
   LOCAL_SAVED_DRAFTS_MAILBOX,
   SAVED_DRAFT_THREAD_PREFIX,
   UNIFIED_INBOX_MAILBOX,
@@ -233,10 +228,6 @@ import { toastSendDraftImapNotice } from "./mail/sendDraftImapNotice";
 import { clearThreadAiSummaryState } from "./mail/threadAiSummaryState";
 import { threadMessageAnchorId } from "./mail/threadMessageAnchor";
 import { registerThreadScrollToMessageDeps } from "./mail/threadScrollToMessage";
-import {
-  extractAddrSpec,
-  normalizeNlRuleInvokeInput,
-} from "./mail/newsletterRuleInput";
 import { writeSidebarCollapsedPreference } from "./lib/sidebarUiPref";
 import { draftHasRecipientsExtra } from "./mail/composeDraftRecipients";
 import {
@@ -271,7 +262,17 @@ import {
 import { pickAttachments, registerComposePickAttachmentsDeps } from "./mail/composePickAttachments";
 import {
   registerComposeComposerBridgeDeps,
+  loadComposeMarkdownIntoEditor,
+  resetMarkdownEditorHistory,
+  setComposeFromTextareaValue,
+  computePreview,
+  schedulePreviewUpdate,
 } from "./mail/composeComposerBridge";
+import {
+  composePreviewPaneActive,
+  registerComposeDraftPreviewDeps,
+} from "./mail/composeDraftPreview";
+import { firstMatchingNewsletterRule, newsletterEmailListed } from "./mail/newsletterRulesMatch";
 import { registerThreadAiWireActionsDeps } from "./mail/threadAiWireActions";
 import { registerComposeAiWireActionsDeps } from "./mail/composeAiWireActions";
 import { registerAccountsLoadActionDeps } from "./mail/accountsLoadAction";
@@ -813,10 +814,6 @@ async function checkOrphanDraftSessionsOnBoot(): Promise<void> {
   }
 }
 
-function composePreviewPaneActive(): boolean {
-  return state.view === "compose" && state.composeLayout !== "write" && state.composeLayout !== "historique";
-}
-
 let micTimer: number | undefined;
 
 let micMediaRecorder: MediaRecorder | null = null;
@@ -999,146 +996,11 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-let previewTimer: number | undefined;
-
 let composerDropAbort: AbortController | undefined;
 
 let composeInteractionsAbort: AbortController | undefined;
 
 let composeDragDepth = 0;
-
-const markdownUndoStack: string[] = [];
-
-const markdownRedoStack: string[] = [];
-
-function composeDisplayToCanonical(display: string): string {
-  return expandInlineImagePlaceholders(display, state.composeCanonicalBody || state.draft?.markdownBody || display);
-}
-
-function setComposeFromTextareaValue(textareaValue: string) {
-  state.composeBody = textareaValue;
-  const canonical = composeDisplayToCanonical(textareaValue);
-  state.composeCanonicalBody = canonical;
-  if (state.draft) state.draft.markdownBody = canonical;
-}
-
-function loadComposeMarkdownIntoEditor(markdown: string) {
-  state.composeCanonicalBody = markdown;
-  state.composeBody = collapseLargeDataImageMarkdown(markdown);
-  if (state.draft) state.draft.markdownBody = markdown;
-}
-
-function resetMarkdownEditorHistory() {
-  markdownUndoStack.length = 0;
-  markdownRedoStack.length = 0;
-}
-
-function markdownPushToolbarUndoSnapshot(value: string) {
-  markdownUndoStack.push(value);
-  if (markdownUndoStack.length > 42) markdownUndoStack.shift();
-  markdownRedoStack.length = 0;
-}
-
-function markdownPopPendingToolbarSnapshot() {
-  markdownUndoStack.pop();
-}
-
-function applyMarkdownUndoRedo(which: "undo" | "redo") {
-  const textarea = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  if (!textarea) return;
-  if (which === "undo") {
-    if (!markdownUndoStack.length) return;
-    markdownRedoStack.push(textarea.value);
-    const prev = markdownUndoStack.pop()!;
-    textarea.value = prev;
-  } else if (!markdownRedoStack.length) {
-    return;
-  } else {
-    markdownUndoStack.push(textarea.value);
-    const next = markdownRedoStack.pop()!;
-    textarea.value = next;
-  }
-  setComposeFromTextareaValue(textarea.value);
-  schedulePreviewUpdate();
-  textarea.focus();
-}
-
-function finalizeMarkdownToolbarEdit(textarea: HTMLTextAreaElement) {
-  setComposeFromTextareaValue(textarea.value);
-  schedulePreviewUpdate();
-}
-
-function markdownExpandSelectedLines(textarea: HTMLTextAreaElement) {
-  const value = textarea.value;
-  const selA = textarea.selectionStart ?? 0;
-  const selB = textarea.selectionEnd ?? 0;
-  const lo = Math.min(selA, selB);
-  const hi = Math.max(selA, selB);
-  const ls = value.lastIndexOf("\n", lo - 1) + 1;
-  let le = value.indexOf("\n", hi);
-  if (le === -1) le = value.length;
-  return { value, ls, le };
-}
-
-function markdownToggleBulletLines(textarea: HTMLTextAreaElement, prefix = "- ") {
-  const { value, ls, le } = markdownExpandSelectedLines(textarea);
-  const block = value.slice(ls, le);
-  const lines = block.split("\n");
-  const allPrefixed =
-    lines.length > 0 && lines.every((line) => line.trim() === "" || line.startsWith(prefix));
-  const nextLines = lines.map((line) => {
-    if (line.trim() === "") return line;
-    if (allPrefixed && line.startsWith(prefix)) return line.slice(prefix.length);
-    return `${prefix}${line}`;
-  });
-  const replacement = nextLines.join("\n");
-  textarea.setRangeText(replacement, ls, le, "end");
-}
-
-function markdownToggleNumberedLines(textarea: HTMLTextAreaElement) {
-  const { value, ls, le } = markdownExpandSelectedLines(textarea);
-  const block = value.slice(ls, le);
-  const lines = block.split("\n");
-  const allPrefixed =
-    lines.length > 0 && lines.every((line) => line.trim() === "" || /^\s*\d+\.\s/.test(line));
-  const nextLines =
-    lines.length && allPrefixed
-      ? lines.map((line) => (line.trim() === "" ? line : line.replace(/^\s*\d+\.\s*/, "").trimStart()))
-      : lines.map((line, idx) =>
-          line.trim() === ""
-            ? line
-            : `${idx + 1}. ${line.replace(/^\s*\d+\.\s*/, "").trimStart()}`
-        );
-  textarea.setRangeText(nextLines.join("\n"), ls, le, "end");
-}
-
-function markdownToggleBlockquoteLines(textarea: HTMLTextAreaElement) {
-  markdownToggleBulletLines(textarea, "> ");
-}
-
-function markdownToggleHeadingLines(textarea: HTMLTextAreaElement, level: 1 | 2 | 3 = 2) {
-  const { value, ls, le } = markdownExpandSelectedLines(textarea);
-  const block = value.slice(ls, le);
-  const lines = block.split("\n");
-  const prefix = `${"#".repeat(level)} `;
-  const stripRe = /^(#{1,6})\s+/;
-  const allAreSameHeading = lines.length > 0 && lines.every((line) => line.trim() === "" || line.startsWith(prefix));
-  const nextLines = lines.map((line) => {
-    if (line.trim() === "") return line;
-    const noHeading = line.replace(stripRe, "");
-    return allAreSameHeading ? noHeading : `${prefix}${noHeading}`;
-  });
-  textarea.setRangeText(nextLines.join("\n"), ls, le, "end");
-}
-
-function markdownInsertCodeOrFence(textarea: HTMLTextAreaElement, start: number, end: number, selected: string) {
-  if (selected && selected.includes("\n")) {
-    const replacement = `\`\`\`\n${selected}\n\`\`\``;
-    textarea.setRangeText(replacement, start, end, "end");
-  } else {
-    wrapSelection(textarea, start, end, "`", "`", selected || "code", { selectInnerWhenEmpty: true });
-  }
-}
 
 function warnOAuthEphemeralRedirect(outcome: OAuthDesktopLoginOutcome): void {
   if (!outcome.ephemeralRedirect) return;
@@ -1572,33 +1434,6 @@ async function switchActiveAccount(accountId: string): Promise<void> {
   await refreshSuggestedSavedViews();
   state.selectedThreadId = state.threads[0]?.id;
   state.selectedThread = undefined;
-}
-
-function hostSuffixMatch(host: string, domain: string): boolean {
-  const h = host.trim().toLowerCase();
-  const d = domain.trim().toLowerCase();
-  if (!d) return false;
-  return h === d || h.endsWith(`.${d}`);
-}
-
-function newsletterEmailListed(email: string): boolean {
-  return firstMatchingNewsletterRule(email) !== null;
-}
-
-function firstMatchingNewsletterRule(email: string): NewsletterRuleRow | null {
-  const e = canonicalEmailForNlMatch(email);
-  if (!e) return null;
-  const at = e.lastIndexOf("@");
-  if (at <= 0 || at === e.length - 1) return null;
-  const local = e.slice(0, at);
-  const host = e.slice(at + 1);
-  for (const r of state.newsletterRules) {
-    const d = r.domain.toLowerCase();
-    const lp = (r.localPart ?? "*").toLowerCase();
-    if (!hostSuffixMatch(host, d)) continue;
-    if (lp === "*" || lp === local) return r;
-  }
-  return null;
 }
 
 let tauriNativeDragDropUnlisten: (() => void) | undefined;
@@ -6232,34 +6067,6 @@ async function syncInbox(options?: { background?: boolean; allMailboxes?: boolea
   }
 }
 
-function applyComposerPreviewDom(htmlRaw: string) {
-  const node = document.querySelector<HTMLElement>(".composer-body .preview");
-  if (!node) return false;
-  node.innerHTML = sanitizeEmailHtml(htmlRaw, { relocateUnsubscribe: false }).html;
-  return true;
-}
-
-async function computePreview() {
-  persistDraft();
-  const md = state.composeCanonicalBody || state.draft?.markdownBody || state.composeBody;
-  state.preview = await safeInvoke<DraftPreview>("preview_draft", { markdownBody: md }, {
-    textPlain: md,
-    html: `<p>${escapeHtml(md).replace(/\n/g, "<br />")}</p>`
-  });
-  // Ne pas faire un render() global pendant la frappe : il détruirait #compose-body et saute le curseur.
-  // On met uniquement à jour le panneau d’aperçu si le composer est déjà monté avec l’aperçu ouvert.
-  if (state.view === "compose" && composePreviewPaneActive() && applyComposerPreviewDom(state.preview?.html ?? "")) {
-    return;
-  }
-  render();
-}
-
-function schedulePreviewUpdate(delayMs: number = 250) {
-  if (!composePreviewPaneActive()) return;
-  if (previewTimer) window.clearTimeout(previewTimer);
-  previewTimer = window.setTimeout(() => void computePreview(), delayMs);
-}
-
 function toastSplitImapNotices(notes: Array<string | null | undefined> | undefined) {
   if (!notes?.length) return;
   const shorten = (s: string, n = 220) => (s.length <= n ? s : `${s.slice(0, n)}…`);
@@ -7269,162 +7076,6 @@ function extractDroppedPaths(dataTransfer: DataTransfer | null): string[] {
     .filter(Boolean);
 }
 
-async function applyMarkdownAction(action: string) {
-  const textarea = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  if (!textarea) return;
-
-  if (action === "undo") {
-    applyMarkdownUndoRedo("undo");
-    return;
-  }
-  if (action === "redo") {
-    applyMarkdownUndoRedo("redo");
-    return;
-  }
-
-  const start = textarea.selectionStart ?? 0;
-  const end = textarea.selectionEnd ?? 0;
-  const selected = textarea.value.slice(start, end);
-
-  if (action === "link") {
-    markdownPushToolbarUndoSnapshot(textarea.value);
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
-    const selected = textarea.value.slice(start, end);
-    void (async () => {
-      const url = await openTextPromptModal({
-        title: "Insérer un lien",
-        label: "URL",
-        defaultValue: "https://",
-      });
-      if (url == null) {
-        markdownPopPendingToolbarSnapshot();
-        return;
-      }
-      const trimmed = url.trim();
-      if (!trimmed) {
-        markdownPopPendingToolbarSnapshot();
-        return;
-      }
-      const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-      if (!ta) return;
-      const label = selected || "lien";
-      const replacement = `[${label}](${trimmed})`;
-      ta.setRangeText(replacement, start, end, "end");
-      if (!selected) {
-        const labelStart = start + 1;
-        const labelEnd = labelStart + label.length;
-        ta.setSelectionRange(labelStart, labelEnd);
-      }
-      ta.focus();
-      finalizeMarkdownToolbarEdit(ta);
-    })();
-    return;
-  }
-
-  if (action === "image") {
-    markdownPushToolbarUndoSnapshot(textarea.value);
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
-    const selected = textarea.value.slice(start, end);
-    void (async () => {
-      const url = await openTextPromptModal({
-        title: "Insérer une image",
-        label: "URL de l’image",
-        defaultValue: "https://",
-      });
-      if (url == null) {
-        markdownPopPendingToolbarSnapshot();
-        return;
-      }
-      const trimmed = url.trim();
-      if (!trimmed) {
-        markdownPopPendingToolbarSnapshot();
-        return;
-      }
-      const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-      if (!ta) return;
-      const alt = selected || "image";
-      const replacement = `![${alt}](${trimmed})`;
-      ta.setRangeText(replacement, start, end, "end");
-      if (!selected) {
-        const altStart = start + 2;
-        const altEnd = altStart + alt.length;
-        ta.setSelectionRange(altStart, altEnd);
-      }
-      ta.focus();
-      finalizeMarkdownToolbarEdit(ta);
-    })();
-    return;
-  }
-
-  if (action === "table") {
-    markdownPushToolbarUndoSnapshot(textarea.value);
-    const hdr = "| En-tête 1 ";
-    const stub = `\n\n${hdr}| En-tête 2 |\n| --- | --- |\n|  |  |\n\n`;
-    textarea.setRangeText(stub, start, end, "end");
-    const sliceFrom = Math.min(start, textarea.value.length);
-    const hdrPos = textarea.value.indexOf(hdr, sliceFrom);
-    if (hdrPos >= 0) {
-      const innerStart = hdrPos + 2;
-      textarea.setSelectionRange(innerStart, innerStart + "En-tête 1".length);
-    }
-    textarea.focus();
-    finalizeMarkdownToolbarEdit(textarea);
-    return;
-  }
-
-  markdownPushToolbarUndoSnapshot(textarea.value);
-
-  if (action === "bold") {
-    wrapSelection(textarea, start, end, "**", "**", selected || "texte", { selectInnerWhenEmpty: true });
-  } else if (action === "italic") {
-    wrapSelection(textarea, start, end, "*", "*", selected || "texte", { selectInnerWhenEmpty: true });
-  } else if (action === "underline") {
-    wrapSelection(textarea, start, end, "<u>", "</u>", selected || "texte", { selectInnerWhenEmpty: true });
-  } else if (action === "h1") {
-    markdownToggleHeadingLines(textarea, 1);
-  } else if (action === "h2") {
-    markdownToggleHeadingLines(textarea, 2);
-  } else if (action === "h3") {
-    markdownToggleHeadingLines(textarea, 3);
-  } else if (action === "ul") {
-    markdownToggleBulletLines(textarea, "- ");
-  } else if (action === "ol") {
-    markdownToggleNumberedLines(textarea);
-  } else if (action === "quote") {
-    markdownToggleBlockquoteLines(textarea);
-  } else if (action === "code") {
-    markdownInsertCodeOrFence(textarea, start, end, selected);
-  } else {
-    markdownPopPendingToolbarSnapshot();
-    return;
-  }
-
-  finalizeMarkdownToolbarEdit(textarea);
-}
-
-function wrapSelection(
-  textarea: HTMLTextAreaElement,
-  start: number,
-  end: number,
-  prefix: string,
-  suffix: string,
-  fallbackText: string,
-  options?: { selectInnerWhenEmpty?: boolean }
-) {
-  const selected = textarea.value.slice(start, end);
-  const inner = selected || fallbackText;
-  const replacement = `${prefix}${inner}${suffix}`;
-  textarea.setRangeText(replacement, start, end, "end");
-  if (!selected && options?.selectInnerWhenEmpty) {
-    const innerStart = start + prefix.length;
-    const innerEnd = innerStart + inner.length;
-    textarea.setSelectionRange(innerStart, innerEnd);
-  }
-  textarea.focus();
-}
-
 function parseEmailList(value: string): Array<{ email: string; name?: string | null }> {
   return value
     .split(",")
@@ -8092,7 +7743,6 @@ registerRenderDeps({
   senderAccentVars,
   receivedAtIsoDatetime,
   effectiveMessageViewMode,
-  newsletterEmailListed,
   threadSuppressAutoEnvelopeMeta,
   messageHtmlForDisplay,
   extractUnsubscribeLinksFromHtml,
@@ -8101,7 +7751,6 @@ registerRenderDeps({
   mailSecurityTierClass,
   mailSecurityFindingsForDisplay,
   zenSummaryHtmlFragments,
-  firstMatchingNewsletterRule,
   parseMaybeDate,
   dayKey,
   unsubscribeHrefScore,
@@ -8273,14 +7922,13 @@ registerLlmQueueCancelDeps({
 
 registerComposeSendDraftActionDeps({ sendDraft });
 
+registerComposeDraftPreviewDeps({
+  persistDraft,
+  sanitizePreviewHtml: (htmlRaw) => sanitizeEmailHtml(htmlRaw, { relocateUnsubscribe: false }).html,
+});
+
 registerComposeComposerBridgeDeps({
-  loadComposeMarkdownIntoEditor,
-  resetMarkdownEditorHistory,
-  computePreview,
   scheduleDraftRevisionSave,
-  schedulePreviewUpdate,
-  setComposeFromTextareaValue,
-  applyMarkdownAction,
   bindComposerDropzone,
   wireComposeRecipientChips,
 });

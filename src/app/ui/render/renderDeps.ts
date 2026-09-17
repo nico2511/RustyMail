@@ -8,7 +8,6 @@ import type {
   MailUnsubscribeLink,
   MessageViewMode,
   MicDictationTarget,
-  NewsletterRuleRow,
   State,
   Tag,
   ThreadListItem,
@@ -77,7 +76,6 @@ export type RenderDeps = {
   senderAccentVars: (sender: string) => string;
   receivedAtIsoDatetime: (receivedAt: string) => string;
   effectiveMessageViewMode: (message: CleanedMessageView, userMode: MessageViewMode) => MessageViewMode;
-  newsletterEmailListed: (email: string) => boolean;
   threadSuppressAutoEnvelopeMeta: (
     thread: { isNewsletterThread?: boolean },
     message: CleanedMessageView,
@@ -93,7 +91,6 @@ export type RenderDeps = {
     ms: MailSecuritySignals,
   ) => MailSecurityFinding[];
   zenSummaryHtmlFragments: (text: string) => string;
-  firstMatchingNewsletterRule: (email: string) => NewsletterRuleRow | null;
   parseMaybeDate: (value: string) => Date | null;
   dayKey: (date: Date) => string;
   unsubscribeHrefScore: (hrefRaw: string) => number;

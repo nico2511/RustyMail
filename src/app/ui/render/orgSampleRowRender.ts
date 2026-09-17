@@ -12,6 +12,7 @@ import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { iconSvg } from "../../lib/iconSvg";
 import { initials } from "../../lib/tags";
 import { state } from "../../state";
+import { newsletterEmailListed } from "../../mail/newsletterRulesMatch";
 import { renderDeps } from "./renderDeps";
 import { renderThreadNlRuleButton } from "./threadViewRender";
 
@@ -62,7 +63,7 @@ export function renderOrgThreadSampleRow(ref: OrgThreadRef, proposal: OrgProposa
   const activityTip = escapeAttr(threadListActivityTooltip(activityRaw));
   const activityParsed = parseThreadListActivityDate(activityRaw);
   const activityDatetime = activityParsed ? escapeAttr(activityParsed.toISOString()) : "";
-  const nlListed = senderRaw ? d.newsletterEmailListed(senderRaw) : false;
+  const nlListed = senderRaw ? newsletterEmailListed(senderRaw) : false;
   const autoBtn = senderRaw.includes("@") ? renderThreadNlRuleButton(senderRaw, nlListed) : "";
   const mbAttr = escapeAttr(mbRaw);
   const rowActions: string[] = [];
