@@ -124,6 +124,14 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/folderManagerPanelState.ts` | État recherche panneau dossiers |
 | `app/mail/orgApplyStatusMessage.ts` | Libellés progression Organiser |
 | `app/mail/threadShellLayout.ts` | Layout lecture fil / panneau IA shell |
+| `app/mail/settingsLlmRuntime.ts` | Statut LLM, llama-server, modale moteurs, contexte |
+| `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
+| `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
+| `app/mail/settingsOpenView.ts` | Ouverture vue Paramètres |
+| `app/mail/settingsAiPrefsPersistDom.ts` | Persistance prefs IA depuis le DOM |
+| `app/mail/savedDraftsMailboxCountRefresh.ts` | Compteur dossier Brouillons sauvés |
+| `app/mail/composeTauriNativeFileDrop.ts` | Glisser-déposer natif Tauri (PJ compose) |
+| `app/mail/threadStatusJobCounts.ts` | Compteurs jobs traduction (barre d’état) |
 | `app/mail/composeSendDraftAction.ts` | Ré-export `sendDraft()` |
 | `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
 | `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |
