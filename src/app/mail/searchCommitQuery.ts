@@ -1,10 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
 import { isAiFeatureEnabled } from "../../aiFeatures";
 import { threadMailboxListLabel } from "../../mailboxKinds";
 import { parseSearchBarDraft } from "../../searchBarParse";
 import {
   applyNlSearchQueryToState,
-  extractNlSearchFallbackText,
   parsedSearchBarHasModifiers,
   resetSearchStructuralState,
   searchCriteriaSnapshotsEqual,
@@ -13,15 +11,14 @@ import {
   type SearchStructuralState,
 } from "../../searchQueryState";
 import type { Tag, ThreadListItem } from "../types";
-import { LLM_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { formatNewsletterRuleInput } from "../lib/newsletterRuleFormat";
 import { tagFamilyForInvoke } from "../lib/tagFamilyForInvoke";
-import { withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { searchThreads } from "./searchThreadsRun";
+import { runNlSearchCommitFromBar } from "./searchCommitNlBarRun";
 import { recordSearchCommittedActivity } from "./threadActivityTracking";
 import {
   canonicalEmailForNlMatch,
@@ -30,7 +27,6 @@ import {
 import { resolveSearchMailboxPath } from "./searchMailboxResolve";
 import {
   committedSearchCriteriaSnapshot,
-  effectiveSearchMailboxPath,
   isSearchActive,
   searchMailboxForQuery,
   searchQueryUsesThreadsApi,
@@ -355,94 +351,7 @@ export function commitSearchQuery(opts?: { fromModal?: boolean }): void {
       });
       return;
     }
-    void (async () => {
-      const ran = await d.withLlmQueue("Recherche NL", async (signal) => {
-        if (signal.aborted) return;
-        let sq:
-          | {
-              text?: string | null;
-              sender?: string | null;
-              senders?: string[];
-              tags?: Tag[];
-              mode?: string | null;
-              accountId?: string | null;
-              mailbox?: string | null;
-              language?: string | null;
-            }
-          | null = null;
-        try {
-          sq = await withTimeout(
-            invoke<{
-              text?: string | null;
-              sender?: string | null;
-              senders?: string[];
-              tags?: Tag[];
-              mode?: string | null;
-              accountId?: string | null;
-              mailbox?: string | null;
-              language?: string | null;
-            }>("llm_search_nl", { accountId, phrase }),
-            LLM_INVOKE_TIMEOUT_MS,
-          );
-        } catch (err) {
-          console.error("llm_search_nl from search bar", err);
-        }
-        if (signal.aborted) return;
-        if (sq) {
-          applySearchQueryFromNl(sq);
-          if (!state.search.trim() && !state.searchSenders.length && !state.searchTags.length && phrase) {
-            const fb = extractNlSearchFallbackText(phrase);
-            if (fb) {
-              state.search = fb;
-              state.searchDraft = fb;
-              state.searchNlMode = "lexical";
-            }
-          }
-        } else {
-          const fb = extractNlSearchFallbackText(phrase);
-          if (fb) {
-            state.search = fb;
-            state.searchDraft = fb;
-            state.searchNlMode = "lexical";
-          } else {
-            state.search = phrase;
-            state.searchDraft = phrase;
-            state.searchNlMode = null;
-          }
-        }
-        if (
-          !state.search.trim() &&
-          !state.searchSenders.length &&
-          !state.searchTags.length &&
-          !state.searchLanguageFilter?.trim()
-        ) {
-          toast(
-            "Recherche NL : aucun critère exploitable. Reformulez avec des mots-clés (ex. facture, Amazon) ou un expéditeur.",
-          );
-          return;
-        }
-        await searchThreads();
-        const n = d.threadsVisibleInList().length;
-        const bits = [
-          n === 0 ? "aucun résultat" : `${n} fil${n === 1 ? "" : "s"}`,
-          state.searchNlMode ? `mode ${state.searchNlMode}` : null,
-          state.searchLanguageFilter ? `langue ${state.searchLanguageFilter.toUpperCase()}` : null,
-        ].filter(Boolean);
-        const scope =
-          state.searchScope === "account"
-            ? " (compte entier)"
-            : effectiveSearchMailboxPath()
-              ? " (dossier précis)"
-              : "";
-        toast(`Recherche NL : ${bits.join(" · ")}${scope}.`);
-        recordSearchCommittedActivity();
-      });
-      if (!ran) return;
-      if (closeModal) state.searchModalOpen = false;
-      if (state.view === "thread") d.clearThreadAiSummaryState();
-      if (state.view !== "list") state.view = "list";
-      render();
-    })();
+    void runNlSearchCommitFromBar({ accountId, phrase, closeModal });
   } else {
     void applySearchBarQuery().then(() => {
       toastSearchBarResult();
