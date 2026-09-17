@@ -76,7 +76,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailAttachmentActions.ts` | Téléchargement / ouverture PJ (confirm risque) |
 | `app/mail/appShellRender.ts` | Rendu DOM shell + enregistrement `render` / wireEvents context |
 | `app/ui/wireEvents/depsContext.ts` | Mutateurs contexte wireEvents (capture compte, carnet) |
-| `app/mail/appModuleRegistry.ts` | Enregistrement unique `register*Deps` + init digest / prefetch idle |
+| `app/mail/appModuleRegistry.ts` | Enregistrement `register*Deps` wire + init digest / prefetch idle |
+| `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` → `registerRenderDeps` (vues org, liste, fil, compose, réglages) |
 | `app/mail/savedDraftOpenRun.ts` | Ouvrir un brouillon enregistré dans le composeur |
 | `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |
 | `app/mail/loadBootDeferredPrefs.ts` | Prefs différées au boot + abonnements modèles / prefetch |
@@ -234,7 +235,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Réduire **`appModuleRegistry.ts`** (imports morts, sous-registres render vs wire)
-2. Pointer les `handleAction*` vers les barrels domaine au lieu du barrel global si utile
+1. Extraire d’autres sous-registres wire (search, compose) si `appModuleRegistry` regrossit
+2. Pointer les `handleAction*` vers les barrels domaine `deps*` au lieu du barrel global
 
 `npm run verify:ts` · `npm test`
