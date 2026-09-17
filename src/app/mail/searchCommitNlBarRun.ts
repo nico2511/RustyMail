@@ -1,16 +1,14 @@
-import { invoke } from "@tauri-apps/api/core";
-import { extractNlSearchFallbackText } from "../../searchQueryState";
-import type { Tag } from "../types";
-import { LLM_INVOKE_TIMEOUT_MS } from "../core/timeouts";
-import { withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
-import {
-  applySearchQueryFromNl,
-  requireSearchCommitDeps,
-} from "./searchCommitQuery";
+import { requireSearchCommitDeps } from "./searchCommitQuery";
 import { effectiveSearchMailboxPath } from "./searchQueryContext";
+import {
+  applyNlSearchResultToState,
+  invokeLlmSearchNlOptional,
+  nlSearchCriteriaEmpty,
+  NL_SEARCH_NO_CRITERIA_TOAST,
+} from "./searchNlQueryInvoke";
 import { searchThreads } from "./searchThreadsRun";
 import { recordSearchCommittedActivity } from "./threadActivityTracking";
 
@@ -23,67 +21,11 @@ export async function runNlSearchCommitFromBar(opts: {
   const { accountId, phrase, closeModal } = opts;
   const ran = await d.withLlmQueue("Recherche NL", async (signal) => {
     if (signal.aborted) return;
-    let sq:
-      | {
-          text?: string | null;
-          sender?: string | null;
-          senders?: string[];
-          tags?: Tag[];
-          mode?: string | null;
-          accountId?: string | null;
-          mailbox?: string | null;
-          language?: string | null;
-        }
-      | null = null;
-    try {
-      sq = await withTimeout(
-        invoke<{
-          text?: string | null;
-          sender?: string | null;
-          senders?: string[];
-          tags?: Tag[];
-          mode?: string | null;
-          accountId?: string | null;
-          mailbox?: string | null;
-          language?: string | null;
-        }>("llm_search_nl", { accountId, phrase }),
-        LLM_INVOKE_TIMEOUT_MS,
-      );
-    } catch (err) {
-      console.error("llm_search_nl from search bar", err);
-    }
+    const sq = await invokeLlmSearchNlOptional(accountId, phrase, "llm_search_nl from search bar");
     if (signal.aborted) return;
-    if (sq) {
-      applySearchQueryFromNl(sq);
-      if (!state.search.trim() && !state.searchSenders.length && !state.searchTags.length && phrase) {
-        const fb = extractNlSearchFallbackText(phrase);
-        if (fb) {
-          state.search = fb;
-          state.searchDraft = fb;
-          state.searchNlMode = "lexical";
-        }
-      }
-    } else {
-      const fb = extractNlSearchFallbackText(phrase);
-      if (fb) {
-        state.search = fb;
-        state.searchDraft = fb;
-        state.searchNlMode = "lexical";
-      } else {
-        state.search = phrase;
-        state.searchDraft = phrase;
-        state.searchNlMode = null;
-      }
-    }
-    if (
-      !state.search.trim() &&
-      !state.searchSenders.length &&
-      !state.searchTags.length &&
-      !state.searchLanguageFilter?.trim()
-    ) {
-      toast(
-        "Recherche NL : aucun critère exploitable. Reformulez avec des mots-clés (ex. facture, Amazon) ou un expéditeur.",
-      );
+    applyNlSearchResultToState(phrase, sq);
+    if (nlSearchCriteriaEmpty()) {
+      toast(NL_SEARCH_NO_CRITERIA_TOAST);
       return;
     }
     await searchThreads();
