@@ -257,6 +257,28 @@ import {
   threadTreeLaneRight,
   zenSummaryHtmlFragments,
 } from "./mail/threadViewUiHelpers";
+import { composeKindTitle, formatDraftRevisionStamp } from "./mail/composeFormLabels";
+import {
+  buildSettingsAiPanelDeps,
+  mergedProfileForAccountsForm,
+  settingsDraftProfile,
+} from "./mail/settingsRenderHelpers";
+import {
+  captureAccountsFormIdentityFromDom,
+  getAccountsFormIdentityScratch,
+} from "./mail/settingsAccountsFormState";
+import {
+  agentOfferSlotsStep,
+  agentSkillEnabled,
+  agentStepProgressLabel,
+  applyThreadAiOutputIfLive,
+  paintAgentDraftDom,
+  paintThreadAiSummaryDom,
+  paintThreadQaStreamDom,
+  threadAiSummaryForCurrentThread,
+  threadAiSummaryScoped,
+  threadAiSummaryShownInZen,
+} from "./mail/threadAiStreamDom";
 import { attachmentPathsJoinedForHiddenField } from "./mail/composeAttachmentPaths";
 import {
   clearDraftSession,
@@ -651,7 +673,6 @@ let subscribedModelBootstrapProgress = false;
 
 let skipAccountIdentityCaptureOnce = false;
 
-let accountsFormIdentityScratch: { displayName: string; email: string } | undefined;
 
 async function flushDraftRevisionPending(): Promise<void> {
   await flushDraftRevisionPendingNow(
@@ -922,209 +943,6 @@ export async function boot() {
   }
 }
 
-function composeKindTitle(kind?: Draft["kind"]): string {
-  switch (kind) {
-    case "Reply":
-      return "Réponse";
-    case "Forward":
-      return "Transfert";
-    default:
-      return "Nouveau message";
-  }
-}
-
-function formatDraftRevisionStamp(iso: string): string {
-  const raw = iso.trim();
-  const t = Date.parse(raw);
-  if (!Number.isFinite(t)) return raw;
-  return new Date(t).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
-}
-
-function settingsDraftProfile(): Account | undefined {
-  if (state.settingsSelectedAccountId === "new") return undefined;
-  return state.accounts.find((a) => a.id === state.settingsSelectedAccountId);
-}
-
-function mergedProfileForAccountsForm(): Account | undefined {
-  const base = settingsDraftProfile();
-  const scratch = state.accountFormOAuthPrefill ?? accountsFormIdentityScratch;
-  if (!getDiscoveredServersFormSnap() || accountFieldTouched.serverFields) {
-    return base;
-  }
-
-  const displayName = scratch?.displayName?.trim() ?? base?.displayName ?? "";
-  const email = scratch?.email?.trim() ?? base?.email ?? "";
-  const snapImap = getDiscoveredServersFormSnap()!.imap;
-  const snapSmtp = getDiscoveredServersFormSnap()!.smtp;
-  if (base) {
-    return { ...base, imap: snapImap, smtp: snapSmtp };
-  }
-  return {
-    id: "__draft__",
-    displayName,
-    email,
-    imap: snapImap,
-    smtp: snapSmtp,
-    authKind: state.accountFormAuthKind,
-  };
-}
-
-function buildSemanticStatsBlockHtml(): string {
-  const accForStats = currentAccount();
-  const mbNorm = (state.selectedMailbox || "INBOX").toLowerCase();
-  const cnt = state.semanticEmbeddingCounts;
-  const countsOk = Boolean(
-    cnt &&
-      accForStats &&
-      cnt.accountId === accForStats.id &&
-      cnt.mailbox.trim().toLowerCase() === mbNorm
-  );
-  const mailboxSide = state.selectedMailbox || "INBOX";
-  if (!isTauriRuntime()) {
-    return `<p class="settings-explain settings-explain--lead" role="status">${escapeHtml(t("semantic.tauriOnly"))}</p>`;
-  }
-  if (!accForStats) {
-    return `<p class="settings-explain settings-explain--lead" role="status">${escapeHtml(t("semantic.pickAccount"))}</p>`;
-  }
-  if (!countsOk || !cnt) {
-    return `<p class="settings-explain settings-explain--lead" role="status">${escapeHtml(t("semantic.loading", { mailbox: mailboxSide }))}</p>`;
-  }
-  const c = cnt;
-  return `<div class="settings-semantic-stats surface-sm" role="status" style="margin:0 0 14px;padding:12px 14px;border-radius:var(--radius-lg);font-size:13px;line-height:1.55">
-            <strong>${escapeHtml(t("semantic.title", { model: c.modelId }))}</strong>
-            <ul style="margin:8px 0 0;padding-left:1.15em">
-              <li>${escapeHtml(t("semantic.mailboxLine", { mailbox: c.mailbox, embedded: c.embeddingsInMailbox, cached: c.messagesInMailboxCached }))}</li>
-              <li>${escapeHtml(t("semantic.accountLine", { total: c.embeddingsTotalForAccount }))}</li>
-            </ul>
-            <p class="dim" style="margin:10px 0 0;font-size:12px;line-height:1.5">${escapeHtml(t("semantic.hint"))}</p>
-          </div>`;
-}
-
-function buildSettingsAiPanelDeps(): SettingsAiPanelDeps {
-  return {
-    ai: state.appPrefs.ai,
-    escapeHtml,
-    escapeAttr,
-    iconSvg,
-    settingsExplainHtml,
-    formatWhisperPttKeyLabel,
-    isTauri: isTauriRuntime(),
-    semanticStatsBlock: buildSemanticStatsBlockHtml(),
-    semOk: state.semanticModelAvailable,
-    keyHint:
-      state.openrouterApiKeySet || state.dictationApiKeySet
-        ? "Clé cloud enregistrée dans le trousseau."
-        : "Aucune clé cloud.",
-    dictationApiKeySet: state.dictationApiKeySet,
-    openrouterApiKeySet: state.openrouterApiKeySet,
-    llamaServerApiKeySet: state.llamaServerApiKeySet,
-    llmRuntimeStatus: state.llmRuntimeStatus,
-    llmPrefetchPercent: state.llmPrefetchPercent,
-    llmPrefetchInFlight: state.llmPrefetchInFlight,
-    llmCachedGgufFilenames: state.llmCachedGgufFilenames,
-    bootstrapModelsCompleted: Boolean(state.appPrefs.general.bootstrapModelsCompleted),
-    engineSettingsTab: state.aiEngineSettingsTab,
-  };
-}
-
-function threadAiSummaryLiveFor(threadId: string): boolean {
-  const tid = String(threadId).trim();
-  return (
-    state.view === "thread" &&
-    Boolean(tid) &&
-    threadIdsMatch(state.selectedThreadId, tid) &&
-    threadIdsMatch(state.aiThreadScope, tid)
-  );
-}
-
-function applyThreadAiOutputIfLive(threadId: string, text: string): boolean {
-  if (!threadAiSummaryLiveFor(threadId)) return false;
-  state.aiOutput = text;
-  return true;
-}
-
-let aiStreamPaintRaf = 0;
-
-let aiStreamPaintFn: (() => void) | null = null;
-
-function scheduleAiStreamDomPaint(paint: () => void): void {
-  aiStreamPaintFn = paint;
-  if (aiStreamPaintRaf) return;
-  aiStreamPaintRaf = window.requestAnimationFrame(() => {
-    aiStreamPaintRaf = 0;
-    aiStreamPaintFn?.();
-    aiStreamPaintFn = null;
-  });
-}
-
-function paintThreadAiSummaryDom(text: string): void {
-  scheduleAiStreamDomPaint(() => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    const html = zenSummaryHtmlFragments(trimmed);
-    document.querySelectorAll<HTMLElement>(".thread-reading .thread-zen .thread-zen-body").forEach((el) => {
-      el.classList.add("is-ai-streaming");
-      if (el.innerHTML !== html) el.innerHTML = html;
-    });
-    document.querySelectorAll<HTMLElement>(".ai-thread-summary__body").forEach((el) => {
-      el.classList.add("is-ai-streaming");
-      if (el.innerHTML !== html) el.innerHTML = html;
-    });
-  });
-}
-
-function paintThreadQaStreamDom(text: string): void {
-  scheduleAiStreamDomPaint(() => {
-    const el = document.querySelector<HTMLElement>(".ai-qa-answer--stream .ai-qa-answer__text");
-    if (!el) return;
-    const html = formatPlainTextWithLinks(text);
-    if (el.innerHTML !== html) el.innerHTML = html;
-  });
-}
-
-function paintAgentDraftDom(text: string): void {
-  const ta = document.querySelector<HTMLTextAreaElement>("#agent-draft-text");
-  if (!ta) {
-    render();
-    return;
-  }
-  scheduleAiStreamDomPaint(() => {
-    if (ta.value !== text) ta.value = text;
-  });
-}
-
-function threadAiSummaryScoped(): boolean {
-  return Boolean(state.aiOutput?.trim() && state.aiThreadScope);
-}
-
-function threadAiSummaryForCurrentThread(): boolean {
-  return threadAiSummaryScoped() && threadAiSummaryLiveFor(String(state.aiThreadScope));
-}
-
-function threadAiSummaryShownInZen(): boolean {
-  return state.view === "thread" && Boolean(state.selectedThread) && threadAiSummaryForCurrentThread();
-}
-
-function agentOfferSlotsStep(session: NonNullable<typeof state.agentSession>): boolean {
-  return session.plan?.offerSlotStep ?? session.offerSlotsStep;
-}
-
-function agentPrepareReplyStepCount(session: NonNullable<typeof state.agentSession>): number {
-  const planned = session.plan?.steps.length;
-  if (planned && planned > 0) {
-    return planned + (session.plan?.needsClarification ? 1 : 0);
-  }
-  if (session.assistMode === "quick") return agentOfferSlotsStep(session) ? 2 : 1;
-  return agentOfferSlotsStep(session) ? 5 : 4;
-}
-
-function agentStepProgressLabel(session: NonNullable<typeof state.agentSession>): string {
-  const n = agentPrepareReplyStepCount(session);
-  const order = ["analyzeIntent", "extractFacts", "clarification", "draftReply", "suggestSlots"];
-  const idx = Math.max(0, order.indexOf(session.step));
-  return `${idx + 1}/${n} · ${assistStepLabel(session.step)}`;
-}
-
 function agentAssistBasePayload(): ReturnType<typeof buildAssistPayload> | null {
   const s = state.agentSession;
   const tid = state.selectedThreadId?.trim();
@@ -1133,13 +951,6 @@ function agentAssistBasePayload(): ReturnType<typeof buildAssistPayload> | null 
   const mode = s?.assistMode ?? "deep";
   const skills = s?.enabledSkills?.length ? s.enabledSkills : defaultEnabledSkillIds(mode);
   return buildAssistPayload(tid, accountId, mode, skills);
-}
-
-function agentSkillEnabled(skill: AssistSkillId): boolean {
-  const s = state.agentSession;
-  if (!s) return false;
-  const skills = s.enabledSkills.length ? s.enabledSkills : defaultEnabledSkillIds(s.assistMode);
-  return skills.includes(skill);
 }
 
 function pushAgentTelemetry(step: AssistRunStep): void {
@@ -3215,18 +3026,13 @@ function normalizeCapabilities(raw: unknown): AppCapabilities {
 
 function render() {
   syncMailboxDigestPanelWithFeaturePref();
-  accountsFormIdentityScratch = undefined;
   if (state.view === "settings" && state.settingsTab === "accounts") {
-    const mailInput = document.querySelector<HTMLInputElement>("#account-email");
-    if (mailInput && !skipAccountIdentityCaptureOnce) {
-      accountsFormIdentityScratch = {
-        email: mailInput.value ?? "",
-        displayName: document.querySelector<HTMLInputElement>("#account-display-name")?.value ?? "",
-      };
-    }
+    captureAccountsFormIdentityFromDom(skipAccountIdentityCaptureOnce);
     if (skipAccountIdentityCaptureOnce) {
       skipAccountIdentityCaptureOnce = false;
     }
+  } else {
+    captureAccountsFormIdentityFromDom(true);
   }
 
   // Preserve scroll positions across full re-render (appShell.innerHTML rebuilds DOM).
@@ -3464,7 +3270,7 @@ registerRenderDeps({
   addressBookRowsCache: getAddressBookRowsCache,
   addressBookEditEmail: () => addressBookEditEmail,
   addressBookListQuery: getAddressBookListQuery,
-  accountsFormIdentityScratch: () => accountsFormIdentityScratch,
+  accountsFormIdentityScratch: getAccountsFormIdentityScratch,
   threadQaMicButtonTitle,
   threadAiSummaryForCurrentThread,
   threadIdsMatch,
