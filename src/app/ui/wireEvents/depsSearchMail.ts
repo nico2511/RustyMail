@@ -17,8 +17,8 @@ export {
   commitSearchQuery,
   resetManualSearchNlFilters,
   searchDraftDiffersFromCommitted,
-  searchNlAssist,
 } from "../../mail/searchCommitQuery";
+export { searchNlAssist } from "../../mail/searchNlAssistRun";
 export {
   launchContactMailSearch,
   launchDomainMailSearch,

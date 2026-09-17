@@ -37,7 +37,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` |
 | `app/mail/fetchOpenThread.ts` | `fetchOpenThreadOrNotify()` |
 | `app/mail/openThreadView.ts` | `openThread()` + `registerOpenThreadDeps()` |
-| `app/mail/searchCommitQuery.ts` | `commitSearchQuery`, barre, NL + `registerSearchCommitDeps()` |
+| `app/mail/searchCommitQuery.ts` | `commitSearchQuery`, barre, apply NL + `registerSearchCommitDeps()` |
+| `app/mail/searchNlAssistRun.ts` | Action « recherche NL » (prompt + `llm_search_nl`) |
 | `app/mail/searchBarUi.ts` | Modale recherche, `syncSearchBarChrome` |
 | `app/mail/searchMailboxResolve.ts` | Résolution chemin dossier (liste + recherche) |
 | `app/mail/searchAccountResolve.ts` | Email canonique NL, expéditeurs recherche, compte depuis ref barre |
