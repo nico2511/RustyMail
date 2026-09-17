@@ -23,10 +23,10 @@ import {
   toastSearchBarResult,
 } from "./searchCommitQuery";
 import { searchThreads } from "./searchThreadsRun";
+import { resolveSearchMailboxPath } from "./searchMailboxResolve";
 
 export type SearchLaunchDeps = {
   clearThreadAiSummaryState: () => void;
-  resolveSearchMailboxPath: (requested: string) => string | null;
   ensureValidSelectedMailbox: () => void;
   refreshSearchTagCatalog: () => Promise<void>;
 };
@@ -156,7 +156,7 @@ export function applyHashAutocompleteHitToState(hit: InboxFilterHit): void {
 
   if (hit.id.startsWith("mailbox:")) {
     const raw = hit.id.slice(8);
-    state.searchMailboxPath = d.resolveSearchMailboxPath(raw) ?? raw;
+    state.searchMailboxPath = resolveSearchMailboxPath(raw) ?? raw;
     state.searchScope = "mailbox";
     return;
   }

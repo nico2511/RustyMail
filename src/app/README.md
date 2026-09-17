@@ -40,7 +40,9 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/openThreadView.ts` | `openThread()` + `registerOpenThreadDeps()` |
 | `app/mail/searchCommitQuery.ts` | `commitSearchQuery`, barre, NL + `registerSearchCommitDeps()` |
 | `app/mail/searchBarUi.ts` | Modale recherche, `syncSearchBarChrome` |
-| `app/mail/savedSearchViews.ts` | Vues enregistrées (CRUD, marquer vu, suggestions) + `registerSavedSearchViewsDeps()` |
+| `app/mail/searchMailboxResolve.ts` | Résolution chemin dossier (liste + recherche) |
+| `app/mail/searchAccountResolve.ts` | Email canonique NL, expéditeurs recherche, compte depuis ref barre |
+| `app/mail/savedSearchViews.ts` | Vues enregistrées (CRUD, marquer vu, suggestions) |
 | `app/mail/searchLaunchQueries.ts` | Lancements recherche (tag, contact, domaine, hash) + `registerSearchLaunchDeps()` |
 | `app/mail/searchTagCatalog.ts` | `refreshSearchTagCatalog` + `registerSearchTagCatalogDeps()` |
 | `app/mail/searchAtAutocompleteWire.ts` | Câblage `@` / `#` (recherche + compose) + `registerSearchAtAutocompleteWireDeps()` |
@@ -87,7 +89,7 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/threadAiSummaryState.ts` | Reset état synthèse / agent fil |
 | `app/mail/threadMessageAnchor.ts` | Id DOM ancre message fil |
 | `app/mail/threadScrollToMessage.ts` | Scroll + surbrillance message + `registerThreadScrollToMessageDeps()` |
-| `app/mail/mailListView.ts` | `loadMailView` + `registerMailListDeps()` |
+| `app/mail/mailListView.ts` | `loadMailView`, `loadThreadsForSearchContext` + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
 | `app/core/accountContext.ts` | `currentAccount()` |

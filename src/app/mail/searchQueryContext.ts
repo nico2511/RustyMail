@@ -8,25 +8,18 @@ import {
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import { currentAccount } from "../core/accountContext";
 import { folderManagerPanelMailbox, listMailboxForPanel } from "./mailboxPanelContext";
+import { resolveSearchMailboxPath } from "./searchMailboxResolve";
 import { state } from "../state";
 
 export function folderManagerBrowsingPanel(): boolean {
   return Boolean(folderManagerPanelMailbox()) && !isSearchActive();
 }
 
-let resolveSearchMailboxPathImpl: (requested: string) => string | null = () => null;
-
-export function registerSearchQueryContext(deps: {
-  resolveSearchMailboxPath: (requested: string) => string | null;
-}): void {
-  resolveSearchMailboxPathImpl = deps.resolveSearchMailboxPath;
-}
-
 export function effectiveSearchMailboxPath(): string | null {
   const parsed = parseSearchBarDraft(state.searchDraft, state.newsletterRules);
   const fromDraft = parsed.mailboxPath?.trim();
   if (fromDraft && !isSavedDraftsVirtualMailbox(fromDraft)) {
-    return resolveSearchMailboxPathImpl(fromDraft);
+    return resolveSearchMailboxPath(fromDraft);
   }
   const committed = state.searchMailboxPath?.trim();
   if (committed && !isSavedDraftsVirtualMailbox(committed)) return committed;

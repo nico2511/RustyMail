@@ -43,21 +43,7 @@ import {
 import { canSaveSearchView } from "./searchViewContext";
 import { searchThreads } from "./searchThreadsRun";
 import { activityTrackingEnabled } from "./threadActivityTracking";
-
-export type SavedSearchViewsDeps = {
-  resolveSearchMailboxPath: (requested: string) => string | null;
-};
-
-let savedSearchViewsDeps: SavedSearchViewsDeps | null = null;
-
-export function registerSavedSearchViewsDeps(deps: SavedSearchViewsDeps): void {
-  savedSearchViewsDeps = deps;
-}
-
-function deps(): SavedSearchViewsDeps {
-  if (!savedSearchViewsDeps) throw new Error("registerSavedSearchViewsDeps not called");
-  return savedSearchViewsDeps;
-}
+import { resolveSearchMailboxPath } from "./searchMailboxResolve";
 
 export function patchSavedSearchNewCount(id: string, count: number, lastSeenAt?: string): void {
   const seen = lastSeenAt ?? new Date().toISOString();
@@ -155,7 +141,6 @@ export async function markActiveSavedSearchSeen(options?: { toast?: boolean }): 
 }
 
 export async function saveCurrentSearchView(): Promise<void> {
-  const d = deps();
   if (!isTauriRuntime()) {
     toast("Vues enregistrées : disponible dans l’app Tauri.");
     return;
@@ -207,7 +192,6 @@ export async function saveCurrentSearchView(): Promise<void> {
 }
 
 export async function refreshSuggestedSavedViews(): Promise<void> {
-  const d = deps();
   if (!isTauriRuntime() || !activityTrackingEnabled()) {
     state.suggestedSavedViews = [];
     clearSuggestionShownKeys();
@@ -303,7 +287,6 @@ export async function dismissSuggestedSavedView(
 }
 
 export async function applySavedSearchView(id: string): Promise<void> {
-  const d = deps();
   if (!isTauriRuntime()) return;
   const accountId = currentAccount()?.id?.trim();
   if (!accountId) {
@@ -318,7 +301,7 @@ export async function applySavedSearchView(id: string): Promise<void> {
     await markSavedSearchSeenCmd(accountId, saved.id);
     applySavedSearchToState(saved, state, {
       findNewsletterRule: findNewsletterRuleByParts,
-      resolveMailboxPath: d.resolveSearchMailboxPath,
+      resolveMailboxPath: resolveSearchMailboxPath,
     });
     if (saved.query.accountId?.trim()) {
       state.selectedAccountId = saved.query.accountId.trim();

@@ -10,6 +10,7 @@ import { initials } from "../../lib/tags";
 import { threadTagsForModal } from "../../lib/threadTagsModal";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
+import { canonicalEmailForNlMatch } from "../../mail/searchAccountResolve";
 import type {
   CleanedMessageView,
   MailSecuritySignals,
@@ -72,7 +73,7 @@ function renderMessageSenderLink(message: CleanedMessageView, className = "threa
 
 export function renderThreadNlRuleButton(seSenderRaw: string, nlListedHere: boolean): string {
   if (!isTauriRuntime()) return "";
-  const seNorm = renderDeps().canonicalEmailForNlMatch(seSenderRaw);
+  const seNorm = canonicalEmailForNlMatch(seSenderRaw);
   if (!seNorm) return "";
   if (nlListedHere) {
     const matched = renderDeps().firstMatchingNewsletterRule(seSenderRaw);
@@ -122,7 +123,7 @@ function renderThreadParticipantFirstBadge(message: CleanedMessageView, firstIds
   const senderEmailLower = (message.senderEmail ?? "").trim().toLowerCase();
   if (ownEmailLower && senderEmailLower && ownEmailLower === senderEmailLower) return "";
   if (renderDeps().isOwnSender(message.sender)) return "";
-  const canon = renderDeps().canonicalEmailForNlMatch(message.senderEmail ?? "");
+  const canon = canonicalEmailForNlMatch(message.senderEmail ?? "");
   const sender = escapeHtml(message.sender);
   const emailBit = canon ? ` <span class="dim thread-timeline-note__addr">(${escapeHtml(canon)})</span>` : "";
   return `<div class="thread-timeline-note" role="note">

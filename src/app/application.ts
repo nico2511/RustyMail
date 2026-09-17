@@ -123,7 +123,8 @@ import {
 } from "./account/accountWizardState";
 import { currentAccount } from "./core/accountContext";
 import { threadIdsMatch } from "./lib/threadIdsMatch";
-import { mailboxLogicalPathKey } from "./mail/mailboxPathKeys";
+import { resolveMailboxInList } from "./mail/searchMailboxResolve";
+import { canonicalEmailForNlMatch } from "./mail/searchAccountResolve";
 import {
   folderManagerPanelMailbox,
   listMailboxForPanel,
@@ -159,7 +160,6 @@ import {
   committedSearchCriteriaSnapshot,
   effectiveSearchMailboxPath,
   isSearchActive,
-  registerSearchQueryContext,
   searchAccountIdForQuery,
   searchMailboxForQuery,
   searchQueryMailboxForList,
@@ -187,7 +187,6 @@ import {
   markActiveSavedSearchSeen,
   refreshSavedSearches,
   refreshSuggestedSavedViews,
-  registerSavedSearchViewsDeps,
   saveCurrentSearchView,
 } from "./mail/savedSearchViews";
 import {
@@ -1491,49 +1490,6 @@ async function aiCacheKeySegment(): Promise<string> {
   }
 }
 
-function resolveMailboxInList(mailboxes: string[], selected: string | undefined): string | undefined {
-  const sel = String(selected ?? "");
-  if (!mailboxes.length) return undefined;
-  if (mailboxes.includes(sel)) return sel;
-  const nk = sel.normalize("NFC");
-  for (const m of mailboxes) {
-    if (m.normalize("NFC") === nk) return m;
-  }
-  const trimmed = sel.trim();
-  if (!trimmed) return undefined;
-  const trimMatches = mailboxes.filter((m) => m.trim() === trimmed);
-  if (trimMatches.length === 1) return trimMatches[0];
-  return undefined;
-}
-
-function resolveSearchMailboxPath(requested: string): string | null {
-  const q = requested.trim();
-  if (!q || isSavedDraftsVirtualMailbox(q)) return null;
-  const mbs = state.mailboxes;
-  const exact = resolveMailboxInList(mbs, q);
-  if (exact) return exact;
-
-  const wantKey = mailboxLogicalPathKey(q);
-  const keyMatches = mbs.filter((m) => mailboxLogicalPathKey(m) === wantKey);
-  if (keyMatches.length === 1) return keyMatches[0];
-  if (keyMatches.length > 1) {
-    return [...keyMatches].sort((a, b) => b.length - a.length)[0] ?? null;
-  }
-
-  const qlc = q.toLowerCase();
-  const leafExact = mbs.filter((m) => (m.split("/").pop() ?? m).toLowerCase() === qlc);
-  if (leafExact.length === 1) return leafExact[0];
-
-  const partial = mbs.filter((m) => {
-    const ml = m.toLowerCase();
-    const leaf = (m.split("/").pop() ?? m).toLowerCase();
-    return ml === qlc || leaf === qlc || ml.includes(qlc) || leaf.includes(qlc);
-  });
-  if (partial.length === 1) return partial[0];
-
-  return q;
-}
-
 function defaultListFilterFromPrefs(): State["listFilter"] {
   return defaultListFilterFromRaw(state.appPrefs.general.defaultListFilter);
 }
@@ -1627,14 +1583,6 @@ function hostSuffixMatch(host: string, domain: string): boolean {
 
 function newsletterEmailListed(email: string): boolean {
   return firstMatchingNewsletterRule(email) !== null;
-}
-
-function canonicalEmailForNlMatch(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const bare = extractAddrSpec(trimmed) || trimmed;
-  if (!bare.includes("@")) return null;
-  return normalizeNlRuleInvokeInput(bare);
 }
 
 function firstMatchingNewsletterRule(email: string): NewsletterRuleRow | null {
@@ -1820,25 +1768,6 @@ function mailboxPathPrefixForCreate(): string {
   const m = (state.selectedMailbox ?? "").trim();
   if (!m || isVirtualMailbox(m)) return "";
   return m.endsWith("/") ? m : `${m}/`;
-}
-
-function addSearchSender(email: string): void {
-  const c = canonicalEmailForNlMatch(email) ?? email.trim().toLowerCase();
-  if (!c) return;
-  if (!state.searchSenders.some((s) => s.toLowerCase() === c)) state.searchSenders.push(c);
-}
-
-function resolveAccountIdFromRef(ref: string): string | null {
-  const q = ref.trim().toLowerCase();
-  if (!q) return null;
-  const hit = state.accounts.find(
-    (a) =>
-      a.id.toLowerCase() === q ||
-      a.email.toLowerCase() === q ||
-      a.email.toLowerCase().includes(q) ||
-      (a.displayName ?? "").toLowerCase().includes(q)
-  );
-  return hit?.id ?? null;
 }
 
 async function refreshLlmRuntimeStatus(forceHardwareRescan?: boolean): Promise<void> {
@@ -8172,7 +8101,6 @@ registerRenderDeps({
   mailSecurityTierClass,
   mailSecurityFindingsForDisplay,
   zenSummaryHtmlFragments,
-  canonicalEmailForNlMatch,
   firstMatchingNewsletterRule,
   parseMaybeDate,
   dayKey,
@@ -8210,8 +8138,6 @@ registerMailListDeps({
   searchThreads,
 });
 
-registerSearchQueryContext({ resolveSearchMailboxPath });
-
 registerOpenThreadDeps({
   openSavedDraftById,
   beginNavigation,
@@ -8238,18 +8164,11 @@ registerSearchCommitDeps({
   threadsVisibleInList,
   clearThreadAiSummaryState,
   withLlmQueue,
-  resolveSearchMailboxPath,
-  resolveAccountIdFromRef,
-  canonicalEmailForNlMatch,
 });
 
 registerSearchBarUiDeps({
   refreshSearchTagCatalog,
   searchDraftDiffersFromCommitted,
-});
-
-registerSavedSearchViewsDeps({
-  resolveSearchMailboxPath,
 });
 
 registerSearchViewContextDeps({
@@ -8269,7 +8188,6 @@ registerSearchViewBatchDeps({
 
 registerSearchLaunchDeps({
   clearThreadAiSummaryState,
-  resolveSearchMailboxPath,
   ensureValidSelectedMailbox,
   refreshSearchTagCatalog,
 });

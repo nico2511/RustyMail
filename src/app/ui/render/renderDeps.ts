@@ -93,7 +93,6 @@ export type RenderDeps = {
     ms: MailSecuritySignals,
   ) => MailSecurityFinding[];
   zenSummaryHtmlFragments: (text: string) => string;
-  canonicalEmailForNlMatch: (raw: string) => string | null;
   firstMatchingNewsletterRule: (email: string) => NewsletterRuleRow | null;
   parseMaybeDate: (value: string) => Date | null;
   dayKey: (date: Date) => string;

@@ -25,6 +25,11 @@ import { state } from "../state";
 import { searchThreads } from "./searchThreadsRun";
 import { recordSearchCommittedActivity } from "./threadActivityTracking";
 import {
+  canonicalEmailForNlMatch,
+  resolveAccountIdFromRef,
+} from "./searchAccountResolve";
+import { resolveSearchMailboxPath } from "./searchMailboxResolve";
+import {
   committedSearchCriteriaSnapshot,
   effectiveSearchMailboxPath,
   isSearchActive,
@@ -38,9 +43,6 @@ export type SearchCommitDeps = {
   threadsVisibleInList: () => ThreadListItem[];
   clearThreadAiSummaryState: () => void;
   withLlmQueue: <T>(label: string, fn: (signal: AbortSignal) => Promise<T>) => Promise<T | null>;
-  resolveSearchMailboxPath: (requested: string) => string | null;
-  resolveAccountIdFromRef: (ref: string) => string | null;
-  canonicalEmailForNlMatch: (raw: string) => string | null;
 };
 
 let searchCommitDeps: SearchCommitDeps | null = null;
@@ -58,7 +60,6 @@ function mergeSearchBarTagOnTarget(
   target: SearchStructuralState & { searchTags: Tag[] },
   raw: { family: string; value: string },
 ): void {
-  const d = deps();
   const value = raw.value.trim();
   if (!value) return;
   const family = tagFamilyForInvoke(raw.family);
@@ -68,7 +69,7 @@ function mergeSearchBarTagOnTarget(
 }
 
 function addSearchSenderOnTarget(target: SearchStructuralState, email: string): void {
-  const c = deps().canonicalEmailForNlMatch(email) ?? email.trim().toLowerCase();
+  const c = canonicalEmailForNlMatch(email) ?? email.trim().toLowerCase();
   if (!c) return;
   if (!target.searchSenders.some((s) => s.toLowerCase() === c)) target.searchSenders.push(c);
 }
@@ -77,16 +78,15 @@ export function applyParsedSearchBarToStructural(
   target: SearchStructuralState & { searchTags: Tag[] },
   parsed: ReturnType<typeof parseSearchBarDraft>,
 ): void {
-  const d = deps();
   target.search = parsed.text;
   if (parsed.scope !== undefined) target.searchScope = parsed.scope;
   if (parsed.mailboxPath !== undefined) {
     const raw = parsed.mailboxPath?.trim() || null;
-    target.searchMailboxPath = raw ? d.resolveSearchMailboxPath(raw) : null;
+    target.searchMailboxPath = raw ? resolveSearchMailboxPath(raw) : null;
     if (target.searchMailboxPath) target.searchScope = "mailbox";
   }
   if (parsed.accountRef !== undefined) {
-    const id = parsed.accountRef?.trim() ? d.resolveAccountIdFromRef(parsed.accountRef) : null;
+    const id = parsed.accountRef?.trim() ? resolveAccountIdFromRef(parsed.accountRef) : null;
     target.searchAccountOverrideId = id;
     if (id && target === state) {
       state.selectedAccountId = id;
@@ -269,7 +269,6 @@ export function applySearchQueryFromNl(sq: {
   mailbox?: string | null;
   accountId?: string | null;
 }): void {
-  const d = deps();
   const applied: SearchStructuralState = {
     search: "",
     searchSenders: [],
@@ -289,7 +288,7 @@ export function applySearchQueryFromNl(sq: {
   applyNlSearchQueryToState(
     applied,
     sq,
-    (raw) => d.canonicalEmailForNlMatch(raw) ?? (raw.trim().toLowerCase() || null),
+    (raw) => canonicalEmailForNlMatch(raw) ?? (raw.trim().toLowerCase() || null),
     (id) => state.accounts.some((a) => a.id === id),
   );
   state.search = applied.search;
