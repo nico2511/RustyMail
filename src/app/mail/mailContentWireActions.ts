@@ -1,16 +1,16 @@
+import {
+  hydrateEmailHtml as hydrateEmailHtmlImpl,
+  pickImgSrcForLightbox as pickImgSrcForLightboxImpl,
+  resolveSrcForMailImageLightbox as resolveSrcForMailImageLightboxImpl,
+} from "./mailHtmlShadowHydrate";
+
 export type MailContentWireActionsDeps = {
-  hydrateEmailHtml: () => void;
   onAttachmentAction: (
     kind: "download" | "open",
     messageId: string,
     attachmentId: string,
     fileName?: string,
   ) => void | Promise<void>;
-  pickImgSrcForLightbox: (img: HTMLImageElement) => string;
-  resolveSrcForMailImageLightbox: (
-    rawSrc: string,
-    messageId?: string | null,
-  ) => Promise<{ src: string; revokeObjectUrl?: string | null }>;
 };
 
 let mailContentWireActionsDeps: MailContentWireActionsDeps | null = null;
@@ -25,7 +25,7 @@ function mailContent(): MailContentWireActionsDeps {
 }
 
 export function hydrateEmailHtml(): void {
-  mailContent().hydrateEmailHtml();
+  return hydrateEmailHtmlImpl();
 }
 
 export function onAttachmentAction(
@@ -38,12 +38,12 @@ export function onAttachmentAction(
 }
 
 export function pickImgSrcForLightbox(img: HTMLImageElement): string {
-  return mailContent().pickImgSrcForLightbox(img);
+  return pickImgSrcForLightboxImpl(img);
 }
 
 export function resolveSrcForMailImageLightbox(
   rawSrc: string,
   messageId?: string | null,
 ): Promise<{ src: string; revokeObjectUrl?: string | null }> {
-  return mailContent().resolveSrcForMailImageLightbox(rawSrc, messageId);
+  return resolveSrcForMailImageLightboxImpl(rawSrc, messageId);
 }
