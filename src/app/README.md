@@ -156,13 +156,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/oauthEphemeralRedirectWarn.ts` | Toast redirect OAuth éphémère |
 | `app/mail/searchMailboxBrowseExit.ts` | Sortie mode recherche (navigation dossier) |
 | `app/mail/syncImapAccountContext.ts` | Compte/timeout sync IMAP selon vue |
-| `app/mail/appNavigationStack.ts` | Pile navigation (retour, snapshots, `beginNavigation`) |
-| `app/mail/accountRowNormalize.ts` | Normalisation ligne compte (`list_accounts`) |
-| `app/mail/accountsLoadFromBackend.ts` | Chargement comptes backend |
-| `app/mail/folderManagerPanelState.ts` | État recherche panneau dossiers |
-| `app/mail/orgApplyStatusMessage.ts` | Libellés progression Organiser |
-| `app/mail/threadShellLayout.ts` | Layout lecture fil / panneau IA shell |
-| `app/mail/appNavigationStack.ts` | Pile navigation (retour, snapshots, `beginNavigation`) |
+| `app/mail/appNavigationStack.ts` | Barrel pile navigation |
+| `app/mail/appNavigationStackContext.ts` | `registerAppNavigationStackDeps` |
+| `app/mail/appNavigationSnapshotRun.ts` | `captureCurrentNav`, `beginNavigation` |
+| `app/mail/appNavigationApplyRun.ts` | Restauration snapshot (`applyNavSnapshot`) |
+| `app/mail/appNavigationHistoryRun.ts` | `goBack`, `goForward`, inbox, fil d’Ariane |
 | `app/mail/accountRowNormalize.ts` | Normalisation ligne compte (`list_accounts`) |
 | `app/mail/accountsLoadFromBackend.ts` | Chargement comptes backend |
 | `app/mail/folderManagerPanelState.ts` | État recherche panneau dossiers |
@@ -264,7 +262,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`appNavigationStack`, `searchCommitQuery`, …)
+1. Découper d’autres modules mail > ~350 lignes (`searchCommitQuery`, `threadAiWireUiRun`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
