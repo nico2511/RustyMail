@@ -70,6 +70,8 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/settingsWireActions.ts` | Facades paramètres (comptes, LLM, OAuth, micro…) |
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
 | `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
+| `app/mail/mailEmailHtmlSanitize.ts` | DOMPurify + liens/images + `sanitizeEmailHtml()` |
+| `app/mail/mailHtmlShadowHydrate.ts` | Shadow DOM message HTML + lightbox CID |
 | `app/mail/composeComposerBridge.ts` | Ré-exports éditeur compositeur (markdown, preview, PJ, chips) |
 | `app/mail/composeMarkdownEditor.ts` | Corps markdown compositeur + barre d’outils |
 | `app/mail/composeDraftPreview.ts` | Aperçu brouillon (`preview_draft`) + debounce |

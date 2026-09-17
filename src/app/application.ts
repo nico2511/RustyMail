@@ -209,9 +209,6 @@ import {
   currentThreadIdForReply,
   registerComposeThreadReplyDeps,
 } from "./mail/composeThreadReply";
-import {
-  normalizeMailHrefForOpen,
-} from "./mail/mailLinkOpen";
 import { loadNewsletterRules } from "./mail/newsletterRulesLoad";
 import { threadIsAutoMail } from "./mail/threadAutoMail";
 import { clearThreadAiSummaryState } from "./mail/threadAiSummaryState";
