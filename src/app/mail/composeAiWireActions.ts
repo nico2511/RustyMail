@@ -1,7 +1,8 @@
+import { confirmAndExecuteSplitSend as confirmAndExecuteSplitSendImpl } from "./composeSendDraftRun";
+
 export type ComposeAiWireActionsDeps = {
   composeAiRewrite: (styleRaw: string) => void | Promise<void>;
   composeAiGrammar: () => void | Promise<void>;
-  confirmAndExecuteSplitSend: () => void | Promise<void>;
 };
 
 let composeAiWireActionsDeps: ComposeAiWireActionsDeps | null = null;
@@ -24,5 +25,5 @@ export function composeAiGrammar(): void | Promise<void> {
 }
 
 export function confirmAndExecuteSplitSend(): void | Promise<void> {
-  return composeAi().confirmAndExecuteSplitSend();
+  return confirmAndExecuteSplitSendImpl();
 }

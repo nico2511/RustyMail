@@ -90,7 +90,9 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/composeAttachmentsAction.ts` | Retrait PJ compositeur |
 | `app/mail/cycleComposeLayout.ts` | Cycle split / write / preview / historique |
 | `app/mail/llmQueueCancel.ts` | Annulation file jobs LLM |
-| `app/mail/composeSendDraftAction.ts` | Facade `sendDraft()` |
+| `app/mail/composeSendDraftRun.ts` | Envoi brouillon + split send |
+| `app/mail/composeViewNavigation.ts` | `enterComposeView` (historique nav) |
+| `app/mail/composeSendDraftAction.ts` | Ré-export `sendDraft()` |
 | `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
 | `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |
 | `app/mail/mailboxImapFallback.ts` | Dossier IMAP par défaut (`pickImapMailboxFallback`) |

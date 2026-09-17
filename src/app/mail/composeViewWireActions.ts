@@ -1,23 +1,9 @@
 import { startNewDraftSession as startNewDraftSessionImpl } from "./composeDraftSession";
 import { syncPreviewOpenFromComposeLayout as syncPreviewOpenFromComposeLayoutImpl } from "./composeLayoutState";
-
-export type ComposeViewWireActionsDeps = {
-  enterComposeView: (opts?: { skipHistory?: boolean }) => void;
-};
-
-let composeViewWireActionsDeps: ComposeViewWireActionsDeps | null = null;
-
-export function registerComposeViewWireActionsDeps(deps: ComposeViewWireActionsDeps): void {
-  composeViewWireActionsDeps = deps;
-}
-
-function composeView(): ComposeViewWireActionsDeps {
-  if (!composeViewWireActionsDeps) throw new Error("registerComposeViewWireActionsDeps not called");
-  return composeViewWireActionsDeps;
-}
+import { enterComposeView as enterComposeViewImpl } from "./composeViewNavigation";
 
 export function enterComposeView(opts?: { skipHistory?: boolean }): void {
-  composeView().enterComposeView(opts);
+  enterComposeViewImpl(opts);
 }
 
 export function startNewDraftSession(): void {
