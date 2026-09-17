@@ -15,7 +15,6 @@ import type {
   ThreadRecipientPresenceEvents,
 } from "../../types";
 import type { SavedSearchListItem } from "../../../savedSearches";
-import type { StatusBarProgressJob } from "../../../statusBarProgress";
 import type { SettingsAiPanelDeps } from "../../../settingsAiPanel";
 import type { AssistSkillId } from "../../../assistAgent";
 
