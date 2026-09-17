@@ -64,7 +64,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailboxManageAction.ts` | CRUD dossier IMAP (modale gérer) + `registerMailboxManageActionDeps()` |
 | `app/mail/threadActivityTracking.ts` | Activité fil / recherche (suggestions vues enregistrées) |
 | `app/mail/syncInboxAction.ts` | Facade `syncInbox()` |
-| `app/mail/syncInboxRun.ts` | Sync IMAP multi-dossiers, refresh après push IDLE, focus watch |
+| `app/mail/syncInboxRun.ts` | Orchestration `syncInbox`, re-exports watch / push refresh |
+| `app/mail/syncInboxBatchRun.ts` | Cibles IMAP, batches `sync_mailboxes`, aliases |
+| `app/mail/syncInboxListReloadRun.ts` | Rechargement liste + fil ouvert après sync |
+| `app/mail/syncInboxPushRefreshRun.ts` | `refreshUiAfterImapPush` (IDLE) |
+| `app/mail/syncInboxImapWatch.ts` | Focus dossier pour watch IMAP |
 | `app/mail/composeThreadReply.ts` | Répondre / transférer depuis un fil + `registerComposeThreadReplyDeps()` |
 | `app/mail/mailLinkOpen.ts` | Liens mail (normalisation href, ouverture externe) |
 | `app/mail/collapsedQuotesGroup.ts` | Regroupement citations repliées (modale fil) |
@@ -260,7 +264,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`syncInboxRun`, `appNavigationStack`, …)
+1. Découper d’autres modules mail > ~350 lignes (`appNavigationStack`, `searchCommitQuery`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
