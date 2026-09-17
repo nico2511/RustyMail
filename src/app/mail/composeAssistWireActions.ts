@@ -1,1 +1,2 @@
-export { llmQuickRepliesComposeUi, summarizeSenderThreadsLight } from "./threadAiRun";
+export { llmQuickRepliesComposeUi } from "./threadAiWireUiRun";
+export { summarizeSenderThreadsLight } from "./threadAiRun";

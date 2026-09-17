@@ -12,9 +12,9 @@ import { openThread, registerOpenThreadDeps } from "./openThreadView";
 import { scheduleSecurityLlmAugment } from "./mailSecurityDisplay";
 import {
   hydrateMessageTranslationsFromCacheForThread,
-  isSenderBatchSummarizeActive,
   summarizeThread,
-} from "./threadAiRun";
+} from "./threadAiWireUiRun";
+import { isSenderBatchSummarizeActive } from "./threadAiRun";
 import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 import { threadAiSummaryScoped } from "./threadAiStreamDom";
 import { threadIsAutoMail } from "./threadAutoMail";
