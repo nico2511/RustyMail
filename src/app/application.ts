@@ -241,10 +241,25 @@ import {
 } from "./mail/newsletterRuleInput";
 import { writeSidebarCollapsedPreference } from "./lib/sidebarUiPref";
 import { draftHasRecipientsExtra } from "./mail/composeDraftRecipients";
-import { pickImapMailboxFallback } from "./mail/mailboxImapFallback";
 import {
   registerSwitchMailboxActionDeps,
 } from "./mail/switchMailboxAction";
+import { attachmentPathsJoinedForHiddenField } from "./mail/composeAttachmentPaths";
+import {
+  clearDraftSession,
+  discardCurrentDraftSession,
+  finalizeCloseComposeFromUser,
+  leaveComposeViewAfterClose,
+  registerComposeCloseFlowDeps,
+} from "./mail/composeCloseFlow";
+import {
+  clearAttachments,
+  registerComposeAttachmentsActionDeps,
+  removeAttachment,
+} from "./mail/composeAttachmentsAction";
+import { cancelLlmQueueJob, registerLlmQueueCancelDeps } from "./mail/llmQueueCancel";
+import { cycleComposeLayout, registerCycleComposeLayoutDeps } from "./mail/cycleComposeLayout";
+import { registerComposeSendDraftActionDeps } from "./mail/composeSendDraftAction";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -546,12 +561,6 @@ let senderBatchSummarizeAbort: AbortController | null = null;
 
 let senderBatchSummarizeActive = false;
 
-const ATTACH_PATH_FIELD_SEP = "\u001f";
-
-function attachmentPathsJoinedForHiddenField(paths: string[]): string {
-  return paths.join(ATTACH_PATH_FIELD_SEP);
-}
-
 function draftPayloadForRust(d: Draft): Draft {
   const pathsRaw = Array.isArray(d.attachmentPaths) ? d.attachmentPaths : [];
   const attachmentPaths = Array.from(new Set(pathsRaw.map((p) => p.trim()).filter(Boolean)));
@@ -706,24 +715,6 @@ function startNewDraftSession() {
   state.draftDiffOtherBody = "";
   state.draftRevisionPreview = null;
   state.draftVersionsListExpanded = false;
-}
-
-function clearDraftSession() {
-  state.draftSessionId = null;
-  state.savedDraftRecordId = null;
-  state.draftRevisionsLoading = false;
-  state.draftRevisions = [];
-  state.draftDiffRevisionId = null;
-  state.draftDiffLoading = false;
-  state.draftDiffLines = [];
-  state.draftDiffView = "preview";
-  state.draftDiffOtherBody = "";
-  state.draftRevisionPreview = null;
-  state.draftVersionsListExpanded = false;
-  if (draftRevisionDebounceTimer !== null) {
-    window.clearTimeout(draftRevisionDebounceTimer);
-    draftRevisionDebounceTimer = null;
-  }
 }
 
 function splitLines(input: string): string[] {
@@ -992,81 +983,6 @@ async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }): Promis
     toast(tauriErrorMessage(e));
     return false;
   }
-}
-
-async function discardCurrentDraftSession(): Promise<void> {
-  if (!isTauriRuntime()) {
-    clearDraftSession();
-    return;
-  }
-  const accountId = currentAccount()?.id?.trim() ?? "";
-  const sessionId = state.draftSessionId?.trim() ?? "";
-  const savedId = state.savedDraftRecordId?.trim() ?? "";
-  if (draftRevisionDebounceTimer !== null) {
-    window.clearTimeout(draftRevisionDebounceTimer);
-    draftRevisionDebounceTimer = null;
-  }
-  try {
-    if (accountId && savedId) {
-      await withTimeout(
-        invoke("saved_draft_delete", { accountId, savedDraftId: savedId }),
-        MAIL_ACTION_TIMEOUT_MS
-      );
-    } else if (accountId && sessionId) {
-      await withTimeout(
-        invoke("draft_revision_purge_session", { accountId, sessionId }),
-        MAIL_ACTION_TIMEOUT_MS
-      );
-    }
-  } catch (e) {
-    console.error("discardCurrentDraftSession", e);
-    toast(`Impossible de supprimer le brouillon local : ${tauriErrorMessage(e)}`);
-  }
-  clearDraftSession();
-  void refreshSavedDraftsMailboxCount();
-}
-
-async function leaveComposeViewAfterClose(): Promise<void> {
-  if (navCanGoBack()) {
-    await goBack();
-    return;
-  }
-  state.view = state.selectedThread ? "thread" : "list";
-  if (state.view === "thread" && state.selectedThread && threadReadingIsSimpleLayout()) {
-    state.aiOpen = true;
-  }
-  render();
-}
-
-async function finalizeCloseComposeFromUser() {
-  persistDraft();
-  await flushDraftRevisionPending();
-  if (
-    isTauriRuntime() &&
-    currentAccount()?.id?.trim() &&
-    state.draftSessionId &&
-    state.draft &&
-    composeDraftHasMeaningfulContent()
-  ) {
-    // Autosave déjà fait dans flush ; proposer garder / supprimer.
-    state.closeComposeModal = {
-      subject: state.draft.subject ?? "",
-      hasSavedRecord: Boolean(state.savedDraftRecordId),
-    };
-    render();
-    return;
-  }
-  // Brouillon vide : nettoyer d’éventuelles révisions vides.
-  if (isTauriRuntime() && state.draftSessionId && !state.savedDraftRecordId) {
-    const accountId = currentAccount()?.id?.trim() ?? "";
-    const sessionId = state.draftSessionId.trim();
-    if (accountId && sessionId) {
-      void invoke("draft_revision_purge_session", { accountId, sessionId }).catch(() => {});
-    }
-  }
-  state.closeComposeModal = null;
-  clearDraftSession();
-  await leaveComposeViewAfterClose();
 }
 
 async function checkOrphanDraftSessionsOnBoot(): Promise<void> {
@@ -4740,12 +4656,6 @@ async function withLlmQueue<T>(
   }
 }
 
-function cancelLlmQueueJob(): void {
-  cancelActiveLlmStreamJob();
-  abortIdleAiCachePrefetchInFlight();
-  llmQueueAbort?.abort();
-}
-
 function normalizeRecipientEmailForDiff(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -5872,17 +5782,6 @@ async function onAttachmentAction(
   }
 }
 
-function removeAttachment(path: string) {
-  if (!state.draft) return;
-  const p = path.trim();
-  if (!p) return;
-  state.draft.attachmentPaths = (state.draft.attachmentPaths ?? []).filter((x) => x !== p);
-  const attachmentsField = document.querySelector<HTMLInputElement>("#compose-attachments");
-  if (attachmentsField) attachmentsField.value = attachmentPathsJoinedForHiddenField(state.draft.attachmentPaths);
-  render();
-  scheduleDraftRevisionSave(250);
-}
-
 function fileBaseName(path: string) {
   const normalized = String(path).replace(/\\/g, "/");
   const last = normalized.split("/").pop() ?? normalized;
@@ -5906,14 +5805,6 @@ async function pickAttachments() {
   } catch (error) {
     toast(`Picker PJ échoué: ${tauriErrorMessage(error)}`);
   }
-}
-
-function clearAttachments() {
-  if (!state.draft) return;
-  state.draft.attachmentPaths = [];
-  toast("Pièces jointes supprimées.");
-  render();
-  scheduleDraftRevisionSave(250);
 }
 
 async function mailboxAction(kind: "create" | "rename" | "delete" | "subscribe") {
@@ -6722,19 +6613,6 @@ async function syncInbox(options?: { background?: boolean; allMailboxes?: boolea
     }
     render();
   }
-}
-
-async function cycleComposeLayout() {
-  persistDraft();
-  const order: ComposeLayout[] = ["split", "write", "preview"];
-  const fullOrder: ComposeLayout[] =
-    isTauriRuntime() ? [...order, "historique"] : order;
-  const idx = Math.max(0, fullOrder.indexOf(state.composeLayout));
-  state.composeLayout = fullOrder[(idx + 1) % fullOrder.length];
-  syncPreviewOpenFromComposeLayout();
-  render();
-  if (state.composeLayout === "historique") void refreshDraftRevisions(60);
-  else if (state.composeLayout !== "write") await computePreview();
 }
 
 function applyComposerPreviewDom(htmlRaw: string) {
@@ -8529,7 +8407,6 @@ registerWireEventsBridge({
   loadComposeMarkdownIntoEditor,
   schedulePersistAiPrefsFromDom,
   finalizeSettingsAiModalClose,
-  finalizeCloseComposeFromUser,
   setComposeFromTextareaValue,
   paintLlmPrefetchProgressDom,
   loadThreadsForSearchContext,
@@ -8543,8 +8420,6 @@ registerWireEventsBridge({
   warnOAuthEphemeralRedirect,
   defaultListFilterFromPrefs,
   ensureValidSelectedMailbox,
-  discardCurrentDraftSession,
-  leaveComposeViewAfterClose,
   mediaBlobToWav16kMonoPcm16,
   openEnginesAiSettingsModal,
   confirmAndExecuteSplitSend,
@@ -8598,15 +8473,10 @@ registerWireEventsBridge({
   applyMarkdownAction,
   stopAgentTelemetry,
   onAttachmentAction,
-  cycleComposeLayout,
-  clearDraftSession,
-  cancelLlmQueueJob,
   confirmMoveDialog,
   enterComposeView,
   hydrateEmailHtml,
   openSettingsView,
-  removeAttachment,
-  clearAttachments,
   requestMicStream,
   openContactsView,
   onOrgSyncMailbox,
@@ -8630,7 +8500,6 @@ registerWireEventsBridge({
   runOrgApply,
   saveAccount,
   syncInbox,
-  sendDraft,
   micAction,
   render,
   goBack,
@@ -8875,6 +8744,39 @@ registerThreadScrollToMessageDeps({
 });
 
 registerSwitchMailboxActionDeps({ switchMailbox });
+
+registerComposeCloseFlowDeps({
+  persistDraft,
+  flushDraftRevisionPending,
+  composeDraftHasMeaningfulContent,
+  clearDraftRevisionDebounce: () => {
+    if (draftRevisionDebounceTimer !== null) {
+      window.clearTimeout(draftRevisionDebounceTimer);
+      draftRevisionDebounceTimer = null;
+    }
+  },
+  refreshSavedDraftsMailboxCount,
+  threadReadingIsSimpleLayout,
+});
+
+registerComposeAttachmentsActionDeps({ scheduleDraftRevisionSave });
+
+registerCycleComposeLayoutDeps({
+  persistDraft,
+  syncPreviewOpenFromComposeLayout,
+  refreshDraftRevisions,
+  computePreview,
+});
+
+registerLlmQueueCancelDeps({
+  cancelActiveLlmStreamJob,
+  abortIdleAiCachePrefetchInFlight,
+  abortLlmQueue: () => {
+    llmQueueAbort?.abort();
+  },
+});
+
+registerComposeSendDraftActionDeps({ sendDraft });
 
 registerComposeThreadReplyDeps({
   loadComposeMarkdownIntoEditor,

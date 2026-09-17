@@ -60,6 +60,12 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/threadAutoMail.ts` | Détection fil newsletter / auto |
 | `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
 | `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
+| `app/mail/composeCloseFlow.ts` | Fermeture compositeur, discard, `clearDraftSession` |
+| `app/mail/composeAttachmentsAction.ts` | Retrait PJ compositeur |
+| `app/mail/cycleComposeLayout.ts` | Cycle split / write / preview / historique |
+| `app/mail/llmQueueCancel.ts` | Annulation file jobs LLM |
+| `app/mail/composeSendDraftAction.ts` | Facade `sendDraft()` |
+| `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
 | `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |
 | `app/mail/mailboxImapFallback.ts` | Dossier IMAP par défaut (`pickImapMailboxFallback`) |
 | `app/mail/switchMailboxAction.ts` | Facade `switchMailbox()` + `registerSwitchMailboxActionDeps()` |

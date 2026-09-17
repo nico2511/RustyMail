@@ -147,6 +147,16 @@ export { sendQuickReply } from "../mail/composeSendQuickReply";
 export { draftHasRecipientsExtra } from "../mail/composeDraftRecipients";
 export { pickImapMailboxFallback } from "../mail/mailboxImapFallback";
 export { switchMailbox } from "../mail/switchMailboxAction";
+export {
+  clearDraftSession,
+  discardCurrentDraftSession,
+  finalizeCloseComposeFromUser,
+  leaveComposeViewAfterClose,
+} from "../mail/composeCloseFlow";
+export { removeAttachment, clearAttachments } from "../mail/composeAttachmentsAction";
+export { cycleComposeLayout } from "../mail/cycleComposeLayout";
+export { cancelLlmQueueJob } from "../mail/llmQueueCancel";
+export { sendDraft } from "../mail/composeSendDraftAction";
 export { clearThreadAiSummaryState } from "../mail/threadAiSummaryState";
 export { scrollToThreadMessage } from "../mail/threadScrollToMessage";
 export { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";

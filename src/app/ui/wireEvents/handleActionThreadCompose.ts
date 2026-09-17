@@ -20,6 +20,15 @@ import {
   pickImapMailboxFallback,
   switchMailbox,
   saveDraftToSavedListNow,
+  finalizeCloseComposeFromUser,
+  discardCurrentDraftSession,
+  leaveComposeViewAfterClose,
+  clearDraftSession,
+  cycleComposeLayout,
+  removeAttachment,
+  clearAttachments,
+  cancelLlmQueueJob,
+  sendDraft,
   loadMailView,
   loadMailboxUnread,
   render,
@@ -316,7 +325,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     }
     case "close-compose":
-      void callApp("finalizeCloseComposeFromUser");
+      void finalizeCloseComposeFromUser();
       return true;
     case "close-close-compose-modal":
       state.closeComposeModal = null;
@@ -326,8 +335,8 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void (async () => {
         state.closeComposeModal = null;
         render();
-        await callApp("discardCurrentDraftSession");
-        await callApp("leaveComposeViewAfterClose");
+        await discardCurrentDraftSession();
+        await leaveComposeViewAfterClose();
       })();
       return true;
     case "save-and-close-compose": {
@@ -337,8 +346,8 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         const ok = await saveDraftToSavedListNow({ silentToast: true });
         if (ok) {
           toast("Conservé dans « Sauvés », compositeur fermé.");
-          callApp("clearDraftSession");
-          await callApp("leaveComposeViewAfterClose");
+          clearDraftSession();
+          await leaveComposeViewAfterClose();
         }
       })();
       return true;
@@ -430,7 +439,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     }
     case "toggle-preview":
-      await callApp("cycleComposeLayout");
+      await cycleComposeLayout();
       return true;
     case "set-compose-layout": {
       const raw = element?.dataset.composeLayout?.trim();
@@ -456,7 +465,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     }
     case "send":
-      await callApp("sendDraft");
+      await sendDraft();
       return true;
     case "cancel-split-send":
       state.splitSendConfirm = null;
@@ -470,10 +479,10 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       await callApp("pickAttachments");
       return true;
     case "clear-attachments":
-      callApp("clearAttachments");
+      clearAttachments();
       return true;
     case "remove-attachment":
-      callApp("removeAttachment", element?.dataset.path ?? "");
+      removeAttachment(element?.dataset.path ?? "");
       return true;
     case "quick-reply-send":
       await sendQuickReply("reply");
@@ -638,7 +647,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void searchNlAssist();
       return true;
     case "llm-cancel-job":
-      callApp("cancelLlmQueueJob");
+      cancelLlmQueueJob();
       toast("Annulation demandée…");
       return true;
     case "llm-qa-thread":
