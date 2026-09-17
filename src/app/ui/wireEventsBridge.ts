@@ -1,7 +1,6 @@
-/** @deprecated Use registerWireEventsContext from ./wireEvents/wireEventsContext */
+/** UI refs and constants wired from application.ts before wireEvents() runs. */
 export {
   registerWireEventsContext,
-  registerWireEventsContext as registerWireEventsBridge,
   wireEventsContext,
   type WireEventsContext,
 } from "./wireEvents/wireEventsContext";

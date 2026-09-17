@@ -1,65 +1,27 @@
-// @ts-nocheck
 import {
   currentAccount,
   loadMailView,
   searchThreads,
   applyListFilter,
-  threadIdsMatch,
   state,
   toast,
   invoke,
   t,
   isTauriRuntime,
   MAIL_ACTION_TIMEOUT_MS,
-  BOOT_INVOKE_TIMEOUT_MS,
-  OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
   openConfirmModal,
-  finishConfirmModal,
-  finishTextPromptModal,
-  accountFieldTouched,
-  setAllAiFeatures,
-  normalizeAiPrefsMerged,
   navCanGoBack,
-  composeRewriteStyleFromTone,
-  mailboxDigestSlotInList,
   dismissMailboxDigestPanel,
-  enqueueMailboxDigestRefreshWhenIdle,
-  ipcThrottleMs,
-  clearSuggestionShownKeys,
-  setLocale,
-  isSavedDraftsVirtualMailbox,
-  captureAiPrefsFieldsFromDom,
-  syncLlmEnginePrefsToDom,
-  applyEngineConnectionMode,
-  normalizeSettingsAiModalId,
-  defaultEnabledSkillIds,
-  invalidateIdleAiCachePrefetch,
-  scheduleIdleAiCachePrefetch,
   loadContactsList,
-  isContactsListLoading,
-  contactsListHasMore,
   getContactDetail,
   getContactsKeywordDraft,
   setContactsKeywordDraft,
   loadContactDetail,
   loadContactProfile,
   isAiFeatureEnabled,
-  markThreadsRecentlyRemoved,
-  clearThreadsRecentlyRemoved,
-  mailboxKind,
   threadMailboxListLabel,
-  saveFolderTreeExpanded,
-  setMailboxLocked,
-  orgV2ScanAccount,
-  orgUndoLast,
-  orgScanAccount,
-  orgRetagAccount,
-  safeInvoke,
   withTimeout,
   tauriErrorMessage,
-  setSkipAccountIdentityCaptureOnce,
-  setAddressBookEditEmail,
-  addressBookRowsCache,
   openThread,
   clearSearchAndReloadInbox,
   resetManualSearchNlFilters,
@@ -106,17 +68,8 @@ import {
   refreshAddressBookList,
   saveDraftToSavedListNow,
   refreshSavedDraftsMailboxCount,
-  DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
-  LIST_FILTER_VALUES,
-  ENABLE_CLEAN_MESSAGE_VIEW,
-  type OAuthDesktopLoginOutcome,
-  type Draft,
-  type Tone,
-  type PromptCatalogItem,
-  type AssistMode,
-  type AssistSkillId,
-  type State,
 } from "./deps";
+import type { Tag, ThreadListItem } from "../../types";
 
 export async function tryHandleInboxSearch(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -303,7 +256,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       void agentPrepareReplyContinue();
       return true;
     case "agent-prepare-cancel":
-      void stopAgentTelemetry().then(() => {
+      void Promise.resolve(stopAgentTelemetry()).then(() => {
         state.agentSession = null;
         render();
       });
@@ -437,7 +390,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       return true;
     case "clear-search-sender-one": {
       const email = element?.dataset.email?.trim().toLowerCase();
-      if (email) state.searchSenders = state.searchSenders.filter((s) => s.toLowerCase() !== email);
+      if (email) state.searchSenders = state.searchSenders.filter((s: string) => s.toLowerCase() !== email);
       if (!isSearchActive()) void clearSearchAndReloadInbox();
       else if (state.search.trim() || state.searchSenders.length || state.searchTags.length) void searchThreads();
       else void loadThreadsForSearchContext(false).then(() => render());
@@ -464,7 +417,9 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     case "clear-search-tag-one": {
       const raw = element?.dataset.tag?.trim().toLowerCase();
       if (raw) {
-        state.searchTags = state.searchTags.filter((t) => `${String(t.family).toLowerCase()}:${t.value}`.toLowerCase() !== raw);
+        state.searchTags = state.searchTags.filter(
+          (t: Tag) => `${String(t.family).toLowerCase()}:${t.value}`.toLowerCase() !== raw,
+        );
       }
       if (!isSearchActive()) void clearSearchAndReloadInbox();
       else if (state.search.trim() || state.searchSenders.length || state.searchTags.length) void searchThreads();
@@ -540,8 +495,10 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
       }
       void (async () => {
         try {
-          const { moveThreadUnarchive } = await import("../../organizationView");
-          const out = await withTimeout(moveThreadUnarchive(acc.id, tid), MAIL_ACTION_TIMEOUT_MS);
+          const { moveThreadUnarchive } = await import("../../../organizationView");
+          const out = (await withTimeout(moveThreadUnarchive(acc.id, tid), MAIL_ACTION_TIMEOUT_MS)) as {
+            message?: string;
+          };
           toast(out.message || "Désarchivé vers Inbox.");
           await openThread(tid, { skipHistory: true, preserveAi: true });
           render();
@@ -579,7 +536,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     case "toggle-thread-seen": {
       const tid = element?.dataset.threadId?.trim() ?? "";
       if (!tid) return true;
-      const row = state.threads.find((t) => String(t.id) === tid);
+      const row = state.threads.find((t: ThreadListItem) => String(t.id) === tid);
       void onThreadSeen(row?.unread ? "read" : "unread", tid);
       return true;
     }
@@ -592,7 +549,7 @@ export async function tryHandleInboxSearch(action: string, element?: HTMLElement
     case "toggle-thread-seen-cur": {
       const tid = state.selectedThreadId;
       if (!tid) return true;
-      const row = state.threads.find((t) => String(t.id) === tid);
+      const row = state.threads.find((t: ThreadListItem) => String(t.id) === tid);
       const unreadNow = Boolean(row?.unread ?? state.selectedThread?.unread);
       void onThreadSeen(unreadNow ? "read" : "unread", tid);
       return true;

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { tryHandleComposeSettings } from "./handleActionComposeSettings";
 import { tryHandleThreadCompose } from "./handleActionThreadCompose";
 import { tryHandleOrgFolder } from "./handleActionOrgFolder";

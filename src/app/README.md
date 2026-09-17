@@ -115,7 +115,8 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `aiPanelRender.ts` | Panneau Détails / brief dossier / agent IA |
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
-| `wireEvents/handleAction*.ts` | Dispatch actions via imports **`deps`** / **`app/mail/*`** (plus de `callApp`) |
+| `wireEvents/handleActionInboxSearch.ts` | Inbox / recherche / fil / agents — **typé** (sans `@ts-nocheck`) |
+| `wireEvents/handleAction*.ts` | Autres dispatchers via **`deps`** / **`app/mail/*`** |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
@@ -131,6 +132,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
+1. Retirer `@ts-nocheck` sur les autres **`handleAction*`** (compose, settings, org, thread)
+2. Typage progressif de **`deps.ts`**
 
 `npm run verify:ts` · `npm test`
