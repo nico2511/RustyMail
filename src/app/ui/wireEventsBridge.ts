@@ -1,4 +1,4 @@
-/** UI refs and constants wired from application.ts before wireEvents() runs. */
+/** UI refs and constants wired at startup via appShellRender before wireEvents() runs. */
 export {
   registerWireEventsContext,
   wireEventsContext,

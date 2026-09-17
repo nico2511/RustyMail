@@ -7,7 +7,6 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | Fichier | Rôle |
 | ------- | ---- |
 | `main.ts` | CSS, `registerAllAppModules()`, `boot()`, file drop Tauri |
-| `app/application.ts` | Réexport legacy `boot` / `registerAllAppModules` |
 | `app/state.ts` | État global `state` |
 | `app/dispatch.ts` | `render()` / `registerRender()` |
 | `app/dom.ts` | Élément racine `#app` |
@@ -194,7 +193,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 
 ### Rendu UI (`app/ui/render/`)
 
-Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `application.ts` (fil d’Ariane, tags fil, etc.).
+Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **`appRenderRegistry.ts`** (fil d’Ariane, tags fil, etc.).
 
 | Fichier | Contenu |
 | ------- | ------- |
@@ -238,7 +237,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Autres extractions ciblées si un module mail repasse ~400 lignes
-2. Conserver `application.ts` comme façade legacy ou le retirer si plus référencé
+1. Découper les gros modules mail si besoin (`searchCommitQuery.ts`, `threadAiRun.ts`, …)
+2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`

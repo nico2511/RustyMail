@@ -1,4 +1,4 @@
-/** Orchestrates startup module wiring — extracted from application.ts */
+/** Orchestrates startup module wiring (formerly in application.ts). */
 import { getAddressBookRowsCache } from "./addressBookListState";
 import { registerAppAccountOrgWireDeps, registerAppBackgroundServices } from "./appAccountOrgWireRegistry";
 import { registerAppComposeWireDeps } from "./appComposeWireRegistry";

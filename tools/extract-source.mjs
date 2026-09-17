@@ -1,8 +1,10 @@
 import fs from "node:fs";
 
-/** Default TS file for degrade/extract tooling after the application.ts slim-down. */
+/** Default TS file for degrade/extract tooling (post monolith). */
+
 export const DEFAULT_EXTRACT_SOURCE = "src/app/mail/appModuleRegistry.ts";
 
+/** Former entry shim; kept for --source= warnings only. */
 export const LEGACY_APPLICATION = "src/app/application.ts";
 
 export function resolveExtractSource(argv = process.argv) {

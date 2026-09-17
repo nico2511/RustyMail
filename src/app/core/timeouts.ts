@@ -1,4 +1,4 @@
-/** Délais d’appel Tauri / debounces UI (centralisés pour le dégraissage de application.ts). */
+/** Délais d’appel Tauri / debounces UI (centralisés). */
 
 export const DEFAULT_INVOKE_TIMEOUT_MS = 2500;
 
