@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   currentAccount,
   decodeHtmlEntitiesLoose,
@@ -56,61 +55,23 @@ import {
   persistAiFeaturePrefs,
   refreshAddressBookList,
   loadAddressBookSidebarCount,
-  applyListFilter,
-  threadIdsMatch,
   state,
   toast,
   invoke,
   t,
   isTauriRuntime,
   MAIL_ACTION_TIMEOUT_MS,
-  BOOT_INVOKE_TIMEOUT_MS,
-  OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
   openConfirmModal,
-  finishConfirmModal,
-  finishTextPromptModal,
-  accountFieldTouched,
   setAllAiFeatures,
   normalizeAiPrefsMerged,
-  navCanGoBack,
   composeRewriteStyleFromTone,
   mailboxDigestSlotInList,
   dismissMailboxDigestPanel,
-  enqueueMailboxDigestRefreshWhenIdle,
-  ipcThrottleMs,
-  clearSuggestionShownKeys,
-  setLocale,
-  isSavedDraftsVirtualMailbox,
-  captureAiPrefsFieldsFromDom,
-  syncLlmEnginePrefsToDom,
-  applyEngineConnectionMode,
-  normalizeSettingsAiModalId,
-  defaultEnabledSkillIds,
-  invalidateIdleAiCachePrefetch,
-  scheduleIdleAiCachePrefetch,
-  loadContactsList,
-  isContactsListLoading,
-  contactsListHasMore,
-  getContactDetail,
-  getContactsKeywordDraft,
-  setContactsKeywordDraft,
-  loadContactDetail,
-  loadContactProfile,
-  isAiFeatureEnabled,
   markThreadsRecentlyRemoved,
   clearThreadsRecentlyRemoved,
   mailboxKind,
-  threadMailboxListLabel,
-  saveFolderTreeExpanded,
-  setMailboxLocked,
-  orgV2ScanAccount,
-  orgUndoLast,
-  orgScanAccount,
-  orgRetagAccount,
-  safeInvoke,
   withTimeout,
   tauriErrorMessage,
-  setSkipAccountIdentityCaptureOnce,
   setAddressBookEditEmail,
   addressBookRowsCache,
   commitSearchQuery,
@@ -118,19 +79,12 @@ import {
   openSearchModal,
   launchTagMailSearchFromRawFamily,
   searchNlAssist,
-  DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
-  LIST_FILTER_VALUES,
   ENABLE_CLEAN_MESSAGE_VIEW,
   syncPreviewOpenFromComposeLayout,
   enterComposeView,
-  type OAuthDesktopLoginOutcome,
-  type Draft,
-  type Tone,
-  type PromptCatalogItem,
-  type AssistMode,
-  type AssistSkillId,
-  type State,
 } from "./deps";
+import type { AddressBookRow, CleanedMessageView, Draft, ThreadListItem } from "../../types";
+import type { Account } from "../../../accountSetup";
 
 export async function tryHandleThreadCompose(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -201,7 +155,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "open-quote-fold": {
       const mid = element?.dataset.msgId?.trim();
       if (!mid || !state.selectedThread) return true;
-      const msg = state.selectedThread.messages.find((x) => x.messageId === mid);
+      const msg = state.selectedThread.messages.find((x: CleanedMessageView) => x.messageId === mid);
       const raw = msg?.collapsedQuotes ?? [];
       if (!raw.length) return true;
       const merged = groupCollapsedQuotesByAttribution(raw);
@@ -302,7 +256,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       const source = element?.dataset.sourceMailbox?.trim() || state.selectedMailbox || "INBOX";
       if (!tid || !isTauriRuntime()) return true;
       void (async () => {
-        const spam = state.mailboxes.find((m) => mailboxKind(m) === "spam");
+        const spam = state.mailboxes.find((m: string) => mailboxKind(m) === "spam");
         if (!spam) {
           toast(t("toast.junkFolderMissing"));
           return;
@@ -321,7 +275,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
             MAIL_ACTION_TIMEOUT_MS,
           );
           toast(t("toast.movedToJunk"));
-          state.threads = state.threads.filter((t) => String(t.id) !== tid);
+          state.threads = state.threads.filter((threadRow: ThreadListItem) => String(threadRow.id) !== tid);
           if (state.selectedThreadId === tid) {
             state.selectedThreadId = undefined;
             state.selectedThread = undefined;
@@ -558,7 +512,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         const ok = await loadAccountsFromBackend({ silent: false });
         if (!ok) toast("Rechargement des comptes incomplet — vérifie la liste.");
         const DEMO = "playground@demo.rustymail.app";
-        if (state.accounts.some((a) => a.id === DEMO)) {
+        if (state.accounts.some((a: Account) => a.id === DEMO)) {
           state.selectedAccountId = DEMO;
           state.view = "list";
           state.selectedMailbox = "INBOX";
@@ -757,7 +711,8 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void (async () => {
         const acc = currentAccount();
         const email = element?.dataset.email?.trim();
-        const row = addressBookRowsCache().find((r) => r.email === email);
+        const rows = addressBookRowsCache() as AddressBookRow[];
+        const row = rows.find((r) => r.email === email);
         if (!acc?.id || !email || !row) return;
         try {
           await invoke("upsert_manual_contact_cmd", {

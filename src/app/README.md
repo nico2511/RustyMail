@@ -133,8 +133,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-| `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes / prefs IA — **typé** |
-| `wireEvents/handleActionThreadCompose.ts` | Compose / fil — encore `@ts-nocheck` |
+1. Retirer `@ts-nocheck` sur **`handleActionThreadCompose`**
 2. Typage progressif de **`deps.ts`**
 
 `npm run verify:ts` · `npm test`
