@@ -226,7 +226,11 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
-| `app/mail/accountSettingsRun.ts` | Save/delete compte, OAuth auto, détection serveurs IMAP/SMTP |
+| `app/mail/accountSettingsRun.ts` | Barrel save/delete/OAuth/discovery (voir `account*Run.ts`) |
+| `app/mail/accountSaveRun.ts` | `saveAccount`, `saveAccountProgrammatic` |
+| `app/mail/accountDeleteRun.ts` | `deleteSettingsAccount` |
+| `app/mail/accountServerDiscoveryRun.ts` | Détection IMAP/SMTP (formulaire + OAuth snap) |
+| `app/mail/accountOAuthFinishRun.ts` | Post-login OAuth nouveau compte |
 | `wireEvents/depsCore.ts` | invoke, toast, state, render, loaders, nav, modales — réexporte `depsContext` |
 | `wireEvents/depsSearchMail.ts` | inbox, recherche, agent, carnet, entrée compose |
 | `wireEvents/depsComposeThread.ts` | compose, fil, LLM compose |
