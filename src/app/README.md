@@ -44,7 +44,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchBarUi.ts` | Modale recherche, `syncSearchBarChrome` |
 | `app/mail/searchMailboxResolve.ts` | Résolution chemin dossier (liste + recherche) |
 | `app/mail/searchAccountResolve.ts` | Email canonique NL, expéditeurs recherche, compte depuis ref barre |
-| `app/mail/savedSearchViews.ts` | Vues enregistrées (CRUD, marquer vu, suggestions) |
+| `app/mail/savedSearchViews.ts` | Barrel vues enregistrées |
+| `app/mail/savedSearchViewsHelpers.ts` | Sync brouillon recherche, nom suggéré, règle newsletter |
+| `app/mail/savedSearchListRun.ts` | Liste / refresh / marquer vue active vue |
+| `app/mail/savedSearchCrudRun.ts` | Enregistrer, appliquer, supprimer une vue |
+| `app/mail/savedSearchSuggestionsRun.ts` | Suggestions de vues (activité) |
 | `app/mail/searchLaunchQueries.ts` | Lancements recherche (tag, contact, domaine, hash) + `registerSearchLaunchDeps()` |
 | `app/mail/searchTagCatalog.ts` | `refreshSearchTagCatalog` + `registerSearchTagCatalogDeps()` |
 | `app/mail/searchAtAutocompleteWire.ts` | Câblage `@` / `#` (recherche + compose) + `registerSearchAtAutocompleteWireDeps()` |
@@ -256,7 +260,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`savedSearchViews`, `syncInboxRun`, …)
+1. Découper d’autres modules mail > ~350 lignes (`syncInboxRun`, `appNavigationStack`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
