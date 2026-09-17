@@ -282,11 +282,15 @@ import {
 } from "./mail/composeDraftLocalSave";
 import { composeDraftHasMeaningfulContent, startNewDraftSession } from "./mail/composeDraftSession";
 import { syncPreviewOpenFromComposeLayout } from "./mail/composeLayoutState";
+import { registerComposeDraftPreviewDeps } from "./mail/composeDraftPreview";
+import { threadsVisibleInList, threadListFollowed } from "./mail/mailListThreadFilter";
+import { bindMicPushToTalk } from "./mail/composeMicDictation";
+import { formatWhisperPttKeyLabel } from "./mail/composeMicPtt";
 import {
-  composePreviewPaneActive,
-  registerComposeDraftPreviewDeps,
-} from "./mail/composeDraftPreview";
-import { firstMatchingNewsletterRule, newsletterEmailListed } from "./mail/newsletterRulesMatch";
+  composeMicButtonTitle,
+  micAriaLabel,
+  threadQaMicButtonTitle,
+} from "./mail/composeMicUiHints";
 import { registerThreadAiWireActionsDeps } from "./mail/threadAiWireActions";
 import { registerComposeAiWireActionsDeps } from "./mail/composeAiWireActions";
 import { registerAccountsLoadActionDeps } from "./mail/accountsLoadAction";
@@ -564,7 +568,7 @@ import { registerRender } from "./dispatch";
 
 import { root as appShell } from "./dom";
 
-import type { View, Tone, Tag, Entity, ThreadListItem, Draft, DraftPreview, DraftRevisionListItem, DraftDiffLine, DraftCompareView, MicDictationTarget, MessageViewMode, ComposeLayout, MicState, MailSecuritySignals, CleanedMessageView, DiscussionThreadView, AppStatus, AppPathsView, AppCapabilities, LlmRuntimeStatus, NewsletterRuleRow, InboxFilterCounts, ActionBriefResult, CloseComposeModal, ResumeDraftModal, OrphanDraftSessionItem, State, SearchViewBatchJob, MailboxFolderStatsRow, SavedDraftListItem, SemanticEmbeddingCountsSnapshot, FluxAffinerResult, MailUnsubscribeLink, InlineAttachPayload, ThreadParticipantLink, ThreadRecipientPresenceEvents, TextPromptModalSpec, ConfirmModalSpec, NavigateOpts, OAuthDesktopLoginOutcome, SummaryResult, ActionBriefEvidenceLink, AddressBookRow, ShortcutRow, SavedDraftOpenPayload, LlmTranslationResult, MicActionOpts } from "./types";
+import type { View, Tone, Tag, Entity, ThreadListItem, Draft, DraftPreview, DraftRevisionListItem, DraftDiffLine, DraftCompareView, MessageViewMode, ComposeLayout, MicState, MailSecuritySignals, CleanedMessageView, DiscussionThreadView, AppStatus, AppPathsView, AppCapabilities, LlmRuntimeStatus, NewsletterRuleRow, InboxFilterCounts, ActionBriefResult, CloseComposeModal, ResumeDraftModal, OrphanDraftSessionItem, State, SearchViewBatchJob, MailboxFolderStatsRow, SavedDraftListItem, SemanticEmbeddingCountsSnapshot, FluxAffinerResult, MailUnsubscribeLink, InlineAttachPayload, ThreadParticipantLink, ThreadRecipientPresenceEvents, TextPromptModalSpec, ConfirmModalSpec, NavigateOpts, OAuthDesktopLoginOutcome, SummaryResult, ActionBriefEvidenceLink, AddressBookRow, ShortcutRow, SavedDraftOpenPayload, LlmTranslationResult } from "./types";
 
 let llmQueueAbort: AbortController | null = null;
 
@@ -583,26 +587,6 @@ let autoThreadSummaryDoneFor: string | null = null;
 let senderBatchSummarizeAbort: AbortController | null = null;
 
 let senderBatchSummarizeActive = false;
-
-async function rewriteDictatedSegmentWithTone(raw: string): Promise<string> {
-  const t = raw.trim();
-  if (!t || !isTauriRuntime() || state.view !== "compose") return raw;
-  if (!state.appPrefs.ai.dictationRewriteWithStyle) return raw;
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureComposeRewriteEnabled")) return raw;
-  try {
-    const style = composeRewriteStyleFromTone();
-    const res = await withTimeout(
-      invoke<{ text: string }>("llm_rewrite_compose", { text: t, style }),
-      LLM_INVOKE_TIMEOUT_MS
-    );
-    const out = (res.text ?? "").trim();
-    return out.length ? out : raw;
-  } catch {
-    toast("Réécriture du texte dicté indisponible (porte LLM fermée ou erreur réseau) — transcription brute conservée.");
-    return raw;
-  }
-}
-
 
 let llmIdlePrefetchAfterBootScheduled = false;
 
@@ -630,184 +614,6 @@ async function flushDraftRevisionPending(): Promise<void> {
   await flushDraftRevisionPendingNow(
     () => state.view === "compose" && Boolean(state.draft && state.draftSessionId),
   );
-}
-
-let micTimer: number | undefined;
-
-let micMediaRecorder: MediaRecorder | null = null;
-
-let micChunks: Blob[] = [];
-
-let micStream: MediaStream | null = null;
-
-let micDictationTarget: MicDictationTarget = "compose";
-
-let micPttKeyHeld = false;
-
-function composePushToTalkTargetCode(): string {
-  return (state.appPrefs.ai.whisperPttKeyCode ?? "").trim();
-}
-
-function formatWhisperPttKeyLabel(code: string): string {
-  const c = code.trim();
-  if (!c) return "";
-  const labels: Record<string, string> = {
-    F8: "F8",
-    F9: "F9",
-    F10: "F10",
-    F11: "F11",
-    F12: "F12",
-    Pause: "Pause",
-    ScrollLock: "Arrêt défil.",
-    Insert: "Insertion",
-    Backquote: "² / sous Échap (selon clavier)",
-  };
-  return labels[c] ?? c;
-}
-
-function composePushToTalkShortcutLabel(): string {
-  return formatWhisperPttKeyLabel(composePushToTalkTargetCode());
-}
-
-function pushToTalkKeyMatches(event: KeyboardEvent): boolean {
-  const code = composePushToTalkTargetCode();
-  if (!code) return false;
-  const pttViewOk =
-    state.view === "compose" ||
-    (state.view === "thread" && isAiFeatureEnabled(state.appPrefs.ai, "featureThreadQaEnabled"));
-  if (!pttViewOk) return false;
-  if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return false;
-  return event.code === code;
-}
-
-function micTargetFromView(explicit?: MicDictationTarget): MicDictationTarget {
-  if (explicit) return explicit;
-  return state.view === "thread" ? "thread-qa" : "compose";
-}
-
-function dictationBaseTextForTarget(target: MicDictationTarget): string {
-  if (target === "thread-qa") {
-    const ta = document.querySelector<HTMLTextAreaElement>("#thread-qa-input");
-    return ta?.value ?? state.threadQaDraft ?? "";
-  }
-  return state.composeCanonicalBody || state.draft?.markdownBody || state.composeBody || "";
-}
-
-function applyDictationToTarget(text: string, target: MicDictationTarget): void {
-  const trimmed = text.trim();
-  if (!trimmed) return;
-  if (target === "thread-qa") {
-    const ta = document.querySelector<HTMLTextAreaElement>("#thread-qa-input");
-    const base = (ta?.value ?? state.threadQaDraft).trimEnd();
-    const joiner = base.length && !/\s$/.test(base) ? " " : "";
-    const next = `${base}${joiner}${trimmed}`;
-    state.threadQaDraft = next;
-    if (ta) {
-      ta.value = next;
-      ta.focus();
-      const end = next.length;
-      ta.setSelectionRange(end, end);
-    }
-    return;
-  }
-  const base = dictationBaseTextForTarget("compose").trimEnd();
-  const joiner = base.length ? "\n\n" : "";
-  loadComposeMarkdownIntoEditor(`${base}${joiner}${trimmed}`);
-  if (composePreviewPaneActive()) schedulePreviewUpdate(0);
-}
-
-function bindMicPushToTalk() {
-  document.addEventListener(
-    "keydown",
-    (event: KeyboardEvent) => {
-      if (!state.appPrefs.ai.dictationEnabled || !isTauriRuntime() || event.repeat) return;
-      if (!pushToTalkKeyMatches(event)) return;
-      if (state.micState !== "idle") return;
-      event.preventDefault();
-      micPttKeyHeld = true;
-      void micAction({ fromPushToTalk: true, target: micTargetFromView() });
-    },
-    true
-  );
-  document.addEventListener(
-    "keyup",
-    (event: KeyboardEvent) => {
-      if (!micPttKeyHeld) return;
-      const target = composePushToTalkTargetCode();
-      if (!target || event.code !== target) return;
-      micPttKeyHeld = false;
-      if (state.micState === "recording") {
-        event.preventDefault();
-        void micAction();
-      }
-    },
-    true
-  );
-}
-
-async function mediaBlobToWav16kMonoPcm16(blob: Blob): Promise<Uint8Array> {
-  const arrayBuf = await blob.arrayBuffer();
-  const ctx = new AudioContext();
-  let audioBuf: AudioBuffer;
-  try {
-    audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
-  } finally {
-    await ctx.close().catch(() => undefined);
-  }
-  const inRate = audioBuf.sampleRate;
-  const inCh = audioBuf.numberOfChannels;
-  const inLen = audioBuf.length;
-  const mono = new Float32Array(inLen);
-  for (let i = 0; i < inLen; i++) {
-    let s = 0;
-    for (let c = 0; c < inCh; c++) s += audioBuf.getChannelData(c)[i];
-    mono[i] = s / inCh;
-  }
-  const outRate = 16_000;
-  const outLen = Math.max(1, Math.floor((inLen * outRate) / inRate));
-  const resampled = new Float32Array(outLen);
-  for (let i = 0; i < outLen; i++) {
-    const pos = (i * inRate) / outRate;
-    const i0 = Math.floor(pos);
-    const i1 = Math.min(i0 + 1, inLen - 1);
-    const f = pos - i0;
-    resampled[i] = mono[i0] * (1 - f) + mono[i1] * f;
-  }
-  const pcm = new Int16Array(outLen);
-  for (let i = 0; i < outLen; i++) {
-    const x = Math.max(-1, Math.min(1, resampled[i]));
-    pcm[i] = x < 0 ? Math.round(x * 0x8000) : Math.round(x * 0x7fff);
-  }
-  const dataSize = pcm.length * 2;
-  const buf = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buf);
-  const writeStr = (off: number, s: string) => {
-    for (let j = 0; j < s.length; j++) view.setUint8(off + j, s.charCodeAt(j));
-  };
-  writeStr(0, "RIFF");
-  view.setUint32(4, 36 + dataSize, true);
-  writeStr(8, "WAVE");
-  writeStr(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, outRate, true);
-  view.setUint32(28, outRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeStr(36, "data");
-  view.setUint32(40, dataSize, true);
-  new Uint8Array(buf, 44).set(new Uint8Array(pcm.buffer));
-  return new Uint8Array(buf);
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
-  }
-  return btoa(binary);
 }
 
 let composeInteractionsAbort: AbortController | undefined;
@@ -1584,42 +1390,6 @@ async function switchMailbox(nextMailbox: string) {
     state.selectedThread = undefined;
   }
   render();
-}
-
-function micPermissionErrorMessage(error: unknown): string {
-  const raw = tauriErrorMessage(error);
-  const low = raw.toLowerCase();
-  if (
-    low.includes("permission denied") ||
-    low.includes("notallowed") ||
-    low.includes("permission") && low.includes("denied")
-  ) {
-    return (
-      "Micro refusé par Windows ou la WebView. Ouvrez Paramètres Windows → Confidentialité → Microphone, " +
-      "autorisez RustyMail, puis relancez l’app. Si le problème persiste, utilisez le bouton micro (clic) une fois."
-    );
-  }
-  return `Micro inaccessible : ${raw}`;
-}
-
-async function requestMicStream(): Promise<MediaStream> {
-  try {
-    return await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (e) {
-    const low = tauriErrorMessage(e).toLowerCase();
-    if (
-      isTauriRuntime() &&
-      (low.includes("permission") || low.includes("notallowed"))
-    ) {
-      try {
-        await invoke("reset_webview_microphone_permission");
-        return await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (retryErr) {
-        throw retryErr;
-      }
-    }
-    throw e;
-  }
 }
 
 async function loadBootDeferredPrefs(): Promise<void> {
@@ -2706,40 +2476,6 @@ async function loadAddressBookSidebarCount(): Promise<void> {
   } catch {
     state.addressBookSidebarCount = null;
   }
-}
-
-function threadMatchesNewsletterRule(thread: ThreadListItem, rule: NewsletterRuleRow): boolean {
-  for (const p of thread.participants) {
-    const matched = firstMatchingNewsletterRule(p);
-    if (!matched) continue;
-    if (
-      matched.domain.toLowerCase() === rule.domain.toLowerCase() &&
-      matched.localPart.toLowerCase() === (rule.localPart ?? "*").toLowerCase()
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function threadsVisibleInList(): ThreadListItem[] {
-  let base = state.threads;
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) return base;
-  if (state.searchNewsletterRule) {
-    const rule = state.searchNewsletterRule;
-    base = base.filter((t) => threadMatchesNewsletterRule(t, rule));
-  }
-  /** Résultats recherche : ne pas masquer via les puces Non lus / Priorité / Auto. */
-  if (isSearchActive()) return base;
-  if (state.listFilter === "unread") return base.filter((t) => t.unread);
-  if (state.listFilter === "starred") return base.filter((t) => threadListFollowed(t));
-  if (state.listFilter === "focused") return base.filter((t) => !t.isNewsletterThread);
-  if (state.listFilter === "auto") return base.filter((t) => Boolean(t.isNewsletterThread));
-  return base;
-}
-
-function threadListFollowed(thread: ThreadListItem): boolean {
-  return Boolean(thread.followed);
 }
 
 function activeMessageTranslationJobCount(): number {
@@ -6458,156 +6194,6 @@ async function composeAiGrammar() {
   if (ran === null) return;
 }
 
-async function micAction(opts?: MicActionOpts) {
-  if (state.micState === "idle") {
-    micDictationTarget = micTargetFromView(opts?.target);
-    if (!isTauriRuntime()) {
-      toast("Dictée : l’app bureau Tauri est requise.");
-      return;
-    }
-    if (!state.appPrefs.ai.dictationEnabled) {
-      toast("Activez la dictée dans Paramètres → IA & dictée.");
-      return;
-    }
-    const backend = state.appPrefs.ai.dictationBackend;
-    if (backend === "cloud" && !state.dictationApiKeySet) {
-      toast("Clé API absente : Paramètres → IA & dictée.");
-      return;
-    }
-    if (
-      backend === "whisper_cpp" &&
-      state.appPrefs.ai.whisperCloudFallback &&
-      !state.dictationApiKeySet
-    ) {
-      toast("Repli cloud activé : enregistrez une clé API, ou désactivez le repli.");
-      return;
-    }
-    if (backend === "local_http" && !state.appPrefs.ai.localCompanionBaseUrl.trim()) {
-      toast("Indiquez l’URL du compagnon local (Paramètres → IA & dictée).");
-      return;
-    }
-    try {
-      micStream = await requestMicStream();
-      if (opts?.fromPushToTalk && !micPttKeyHeld) {
-        micStream.getTracks().forEach((t) => t.stop());
-        micStream = null;
-        render();
-        return;
-      }
-      micChunks = [];
-      const mimeOpt =
-        typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-          ? "audio/webm;codecs=opus"
-          : "audio/webm";
-      micMediaRecorder = new MediaRecorder(micStream, { mimeType: mimeOpt });
-      micMediaRecorder.ondataavailable = (ev) => {
-        if (ev.data && ev.data.size > 0) micChunks.push(ev.data);
-      };
-      if (opts?.fromPushToTalk && !micPttKeyHeld) {
-        micStream.getTracks().forEach((t) => t.stop());
-        micStream = null;
-        micMediaRecorder = null;
-        render();
-        return;
-      }
-      micMediaRecorder.start(250);
-      state.micState = "recording";
-      state.micSeconds = 0;
-      const maxRec = state.appPrefs.ai.whisperMaxRecordSeconds;
-      micTimer = window.setInterval(() => {
-        state.micSeconds += 1;
-        if (maxRec > 0 && state.micSeconds >= maxRec) {
-          void micAction();
-          return;
-        }
-        render();
-      }, 1000);
-      render();
-    } catch (e) {
-      toast(micPermissionErrorMessage(e));
-      micStream?.getTracks().forEach((t) => t.stop());
-      micStream = null;
-      micMediaRecorder = null;
-    }
-    return;
-  }
-  if (state.micState === "recording") {
-    if (micTimer) {
-      window.clearInterval(micTimer);
-      micTimer = undefined;
-    }
-    const backend = state.appPrefs.ai.dictationBackend;
-    if (!micMediaRecorder) {
-      state.micState = "idle";
-      state.micSeconds = 0;
-      render();
-      return;
-    }
-    state.micState = "processing";
-    if (backend === "whisper_cpp" && micDictationTarget === "compose") {
-      state.composeMessage =
-        "Whisper : téléchargement du modèle HF au premier usage si besoin — patientez.";
-    }
-    render();
-    try {
-      const blob: Blob = await new Promise((resolve, reject) => {
-        const rec = micMediaRecorder!;
-        rec.onerror = () => reject(new Error("Enregistrement interrompu"));
-        rec.onstop = () => {
-          micStream?.getTracks().forEach((t) => t.stop());
-          micStream = null;
-          resolve(new Blob(micChunks, { type: rec.mimeType || "audio/webm" }));
-        };
-        rec.stop();
-      });
-      micMediaRecorder = null;
-      micChunks = [];
-      const buf = new Uint8Array(await blob.arrayBuffer());
-      const b64 = bytesToBase64(buf);
-      const ext = blob.type.includes("wav") ? "wav" : "webm";
-      let audioWavBase64: string | undefined;
-      if (backend === "whisper_cpp") {
-        const wavBytes = await mediaBlobToWav16kMonoPcm16(blob);
-        audioWavBase64 = bytesToBase64(wavBytes);
-        if (micDictationTarget === "compose") {
-          state.composeMessage = "Transcription Whisper en cours…";
-          render();
-        }
-      }
-      let text = await withTimeout(
-        invoke<string>("transcribe_dictation", {
-          args: {
-            audioBase64: b64,
-            ...(audioWavBase64 ? { audioWavBase64 } : {}),
-            fileName: `dictation.${ext}`,
-            mimeType: blob.type || "audio/webm",
-          },
-        }),
-        120_000
-      );
-      if (
-        micDictationTarget === "compose" &&
-        state.appPrefs.ai.dictationRewriteWithStyle &&
-        text.trim()
-      ) {
-        state.composeMessage = "Réécriture du texte dicté…";
-        render();
-        text = await rewriteDictatedSegmentWithTone(text);
-      }
-      applyDictationToTarget(text, micDictationTarget);
-      state.composeMessage = "";
-    } catch (e) {
-      console.error("transcribe_dictation", e);
-      const errMsg = tauriErrorMessage(e);
-      if (micDictationTarget === "compose") state.composeMessage = errMsg;
-      toast(errMsg);
-    }
-    state.micState = "idle";
-    state.micSeconds = 0;
-    render();
-  }
-}
-
 function mouseNavBlockedByOverlay(): boolean {
   return Boolean(
     state.quoteFoldModal ||
@@ -6893,92 +6479,6 @@ function normalizeAccountRow(raw: unknown): Account | null {
     smtp: normalizeServerSettings(r.smtp),
     authKind: normalizeAuthKind(r.authKind ?? r.auth_kind)
   };
-}
-
-function composeMicButtonTitle(): string {
-  if (state.micState === "recording") {
-    const ptt = composePushToTalkTargetCode();
-    return ptt
-      ? "Enregistrement — relâcher la touche ou cliquer pour transcrire."
-      : "Enregistrement — cliquer pour arrêter et transcrire.";
-  }
-  return composeMicFooterHint();
-}
-
-function threadQaMicButtonTitle(): string {
-  if (state.micState === "recording") {
-    const ptt = composePushToTalkTargetCode();
-    return ptt
-      ? "Enregistrement — relâcher la touche ou cliquer pour dicter la question."
-      : "Enregistrement — cliquer pour arrêter et transcrire la question.";
-  }
-  return threadQaMicFooterHint();
-}
-
-function threadQaMicFooterHint(): string {
-  if (state.micState === "processing") {
-    const bb = state.appPrefs.ai.dictationBackend;
-    if (bb === "whisper_cpp") return "Transcription Whisper de votre question…";
-    return "Insertion de la question dictée…";
-  }
-  if (!isTauriRuntime()) return "Dictée : l’app bureau Tauri est requise.";
-  if (!state.appPrefs.ai.dictationEnabled) return "Dictée désactivée — Paramètres → IA & dictée.";
-  const b = state.appPrefs.ai.dictationBackend;
-  const ptt = composePushToTalkTargetCode();
-  const pttFrag = ptt ? ` ou maintenir ${composePushToTalkShortcutLabel()}` : "";
-  if (b === "whisper_cpp")
-    return ptt
-      ? `Whisper : clic micro${pttFrag}, relâcher pour dicter la question.`
-      : "Whisper : clic sur le micro pour dicter la question.";
-  if (b === "cloud")
-    return ptt
-      ? `Cloud : clic micro${pttFrag} — relâcher pour dicter la question.`
-      : "Cloud : clic sur le micro pour dicter la question.";
-  if (b === "local_http")
-    return ptt ? `Compagnon : clic micro${pttFrag} — relâcher pour dicter.` : "Compagnon : clic sur le micro.";
-  return "Dictée de question";
-}
-
-function composeMicFooterHint(): string {
-  if (state.composeMessage) return state.composeMessage;
-  if (state.micState === "processing") {
-    const bb = state.appPrefs.ai.dictationBackend;
-    if (bb === "whisper_cpp") return "Dictée Whisper en cours…";
-    return "Dictée en cours d’insertion…";
-  }
-  if (!isTauriRuntime()) return "Dictée : l’app bureau Tauri est requise.";
-  if (!state.appPrefs.ai.dictationEnabled) return "Dictée désactivée — Paramètres → IA & dictée.";
-  const b = state.appPrefs.ai.dictationBackend;
-  const ptt = composePushToTalkTargetCode();
-  const pttFrag = ptt ? ` ou maintenir ${composePushToTalkShortcutLabel()}` : "";
-  if (b === "whisper_cpp")
-    return ptt
-      ? `Whisper : clic micro${pttFrag}, relâcher pour transcrire (HF auto).`
-      : "Whisper : clic sur le micro pour transcrire (HF auto).";
-  if (b === "cloud")
-    return ptt
-      ? `Cloud : clic micro${pttFrag} (clé API requise) — relâcher pour envoyer.`
-      : "Cloud : clic sur le micro (clé API requise).";
-  if (b === "local_http")
-    return ptt ? `Compagnon : clic micro${pttFrag} — relâcher, audio HTTP.` : "Compagnon : clic sur le micro — audio HTTP.";
-  return "Dictée";
-}
-
-function micAriaLabel(target: MicDictationTarget = "compose") {
-  const ptt = composePushToTalkTargetCode();
-  const lbl = composePushToTalkShortcutLabel();
-  const qa = target === "thread-qa";
-  if (state.micState === "recording") {
-    return ptt
-      ? `Enregistrement en cours — relâcher ${lbl} ou cliquer pour arrêter`
-      : "Enregistrement en cours — cliquer pour arrêter";
-  }
-  if (state.micState === "processing") return qa ? "Transcription de la question en cours" : "Transcription en cours";
-  return ptt
-    ? `${qa ? "Dicter la question" : "Dictée"} — clic ou maintenir ${lbl}`
-    : qa
-      ? "Dicter la question — clic sur le micro"
-      : "Dictée — clic sur le micro";
 }
 
 function render() {
@@ -7445,10 +6945,6 @@ registerSettingsWireActionsDeps({
   autoDetectLlamaServerBinary,
   paintLlmPrefetchProgressDom,
   paintStatusBarProgressDom,
-  requestMicStream,
-  mediaBlobToWav16kMonoPcm16,
-  bytesToBase64,
-  micPermissionErrorMessage,
   discoverMailServersAction,
   warnOAuthEphemeralRedirect,
   finishOAuthNewAccountAfterLogin,
@@ -7521,7 +7017,6 @@ registerAddressBookWireActionsDeps({
 });
 
 registerAccountWireActionsDeps({
-  micAction,
   saveAccount,
   refreshSavedDraftsMailboxCount,
 });

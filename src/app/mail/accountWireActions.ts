@@ -1,8 +1,8 @@
 import type { MicActionOpts } from "../types";
 import { saveDraftToSavedListNow as saveDraftToSavedListNowImpl } from "./composeDraftLocalSave";
+import { micAction as micActionImpl } from "./composeMicDictation";
 
 export type AccountWireActionsDeps = {
-  micAction: (opts?: MicActionOpts) => void | Promise<void>;
   saveAccount: () => void | Promise<void>;
   refreshSavedDraftsMailboxCount: () => Promise<void>;
 };
@@ -19,7 +19,7 @@ function accountWire(): AccountWireActionsDeps {
 }
 
 export function micAction(opts?: MicActionOpts): void | Promise<void> {
-  return accountWire().micAction(opts);
+  return micActionImpl(opts);
 }
 
 export function saveAccount(): void | Promise<void> {

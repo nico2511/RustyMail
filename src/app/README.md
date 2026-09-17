@@ -92,6 +92,13 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/llmQueueCancel.ts` | Annulation file jobs LLM |
 | `app/mail/composeSendDraftRun.ts` | Envoi brouillon + split send |
 | `app/mail/composeViewNavigation.ts` | `enterComposeView` (historique nav) |
+| `app/mail/mailListThreadFilter.ts` | Filtres liste (`threadsVisibleInList`, suivi) |
+| `app/mail/micAudioUtil.ts` | WAV 16 kHz mono + base64 (dictée) |
+| `app/mail/micStreamAccess.ts` | Accès micro navigateur / messages permission |
+| `app/mail/composeMicPtt.ts` | Push-to-talk (raccourci, correspondance touche) |
+| `app/mail/composeMicUiHints.ts` | Titres micro / aria (compose + Q&R fil) |
+| `app/mail/composeDictationRewrite.ts` | Réécriture segment dicté (ton) |
+| `app/mail/composeMicDictation.ts` | `micAction`, enregistrement, PTT |
 | `app/mail/composeSendDraftAction.ts` | Ré-export `sendDraft()` |
 | `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
 | `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |

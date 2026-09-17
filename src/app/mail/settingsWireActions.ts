@@ -1,3 +1,6 @@
+import { bytesToBase64 as bytesToBase64Impl, mediaBlobToWav16kMonoPcm16 as mediaBlobToWavImpl } from "./micAudioUtil";
+import { micPermissionErrorMessage as micPermissionErrorMessageImpl, requestMicStream as requestMicStreamImpl } from "./micStreamAccess";
+
 export type SettingsWireActionsDeps = {
   openSettingsView: () => void | Promise<void>;
   ensureValidSelectedMailbox: () => void;
@@ -14,10 +17,6 @@ export type SettingsWireActionsDeps = {
   autoDetectLlamaServerBinary: (opts?: { silent?: boolean; persist?: boolean }) => Promise<boolean>;
   paintLlmPrefetchProgressDom: () => void;
   paintStatusBarProgressDom: () => void;
-  requestMicStream: () => Promise<MediaStream>;
-  mediaBlobToWav16kMonoPcm16: (blob: Blob) => Promise<Uint8Array>;
-  bytesToBase64: (bytes: Uint8Array) => string;
-  micPermissionErrorMessage: (error: unknown) => string;
   discoverMailServersAction: () => void | Promise<void>;
   warnOAuthEphemeralRedirect: (outcome: import("../types").OAuthDesktopLoginOutcome) => void;
   finishOAuthNewAccountAfterLogin: (
@@ -106,19 +105,19 @@ export function paintStatusBarProgressDom(): void {
 }
 
 export function requestMicStream(): Promise<MediaStream> {
-  return settings().requestMicStream();
+  return requestMicStreamImpl();
 }
 
 export function mediaBlobToWav16kMonoPcm16(blob: Blob): Promise<Uint8Array> {
-  return settings().mediaBlobToWav16kMonoPcm16(blob);
+  return mediaBlobToWavImpl(blob);
 }
 
 export function bytesToBase64(bytes: Uint8Array): string {
-  return settings().bytesToBase64(bytes);
+  return bytesToBase64Impl(bytes);
 }
 
 export function micPermissionErrorMessage(error: unknown): string {
-  return settings().micPermissionErrorMessage(error);
+  return micPermissionErrorMessageImpl(error);
 }
 
 export function discoverMailServersAction(): void | Promise<void> {
