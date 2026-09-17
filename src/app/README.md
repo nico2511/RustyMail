@@ -117,7 +117,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
 | `wireEvents/handleAction*.ts` | Dispatch actions via imports **`deps`** / **`app/mail/*`** (plus de `callApp`) |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
-| `wireEvents/appWireFacades.ts` | Facades vers handlers restés dans `application.ts` (compose, agents, carnet…) |
+| `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
+| `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
+| `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
+| `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
 | `wireEvents/deps.ts` | Imports partagés + facades mail / wireEvents |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
@@ -129,6 +132,6 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 ## Prochaines extractions (ordre suggéré)
 
 1. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
-2. Extraire encore du corps d’`application.ts` vers facades **`appWireFacades`** / **`app/mail/*`**
+2. Typage progressif de **`deps.ts`** / retrait de `@ts-nocheck` sur les dispatchers
 
 `npm run verify:ts` · `npm test`

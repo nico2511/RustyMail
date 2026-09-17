@@ -224,9 +224,14 @@ export {
   fmCreateMailbox,
   fmSelectMailbox,
   fmSyncMailbox,
+  onOrgDeleteMailboxOne,
+  onOrgSyncMailbox,
+  onOrgV2IgnoreMailboxUi,
+  onOrgV2UnignoreMailboxUi,
   openContactsView,
   openFolderManagerView,
   openOrganizationMailbox,
+  openOrganizationV2View,
   openOrganizationView,
   orgV2DismissProposal,
   orgV2SnoozeProposal,
@@ -257,21 +262,25 @@ export {
 export { state } from "../state";
 import { wireEventsContext } from "./wireEventsContext";
 export {
-  agentInsertDraftIntoCompose,
   llmQuickRepliesComposeUi,
+  summarizeSenderThreadsLight,
+} from "../mail/composeAssistWireActions";
+export {
+  enterComposeView,
+  startNewDraftSession,
+  syncPreviewOpenFromComposeLayout,
+} from "../mail/composeViewWireActions";
+export {
   loadAddressBookSidebarCount,
-  micAction,
   openContactDetailView,
-  openOrganizationV2View,
   refreshAddressBookList,
+} from "../mail/addressBookWireActions";
+export {
+  micAction,
   refreshSavedDraftsMailboxCount,
   saveAccount,
   saveDraftToSavedListNow,
-  startNewDraftSession,
-  summarizeSenderThreadsLight,
-  syncPreviewOpenFromComposeLayout,
-  enterComposeView,
-} from "./appWireFacades";
+} from "../mail/accountWireActions";
 export type {
   Draft,
   OAuthDesktopLoginOutcome,

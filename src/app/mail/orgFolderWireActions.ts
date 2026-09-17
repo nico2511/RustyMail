@@ -36,6 +36,7 @@ export type OrgFolderWireActionsDeps = {
     deleteMailboxAck?: string,
   ) => void | Promise<void>;
   refreshOrganizationReport: () => Promise<void>;
+  openOrganizationV2View: () => void | Promise<void>;
   onOrgDeleteMailboxOne: (mailbox: string, mailboxRefId: string) => void | Promise<void>;
   onOrgSyncMailbox: (mailbox: string) => void | Promise<void>;
   onOrgV2IgnoreMailboxUi: (mailbox: string) => void | Promise<void>;
@@ -136,6 +137,10 @@ export function runOrgApply(
 
 export function refreshOrganizationReport(): Promise<void> {
   return orgFolder().refreshOrganizationReport();
+}
+
+export function openOrganizationV2View(): void | Promise<void> {
+  return orgFolder().openOrganizationV2View();
 }
 
 export function onOrgDeleteMailboxOne(mailbox: string, mailboxRefId: string): void | Promise<void> {

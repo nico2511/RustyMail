@@ -56,7 +56,6 @@ import {
   persistAiFeaturePrefs,
   refreshAddressBookList,
   loadAddressBookSidebarCount,
-  saveDraftToSavedListNow,
   applyListFilter,
   threadIdsMatch,
   state,

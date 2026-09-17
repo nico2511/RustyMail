@@ -280,6 +280,10 @@ import { registerAccountsLoadActionDeps } from "./mail/accountsLoadAction";
 import { registerSettingsWireActionsDeps } from "./mail/settingsWireActions";
 import { registerOrgFolderWireActionsDeps } from "./mail/orgFolderWireActions";
 import { registerAgentWireActionsDeps } from "./mail/agentWireActions";
+import { registerComposeAssistWireActionsDeps } from "./mail/composeAssistWireActions";
+import { registerComposeViewWireActionsDeps } from "./mail/composeViewWireActions";
+import { registerAddressBookWireActionsDeps } from "./mail/addressBookWireActions";
+import { registerAccountWireActionsDeps } from "./mail/accountWireActions";
 import { registerMailContentWireActionsDeps } from "./mail/mailContentWireActions";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
@@ -337,7 +341,6 @@ import {
 import { renderComposer } from "./ui/render/composerRender";
 import { renderOrgThreadSampleRow } from "./ui/render/orgSampleRowRender";
 import { registerWireEventsContext } from "./ui/wireEventsBridge";
-import { registerAppWireFacades } from "./ui/wireEvents/appWireFacades";
 import { wireEvents, handleAction } from "./ui/wireEvents";
 import { renderAiPanel } from "./ui/render/aiPanelRender";
 import { renderSettings, renderSettingsAiModal } from "./ui/render/settingsRender";
@@ -8571,6 +8574,7 @@ registerOrgFolderWireActionsDeps({
   confirmThenRunOrgApply,
   runOrgApply,
   refreshOrganizationReport,
+  openOrganizationV2View,
   onOrgDeleteMailboxOne,
   onOrgSyncMailbox,
   onOrgV2IgnoreMailboxUi,
@@ -8603,16 +8607,24 @@ registerAgentWireActionsDeps({
   agentRefreshPlanFromDraft,
 });
 
-registerAppWireFacades({
+registerComposeViewWireActionsDeps({
   enterComposeView,
   startNewDraftSession,
   syncPreviewOpenFromComposeLayout,
-  openContactDetailView,
-  openOrganizationV2View,
-  loadAddressBookSidebarCount,
-  refreshAddressBookList,
+});
+
+registerComposeAssistWireActionsDeps({
   summarizeSenderThreadsLight,
   llmQuickRepliesComposeUi,
+});
+
+registerAddressBookWireActionsDeps({
+  openContactDetailView,
+  loadAddressBookSidebarCount,
+  refreshAddressBookList,
+});
+
+registerAccountWireActionsDeps({
   micAction,
   saveAccount,
   saveDraftToSavedListNow,
