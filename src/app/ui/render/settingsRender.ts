@@ -17,6 +17,10 @@ import { settingsExplainHtml } from "../../lib/settingsExplainHtml";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
 import type { AddressBookRow, ShortcutRow } from "../../types";
+import {
+  defaultAccountIdFromPrefs,
+  defaultListFilterFromPrefs,
+} from "../../mail/accountDefaultPrefs";
 import { renderViewNavTrail } from "./listChrome";
 import { renderDeps } from "./renderDeps";
 
@@ -29,8 +33,8 @@ function renderSettingsGeneralPanel(): string {
   const ml = state.appPrefs.general.motherLanguage;
   const globalBook = Boolean(state.appPrefs.general.addressBookGlobalScope);
   const activitySuggestions = state.appPrefs.general.activitySuggestionsEnabled !== false;
-  const defaultLf = renderDeps().defaultListFilterFromPrefs();
-  const prefAccId = renderDeps().defaultAccountIdFromPrefs() ?? "";
+  const defaultLf = defaultListFilterFromPrefs();
+  const prefAccId = defaultAccountIdFromPrefs() ?? "";
   const accountOptions =
     state.accounts.length ?
       `<option value="" ${!prefAccId ? "selected" : ""}>Premier compte de la liste</option>${state.accounts

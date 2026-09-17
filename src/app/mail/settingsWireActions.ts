@@ -1,17 +1,19 @@
 import { bytesToBase64 as bytesToBase64Impl, mediaBlobToWav16kMonoPcm16 as mediaBlobToWavImpl } from "./micAudioUtil";
 import { micPermissionErrorMessage as micPermissionErrorMessageImpl, requestMicStream as requestMicStreamImpl } from "./micStreamAccess";
+import {
+  defaultListFilterFromPrefs as defaultListFilterFromPrefsImpl,
+  ensureValidSelectedMailbox as ensureValidSelectedMailboxImpl,
+  persistDefaultAccountId as persistDefaultAccountIdImpl,
+} from "./accountDefaultPrefs";
 
 export type SettingsWireActionsDeps = {
   openSettingsView: () => void | Promise<void>;
-  ensureValidSelectedMailbox: () => void;
   refreshSemanticEmbeddingCounts: () => Promise<void>;
   refreshSettingsPathsFromBackend: () => void | Promise<void>;
   openEnginesAiSettingsModal: () => void | Promise<void>;
   finalizeSettingsAiModalClose: () => void;
-  persistDefaultAccountId: (id: string) => Promise<void>;
   switchActiveAccount: (id: string) => Promise<void>;
   syncActivityRecordingPrefs: () => void;
-  defaultListFilterFromPrefs: () => import("../types").State["listFilter"];
   persistAiPrefsFromDom: (opts?: { silent?: boolean; skipRender?: boolean }) => void | Promise<void>;
   refreshLlmRuntimeStatus: (forceHardwareRescan?: boolean) => Promise<void>;
   autoDetectLlamaServerBinary: (opts?: { silent?: boolean; persist?: boolean }) => Promise<boolean>;
@@ -46,7 +48,7 @@ export function openSettingsView(): void | Promise<void> {
 }
 
 export function ensureValidSelectedMailbox(): void {
-  settings().ensureValidSelectedMailbox();
+  return ensureValidSelectedMailboxImpl();
 }
 
 export function refreshSemanticEmbeddingCounts(): Promise<void> {
@@ -66,7 +68,7 @@ export function finalizeSettingsAiModalClose(): void {
 }
 
 export function persistDefaultAccountId(id: string): Promise<void> {
-  return settings().persistDefaultAccountId(id);
+  return persistDefaultAccountIdImpl(id);
 }
 
 export function switchActiveAccount(id: string): Promise<void> {
@@ -78,7 +80,7 @@ export function syncActivityRecordingPrefs(): void {
 }
 
 export function defaultListFilterFromPrefs(): import("../types").State["listFilter"] {
-  return settings().defaultListFilterFromPrefs();
+  return defaultListFilterFromPrefsImpl();
 }
 
 export function persistAiPrefsFromDom(opts?: { silent?: boolean; skipRender?: boolean }): void | Promise<void> {

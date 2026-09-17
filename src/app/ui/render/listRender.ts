@@ -16,6 +16,7 @@ import {
 } from "../../../threadListDates";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { renderMailboxDigestTriggerButton } from "../../mail/mailboxDigest";
+import { cleanThreadListPreview } from "../../mail/mailListPreviewClean";
 import { iconSvg } from "../../lib/iconSvg";
 import { initials } from "../../lib/tags";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
@@ -168,7 +169,7 @@ function renderThreadRow(thread: ThreadListItem): string {
   )}" aria-label="${escapeAttr(followTitle)}" aria-pressed="${followed}">${iconSvg(
     followed ? "starFilled" : "starOutline"
   )}</button>`;
-  const previewClean = d.cleanThreadListPreview(thread.preview);
+  const previewClean = cleanThreadListPreview(thread.preview);
 
   return `
     <div class="thread-row inbox-thread-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}" role="listitem">

@@ -24,10 +24,10 @@ import {
 } from "./searchCommitQuery";
 import { searchThreads } from "./searchThreadsRun";
 import { resolveSearchMailboxPath } from "./searchMailboxResolve";
+import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 
 export type SearchLaunchDeps = {
   clearThreadAiSummaryState: () => void;
-  ensureValidSelectedMailbox: () => void;
   refreshSearchTagCatalog: () => Promise<void>;
 };
 
@@ -202,7 +202,7 @@ export async function applyInboxFilterFromHashHit(hit: InboxFilterHit): Promise<
   if (hit.id.startsWith("account:")) {
     const id = hit.id.slice(8);
     state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: id }, [], BOOT_INVOKE_TIMEOUT_MS);
-    d.ensureValidSelectedMailbox();
+    ensureValidSelectedMailbox();
     const acc = state.accounts.find((a) => a.id === id);
     toast(`Compte : ${acc?.email ?? id}`);
     void d.refreshSearchTagCatalog();

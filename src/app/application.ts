@@ -102,10 +102,8 @@ import {
 import { isTauriRuntime } from "./lib/tauriRuntime";
 import { safeInvoke, tauriErrorMessage, withTimeout } from "./lib/tauriCommand";
 import {
-  DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   ENABLE_CLEAN_MESSAGE_VIEW,
   LIST_FILTER_VALUES,
-  defaultListFilterFromRaw,
 } from "./lib/appUiConstants";
 import {
   clearDiscoveredServerSnap,
@@ -118,7 +116,6 @@ import {
 } from "./account/accountWizardState";
 import { currentAccount } from "./core/accountContext";
 import { threadIdsMatch } from "./lib/threadIdsMatch";
-import { resolveMailboxInList } from "./mail/searchMailboxResolve";
 import { canonicalEmailForNlMatch } from "./mail/searchAccountResolve";
 import {
   folderManagerPanelMailbox,
@@ -284,6 +281,14 @@ import { composeDraftHasMeaningfulContent, startNewDraftSession } from "./mail/c
 import { syncPreviewOpenFromComposeLayout } from "./mail/composeLayoutState";
 import { registerComposeDraftPreviewDeps } from "./mail/composeDraftPreview";
 import { threadsVisibleInList, threadListFollowed } from "./mail/mailListThreadFilter";
+import {
+  applyDefaultAccountFromPrefs,
+  defaultListFilterFromPrefs,
+  ensureValidSelectedMailbox,
+} from "./mail/accountDefaultPrefs";
+import { aiCacheKeySegment } from "./mail/aiCacheKeySegment";
+import { mailboxPathDelimiter, reparentMailboxPath } from "./mail/folderManagerPathUtil";
+import { abortLlmQueueJob, withLlmQueue } from "./mail/llmJobQueue";
 import { bindMicPushToTalk } from "./mail/composeMicDictation";
 import { formatWhisperPttKeyLabel } from "./mail/composeMicPtt";
 import {
@@ -292,7 +297,6 @@ import {
   threadQaMicButtonTitle,
 } from "./mail/composeMicUiHints";
 import { registerThreadAiWireActionsDeps } from "./mail/threadAiWireActions";
-import { registerComposeAiWireActionsDeps } from "./mail/composeAiWireActions";
 import { registerAccountsLoadActionDeps } from "./mail/accountsLoadAction";
 import { registerSettingsWireActionsDeps } from "./mail/settingsWireActions";
 import { registerOrgFolderWireActionsDeps } from "./mail/orgFolderWireActions";
@@ -569,8 +573,6 @@ import { registerRender } from "./dispatch";
 import { root as appShell } from "./dom";
 
 import type { View, Tone, Tag, Entity, ThreadListItem, Draft, DraftPreview, DraftRevisionListItem, DraftDiffLine, DraftCompareView, MessageViewMode, ComposeLayout, MicState, MailSecuritySignals, CleanedMessageView, DiscussionThreadView, AppStatus, AppPathsView, AppCapabilities, LlmRuntimeStatus, NewsletterRuleRow, InboxFilterCounts, ActionBriefResult, CloseComposeModal, ResumeDraftModal, OrphanDraftSessionItem, State, SearchViewBatchJob, MailboxFolderStatsRow, SavedDraftListItem, SemanticEmbeddingCountsSnapshot, FluxAffinerResult, MailUnsubscribeLink, InlineAttachPayload, ThreadParticipantLink, ThreadRecipientPresenceEvents, TextPromptModalSpec, ConfirmModalSpec, NavigateOpts, OAuthDesktopLoginOutcome, SummaryResult, ActionBriefEvidenceLink, AddressBookRow, ShortcutRow, SavedDraftOpenPayload, LlmTranslationResult } from "./types";
-
-let llmQueueAbort: AbortController | null = null;
 
 let addressBookListQuery = "";
 
@@ -933,89 +935,6 @@ function navigateToInbox(opts?: NavigateOpts): void {
   state.aiOpen = false;
   clearThreadAiSummaryState();
   render();
-}
-
-function cleanThreadListPreview(raw: string): string {
-  let s = String(raw ?? "");
-  // Retire balises HTML
-  s = s.replace(/<[^>]*>/g, " ");
-  // Retire blocs CSS courants : `selector{ ... }`
-  for (let i = 0; i < 4; i++) {
-    const next = s.replace(/[^{]{0,120}\{[^}]{0,600}\}/g, " ");
-    if (next === s) break;
-    s = next;
-  }
-  // Normalise espaces
-  s = s.replace(/\s+/g, " ").trim();
-  // Coupe un peu (la CSS brute explose vite)
-  if (s.length > 220) s = `${s.slice(0, 220).trim()}…`;
-  return s;
-}
-
-async function aiCacheKeySegment(): Promise<string> {
-  if (!isTauriRuntime()) return "none";
-  try {
-    const s = await withTimeout(invoke<string>("ai_cache_llm_segment", {}), BOOT_INVOKE_TIMEOUT_MS);
-    return (s ?? "none").trim() || "none";
-  } catch {
-    return "none";
-  }
-}
-
-function defaultListFilterFromPrefs(): State["listFilter"] {
-  return defaultListFilterFromRaw(state.appPrefs.general.defaultListFilter);
-}
-
-function defaultAccountIdFromPrefs(): string | undefined {
-  const id = (state.appPrefs.general.defaultAccountId ?? "").trim();
-  if (!id) return undefined;
-  return state.accounts.some((a) => a.id === id) ? id : undefined;
-}
-
-function applyDefaultAccountFromPrefs(): void {
-  const pref = defaultAccountIdFromPrefs();
-  if (pref) {
-    state.selectedAccountId = pref;
-    return;
-  }
-  if (!state.selectedAccountId || !state.accounts.some((a) => a.id === state.selectedAccountId)) {
-    state.selectedAccountId = state.accounts[0]?.id;
-  }
-}
-
-function ensureValidSelectedMailbox(): void {
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox) && isTauriRuntime()) return;
-  if (!state.mailboxes.length) return;
-  const resolved = resolveMailboxInList(state.mailboxes, state.selectedMailbox);
-  if (resolved !== undefined) {
-    if (resolved !== state.selectedMailbox) state.selectedMailbox = resolved;
-    return;
-  }
-  state.selectedMailbox =
-    preferredInboxMailboxName(state.mailboxes) ?? state.mailboxes[0] ?? "INBOX";
-}
-
-function shouldShowDefaultAccountPrompt(): boolean {
-  if (!isTauriRuntime() || state.view !== "list") return false;
-  if (state.accounts.length < 2) return false;
-  if (defaultAccountIdFromPrefs()) return false;
-  try {
-    if (window.localStorage.getItem(DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY) === "1") return false;
-  } catch {
-    /* ignore */
-  }
-  return true;
-}
-
-async function persistDefaultAccountId(accountId: string): Promise<void> {
-  const id = accountId.trim();
-  if (!id || !state.accounts.some((a) => a.id === id)) {
-    toast("Compte introuvable.");
-    return;
-  }
-  if (!isTauriRuntime()) return;
-  state.appPrefs.general.defaultAccountId = id;
-  await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
 }
 
 async function switchActiveAccount(accountId: string): Promise<void> {
@@ -2104,23 +2023,6 @@ async function openOrganizationV2View() {
     state.organizationV2.scanning = false;
     if (state.view === "organizationV2") render();
   }
-}
-
-function mailboxPathDelimiter(mb: string): string {
-  return mb.includes("/") ? "/" : ".";
-}
-
-function mailboxLeafName(path: string): string {
-  const segs = splitMailboxSegments(path);
-  return segs[segs.length - 1] ?? path;
-}
-
-function reparentMailboxPath(from: string, newParent: string): string {
-  const leaf = mailboxLeafName(from);
-  const parent = newParent.trim();
-  if (!parent) return leaf;
-  const delim = mailboxPathDelimiter(parent);
-  return `${parent.replace(/[/.]$/, "")}${delim}${leaf}`;
 }
 
 async function refreshFolderManagerTree(): Promise<void> {
@@ -3643,28 +3545,6 @@ function repairSummaryResultStrings(o: SummaryResult): SummaryResult {
 function summaryResultToZenText(o: SummaryResult): string {
   const r = repairSummaryResultStrings(o);
   return `${r.title}\n\n${r.bullets.map((bullet) => `- ${bullet}`).join("\n")}`;
-}
-
-async function withLlmQueue<T>(
-  label: string,
-  fn: (signal: AbortSignal) => Promise<T>
-): Promise<T | null> {
-  if (state.llmJobLabel) {
-    toast(`IA occupée (${state.llmJobLabel}). Annulez ou attendez la fin.`);
-    return null;
-  }
-  abortIdleAiCachePrefetchInFlight();
-  const ac = new AbortController();
-  llmQueueAbort = ac;
-  state.llmJobLabel = label;
-  render();
-  try {
-    return await fn(ac.signal);
-  } finally {
-    if (llmQueueAbort === ac) llmQueueAbort = null;
-    state.llmJobLabel = null;
-    render();
-  }
 }
 
 function normalizeRecipientEmailForDiff(email: string): string {
@@ -6134,66 +6014,6 @@ async function llmInboxDigestUi() {
   openMailboxDigestPanel(true);
 }
 
-async function composeAiRewrite(styleRaw: string) {
-  if (state.view !== "compose") {
-    toast("Ouvre le compositeur pour réécrire.");
-    return;
-  }
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureComposeRewriteEnabled")) {
-    toast("Réécriture IA désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
-    return;
-  }
-  const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  const src = ta?.value ?? state.composeBody;
-  const style = styleRaw.trim() || "Neutral";
-  if (!isTauriRuntime()) return void toast("Réécriture IA : Tauri requis.");
-  const ran = await withLlmQueue(`Réécriture ${style}`, async (signal) => {
-    if (signal.aborted) return;
-    toast(`Réécriture « ${style} »…`);
-    const res = await withTimeout(invoke<{ text: string }>("llm_rewrite_compose", { text: src, style }), LLM_INVOKE_TIMEOUT_MS);
-    if (signal.aborted) return;
-    state.composeCanonicalBody = res.text ?? src;
-    state.composeBody = res.text ?? src;
-    if (ta) ta.value = res.text ?? src;
-    toast("Texte réécrit.");
-    render();
-    void computePreview();
-  });
-  if (ran === null) return;
-}
-
-async function composeAiGrammar() {
-  if (state.view !== "compose") {
-    toast("Ouvre le compositeur.");
-    return;
-  }
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureComposeGrammarEnabled")) {
-    toast("Correction grammaticale désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
-    return;
-  }
-  const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  const src = ta?.value ?? state.composeBody;
-  if (!isTauriRuntime()) return void toast("Correction (LLM) : Tauri requis.");
-  const ran = await withLlmQueue("Orthographe", async (signal) => {
-    if (signal.aborted) return;
-    try {
-      const res = await withTimeout(
-        invoke<{ suggestions: Array<{ reason: string; replacement: string; original: string }> }>("llm_grammar_compose", { text: src }),
-        LLM_INVOKE_TIMEOUT_MS
-      );
-      if (signal.aborted) return;
-      const n = res.suggestions?.length ?? 0;
-      state.composeGrammarSuggestions = res.suggestions ?? [];
-      toast(n ? `${n} suggestion(s) — voir le panneau Correction entre la barre d’outils et le texte.` : "Aucune suggestion.");
-    } catch (e) {
-      state.composeGrammarSuggestions = null;
-      toast(tauriErrorMessage(e));
-    }
-    render();
-  });
-  if (ran === null) return;
-}
-
 function mouseNavBlockedByOverlay(): boolean {
   return Boolean(
     state.quoteFoldModal ||
@@ -6646,8 +6466,6 @@ registerRender(render);
 
 registerRenderDeps({
   navCurrentBreadcrumbSegment,
-  shouldShowDefaultAccountPrompt,
-  defaultAccountIdFromPrefs,
   normalizeThreadSenderLabel,
   formatThreadReadingWhen,
   sortMessagesByReceivedDescending,
@@ -6699,7 +6517,6 @@ registerRenderDeps({
   isSearchActive,
   searchViewBatchJobStatusText,
   folderManagerPanelMailbox,
-  cleanThreadListPreview,
   threadParticipantsWithEmails,
   threadQuickReplyTargetName,
   threadParticipantFirstMessageIds,
@@ -6732,7 +6549,6 @@ registerRenderDeps({
   micAriaLabel,
   formatDraftRevisionStamp,
   sanitizeEmailHtml,
-  defaultListFilterFromPrefs,
   settingsDraftProfile,
   mergedProfileForAccountsForm,
   buildSettingsAiPanelDeps,
@@ -6807,7 +6623,6 @@ registerSearchViewBatchDeps({
 
 registerSearchLaunchDeps({
   clearThreadAiSummaryState,
-  ensureValidSelectedMailbox,
   refreshSearchTagCatalog,
 });
 
@@ -6842,7 +6657,6 @@ registerThreadListActionsDeps({
 });
 
 registerMailboxManageActionDeps({
-  ensureValidSelectedMailbox,
   loadMailboxUnread,
   loadMailView,
 });
@@ -6876,9 +6690,7 @@ registerCycleComposeLayoutDeps({
 registerLlmQueueCancelDeps({
   cancelActiveLlmStreamJob,
   abortIdleAiCachePrefetchInFlight,
-  abortLlmQueue: () => {
-    llmQueueAbort?.abort();
-  },
+  abortLlmQueue: abortLlmQueueJob,
 });
 
 registerComposeSendDraftRunDeps({
@@ -6922,24 +6734,16 @@ registerThreadAiWireActionsDeps({
   llmQaThreadUi,
 });
 
-registerComposeAiWireActionsDeps({
-  composeAiRewrite,
-  composeAiGrammar,
-});
-
 registerAccountsLoadActionDeps({ loadAccountsFromBackend });
 
 registerSettingsWireActionsDeps({
   openSettingsView,
-  ensureValidSelectedMailbox,
   refreshSemanticEmbeddingCounts,
   refreshSettingsPathsFromBackend,
   openEnginesAiSettingsModal,
   finalizeSettingsAiModalClose,
-  persistDefaultAccountId,
   switchActiveAccount,
   syncActivityRecordingPrefs,
-  defaultListFilterFromPrefs,
   persistAiPrefsFromDom,
   refreshLlmRuntimeStatus,
   autoDetectLlamaServerBinary,

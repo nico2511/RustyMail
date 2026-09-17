@@ -8,9 +8,9 @@ import { toast } from "../lib/toast";
 import { openConfirmModal, openTextPromptModal } from "../modals/promptConfirm";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 
 export type MailboxManageActionDeps = {
-  ensureValidSelectedMailbox: () => void;
   loadMailboxUnread: () => Promise<void>;
   loadMailView: (append?: boolean) => Promise<void>;
 };
@@ -112,7 +112,7 @@ export async function mailboxManageAction(
     }
     toast(msg);
     state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: account.id }, [], BOOT_INVOKE_TIMEOUT_MS);
-    d.ensureValidSelectedMailbox();
+    ensureValidSelectedMailbox();
     state.mailboxManageOpen = false;
     await d.loadMailboxUnread();
     await d.loadMailView(false);

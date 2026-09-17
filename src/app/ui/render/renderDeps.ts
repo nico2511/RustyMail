@@ -22,8 +22,6 @@ import type { AssistSkillId } from "../../../assistAgent";
 /** Callbacks laissés dans application.ts pour éviter les imports circulaires depuis les modules render. */
 export type RenderDeps = {
   navCurrentBreadcrumbSegment: () => string | null;
-  shouldShowDefaultAccountPrompt: () => boolean;
-  defaultAccountIdFromPrefs: () => string | undefined;
   normalizeThreadSenderLabel: (sender: string) => string;
   formatThreadReadingWhen: (receivedAt: string) => string;
   sortMessagesByReceivedDescending: (messages: CleanedMessageView[]) => CleanedMessageView[];
@@ -53,7 +51,6 @@ export type RenderDeps = {
   isSearchActive: () => boolean;
   searchViewBatchJobStatusText: () => string;
   folderManagerPanelMailbox: () => string | null;
-  cleanThreadListPreview: (raw: string) => string;
   threadParticipantsWithEmails: (messages: CleanedMessageView[]) => ThreadParticipantLink[];
   threadQuickReplyTargetName: (msgs: CleanedMessageView[]) => string;
   threadParticipantFirstMessageIds: (messages: CleanedMessageView[]) => Set<string>;
@@ -105,7 +102,6 @@ export type RenderDeps = {
     input: string,
     opts?: { allowRemoteImages?: boolean; relocateUnsubscribe?: boolean; stripOutlookNoise?: boolean },
   ) => { html: string; unsubscribeLinks: MailUnsubscribeLink[] };
-  defaultListFilterFromPrefs: () => State["listFilter"];
   settingsDraftProfile: () => Account | undefined;
   mergedProfileForAccountsForm: () => Account | undefined;
   buildSettingsAiPanelDeps: () => SettingsAiPanelDeps;

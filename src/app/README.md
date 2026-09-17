@@ -99,6 +99,12 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/composeMicUiHints.ts` | Titres micro / aria (compose + Q&R fil) |
 | `app/mail/composeDictationRewrite.ts` | Réécriture segment dicté (ton) |
 | `app/mail/composeMicDictation.ts` | `micAction`, enregistrement, PTT |
+| `app/mail/accountDefaultPrefs.ts` | Compte/dossier par défaut, filtre liste, boîte valide |
+| `app/mail/mailListPreviewClean.ts` | Aperçu liste sans HTML/CSS bruit |
+| `app/mail/aiCacheKeySegment.ts` | Segment clé cache LLM (`ai_cache_llm_segment`) |
+| `app/mail/folderManagerPathUtil.ts` | Chemins dossiers IMAP (délimiteur, reparent) |
+| `app/mail/llmJobQueue.ts` | File jobs LLM (`withLlmQueue`, annulation) |
+| `app/mail/composeAiComposeLlm.ts` | Réécriture / grammaire IA dans le compositeur |
 | `app/mail/composeSendDraftAction.ts` | Ré-export `sendDraft()` |
 | `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
 | `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |

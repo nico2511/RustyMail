@@ -2,6 +2,10 @@ import { navRenderTrailHtml } from "../../../navigation";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
+import {
+  defaultAccountIdFromPrefs,
+  shouldShowDefaultAccountPrompt,
+} from "../../mail/accountDefaultPrefs";
 import { renderDeps } from "./renderDeps";
 
 export function renderViewNavTrail(actionsHtml?: string): string {
@@ -30,8 +34,8 @@ export function renderFolderSidebarCountPill(mb: string): string {
 }
 
 export function renderDefaultAccountPromptBanner(): string {
-  if (!renderDeps().shouldShowDefaultAccountPrompt()) return "";
-  const prefId = renderDeps().defaultAccountIdFromPrefs();
+  if (!shouldShowDefaultAccountPrompt()) return "";
+  const prefId = defaultAccountIdFromPrefs();
   const opts = state.accounts
     .map((a) => {
       const label = (a.displayName || a.email || a.id).trim();

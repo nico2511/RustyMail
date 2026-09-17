@@ -13,6 +13,7 @@ import { iconSvg } from "../../lib/iconSvg";
 import { initials } from "../../lib/tags";
 import { state } from "../../state";
 import { newsletterEmailListed } from "../../mail/newsletterRulesMatch";
+import { cleanThreadListPreview } from "../../mail/mailListPreviewClean";
 import { renderDeps } from "./renderDeps";
 import { renderThreadNlRuleButton } from "./threadViewRender";
 
@@ -57,7 +58,7 @@ export function renderOrgThreadSampleRow(ref: OrgThreadRef, proposal: OrgProposa
   const mbRaw = ref.mailbox || "INBOX";
   const { label: folderLabel } = threadMailboxListLabel(mbRaw);
   const folderTitle = escapeAttr(threadMailboxColumnTitle(mbRaw));
-  const previewClean = d.cleanThreadListPreview(ref.preview ?? "");
+  const previewClean = cleanThreadListPreview(ref.preview ?? "");
   const activityRaw = ref.lastActivity ?? "";
   const activityDisplay = formatFriendlyThreadListDate(activityRaw);
   const activityTip = escapeAttr(threadListActivityTooltip(activityRaw));
