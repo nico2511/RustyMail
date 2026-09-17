@@ -77,6 +77,7 @@ import {
   type AssistMode,
   type AssistSkillId,
   type State,
+  prepareReply,
 } from "./deps";
 
 export async function tryHandleComposeSettings(action: string, element?: HTMLElement): Promise<boolean> {
@@ -89,7 +90,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         state.selectedThreadId?.trim() &&
         !callApp("threadIsAutoMail", state.selectedThread, state.selectedThreadId)
       ) {
-        void callApp("prepareReply");
+        void prepareReply();
         return true;
       }
       callApp("enterComposeView");

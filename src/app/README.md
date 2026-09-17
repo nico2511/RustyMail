@@ -52,6 +52,8 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/appNavActions.ts` | `goBack` / `navigateToInbox` (facade deps) + `registerAppNavActionsDeps()` |
 | `app/mail/mailboxManageAction.ts` | CRUD dossier IMAP (modale gérer) + `registerMailboxManageActionDeps()` |
 | `app/mail/syncInboxAction.ts` | Facade `syncInbox()` + `registerSyncInboxActionDeps()` |
+| `app/mail/composeThreadReply.ts` | Répondre / transférer depuis un fil + `registerComposeThreadReplyDeps()` |
+| `app/mail/mailLinkOpen.ts` | Liens mail (normalisation href, ouverture externe) |
 | `app/mail/mailListView.ts` | `loadMailView` + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
@@ -81,7 +83,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `aiPanelRender.ts` | Panneau Détails / brief dossier / agent IA |
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
-| `wireEvents/handleAction*.ts` | `handleAction()` découpé (settings, thread/compose, org/dossiers, inbox/recherche) |
+| `wireEvents/handleAction*.ts` | Dispatch actions — inbox sans pont ; compose/settings/org via **`callApp()`** ou imports **`app/mail/*`** |
 | `wireEvents/appWireFacades.ts` | Facades vers handlers restés dans `application.ts` (compose, agents, carnet…) |
 | `wireEvents/callApp.ts` | Appels vers le pont bridge par nom (`callApp("handler")`) |
 | `wireEvents/deps.ts` | Imports partagés + facades mail / wireEvents |

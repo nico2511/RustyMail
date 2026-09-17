@@ -2,6 +2,14 @@
 import { callApp } from "./callApp";
 import {
   currentAccount,
+  decodeHtmlEntitiesLoose,
+  normalizeMailHrefForOpen,
+  openExternalFromMailHref,
+  prepareForward,
+  prepareForwardToMessage,
+  prepareReply,
+  prepareReplyAll,
+  prepareReplyToMessage,
   loadMailView,
   loadMailboxUnread,
   render,
@@ -203,19 +211,19 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       render();
       return true;
     case "reply":
-      await callApp("prepareReply");
+      await prepareReply();
       return true;
     case "reply-one":
-      await callApp("prepareReplyToMessage", element?.dataset.msgId ?? "");
+      await prepareReplyToMessage(element?.dataset.msgId ?? "");
       return true;
     case "reply-all":
-      await callApp("prepareReplyAll");
+      await prepareReplyAll();
       return true;
     case "forward":
-      await callApp("prepareForward");
+      await prepareForward();
       return true;
     case "forward-one":
-      await callApp("prepareForwardToMessage", element?.dataset.msgId ?? "");
+      await prepareForwardToMessage(element?.dataset.msgId ?? "");
       return true;
     case "download-all-attachments": {
       const mid = element?.dataset.msgId?.trim();
@@ -224,18 +232,18 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     }
     case "contacts-entity-open": {
       const href = element?.dataset.href?.trim();
-      if (href) void callApp("openExternalFromMailHref", href);
+      if (href) void openExternalFromMailHref(href);
       return true;
     }
     case "contacts-entity-mailto": {
       const email = element?.dataset.email?.trim();
-      if (email) void callApp("openExternalFromMailHref", `mailto:${email}`);
+      if (email) void openExternalFromMailHref(`mailto:${email}`);
       return true;
     }
     case "mail-unsubscribe-open": {
-      const href = callApp("decodeHtmlEntitiesLoose", element?.dataset.href?.trim() ?? "");
-      const normalized = callApp("normalizeMailHrefForOpen", href);
-      if (normalized) void callApp("openExternalFromMailHref", normalized);
+      const href = decodeHtmlEntitiesLoose(element?.dataset.href?.trim() ?? "");
+      const normalized = normalizeMailHrefForOpen(href);
+      if (normalized) void openExternalFromMailHref(normalized);
       else toast("Lien de désabonnement invalide.");
       return true;
     }
@@ -473,7 +481,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         const s = state.quickReplySuggestions[idx];
         if (!s?.text) return true;
         state.composeGrammarSuggestions = null;
-        await callApp("prepareReply");
+        await prepareReply();
         const add = `${s.text.trim()}\n\n`;
         state.composeBody = `${add}${state.composeBody}`;
         state.composeCanonicalBody = state.composeBody;
@@ -483,7 +491,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         toast("Texte inséré dans le compositeur.");
         render();
       } else {
-        await callApp("prepareReply");
+        await prepareReply();
       }
       return true;
     }

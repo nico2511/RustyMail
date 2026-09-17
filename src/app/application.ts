@@ -49,8 +49,6 @@ import { notifyImapWatchFocusedMailbox as notifyImapWatchFocusedMailboxCore } fr
 
 import { mergeServerThreadPage } from "../mailListPage";
 
-import { appendQuotedMessageToDraft } from "../composeQuote";
-
 import {
   formatFriendlyThreadListDate,
   parseThreadListActivityDate,
@@ -222,6 +220,15 @@ import { registerSyncInboxActionDeps } from "./mail/syncInboxAction";
 import {
   registerEmptyTrashMailboxDeps,
 } from "./mail/emptyTrashMailbox";
+import {
+  currentThreadIdForReply,
+  registerComposeThreadReplyDeps,
+} from "./mail/composeThreadReply";
+import {
+  decodeHtmlEntitiesLoose,
+  normalizeMailHrefForOpen,
+  openExternalFromMailHref,
+} from "./mail/mailLinkOpen";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -683,13 +690,6 @@ function threadMessageAnchorId(messageId: string, index: number): string {
   const tail = raw ? encodeURIComponent(raw).replace(/%/g, "_") : "empty";
   const base = `msg-${index}-${tail}`;
   return base.length > 240 ? base.slice(0, 240) : base;
-}
-
-function currentThreadIdForReply(): string | undefined {
-  const a = state.selectedThreadId?.trim();
-  if (a) return a;
-  const b = state.threads[0]?.id;
-  return b ? String(b) : undefined;
 }
 
 function syncPreviewOpenFromComposeLayout() {
@@ -4015,56 +4015,12 @@ function messageHtmlForDisplay(message: CleanedMessageView, mode: MessageViewMod
   return message.htmlBody?.trim() || null;
 }
 
-function normalizeMailHrefForOpen(href: string): string | null {
-  const t = href.trim();
-  if (!t || /^javascript:/i.test(t)) return null;
-  if (t.startsWith("#")) return null;
-  if (t.startsWith("cid:")) return null;
-  if (/^https?:\/\//i.test(t)) return t;
-  if (t.startsWith("//")) return `https:${t}`;
-  if (/^mailto:/i.test(t) || /^tel:/i.test(t)) return t;
-  return null;
-}
-
-function decodeHtmlEntitiesLoose(input: string): string {
-  // `data-*` attrs are usually decoded by the DOM, but keep this as a safety net
-  // for copied/serialized fragments where `&amp;` survives.
-  return input
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, "\"")
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/gi, "'");
-}
-
 function mailUrlLooksRemote(raw: string): boolean {
   return /^https?:\/\//i.test(raw.trim()) || raw.trim().startsWith("//");
 }
 
 function safeDataImageSrc(raw: string): boolean {
   return /^data:image\/(?:png|jpe?g|gif|webp|bmp);base64,/i.test(raw.trim());
-}
-
-async function openExternalFromMailHref(href: string): Promise<void> {
-  const raw = href.trim();
-  if (!raw) return;
-  try {
-    if (isTauriRuntime()) {
-      const { openUrl } = await import("@tauri-apps/plugin-opener");
-      await openUrl(raw);
-    } else {
-      // `mailto:` should trigger the system mail composer (not a browser tab).
-      if (/^mailto:/i.test(raw)) {
-        window.location.assign(raw);
-        return;
-      }
-      window.open(raw, "_blank", "noopener,noreferrer");
-    }
-  } catch (e) {
-    console.error("openExternalFromMailHref", e);
-    toast(`Impossible d'ouvrir le lien : ${tauriErrorMessage(e)}`);
-  }
 }
 
 function sanitizeEmailHtml(
@@ -6937,67 +6893,6 @@ async function syncInbox(options?: { background?: boolean; allMailboxes?: boolea
   }
 }
 
-async function prepareReply() {
-  const threadId = currentThreadIdForReply();
-  if (!threadId) {
-    toast("Aucun fil sélectionné.");
-    return;
-  }
-  try {
-    state.draft = await withTimeout(invoke<Draft>("prepare_reply", { threadId, messageId: null }), MAIL_ACTION_TIMEOUT_MS);
-  } catch (error) {
-    console.error("Tauri command failed: prepare_reply", error);
-    toast(`Impossible de préparer la réponse: ${tauriErrorMessage(error)}`);
-    return;
-  }
-  loadComposeMarkdownIntoEditor(state.draft.markdownBody);
-  enterComposeView();
-  startNewDraftSession();
-  state.composeCcBccOpen = draftHasRecipientsExtra(state.draft);
-  state.composeLayout = "split";
-  syncPreviewOpenFromComposeLayout();
-  resetMarkdownEditorHistory();
-  render();
-  window.setTimeout(() => void computePreview(), 0);
-  scheduleDraftRevisionSave(350);
-}
-
-async function prepareReplyToMessage(messageId: string) {
-  const mid = messageId.trim();
-  if (!mid) return;
-  const threadId = currentThreadIdForReply();
-  if (!threadId) {
-    toast("Aucun fil sélectionné.");
-    return;
-  }
-  const thread = state.selectedThread;
-  const msg = thread?.messages.find((m) => m.messageId === mid);
-  if (!msg) {
-    await prepareReply();
-    return;
-  }
-  try {
-    state.draft = await withTimeout(invoke<Draft>("prepare_reply", { threadId, messageId: mid }), MAIL_ACTION_TIMEOUT_MS);
-  } catch (error) {
-    console.error("Tauri command failed: prepare_reply (quote)", error);
-    toast(`Impossible de préparer la réponse: ${tauriErrorMessage(error)}`);
-    return;
-  }
-  const header = `${formatThreadReadingWhen(msg.receivedAt)} — ${msg.sender}`;
-  const body = (msg.cleanedText || msg.sourceText || "").trim();
-  const next = appendQuotedMessageToDraft(state.draft?.markdownBody ?? "", header, body);
-  loadComposeMarkdownIntoEditor(next);
-  enterComposeView();
-  startNewDraftSession();
-  state.composeCcBccOpen = draftHasRecipientsExtra(state.draft);
-  state.composeLayout = "split";
-  syncPreviewOpenFromComposeLayout();
-  resetMarkdownEditorHistory();
-  render();
-  window.setTimeout(() => void computePreview(), 0);
-  scheduleDraftRevisionSave(350);
-}
-
 async function sendQuickReply(kind: "reply" | "reply-all") {
   const quickInput = document.querySelector<HTMLInputElement>("[data-quick-reply]");
   const body = quickInput?.value.trim() ?? "";
@@ -7047,84 +6942,6 @@ async function sendQuickReply(kind: "reply" | "reply-all") {
     console.error("send_draft (quick reply)", error);
     toast(`Envoi échoué: ${tauriErrorMessage(error)}`);
   }
-}
-
-async function prepareReplyAll() {
-  const threadId = currentThreadIdForReply();
-  if (!threadId) {
-    toast("Aucun fil sélectionné.");
-    return;
-  }
-  try {
-    state.draft = await withTimeout(invoke<Draft>("prepare_reply_all", { threadId }), MAIL_ACTION_TIMEOUT_MS);
-  } catch (error) {
-    console.error("Tauri command failed: prepare_reply_all", error);
-    toast(`Impossible de préparer la réponse: ${tauriErrorMessage(error)}`);
-    return;
-  }
-  loadComposeMarkdownIntoEditor(state.draft.markdownBody);
-  enterComposeView();
-  startNewDraftSession();
-  state.composeCcBccOpen = draftHasRecipientsExtra(state.draft);
-  state.composeLayout = "split";
-  syncPreviewOpenFromComposeLayout();
-  resetMarkdownEditorHistory();
-  render();
-  window.setTimeout(() => void computePreview(), 0);
-  scheduleDraftRevisionSave(350);
-}
-
-async function prepareForward() {
-  await prepareForwardWithOptionalMessage(null);
-}
-
-async function prepareForwardToMessage(messageId: string) {
-  const mid = messageId.trim();
-  if (!mid) {
-    await prepareForward();
-    return;
-  }
-  const threadId = currentThreadIdForReply();
-  if (!threadId) {
-    toast("Aucun fil sélectionné.");
-    return;
-  }
-  const thread = state.selectedThread;
-  const msg = thread?.messages.find((m) => m.messageId === mid);
-  if (!msg) {
-    await prepareForward();
-    return;
-  }
-  await prepareForwardWithOptionalMessage(mid);
-}
-
-async function prepareForwardWithOptionalMessage(messageId: string | null) {
-  const threadId = currentThreadIdForReply();
-  if (!threadId) {
-    toast("Aucun fil sélectionné.");
-    return;
-  }
-  const mid = messageId?.trim() || null;
-  try {
-    state.draft = await withTimeout(
-      invoke<Draft>("prepare_forward", { threadId, messageId: mid }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-  } catch (error) {
-    console.error("Tauri command failed: prepare_forward", error);
-    toast(`Impossible de préparer le transfert: ${tauriErrorMessage(error)}`);
-    return;
-  }
-  loadComposeMarkdownIntoEditor(state.draft.markdownBody);
-  enterComposeView();
-  startNewDraftSession();
-  state.composeCcBccOpen = false;
-  state.composeLayout = "split";
-  syncPreviewOpenFromComposeLayout();
-  resetMarkdownEditorHistory();
-  render();
-  window.setTimeout(() => void computePreview(), 0);
-  scheduleDraftRevisionSave(350);
 }
 
 async function cycleComposeLayout() {
@@ -8973,16 +8790,13 @@ registerWireEventsBridge({
   agentRefreshPlanFromDraft,
   agentPrepareReplyContinue,
   discoverMailServersAction,
-  normalizeMailHrefForOpen,
   resumeOrphanDraftSession,
   onOrgV2UnignoreMailboxUi,
   confirmThenRunOrgV2Apply,
   refreshFolderManagerTree,
-  openExternalFromMailHref,
   llmQuickRepliesComposeUi,
   pickImapMailboxFallback,
   applyContextSliderIndex,
-  decodeHtmlEntitiesLoose,
   draftHasRecipientsExtra,
   saveDraftToSavedListNow,
   persistDefaultAccountId,
@@ -8990,7 +8804,6 @@ registerWireEventsBridge({
   refreshLlmRuntimeStatus,
   fmConfirmArchiveMailbox,
   openOrganizationMailbox,
-  prepareForwardToMessage,
   llmQuickRepliesThreadUi,
   confirmThenRunOrgApply,
   onOrgV2IgnoreMailboxUi,
@@ -9007,7 +8820,6 @@ registerWireEventsBridge({
   onOrgDeleteMailboxOne,
   persistAiPrefsFromDom,
   deleteSettingsAccount,
-  prepareReplyToMessage,
   llmTranslateMessageUi,
   startNewDraftSession,
   bindComposerDropzone,
@@ -9043,12 +8855,10 @@ registerWireEventsBridge({
   fmSelectMailbox,
   fmCreateMailbox,
   pickAttachments,
-  prepareReplyAll,
   summarizeThread,
   openMoveDialog,
   onThreadMoveTo,
   sendQuickReply,
-  prepareForward,
   computePreview,
   bytesToBase64,
   switchMailbox,
@@ -9057,7 +8867,6 @@ registerWireEventsBridge({
   llmQaThreadUi,
   onThreadMove,
   onThreadSeen,
-  prepareReply,
   runOrgApply,
   saveAccount,
   syncInbox,
@@ -9300,6 +9109,18 @@ registerMailboxManageActionDeps({
 });
 
 registerSyncInboxActionDeps({ syncInbox });
+
+registerComposeThreadReplyDeps({
+  loadComposeMarkdownIntoEditor,
+  resetMarkdownEditorHistory,
+  computePreview,
+  scheduleDraftRevisionSave,
+  draftHasRecipientsExtra,
+  formatThreadReadingWhen,
+  enterComposeView,
+  startNewDraftSession,
+  syncPreviewOpenFromComposeLayout,
+});
 
 registerAppWireFacades({
   enterComposeView,

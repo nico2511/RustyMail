@@ -77,6 +77,7 @@ import { commitSearchQuery } from "../mail/searchCommitQuery";
 import { syncSearchBarChrome } from "../mail/searchBarUi";
 import { refreshSearchTagCatalog } from "../mail/searchTagCatalog";
 import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
+import { normalizeMailHrefForOpen, openExternalFromMailHref } from "../mail/mailLinkOpen";
 import { render } from "../dispatch";
 import { callApp } from "./callApp";
 import { app } from "./wireEventsBridge";
@@ -584,10 +585,10 @@ export function wireEvents() {
       const a = t.closest("a[href]") as HTMLAnchorElement | null;
       if (a) {
         const raw = a.getAttribute("href")?.trim() ?? "";
-        const normalized = callApp("normalizeMailHrefForOpen", raw);
+        const normalized = normalizeMailHrefForOpen(raw);
         if (normalized) {
           ev.preventDefault();
-          void callApp("openExternalFromMailHref", normalized);
+          void openExternalFromMailHref(normalized);
         }
         return;
       }

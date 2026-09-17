@@ -139,6 +139,18 @@ export {
 } from "../mail/searchViewBatch";
 export { bulkTrashVisibleThreads } from "../mail/bulkTrashList";
 export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
+export {
+  prepareForward,
+  prepareForwardToMessage,
+  prepareReply,
+  prepareReplyAll,
+  prepareReplyToMessage,
+} from "../mail/composeThreadReply";
+export {
+  decodeHtmlEntitiesLoose,
+  normalizeMailHrefForOpen,
+  openExternalFromMailHref,
+} from "../mail/mailLinkOpen";
 export { state } from "../state";
 export { callApp } from "./callApp";
 export { app } from "../wireEventsBridge";
