@@ -1,75 +1,16 @@
-// @ts-nocheck
 import {
   currentAccount,
-  loadMailView,
   render,
-  applyListFilter,
-  threadIdsMatch,
   state,
   toast,
-  invoke,
   t,
-  isTauriRuntime,
-  MAIL_ACTION_TIMEOUT_MS,
-  BOOT_INVOKE_TIMEOUT_MS,
-  OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
-  openConfirmModal,
-  finishConfirmModal,
-  finishTextPromptModal,
-  accountFieldTouched,
-  setAllAiFeatures,
-  normalizeAiPrefsMerged,
-  navCanGoBack,
-  composeRewriteStyleFromTone,
-  mailboxDigestSlotInList,
-  dismissMailboxDigestPanel,
-  enqueueMailboxDigestRefreshWhenIdle,
-  ipcThrottleMs,
-  clearSuggestionShownKeys,
-  setLocale,
-  isSavedDraftsVirtualMailbox,
-  captureAiPrefsFieldsFromDom,
-  syncLlmEnginePrefsToDom,
-  applyEngineConnectionMode,
-  normalizeSettingsAiModalId,
-  defaultEnabledSkillIds,
-  invalidateIdleAiCachePrefetch,
-  scheduleIdleAiCachePrefetch,
-  loadContactsList,
-  isContactsListLoading,
-  contactsListHasMore,
-  getContactDetail,
-  getContactsKeywordDraft,
-  setContactsKeywordDraft,
-  loadContactDetail,
-  loadContactProfile,
-  isAiFeatureEnabled,
-  markThreadsRecentlyRemoved,
-  clearThreadsRecentlyRemoved,
-  mailboxKind,
-  threadMailboxListLabel,
   saveFolderTreeExpanded,
   setMailboxLocked,
   orgV2ScanAccount,
   orgUndoLast,
   orgScanAccount,
   orgRetagAccount,
-  safeInvoke,
-  withTimeout,
   tauriErrorMessage,
-  setSkipAccountIdentityCaptureOnce,
-  setAddressBookEditEmail,
-  addressBookRowsCache,
-  DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
-  LIST_FILTER_VALUES,
-  ENABLE_CLEAN_MESSAGE_VIEW,
-  type OAuthDesktopLoginOutcome,
-  type Draft,
-  type Tone,
-  type PromptCatalogItem,
-  type AssistMode,
-  type AssistSkillId,
-  type State,
   openOrganizationV2View,
   openContactsView,
   openOrganizationView,
@@ -89,6 +30,8 @@ import {
   runOrgApply,
   refreshOrganizationReport,
 } from "./deps";
+import type { OrgApplyProgress, OrgProposal, OrgScanReport } from "../../../organizationView";
+import type { OrgV2ScanReport } from "../../../organizationViewV2";
 
 export async function tryHandleOrgFolder(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -131,7 +74,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       if (!mb) return true;
       state.folderManager.pendingArchiveMailbox = mb;
       state.folderManager.archiveRemember = (state.folderManager.report?.autoArchiveMailboxes ?? []).some(
-        (m) => m.toLowerCase() === mb.toLowerCase(),
+        (m: string) => m.toLowerCase() === mb.toLowerCase(),
       );
       state.folderManager.archiveConfirmOpen = true;
       render();
@@ -180,11 +123,11 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       if (!acc?.id || !mb) return true;
       const locked = element?.dataset.locked === "1";
       void setMailboxLocked(acc.id, mb, !locked)
-        .then(async (list) => {
+        .then(async (list: string[]) => {
           if (state.folderManager.report) state.folderManager.report.lockedMailboxes = list;
           render();
         })
-        .catch((e) => toast(tauriErrorMessage(e)));
+        .catch((e: unknown) => toast(tauriErrorMessage(e)));
       return true;
     }
     case "fm-toggle-node": {
@@ -209,13 +152,13 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       render();
       const includeLlm = Boolean(state.appPrefs.ai.featureOrgProposalsEnabled);
       void orgV2ScanAccount(acc.id, includeLlm)
-        .then((report) => {
+        .then((report: OrgV2ScanReport) => {
           state.organizationV2.report = report;
           state.organizationV2.scanning = false;
           state.organizationV2.applyMessage = `${report.proposals.length} action(s).`;
           render();
         })
-        .catch((e) => {
+        .catch((e: unknown) => {
           state.organizationV2.scanning = false;
           state.organizationV2.applyMessage = "";
           toast(tauriErrorMessage(e));
@@ -230,13 +173,13 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.organizationV2.applyMessage = "Annulation…";
       render();
       void orgUndoLast(accUndo.id)
-        .then((p) => {
+        .then((p: OrgApplyProgress) => {
           state.organizationV2.applying = false;
           state.organizationV2.applyMessage = p.message || "Lot annulé.";
           toast(state.organizationV2.applyMessage);
           render();
         })
-        .catch((e) => {
+        .catch((e: unknown) => {
           state.organizationV2.applying = false;
           state.organizationV2.applyMessage = "";
           toast(tauriErrorMessage(e));
@@ -263,15 +206,15 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         state.organizationV2.pendingTrashProposalId = proposalId;
         state.organizationV2.pendingTrashActionOverride = null;
         render();
-        return;
+        return true;
       }
       if (element?.dataset.deleteMailbox === "1") {
         state.organizationV2.deleteMailboxConfirmOpen = true;
         state.organizationV2.pendingDeleteMailboxProposalId = proposalId;
         render();
-        return;
+        return true;
       }
-      const applyProposal = state.organizationV2.report?.proposals.find((p) => p.id === proposalId);
+      const applyProposal = state.organizationV2.report?.proposals.find((p: OrgProposal) => p.id === proposalId);
       if (!applyProposal) {
         toast("Proposition introuvable — relancez l’analyse.");
         return true;
@@ -301,7 +244,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.organizationV2.pendingTrashProposalId = null;
       state.organizationV2.pendingTrashActionOverride = null;
       render();
-      const trashProposal = state.organizationV2.report?.proposals.find((p) => p.id === pid);
+      const trashProposal = state.organizationV2.report?.proposals.find((p: OrgProposal) => p.id === pid);
       if (!trashProposal) {
         toast("Proposition introuvable — relancez l’analyse.");
         return true;
@@ -321,7 +264,7 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.organizationV2.deleteMailboxConfirmOpen = false;
       state.organizationV2.pendingDeleteMailboxProposalId = null;
       render();
-      const delMbProposal = state.organizationV2.report?.proposals.find((p) => p.id === pid);
+      const delMbProposal = state.organizationV2.report?.proposals.find((p: OrgProposal) => p.id === pid);
       if (!delMbProposal) {
         toast("Proposition introuvable — relancez l’analyse.");
         return true;
@@ -339,13 +282,13 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       state.organization.applyMessage = "Analyse de la boîte (structure, propositions)…";
       render();
       void orgScanAccount(acc.id, Boolean(state.appPrefs.ai.featureOrgProposalsEnabled))
-        .then((report) => {
+        .then((report: OrgScanReport) => {
           state.organization.report = report;
           state.organization.scanning = false;
           state.organization.applyMessage = `${report.proposals.length} proposition(s).`;
           render();
         })
-        .catch((e) => {
+        .catch((e: unknown) => {
           state.organization.scanning = false;
           state.organization.applyMessage = "";
           toast(tauriErrorMessage(e));
@@ -388,13 +331,13 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
         state.organization.pendingTrashProposalId = proposalId;
         state.organization.pendingTrashActionOverride = null;
         render();
-        return;
+        return true;
       }
       if (element?.dataset.deleteMailbox === "1") {
         state.organization.deleteMailboxConfirmOpen = true;
         state.organization.pendingDeleteMailboxProposalId = proposalId;
         render();
-        return;
+        return true;
       }
       void confirmThenRunOrgApply(acc.id, proposalId);
       return true;
@@ -440,14 +383,14 @@ export async function tryHandleOrgFolder(action: string, element?: HTMLElement):
       toast("Recalcul des tags sur tout le compte…");
       render();
       void orgRetagAccount(acc.id, false)
-        .then(async (p) => {
+        .then(async (p: OrgApplyProgress) => {
           state.organization.applying = false;
           state.organization.applyMessage = p.message;
           toast(p.message);
           await refreshOrganizationReport();
           render();
         })
-        .catch((e) => {
+        .catch((e: unknown) => {
           state.organization.applying = false;
           state.organization.applyMessage = "";
           toast(tauriErrorMessage(e));
