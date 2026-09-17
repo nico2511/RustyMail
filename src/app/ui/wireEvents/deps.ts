@@ -1,14 +1,15 @@
-// @ts-nocheck
 /** Shared imports for wireEvents DOM wiring and handleAction dispatchers. */
+import { wireEventsContext } from "./wireEventsContext";
+import type { AddressBookRow } from "../../types";
 export { invoke } from "@tauri-apps/api/core";
-export { ipcThrottleMs } from "../../ipc_bridge";
-export { clearSuggestionShownKeys } from "../../activity";
+export { ipcThrottleMs } from "../../../ipc_bridge";
+export { clearSuggestionShownKeys } from "../../../activity";
 export {
   accountFieldTouched,
   applyDomainPresetIfSafe,
   serverFieldSelectors,
   serverSidesFromPreset,
-} from "../../accountSetup";
+} from "../../../accountSetup";
 export {
   clearAccountOAuthWizard,
   resetNewAccountSetupState,
@@ -17,16 +18,16 @@ export {
   clearDiscoveredServerSnap,
   setDiscoveredServersFormSnap,
 } from "../../account/discoveredServerSnap";
-export { isAtAutocompletePanelOpen } from "../../atAutocomplete";
-export { isHashAutocompletePanelOpen } from "../../hashAutocomplete";
-export { isAiFeatureEnabled, setAllAiFeatures } from "../../aiFeatures";
+export { isAtAutocompletePanelOpen } from "../../../atAutocomplete";
+export { isHashAutocompletePanelOpen } from "../../../hashAutocomplete";
+export { isAiFeatureEnabled, setAllAiFeatures } from "../../../aiFeatures";
 export {
   captureAiFeatureTogglesFromDom,
   captureAiPrefsFieldsFromDom,
   persistAiFeaturePrefs,
   syncLlmEnginePrefsToDom,
-} from "../../aiPrefsPersist";
-export { defaultEnabledSkillIds, type AssistMode, type AssistSkillId } from "../../assistAgent";
+} from "../../../aiPrefsPersist";
+export { defaultEnabledSkillIds, type AssistMode, type AssistSkillId } from "../../../assistAgent";
 export {
   contactsListHasMore,
   getContactDetail,
@@ -36,8 +37,8 @@ export {
   loadContactProfile,
   loadContactsList,
   setContactsKeywordDraft,
-} from "../../contactsView";
-export { setLocale, t } from "../../i18n";
+} from "../../../contactsView";
+export { setLocale, t } from "../../../i18n";
 export {
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   ENABLE_CLEAN_MESSAGE_VIEW,
@@ -48,51 +49,52 @@ export {
   isSavedDraftsVirtualMailbox,
   mailboxKind,
   threadMailboxListLabel,
-} from "../../mailboxKinds";
-export { saveFolderTreeExpanded } from "../../mailboxTree";
-export { navCanGoBack } from "../../navigation";
-export { orgRetagAccount, orgScanAccount, orgUndoLast } from "../../organizationView";
-export { orgV2ScanAccount } from "../../organizationViewV2";
-export { normalizeAiPrefsMerged } from "../../prefs_defaults";
+} from "../../../mailboxKinds";
+export { saveFolderTreeExpanded } from "../../../mailboxTree";
+export { navCanGoBack } from "../../../navigation";
+export { orgRetagAccount, orgScanAccount, orgUndoLast } from "../../../organizationView";
+export { orgV2ScanAccount } from "../../../organizationViewV2";
+export { normalizeAiPrefsMerged } from "../../../prefs_defaults";
 export {
   clearThreadsRecentlyRemoved,
   markThreadsRecentlyRemoved,
-} from "../../recentlyRemovedThreads";
+} from "../../../recentlyRemovedThreads";
 export {
   applyEngineConnectionMode,
   normalizeSettingsAiModalId,
-} from "../../settingsAiPanel";
-export { setMailboxLocked } from "../../folderManagerView";
-export { composeRewriteStyleFromTone, type Tone } from "../core/composeTone";
+} from "../../../settingsAiPanel";
+export { setMailboxLocked } from "../../../folderManagerView";
+export { composeRewriteStyleFromTone } from "../../core/composeTone";
+export type { Tone } from "../../types";
 export {
   BOOT_INVOKE_TIMEOUT_MS,
   DEFAULT_INVOKE_TIMEOUT_MS,
   MAIL_ACTION_TIMEOUT_MS,
   OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
-} from "../core/timeouts";
-export { isTauriRuntime } from "../lib/tauriRuntime";
-export { toast } from "../lib/toast";
+} from "../../core/timeouts";
+export { isTauriRuntime } from "../../lib/tauriRuntime";
+export { toast } from "../../lib/toast";
 export {
   dismissMailboxDigestPanel,
   enqueueMailboxDigestRefreshWhenIdle,
   mailboxDigestSlotInList,
-} from "../mail/mailboxDigest";
+} from "../../mail/mailboxDigest";
 export {
   invalidateIdleAiCachePrefetch,
   scheduleIdleAiCachePrefetch,
-} from "../mail/idleAiCachePrefetch";
+} from "../../mail/idleAiCachePrefetch";
 export {
   finishConfirmModal,
   finishTextPromptModal,
   openConfirmModal,
-} from "../modals/promptConfirm";
-export { currentAccount } from "../core/accountContext";
-export { threadIdsMatch } from "../lib/threadIdsMatch";
-export { applyListFilter, loadMailView, loadMailboxUnread, loadThreadsForSearchContext } from "../mail/mailListView";
-export { render } from "../dispatch";
-export { goBack, navigateToInbox, navigateToBreadcrumbIndex } from "../mail/appNavActions";
-export { syncInbox } from "../mail/syncInboxAction";
-export { mailboxManageAction } from "../mail/mailboxManageAction";
+} from "../../modals/promptConfirm";
+export { currentAccount } from "../../core/accountContext";
+export { threadIdsMatch } from "../../lib/threadIdsMatch";
+export { applyListFilter, loadMailView, loadMailboxUnread, loadThreadsForSearchContext } from "../../mail/mailListView";
+export { render } from "../../dispatch";
+export { goBack, navigateToInbox, navigateToBreadcrumbIndex } from "../../mail/appNavActions";
+export { syncInbox } from "../../mail/syncInboxAction";
+export { mailboxManageAction } from "../../mail/mailboxManageAction";
 export {
   confirmMoveDialog,
   onThreadMove,
@@ -100,29 +102,29 @@ export {
   onThreadSeen,
   onThreadToggleFollow,
   openMoveDialog,
-} from "../mail/threadListActions";
-export { searchThreads } from "../mail/searchThreadsRun";
-export { fetchOpenThreadOrNotify } from "../mail/fetchOpenThread";
-export { openThread } from "../mail/openThreadView";
+} from "../../mail/threadListActions";
+export { searchThreads } from "../../mail/searchThreadsRun";
+export { fetchOpenThreadOrNotify } from "../../mail/fetchOpenThread";
+export { openThread } from "../../mail/openThreadView";
 export {
   clearSearchAndReloadInbox,
   commitSearchQuery,
   resetManualSearchNlFilters,
   searchDraftDiffersFromCommitted,
   searchNlAssist,
-} from "../mail/searchCommitQuery";
+} from "../../mail/searchCommitQuery";
 export {
   launchContactMailSearch,
   launchDomainMailSearch,
   launchTagMailSearchFromRawFamily,
-} from "../mail/searchLaunchQueries";
-export { usesSearchContextLoader } from "../mail/searchQueryContext";
-export { isSearchActive } from "../mail/searchQueryContext";
+} from "../../mail/searchLaunchQueries";
+export { usesSearchContextLoader } from "../../mail/searchQueryContext";
+export { isSearchActive } from "../../mail/searchQueryContext";
 export {
   closeSearchModal,
   openSearchModal,
   syncSearchBarChrome,
-} from "../mail/searchBarUi";
+} from "../../mail/searchBarUi";
 export {
   acceptSuggestedSavedView,
   applySavedSearchView,
@@ -131,50 +133,50 @@ export {
   markActiveSavedSearchSeen,
   refreshSuggestedSavedViews,
   saveCurrentSearchView,
-} from "../mail/savedSearchViews";
+} from "../../mail/savedSearchViews";
 export {
   bulkArchiveSearchViewThreads,
   bulkMarkReadSearchViewThreads,
   runFluxAffinerFromSearchView,
-} from "../mail/searchViewBatch";
-export { bulkTrashVisibleThreads } from "../mail/bulkTrashList";
-export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
-export { groupCollapsedQuotesByAttribution } from "../mail/collapsedQuotesGroup";
-export { downloadAllAttachmentsForMessage } from "../mail/downloadAllAttachments";
-export { loadNewsletterRules } from "../mail/newsletterRulesLoad";
-export { threadIsAutoMail } from "../mail/threadAutoMail";
-export { sendQuickReply } from "../mail/composeSendQuickReply";
-export { draftHasRecipientsExtra } from "../mail/composeDraftRecipients";
-export { pickImapMailboxFallback } from "../mail/mailboxImapFallback";
-export { switchMailbox } from "../mail/switchMailboxAction";
+} from "../../mail/searchViewBatch";
+export { bulkTrashVisibleThreads } from "../../mail/bulkTrashList";
+export { onEmptyTrashMailbox } from "../../mail/emptyTrashMailbox";
+export { groupCollapsedQuotesByAttribution } from "../../mail/collapsedQuotesGroup";
+export { downloadAllAttachmentsForMessage } from "../../mail/downloadAllAttachments";
+export { loadNewsletterRules } from "../../mail/newsletterRulesLoad";
+export { threadIsAutoMail } from "../../mail/threadAutoMail";
+export { sendQuickReply } from "../../mail/composeSendQuickReply";
+export { draftHasRecipientsExtra } from "../../mail/composeDraftRecipients";
+export { pickImapMailboxFallback } from "../../mail/mailboxImapFallback";
+export { switchMailbox } from "../../mail/switchMailboxAction";
 export {
   clearDraftSession,
   discardCurrentDraftSession,
   finalizeCloseComposeFromUser,
   leaveComposeViewAfterClose,
-} from "../mail/composeCloseFlow";
-export { removeAttachment, clearAttachments } from "../mail/composeAttachmentsAction";
-export { cycleComposeLayout } from "../mail/cycleComposeLayout";
-export { cancelLlmQueueJob } from "../mail/llmQueueCancel";
-export { sendDraft } from "../mail/composeSendDraftAction";
+} from "../../mail/composeCloseFlow";
+export { removeAttachment, clearAttachments } from "../../mail/composeAttachmentsAction";
+export { cycleComposeLayout } from "../../mail/cycleComposeLayout";
+export { cancelLlmQueueJob } from "../../mail/llmQueueCancel";
+export { sendDraft } from "../../mail/composeSendDraftAction";
 export {
   computePreview,
   loadComposeMarkdownIntoEditor,
   resetMarkdownEditorHistory,
   scheduleDraftRevisionSave,
-} from "../mail/composeComposerBridge";
-export { refreshDraftRevisions } from "../mail/composeDraftRevisions";
-export { computeDraftDiffAgainstRevision } from "../mail/composeDraftRevisionDiff";
+} from "../../mail/composeComposerBridge";
+export { refreshDraftRevisions } from "../../mail/composeDraftRevisions";
+export { computeDraftDiffAgainstRevision } from "../../mail/composeDraftRevisionDiff";
 export {
   dismissOrphanDraftSession,
   resumeOrphanDraftSession,
-} from "../mail/composeOrphanDraftSession";
-export { pickAttachments } from "../mail/composePickAttachments";
+} from "../../mail/composeOrphanDraftSession";
+export { pickAttachments } from "../../mail/composePickAttachments";
 export {
   confirmAndExecuteSplitSend,
   composeAiGrammar,
   composeAiRewrite,
-} from "../mail/composeAiWireActions";
+} from "../../mail/composeAiWireActions";
 export {
   llmInboxDigestUi,
   llmQaThreadUi,
@@ -182,15 +184,15 @@ export {
   llmTranslateMessageUi,
   llmTranslateThreadUi,
   summarizeThread,
-} from "../mail/threadAiWireActions";
-export { loadAccountsFromBackend } from "../mail/accountsLoadAction";
+} from "../../mail/threadAiWireActions";
+export { loadAccountsFromBackend } from "../../mail/accountsLoadAction";
 export {
   agentInsertDraftIntoCompose,
   agentPrepareReplyContinue,
   agentPrepareReplyStart,
   agentRefreshPlanFromDraft,
   stopAgentTelemetry,
-} from "../mail/agentWireActions";
+} from "../../mail/agentWireActions";
 export {
   autoDetectLlamaServerBinary,
   bytesToBase64,
@@ -215,7 +217,7 @@ export {
   switchActiveAccount,
   syncActivityRecordingPrefs,
   warnOAuthEphemeralRedirect,
-} from "../mail/settingsWireActions";
+} from "../../mail/settingsWireActions";
 export {
   confirmThenRunOrgApply,
   confirmThenRunOrgV2Apply,
@@ -239,52 +241,52 @@ export {
   refreshOrganizationReport,
   runOrgApply,
   runOrgV2Apply,
-} from "../mail/orgFolderWireActions";
-export { clearThreadAiSummaryState } from "../mail/threadAiSummaryState";
-export { scrollToThreadMessage } from "../mail/threadScrollToMessage";
-export { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";
+} from "../../mail/orgFolderWireActions";
+export { clearThreadAiSummaryState } from "../../mail/threadAiSummaryState";
+export { scrollToThreadMessage } from "../../mail/threadScrollToMessage";
+export { writeSidebarCollapsedPreference } from "../../lib/sidebarUiPref";
 export {
   normalizeNlRuleInvokeInput,
   readNlButtonRule,
-} from "../mail/newsletterRuleInput";
+} from "../../mail/newsletterRuleInput";
 export {
   prepareForward,
   prepareForwardToMessage,
   prepareReply,
   prepareReplyAll,
   prepareReplyToMessage,
-} from "../mail/composeThreadReply";
+} from "../../mail/composeThreadReply";
 export {
   decodeHtmlEntitiesLoose,
   normalizeMailHrefForOpen,
   openExternalFromMailHref,
-} from "../mail/mailLinkOpen";
-export { state } from "../state";
-import { wireEventsContext } from "./wireEventsContext";
+} from "../../mail/mailLinkOpen";
+export { state } from "../../state";
 export {
   llmQuickRepliesComposeUi,
   summarizeSenderThreadsLight,
-} from "../mail/composeAssistWireActions";
+} from "../../mail/composeAssistWireActions";
 export {
   enterComposeView,
   startNewDraftSession,
   syncPreviewOpenFromComposeLayout,
-} from "../mail/composeViewWireActions";
+} from "../../mail/composeViewWireActions";
 export {
   loadAddressBookSidebarCount,
   openContactDetailView,
   refreshAddressBookList,
-} from "../mail/addressBookWireActions";
+} from "../../mail/addressBookWireActions";
 export {
   micAction,
   refreshSavedDraftsMailboxCount,
   saveAccount,
   saveDraftToSavedListNow,
-} from "../mail/accountWireActions";
+} from "../../mail/accountWireActions";
+export type { PromptCatalogItem } from "../../../promptsSettingsPanel";
 export type {
+  AddressBookRow,
   Draft,
   OAuthDesktopLoginOutcome,
-  PromptCatalogItem,
   State,
 } from "../../types";
 
@@ -296,6 +298,6 @@ export function setAddressBookEditEmail(value: string | null): void {
   wireEventsContext().addressBookEditEmailRef.current = value;
 }
 
-export function addressBookRowsCache(): unknown[] {
+export function addressBookRowsCache(): AddressBookRow[] {
   return wireEventsContext().addressBookRowsCache();
 }

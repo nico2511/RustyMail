@@ -118,12 +118,13 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `wireEvents/handleActionInboxSearch.ts` | Inbox / recherche / fil / agents — **typé** |
 | `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — **typé** (+ fix `return true` sur modales) |
 | `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes / prefs IA — **typé** |
+| `wireEvents/handleActionThreadCompose.ts` | Compose / fil / brouillons — **typé** |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
-| `wireEvents/deps.ts` | Imports partagés + facades mail / wireEvents |
+| `wireEvents/deps.ts` | Barrel typé (imports corrigés depuis `wireEvents/`) + `addressBookRowsCache(): AddressBookRow[]` |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
@@ -133,7 +134,6 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Retirer `@ts-nocheck` sur **`handleActionThreadCompose`**
-2. Typage progressif de **`deps.ts`**
+1. Retirer `@ts-nocheck` sur **`wireEvents/deps.ts`** et typer `addressBookRowsCache()`
 
 `npm run verify:ts` · `npm test`

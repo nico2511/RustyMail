@@ -83,7 +83,7 @@ import {
   syncPreviewOpenFromComposeLayout,
   enterComposeView,
 } from "./deps";
-import type { AddressBookRow, CleanedMessageView, Draft, ThreadListItem } from "../../types";
+import type { CleanedMessageView, Draft, ThreadListItem } from "../../types";
 import type { Account } from "../../../accountSetup";
 
 export async function tryHandleThreadCompose(action: string, element?: HTMLElement): Promise<boolean> {
@@ -711,8 +711,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void (async () => {
         const acc = currentAccount();
         const email = element?.dataset.email?.trim();
-        const rows = addressBookRowsCache() as AddressBookRow[];
-        const row = rows.find((r) => r.email === email);
+        const row = addressBookRowsCache().find((r) => r.email === email);
         if (!acc?.id || !email || !row) return;
         try {
           await invoke("upsert_manual_contact_cmd", {

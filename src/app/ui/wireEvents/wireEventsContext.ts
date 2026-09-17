@@ -1,10 +1,12 @@
 /** UI refs and constants wired from application.ts before wireEvents() runs. */
+import type { AddressBookRow } from "../../types";
+
 export type WireEventsContext = {
   composeInteractionsAbortRef: { current?: AbortController };
   AI_PREFS_IMMEDIATE_CHECKBOX_IDS: Set<string>;
   skipAccountIdentityCaptureOnceRef: { current: boolean };
   addressBookEditEmailRef: { current: string | null };
-  addressBookRowsCache: () => unknown[];
+  addressBookRowsCache: () => AddressBookRow[];
 };
 
 let wireEventsCtx: WireEventsContext | null = null;
