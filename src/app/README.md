@@ -141,6 +141,10 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/contactsViewNavigation.ts` | Carnet : `openContactsView`, `openContactDetailView` |
 | `app/mail/loadAddressBookSidebarCount.ts` | Compteur contacts sidebar |
 | `app/mail/mailUnsubscribeLinks.ts` | Détection / tri liens désinscription HTML |
+| `app/mail/addressBookListState.ts` | Cache liste carnet + `refreshAddressBookList()` |
+| `app/mail/orgOpenOrganizationMailbox.ts` | Ouvrir un dossier depuis Organiser |
+| `app/mail/orgRowSyncMailbox.ts` | Sync IMAP d’une ligne org + `registerOrgRowSyncMailboxDeps()` |
+| `app/mail/orgDeleteMailboxOneAction.ts` | Suppression dossier vide (org) + `registerOrgDeleteMailboxOneDeps()` |
 | `app/lib/sidebarUiPref.ts` | Préférence sidebar repliée (localStorage) |
 | `app/mail/newsletterRuleInput.ts` | Lecture/normalisation règles expéditeurs auto (UI) |
 | `app/mail/threadAiSummaryState.ts` | Reset état synthèse / agent fil |

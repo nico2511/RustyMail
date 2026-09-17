@@ -1,20 +1,6 @@
 import { openContactDetailView as openContactDetailViewImpl } from "./contactsViewNavigation";
 import { loadAddressBookSidebarCount as loadAddressBookSidebarCountImpl } from "./loadAddressBookSidebarCount";
-
-export type AddressBookWireActionsDeps = {
-  refreshAddressBookList: () => Promise<void>;
-};
-
-let addressBookWireActionsDeps: AddressBookWireActionsDeps | null = null;
-
-export function registerAddressBookWireActionsDeps(deps: AddressBookWireActionsDeps): void {
-  addressBookWireActionsDeps = deps;
-}
-
-function addressBook(): AddressBookWireActionsDeps {
-  if (!addressBookWireActionsDeps) throw new Error("registerAddressBookWireActionsDeps not called");
-  return addressBookWireActionsDeps;
-}
+import { refreshAddressBookList as refreshAddressBookListImpl } from "./addressBookListState";
 
 export function openContactDetailView(
   email: string,
@@ -28,5 +14,5 @@ export function loadAddressBookSidebarCount(): Promise<void> {
 }
 
 export function refreshAddressBookList(): Promise<void> {
-  return addressBook().refreshAddressBookList();
+  return refreshAddressBookListImpl();
 }

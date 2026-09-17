@@ -1,6 +1,9 @@
 import type { OrgProposal } from "../../organizationView";
 import type { OrgActionOverride } from "../../organizationView";
 import { openContactsView as openContactsViewImpl } from "./contactsViewNavigation";
+import { openOrganizationMailbox as openOrganizationMailboxImpl } from "./orgOpenOrganizationMailbox";
+import { onOrgDeleteMailboxOne as onOrgDeleteMailboxOneImpl } from "./orgDeleteMailboxOneAction";
+import { onOrgSyncMailbox as onOrgSyncMailboxImpl } from "./orgRowSyncMailbox";
 
 export type OrgFolderWireActionsDeps = {
   openOrganizationView: () => void | Promise<void>;
@@ -11,7 +14,6 @@ export type OrgFolderWireActionsDeps = {
   fmSyncMailbox: (mailbox: string) => void | Promise<void>;
   fmConfirmArchiveMailbox: () => void | Promise<void>;
   fmConfirmDeleteMailbox: () => void | Promise<void>;
-  openOrganizationMailbox: (mailbox: string) => void | Promise<void>;
   orgV2DismissProposal: (proposalId: string) => void | Promise<void>;
   orgV2SnoozeProposal: (proposalId: string) => void | Promise<void>;
   confirmThenRunOrgV2Apply: (accountId: string, proposalId: string) => void | Promise<void>;
@@ -37,8 +39,6 @@ export type OrgFolderWireActionsDeps = {
   ) => void | Promise<void>;
   refreshOrganizationReport: () => Promise<void>;
   openOrganizationV2View: () => void | Promise<void>;
-  onOrgDeleteMailboxOne: (mailbox: string, mailboxRefId: string) => void | Promise<void>;
-  onOrgSyncMailbox: (mailbox: string) => void | Promise<void>;
   onOrgV2IgnoreMailboxUi: (mailbox: string) => void | Promise<void>;
   onOrgV2UnignoreMailboxUi: (mailbox: string) => void | Promise<void>;
 };
@@ -90,8 +90,8 @@ export function fmConfirmDeleteMailbox(): void | Promise<void> {
   return orgFolder().fmConfirmDeleteMailbox();
 }
 
-export function openOrganizationMailbox(mailbox: string): void | Promise<void> {
-  return orgFolder().openOrganizationMailbox(mailbox);
+export function openOrganizationMailbox(mailbox: string): Promise<void> {
+  return openOrganizationMailboxImpl(mailbox);
 }
 
 export function orgV2DismissProposal(proposalId: string): void | Promise<void> {
@@ -143,12 +143,12 @@ export function openOrganizationV2View(): void | Promise<void> {
   return orgFolder().openOrganizationV2View();
 }
 
-export function onOrgDeleteMailboxOne(mailbox: string, mailboxRefId: string): void | Promise<void> {
-  return orgFolder().onOrgDeleteMailboxOne(mailbox, mailboxRefId);
+export function onOrgDeleteMailboxOne(mailbox: string, mailboxRefId: string): Promise<void> {
+  return onOrgDeleteMailboxOneImpl(mailbox, mailboxRefId);
 }
 
-export function onOrgSyncMailbox(mailbox: string): void | Promise<void> {
-  return orgFolder().onOrgSyncMailbox(mailbox);
+export function onOrgSyncMailbox(mailbox: string): Promise<void> {
+  return onOrgSyncMailboxImpl(mailbox);
 }
 
 export function onOrgV2IgnoreMailboxUi(mailbox: string): void | Promise<void> {

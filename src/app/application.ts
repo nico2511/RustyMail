@@ -226,7 +226,6 @@ import { writeSidebarCollapsedPreference } from "./lib/sidebarUiPref";
 import { draftHasRecipientsExtra } from "./mail/composeDraftRecipients";
 import {
   registerSwitchMailboxRunDeps,
-  switchMailbox,
 } from "./mail/switchMailboxAction";
 import { loadAddressBookSidebarCount } from "./mail/loadAddressBookSidebarCount";
 import { openContactDetailView } from "./mail/addressBookWireActions";
@@ -334,9 +333,14 @@ import {
 import { registerThreadAiWireActionsDeps } from "./mail/threadAiWireActions";
 import { registerSettingsWireActionsDeps, finalizeSettingsAiModalClose } from "./mail/settingsWireActions";
 import { registerOrgFolderWireActionsDeps } from "./mail/orgFolderWireActions";
+import { registerOrgDeleteMailboxOneDeps } from "./mail/orgDeleteMailboxOneAction";
+import { registerOrgRowSyncMailboxDeps } from "./mail/orgRowSyncMailbox";
+import {
+  getAddressBookListQuery,
+  getAddressBookRowsCache,
+} from "./mail/addressBookListState";
 import { registerAgentWireActionsDeps } from "./mail/agentWireActions";
 import { registerComposeAssistWireActionsDeps } from "./mail/composeAssistWireActions";
-import { registerAddressBookWireActionsDeps } from "./mail/addressBookWireActions";
 import { registerAccountWireActionsDeps } from "./mail/accountWireActions";
 import {
   flushThreadActivityClosed,
@@ -606,7 +610,6 @@ import { root as appShell } from "./dom";
 
 import type { View, Tone, Tag, Entity, ThreadListItem, Draft, DraftPreview, DraftRevisionListItem, DraftDiffLine, DraftCompareView, MessageViewMode, ComposeLayout, MicState, MailSecuritySignals, CleanedMessageView, DiscussionThreadView, AppStatus, AppPathsView, AppCapabilities, LlmRuntimeStatus, NewsletterRuleRow, InboxFilterCounts, ActionBriefResult, CloseComposeModal, ResumeDraftModal, OrphanDraftSessionItem, State, SearchViewBatchJob, MailboxFolderStatsRow, SavedDraftListItem, SemanticEmbeddingCountsSnapshot, FluxAffinerResult, MailUnsubscribeLink, InlineAttachPayload, ThreadParticipantLink, ThreadRecipientPresenceEvents, TextPromptModalSpec, ConfirmModalSpec, NavigateOpts, OAuthDesktopLoginOutcome, SummaryResult, ActionBriefEvidenceLink, AddressBookRow, ShortcutRow, SavedDraftOpenPayload, LlmTranslationResult } from "./types";
 
-let addressBookListQuery = "";
 
 let addressBookEditEmail: string | null = null;
 
@@ -1612,94 +1615,12 @@ function wireFolderManagerDnD(): void {
   });
 }
 
-async function openOrganizationMailbox(mailbox: string) {
-  const mb = mailbox.trim();
-  if (!mb) return;
-  beginNavigation("list");
-  state.view = "list";
-  state.selectedContactEmail = undefined;
-  exitSearchModeForMailboxBrowse();
-  await switchMailbox(mb);
-  render();
-}
-
 function activeSecurityLlmAugmentCount(): number {
   let n = 0;
   for (const v of Object.values(securityLlmAugmentBusy)) {
     if (v) n += 1;
   }
   return n;
-}
-
-async function onOrgSyncMailbox(mailbox: string): Promise<void> {
-  const mb = mailbox.trim();
-  if (!mb || !isTauriRuntime()) {
-    toast("Synchronisation : disponible dans l’app Tauri.");
-    return;
-  }
-  const account = currentAccount();
-  if (!account?.id) {
-    toast("Configurez d’abord un compte IMAP.");
-    return;
-  }
-  state.organization.rowSyncMailbox = mb;
-  render();
-  try {
-    const outcome = await withTimeout(
-      invoke<SyncMailboxesOutcome>("sync_mailboxes", {
-        accountId: account.id,
-        mailboxes: [mb],
-        focusMailbox: mb,
-        limitPerMailbox: 80,
-      }),
-      SYNC_INVOKE_TIMEOUT_MS,
-    );
-    const n = (outcome.results ?? []).reduce((s, r) => s + (r.fetchedUids ?? 0), 0);
-    toast(n > 0 ? `${n} message(s) importé(s) · ${mb}` : `Dossier à jour · ${mb}`);
-    await refreshOrganizationReport();
-    if (state.view === "list" && state.selectedMailbox === mb) {
-      await reloadCurrentThreadList(false);
-    }
-    await loadMailboxUnread();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  } finally {
-    state.organization.rowSyncMailbox = null;
-    render();
-  }
-}
-
-function findEmptyMailboxesProposal(): OrgProposal | undefined {
-  return (
-    state.organizationV2.report?.proposals.find((p) => p.id === "empty-mailboxes") ??
-    state.organization.report?.proposals.find((p) => p.id === "empty-mailboxes")
-  );
-}
-
-async function onOrgDeleteMailboxOne(mailbox: string, mailboxRefId: string): Promise<void> {
-  const mb = mailbox.trim();
-  const refId = mailboxRefId.trim();
-  if (!mb || !refId) return;
-  const ok = await openConfirmModal({
-    title: "Supprimer ce dossier vide ?",
-    body: `Le dossier « ${mb} » sera supprimé côté serveur IMAP s’il est vide. Action irréversible.`,
-    danger: true,
-    confirmLabel: "Supprimer le dossier",
-  });
-  if (!ok) return;
-  const acc = currentAccount();
-  if (!acc?.id) return;
-  const proposal = findEmptyMailboxesProposal();
-  if (!proposal) {
-    toast("Proposition introuvable — relancez l’analyse.");
-    return;
-  }
-  const useV2 = Boolean(state.organizationV2.report?.proposals.some((p) => p.id === "empty-mailboxes"));
-  if (useV2) {
-    await runOrgV2Apply(acc.id, proposal, undefined, undefined, "delete-mailbox", [refId]);
-    return;
-  }
-  await runOrgApply(acc.id, "empty-mailboxes", undefined, undefined, "delete-mailbox", [refId]);
 }
 
 function extractUnsubscribeLinksFromHtml(raw: string): MailUnsubscribeLink[] {
@@ -2852,27 +2773,6 @@ function mergedProfileForAccountsForm(): Account | undefined {
     smtp: snapSmtp,
     authKind: state.accountFormAuthKind,
   };
-}
-
-let addressBookRowsCache: AddressBookRow[] = [];
-
-async function refreshAddressBookList(): Promise<void> {
-  const acc = currentAccount();
-  if (!acc?.id || !isTauriRuntime()) {
-    addressBookRowsCache = [];
-    return;
-  }
-  try {
-    const res = await invoke<{ items: AddressBookRow[]; total: number }>("list_address_contacts_cmd", {
-      accountId: acc.id,
-      query: addressBookListQuery,
-      offset: 0,
-      limit: 80,
-    });
-    addressBookRowsCache = res?.items ?? [];
-  } catch {
-    addressBookRowsCache = [];
-  }
 }
 
 function buildSemanticStatsBlockHtml(): string {
@@ -5273,7 +5173,7 @@ const addressBookEditEmailRef = {
 };
 
 registerWireEventsContext({
-  addressBookRowsCache: () => addressBookRowsCache,
+  addressBookRowsCache: getAddressBookRowsCache,
   skipAccountIdentityCaptureOnceRef,
   addressBookEditEmailRef,
   AI_PREFS_IMMEDIATE_CHECKBOX_IDS,
@@ -5367,9 +5267,9 @@ registerRenderDeps({
   settingsDraftProfile,
   mergedProfileForAccountsForm,
   buildSettingsAiPanelDeps,
-  addressBookRowsCache: () => addressBookRowsCache,
+  addressBookRowsCache: getAddressBookRowsCache,
   addressBookEditEmail: () => addressBookEditEmail,
-  addressBookListQuery: () => addressBookListQuery,
+  addressBookListQuery: getAddressBookListQuery,
   accountsFormIdentityScratch: () => accountsFormIdentityScratch,
   threadQaMicButtonTitle,
   threadAiSummaryForCurrentThread,
@@ -5548,7 +5448,6 @@ registerOrgFolderWireActionsDeps({
   fmSyncMailbox,
   fmConfirmArchiveMailbox,
   fmConfirmDeleteMailbox,
-  openOrganizationMailbox,
   orgV2DismissProposal,
   orgV2SnoozeProposal,
   confirmThenRunOrgV2Apply,
@@ -5557,11 +5456,13 @@ registerOrgFolderWireActionsDeps({
   runOrgApply,
   refreshOrganizationReport,
   openOrganizationV2View,
-  onOrgDeleteMailboxOne,
-  onOrgSyncMailbox,
   onOrgV2IgnoreMailboxUi,
   onOrgV2UnignoreMailboxUi,
 });
+
+registerOrgRowSyncMailboxDeps({ refreshOrganizationReport });
+
+registerOrgDeleteMailboxOneDeps({ runOrgApply, runOrgV2Apply });
 
 registerMailContentWireActionsDeps({
   hydrateEmailHtml,
@@ -5592,10 +5493,6 @@ registerAgentWireActionsDeps({
 registerComposeAssistWireActionsDeps({
   summarizeSenderThreadsLight,
   llmQuickRepliesComposeUi,
-});
-
-registerAddressBookWireActionsDeps({
-  refreshAddressBookList,
 });
 
 registerAccountWireActionsDeps({
