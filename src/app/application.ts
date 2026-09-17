@@ -274,6 +274,9 @@ import { pickAttachments, registerComposePickAttachmentsDeps } from "./mail/comp
 import {
   registerComposeComposerBridgeDeps,
 } from "./mail/composeComposerBridge";
+import { registerThreadAiWireActionsDeps } from "./mail/threadAiWireActions";
+import { registerComposeAiWireActionsDeps } from "./mail/composeAiWireActions";
+import { registerAccountsLoadActionDeps } from "./mail/accountsLoadAction";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -8220,7 +8223,6 @@ registerWireEventsBridge({
   ensureValidSelectedMailbox,
   mediaBlobToWav16kMonoPcm16,
   openEnginesAiSettingsModal,
-  confirmAndExecuteSplitSend,
   micPermissionErrorMessage,
   paintStatusBarProgressDom,
   wireComposeRecipientChips,
@@ -8236,11 +8238,9 @@ registerWireEventsBridge({
   applyContextSliderIndex,
   saveDraftToSavedListNow,
   persistDefaultAccountId,
-  loadAccountsFromBackend,
   refreshLlmRuntimeStatus,
   fmConfirmArchiveMailbox,
   openOrganizationMailbox,
-  llmQuickRepliesThreadUi,
   confirmThenRunOrgApply,
   onOrgV2IgnoreMailboxUi,
   openOrganizationV2View,
@@ -8254,12 +8254,10 @@ registerWireEventsBridge({
   onOrgDeleteMailboxOne,
   persistAiPrefsFromDom,
   deleteSettingsAccount,
-  llmTranslateMessageUi,
   bindComposerDropzone,
   onThreadToggleFollow,
   openOrganizationView,
   orgV2DismissProposal,
-  llmTranslateThreadUi,
   switchActiveAccount,
   mailboxManageAction,
   orgV2SnoozeProposal,
@@ -8273,19 +8271,14 @@ registerWireEventsBridge({
   requestMicStream,
   openContactsView,
   onOrgSyncMailbox,
-  llmInboxDigestUi,
-  composeAiRewrite,
-  composeAiGrammar,
   navigateToInbox,
   fmSelectMailbox,
   fmCreateMailbox,
-  summarizeThread,
   openMoveDialog,
   onThreadMoveTo,
   bytesToBase64,
   runOrgV2Apply,
   fmSyncMailbox,
-  llmQaThreadUi,
   onThreadMove,
   onThreadSeen,
   runOrgApply,
@@ -8590,6 +8583,23 @@ registerComposeOrphanDraftSessionDeps({
 });
 
 registerComposePickAttachmentsDeps({ scheduleDraftRevisionSave });
+
+registerThreadAiWireActionsDeps({
+  summarizeThread,
+  llmTranslateThreadUi,
+  llmTranslateMessageUi,
+  llmQuickRepliesThreadUi,
+  llmInboxDigestUi,
+  llmQaThreadUi,
+});
+
+registerComposeAiWireActionsDeps({
+  composeAiRewrite,
+  composeAiGrammar,
+  confirmAndExecuteSplitSend,
+});
+
+registerAccountsLoadActionDeps({ loadAccountsFromBackend });
 
 registerComposeThreadReplyDeps({
   loadComposeMarkdownIntoEditor,

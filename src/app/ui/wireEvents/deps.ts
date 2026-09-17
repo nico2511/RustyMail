@@ -170,6 +170,20 @@ export {
   resumeOrphanDraftSession,
 } from "../mail/composeOrphanDraftSession";
 export { pickAttachments } from "../mail/composePickAttachments";
+export {
+  confirmAndExecuteSplitSend,
+  composeAiGrammar,
+  composeAiRewrite,
+} from "../mail/composeAiWireActions";
+export {
+  llmInboxDigestUi,
+  llmQaThreadUi,
+  llmQuickRepliesThreadUi,
+  llmTranslateMessageUi,
+  llmTranslateThreadUi,
+  summarizeThread,
+} from "../mail/threadAiWireActions";
+export { loadAccountsFromBackend } from "../mail/accountsLoadAction";
 export { clearThreadAiSummaryState } from "../mail/threadAiSummaryState";
 export { scrollToThreadMessage } from "../mail/threadScrollToMessage";
 export { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";

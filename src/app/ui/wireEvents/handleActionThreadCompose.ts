@@ -38,6 +38,16 @@ import {
   computePreview,
   scheduleDraftRevisionSave,
   pickAttachments,
+  confirmAndExecuteSplitSend,
+  summarizeThread,
+  llmTranslateThreadUi,
+  llmTranslateMessageUi,
+  llmQuickRepliesThreadUi,
+  llmInboxDigestUi,
+  loadAccountsFromBackend,
+  composeAiRewrite,
+  composeAiGrammar,
+  llmQaThreadUi,
   loadMailView,
   loadMailboxUnread,
   render,
@@ -482,7 +492,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       render();
       return true;
     case "confirm-split-send":
-      void callApp("confirmAndExecuteSplitSend");
+      void confirmAndExecuteSplitSend();
       return true;
     case "pick-attachments":
       await pickAttachments();
@@ -521,21 +531,21 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     }
     case "summarize":
-      await callApp("summarizeThread");
+      await summarizeThread();
       return true;
     case "llm-translate-thread":
-      void callApp("llmTranslateThreadUi");
+      void llmTranslateThreadUi();
       return true;
     case "llm-translate-message": {
       const mid = element?.dataset.msgId?.trim();
-      if (mid) void callApp("llmTranslateMessageUi", mid, element?.dataset.llmTranslateRefresh === "1");
+      if (mid) void llmTranslateMessageUi(mid, element?.dataset.llmTranslateRefresh === "1");
       return true;
     }
     case "llm-quick-replies-thread":
-      void callApp("llmQuickRepliesThreadUi");
+      void llmQuickRepliesThreadUi();
       return true;
     case "llm-inbox-digest":
-      void callApp("llmInboxDigestUi");
+      void llmInboxDigestUi();
       return true;
     case "demo-reset-playground": {
       if (!isTauriRuntime()) {
@@ -545,7 +555,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       try {
         const msg = await invoke<string>("demo_reset_playground_mailbox");
         toast(msg);
-        const ok = await callApp("loadAccountsFromBackend", { silent: false });
+        const ok = await loadAccountsFromBackend({ silent: false });
         if (!ok) toast("Rechargement des comptes incomplet — vérifie la liste.");
         const DEMO = "playground@demo.rustymail.app";
         if (state.accounts.some((a) => a.id === DEMO)) {
@@ -579,7 +589,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
         const msg = await invoke<string>("demo_remove_playground_mailbox");
         toast(msg);
         const DEMO = "playground@demo.rustymail.app";
-        const ok = await callApp("loadAccountsFromBackend", { silent: false });
+        const ok = await loadAccountsFromBackend({ silent: false });
         if (!ok) toast("Rechargement des comptes incomplet — vérifie la liste.");
         if (state.selectedAccountId === DEMO) {
           state.selectedAccountId = state.accounts[0]?.id ?? "";
@@ -607,19 +617,19 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       if (mailboxDigestSlotInList()) {
         dismissMailboxDigestPanel();
       } else {
-        void callApp("llmInboxDigestUi");
+        void llmInboxDigestUi();
       }
       return true;
     case "compose-ai-rewrite": {
       const st = element?.dataset.rewriteStyle ?? "Formal";
-      void callApp("composeAiRewrite", st);
+      void composeAiRewrite(st);
       return true;
     }
     case "compose-ai-rewrite-selected-tone":
-      void callApp("composeAiRewrite", composeRewriteStyleFromTone());
+      void composeAiRewrite(composeRewriteStyleFromTone());
       return true;
     case "compose-ai-grammar":
-      void callApp("composeAiGrammar");
+      void composeAiGrammar();
       return true;
     case "compose-grammar-dismiss":
       state.composeGrammarSuggestions = null;
@@ -660,7 +670,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       toast("Annulation demandée…");
       return true;
     case "llm-qa-thread":
-      void callApp("llmQaThreadUi");
+      void llmQaThreadUi();
       return true;
     case "llm-qa-clear":
       state.threadQaAnswer = null;

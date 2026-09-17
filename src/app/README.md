@@ -60,6 +60,9 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/threadAutoMail.ts` | Détection fil newsletter / auto |
 | `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
 | `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
+| `app/mail/threadAiWireActions.ts` | Facades IA fil (synthèse, traduction, Q&R…) |
+| `app/mail/composeAiWireActions.ts` | Facades IA compose + envoi split |
+| `app/mail/accountsLoadAction.ts` | Facade `loadAccountsFromBackend()` |
 | `app/mail/composeComposerBridge.ts` | Facades éditeur (preview, markdown, révisions) |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
 | `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |
