@@ -24,16 +24,14 @@ import { refreshSettingsPathsFromBackend as refreshSettingsPathsFromBackendImpl 
 import { paintStatusBarProgressDom as paintStatusBarProgressDomImpl } from "./statusBarProgressJobs";
 import { warnOAuthEphemeralRedirect as warnOAuthEphemeralRedirectImpl } from "./oauthEphemeralRedirectWarn";
 import { switchActiveAccount as switchActiveAccountImpl } from "./switchActiveAccountAction";
+import {
+  deleteSettingsAccount as deleteSettingsAccountImpl,
+  discoverMailServersAction as discoverMailServersActionImpl,
+  finishOAuthNewAccountAfterLogin as finishOAuthNewAccountAfterLoginImpl,
+} from "./accountSettingsRun";
 
 export type SettingsWireActionsDeps = {
   syncActivityRecordingPrefs: () => void;
-  discoverMailServersAction: () => void | Promise<void>;
-  finishOAuthNewAccountAfterLogin: (
-    authKind: "oauthGoogle" | "oauthMicrosoft",
-    email: string,
-    displayName: string,
-  ) => void | Promise<void>;
-  deleteSettingsAccount: () => void | Promise<void>;
 };
 
 let settingsWireActionsDeps: SettingsWireActionsDeps | null = null;
@@ -127,7 +125,7 @@ export function micPermissionErrorMessage(error: unknown): string {
 }
 
 export function discoverMailServersAction(): void | Promise<void> {
-  return settings().discoverMailServersAction();
+  return discoverMailServersActionImpl();
 }
 
 export function warnOAuthEphemeralRedirect(outcome: import("../types").OAuthDesktopLoginOutcome): void {
@@ -139,11 +137,11 @@ export function finishOAuthNewAccountAfterLogin(
   email: string,
   displayName: string,
 ): void | Promise<void> {
-  return settings().finishOAuthNewAccountAfterLogin(authKind, email, displayName);
+  return finishOAuthNewAccountAfterLoginImpl(authKind, email, displayName);
 }
 
 export function deleteSettingsAccount(): void | Promise<void> {
-  return settings().deleteSettingsAccount();
+  return deleteSettingsAccountImpl();
 }
 
 export function schedulePersistAiPrefsFromDom(opts?: { skipDomCapture?: boolean }): void {

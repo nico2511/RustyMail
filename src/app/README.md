@@ -210,6 +210,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
+| `app/mail/accountSettingsRun.ts` | Save/delete compte, OAuth auto, détection serveurs IMAP/SMTP |
 | `wireEvents/deps.ts` | Barrel typé (imports corrigés depuis `wireEvents/`) + `addressBookRowsCache(): AddressBookRow[]` |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
