@@ -7,21 +7,18 @@ import {
   defaultEnabledSkillIds,
   type AssistMode,
   type AssistResult,
-  type AssistRunStep,
   type AssistSkillId,
 } from "../../assistAgent";
 import { isAiFeatureEnabled } from "../../aiFeatures";
 import { isLlmCancelledError, runLlmStreamJob } from "../../llmStream";
 import { t } from "../../i18n";
 import { currentAccount } from "../core/accountContext";
-import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { threadIdsMatch } from "../lib/threadIdsMatch";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
-import type { Draft } from "../types";
 import { withLlmQueue } from "./llmJobQueue";
 import {
   agentOfferSlotsStep,
@@ -29,42 +26,15 @@ import {
   paintAgentDraftDom,
 } from "./threadAiStreamDom";
 import { threadIsAutoMail } from "./threadAutoMail";
-import { enterComposeView } from "./composeViewWireActions";
-import { draftHasRecipientsExtra } from "./composeDraftRecipients";
-import { startNewDraftSession } from "./composeDraftSession";
 import {
-  computePreview,
-  loadComposeMarkdownIntoEditor,
-  resetMarkdownEditorHistory,
-  scheduleDraftRevisionSave,
-} from "./composeComposerBridge";
-import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
+  agentAssistBasePayload,
+  agentAssistPhasePayload,
+  mergeAgentRecommendations,
+  pushAgentTelemetry,
+  stopAgentTelemetry,
+} from "./agentAssistSessionHelpers";
 
-function agentAssistBasePayload(): ReturnType<typeof buildAssistPayload> | null {
-  const s = state.agentSession;
-  const tid = state.selectedThreadId?.trim();
-  const accountId = currentAccount()?.id?.trim();
-  if (!tid || !accountId) return null;
-  const mode = s?.assistMode ?? "deep";
-  const skills = s?.enabledSkills?.length ? s.enabledSkills : defaultEnabledSkillIds(mode);
-  return buildAssistPayload(tid, accountId, mode, skills);
-}
-
-function pushAgentTelemetry(step: AssistRunStep): void {
-  const s = state.agentSession;
-  if (!s) return;
-  const idx = s.telemetry.findIndex((t) => t.skill === step.skill && t.status === "running");
-  if (idx >= 0) s.telemetry[idx] = step;
-  else s.telemetry.push(step);
-}
-
-export async function stopAgentTelemetry(): Promise<void> {
-  const s = state.agentSession;
-  if (s?.unlistenTelemetry) {
-    s.unlistenTelemetry();
-    s.unlistenTelemetry = undefined;
-  }
-}
+export { stopAgentTelemetry } from "./agentAssistSessionHelpers";
 
 export async function agentPrepareReplyStart(): Promise<void> {
   const tid = state.selectedThreadId?.trim();
@@ -136,21 +106,6 @@ export async function agentPrepareReplyStart(): Promise<void> {
   });
 }
 
-function agentAssistPhasePayload(
-  s: NonNullable<typeof state.agentSession>,
-  extra: Record<string, unknown>,
-): { payload: Record<string, unknown> } {
-  const base = agentAssistBasePayload() ?? buildAssistPayload(s.threadId, s.accountId, s.assistMode);
-  return {
-    payload: {
-      ...base,
-      priorFacts: s.facts ?? null,
-      forceDraft: s.forceDraft,
-      ...extra,
-    },
-  };
-}
-
 async function agentRunExtractFacts(signal: AbortSignal): Promise<boolean> {
   const s = state.agentSession;
   if (!s) return false;
@@ -174,24 +129,6 @@ async function agentRunExtractFacts(signal: AbortSignal): Promise<boolean> {
   }
   await agentRunPostExtractSkills(signal);
   return true;
-}
-
-function mergeAgentRecommendations(
-  s: NonNullable<typeof state.agentSession>,
-  res: AssistResult,
-): void {
-  const recs = res.recommendations ?? [];
-  for (const r of recs) {
-    if (s.recommendations.some((x) => x.kind === r.kind && x.label === r.label)) continue;
-    s.recommendations.push(r);
-  }
-  if (res.slots?.length) {
-    for (const sl of res.slots) {
-      if (!s.recommendations.some((x) => x.kind === "slot" && x.label === sl)) {
-        s.recommendations.push({ kind: "slot", label: sl });
-      }
-    }
-  }
 }
 
 async function agentInvokeSkillPhase(
@@ -377,88 +314,5 @@ export async function agentPrepareReplyContinue(): Promise<void> {
       }
       render();
     });
-  }
-}
-
-function formatAgentSlotsParagraph(slotsText: string): string {
-  const lines = slotsText
-    .split(/\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (!lines.length) return "";
-  if (lines.length === 1) return `Je vous propose le créneau suivant : ${lines[0]}.`;
-  return `Je vous propose les créneaux suivants :\n${lines.map((l) => `· ${l}`).join("\n")}`;
-}
-
-function appendSchedulingSlotsToDraft(draft: string, slotsText: string): string {
-  const d = draft.trimEnd();
-  const block = formatAgentSlotsParagraph(slotsText);
-  if (!block) return d;
-
-  const signOffRe =
-    /\n(\s*(?:Bien\s+)?cordialement\s*,?|Bien\s+à\s+vous\s*,?|Salutations\s+(?:distinguées\s+)?,?|Cordialement\s*,?|Regards\s*,?|Cdlt\.?\s*,?|Merci(?:\s+par\s+avance)?\s*,?)\s*$/i;
-  const m = d.match(signOffRe);
-  if (m?.index !== undefined) {
-    const before = d.slice(0, m.index).trimEnd();
-    const after = d.slice(m.index + 1).trimStart();
-    return `${before}\n\n${block}\n\n${after}`;
-  }
-
-  const paras = d.split(/\n\n+/);
-  if (paras.length >= 2) {
-    const last = paras[paras.length - 1]!.trim();
-    if (
-      /^(?:bien\s+)?cordialement\s*,?$/i.test(last) ||
-      /^salutations/i.test(last) ||
-      /^merci\s*$/i.test(last)
-    ) {
-      return `${paras.slice(0, -1).join("\n\n")}\n\n${block}\n\n${last}`;
-    }
-  }
-
-  return `${d}\n\n${block}`;
-}
-
-export async function agentInsertDraftIntoCompose(extra?: string): Promise<void> {
-  const s = state.agentSession;
-  if (!s?.draft.trim() && !extra?.trim()) return;
-  let body = s?.draft?.trim() ?? "";
-  if (extra?.trim()) body = appendSchedulingSlotsToDraft(body, extra.trim());
-
-  const threadId = (s?.threadId ?? state.selectedThreadId ?? "").trim();
-  if (!threadId) {
-    toast("Ouvrez le fil auquel vous répondez, puis réessayez.");
-    return;
-  }
-  if (!isTauriRuntime()) {
-    toast("Réponse dans le fil : application desktop (Tauri) requise.");
-    return;
-  }
-  if (threadIsAutoMail(state.selectedThread, threadId)) {
-    toast("Réponse indisponible pour ce fil automatique / newsletter.");
-    return;
-  }
-
-  try {
-    const replyDraft = await withTimeout(
-      invoke<Draft>("prepare_reply", { threadId, messageId: null }),
-      MAIL_ACTION_TIMEOUT_MS,
-    );
-    replyDraft.markdownBody = body;
-    state.draft = replyDraft;
-    enterComposeView();
-    startNewDraftSession();
-    loadComposeMarkdownIntoEditor(body);
-    state.composeCcBccOpen = draftHasRecipientsExtra(state.draft);
-    state.composeAdvancedOpen = false;
-    state.composeLayout = "split";
-    syncPreviewOpenFromComposeLayout();
-    resetMarkdownEditorHistory();
-    render();
-    window.setTimeout(() => void computePreview(), 0);
-    scheduleDraftRevisionSave(350);
-  } catch (error) {
-    console.error("agentInsertDraftIntoCompose prepare_reply", error);
-    toast(`Impossible d’ouvrir la réponse dans le fil : ${tauriErrorMessage(error)}`);
   }
 }

@@ -70,7 +70,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadAiRun.ts` | Cœurs synthèse/traduction fil + synthèse batch expéditeur |
 | `app/mail/threadAiWireUiRun.ts` | Actions wire UI (synthèse, traduction, Q&R, réponses rapides, brief) |
 | `app/mail/agentWireActions.ts` | Facades agent assist (prepare reply, telemetry, plan) |
-| `app/mail/agentPrepareReplyRun.ts` | Flux assistant réponse (phases LLM, brouillon, insertion compose) |
+| `app/mail/agentPrepareReplyRun.ts` | Assistant réponse — phases LLM (start / continue / plan) |
+| `app/mail/agentAssistSessionHelpers.ts` | Session assist (payload, télémetrie, merge reco) |
+| `app/mail/agentInsertDraftRun.ts` | Insertion brouillon agent dans le composeur |
+| `app/mail/agentSchedulingDraftFormat.ts` | Format créneaux dans le corps de réponse |
 | `app/mail/composeAiWireActions.ts` | Facades IA compose + envoi split |
 | `app/mail/accountsLoadAction.ts` | Ré-export `loadAccountsFromBackend()` |
 | `app/mail/settingsWireActions.ts` | Facades paramètres (comptes, LLM, OAuth, micro…) |
@@ -245,7 +248,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper les gros modules mail si besoin (`searchCommitQuery.ts`, `threadAiRun.ts`, …)
+1. Découper d’autres modules mail > ~350 lignes (`searchViewBatch`, `mailListView`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
