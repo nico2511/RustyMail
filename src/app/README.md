@@ -219,7 +219,12 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks laissés dans `
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
 | `app/mail/accountSettingsRun.ts` | Save/delete compte, OAuth auto, détection serveurs IMAP/SMTP |
-| `wireEvents/deps.ts` | Barrel typé (imports corrigés depuis `wireEvents/`) + `addressBookRowsCache(): AddressBookRow[]` |
+| `wireEvents/deps.ts` | Barrel réexport (`depsCore`, `depsSearchMail`, `depsComposeThread`, `depsSettingsAccount`, `depsOrgFolder`) |
+| `wireEvents/depsCore.ts` | invoke, toast, state, render, loaders, nav, modales — réexporte `depsContext` |
+| `wireEvents/depsSearchMail.ts` | inbox, recherche, agent, carnet, entrée compose |
+| `wireEvents/depsComposeThread.ts` | compose, fil, LLM compose |
+| `wireEvents/depsSettingsAccount.ts` | réglages, OAuth, prefs IA, setup compte |
+| `wireEvents/depsOrgFolder.ts` | org / gestionnaire dossiers |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
@@ -229,7 +234,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper **`deps.ts`** en barrels par domaine (search, compose, settings…) si utile
-2. Réduire le corps d’**`application.ts`** via modules mail
+1. Réduire **`appModuleRegistry.ts`** (imports morts, sous-registres render vs wire)
+2. Pointer les `handleAction*` vers les barrels domaine au lieu du barrel global si utile
 
 `npm run verify:ts` · `npm test`
