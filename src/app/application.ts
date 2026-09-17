@@ -199,7 +199,6 @@ import {
   registerThreadListActionsDeps,
   sourceMailboxForThread,
 } from "./mail/threadListActions";
-import { registerAppNavActionsDeps } from "./mail/appNavActions";
 import {
   mailboxManageAction,
   registerMailboxManageActionDeps,
@@ -245,7 +244,6 @@ import { cancelLlmQueueJob, registerLlmQueueCancelDeps } from "./mail/llmQueueCa
 import { cycleComposeLayout, registerCycleComposeLayoutDeps } from "./mail/cycleComposeLayout";
 import { enterComposeView } from "./mail/composeViewWireActions";
 import { registerComposeSendDraftRunDeps } from "./mail/composeSendDraftRun";
-import { registerComposeViewNavigationDeps } from "./mail/composeViewNavigation";
 import { refreshDraftRevisions } from "./mail/composeDraftRevisions";
 import {
   computeDraftDiffAgainstRevision,
@@ -297,6 +295,26 @@ import {
 import { paintLlmPrefetchProgressDom } from "./mail/llmPrefetchProgressDom";
 import { paintStatusBarProgressDom, scheduleStatusBarProgressPaint } from "./mail/statusBarProgressJobs";
 import { registerSwitchActiveAccountDeps } from "./mail/switchActiveAccountAction";
+import {
+  beginNavigation,
+  captureCurrentNav,
+  goBack,
+  goForward,
+  navigateToBreadcrumbIndex,
+  navigateToInbox,
+  registerAppNavigationStackDeps,
+} from "./mail/appNavigationStack";
+import { normalizeAccountRow } from "./mail/accountRowNormalize";
+import { loadAccountsFromBackend } from "./mail/accountsLoadFromBackend";
+import {
+  mailboxPathPrefixForCreate,
+  resetFolderManagerPanelSearchState,
+} from "./mail/folderManagerPanelState";
+import { orgApplyStatusMessage } from "./mail/orgApplyStatusMessage";
+import {
+  aiSidePanelExpandedForShell,
+  threadReadingIsSimpleLayout,
+} from "./mail/threadShellLayout";
 import { bindMicPushToTalk } from "./mail/composeMicDictation";
 import { formatWhisperPttKeyLabel } from "./mail/composeMicPtt";
 import {
@@ -305,7 +323,6 @@ import {
   threadQaMicButtonTitle,
 } from "./mail/composeMicUiHints";
 import { registerThreadAiWireActionsDeps } from "./mail/threadAiWireActions";
-import { registerAccountsLoadActionDeps } from "./mail/accountsLoadAction";
 import { registerSettingsWireActionsDeps } from "./mail/settingsWireActions";
 import { registerOrgFolderWireActionsDeps } from "./mail/orgFolderWireActions";
 import { registerAgentWireActionsDeps } from "./mail/agentWireActions";
@@ -628,277 +645,6 @@ async function flushDraftRevisionPending(): Promise<void> {
 
 let composeInteractionsAbort: AbortController | undefined;
 
-async function navigateToBreadcrumbIndex(stackIndex: number): Promise<void> {
-  if (stackIndex < 0) {
-    navigateToInbox();
-    return;
-  }
-  const target = navJumpToStackIndex(stackIndex, captureCurrentNav());
-  if (!target) return;
-  await applyNavSnapshot(target);
-}
-
-function captureCurrentNav(): NavSnapshot {
-  const view = state.view;
-  let backLabel = "Boîte de réception";
-  let breadcrumb: string[] = ["Boîte"];
-  switch (view) {
-    case "list":
-      backLabel = navMailboxSegment();
-      breadcrumb = [navMailboxSegment()];
-      break;
-    case "thread":
-      backLabel = navMailboxSegment();
-      breadcrumb = [navMailboxSegment()];
-      break;
-    case "contacts":
-      backLabel = "Carnet";
-      breadcrumb = ["Carnet"];
-      break;
-    case "contact": {
-      const name = getContactDetail()?.displayName?.trim() || state.selectedContactEmail || "Contact";
-      backLabel = "Contact";
-      breadcrumb = ["Carnet", name];
-      break;
-    }
-    case "settings":
-      backLabel = "Paramètres";
-      breadcrumb = ["Paramètres"];
-      break;
-    case "organization":
-      backLabel = "Organiser";
-      breadcrumb = ["Organiser"];
-      break;
-    case "organizationV2":
-      backLabel = "Organiser V2";
-      breadcrumb = ["Organiser V2"];
-      break;
-    case "folderManager": {
-      const mb = state.folderManager.selectedMailbox?.trim();
-      if (mb) {
-        const label = threadMailboxListLabel(mb).label;
-        backLabel = label;
-        breadcrumb = ["Dossiers", label];
-      } else {
-        backLabel = "Dossiers";
-        breadcrumb = ["Dossiers"];
-      }
-      break;
-    }
-    case "compose":
-      backLabel = state.selectedThread ? "Fil" : navMailboxSegment();
-      breadcrumb =
-        state.selectedThread ? ["Fil", "Composer"] : [navMailboxSegment(), "Composer"];
-      break;
-  }
-  return {
-    view,
-    backLabel,
-    breadcrumb,
-    selectedThreadId: state.selectedThreadId,
-    selectedContactEmail: state.selectedContactEmail,
-    settingsTab: state.settingsTab,
-    selectedMailbox: state.selectedMailbox,
-    search: state.search,
-    searchDraft: state.searchDraft,
-    searchSenders: [...state.searchSenders],
-    listFilter: state.listFilter,
-    searchScope: state.searchScope,
-    searchNlMode: state.searchNlMode,
-    contactsListQuery: getContactsListQuery(),
-    contactsKeywordDraft: getContactsKeywordDraft(),
-    listScrollY: view === "list" ? readListScrollY() : undefined,
-    contactsScrollY: view === "contacts" ? readContactsScrollY() : undefined,
-    aiOpen: state.aiOpen,
-    folderManagerSelectedMailbox:
-      view === "folderManager" ? (state.folderManager.selectedMailbox ?? null) : undefined,
-  };
-}
-
-function shouldPushNavHistory(from: View, to: View): boolean {
-  if (from === to) return false;
-  const drill =
-    (from === "list" && (to === "thread" || to === "compose" || to === "settings")) ||
-    (from === "contacts" && (to === "contact" || to === "thread" || to === "compose")) ||
-    (from === "contact" && (to === "thread" || to === "compose")) ||
-    (from === "thread" && to === "compose") ||
-    (from === "organization" && to === "thread") ||
-    (from === "list" && to === "contacts") ||
-    (from === "list" && to === "organization") ||
-    (from === "list" && to === "folderManager") ||
-    (from === "list" && to === "settings");
-  return drill;
-}
-
-function beginNavigation(to: View, opts?: NavigateOpts): void {
-  if (state.view === "thread" && to !== "thread") {
-    flushThreadActivityClosed();
-  }
-  if (opts?.resetStack) navReset();
-  else if (!opts?.skipHistory) {
-    const from = state.view;
-    if (shouldPushNavHistory(from, to)) {
-      const snap = captureCurrentNav();
-      if (opts?.replaceHistory && navCanGoBack()) {
-        navPop();
-      }
-      navPush(snap);
-    }
-  }
-}
-
-async function applyNavSnapshot(snap: NavSnapshot): Promise<void> {
-  navQueueScrollRestore(snap);
-  state.selectedMailbox = snap.selectedMailbox ?? state.selectedMailbox;
-  if (snap.search !== undefined) state.search = snap.search;
-  if (snap.searchDraft !== undefined) state.searchDraft = snap.searchDraft;
-  if (snap.searchSenders) state.searchSenders = [...snap.searchSenders];
-  if (snap.listFilter) state.listFilter = snap.listFilter;
-  if (snap.searchScope) state.searchScope = snap.searchScope;
-  if (snap.searchNlMode !== undefined) state.searchNlMode = snap.searchNlMode;
-  if (snap.contactsListQuery !== undefined) setContactsListQuery(snap.contactsListQuery);
-  if (snap.contactsKeywordDraft !== undefined) setContactsKeywordDraft(snap.contactsKeywordDraft);
-  state.aiOpen = Boolean(snap.aiOpen);
-  state.selectedContactEmail = snap.selectedContactEmail;
-  if (snap.settingsTab) state.settingsTab = snap.settingsTab;
-
-  switch (snap.view) {
-    case "list":
-      state.view = "list";
-      state.selectedThread = undefined;
-      state.selectedThreadId = undefined;
-      clearThreadAiSummaryState();
-      render();
-      if (
-        (snap.search?.trim() ?? "") ||
-        (snap.searchSenders?.length ?? 0) > 0 ||
-        snap.listFilter !== defaultListFilterFromPrefs()
-      ) {
-        void searchThreads();
-      }
-      break;
-    case "thread": {
-      const tid = snap.selectedThreadId?.trim();
-      if (!tid) {
-        state.view = "list";
-        render();
-        break;
-      }
-      await openThread(tid, { skipHistory: true, preserveAi: snap.aiOpen });
-      break;
-    }
-    case "contacts": {
-      state.view = "contacts";
-      state.selectedContactEmail = undefined;
-      clearContactProfile();
-      clearThreadAiSummaryState();
-      render();
-      const acc = currentAccount();
-      if (acc?.id) {
-        try {
-          await loadContactsList(acc.id, { reset: true, query: snap.contactsListQuery });
-        } catch (e) {
-          toast(tauriErrorMessage(e));
-        }
-      }
-      render();
-      break;
-    }
-    case "contact": {
-      const em = snap.selectedContactEmail?.trim();
-      if (!em) {
-        state.view = "contacts";
-        render();
-        break;
-      }
-      await openContactDetailView(em, { skipHistory: true });
-      break;
-    }
-    case "settings":
-      state.view = "settings";
-      state.settingsTab = snap.settingsTab ?? state.settingsTab;
-      clearThreadAiSummaryState();
-      render();
-      break;
-    case "organization":
-      state.view = "organization";
-      state.mailboxDigestPanelOpen = false;
-      clearThreadAiSummaryState();
-      render();
-      break;
-    case "organizationV2":
-      state.view = "organizationV2";
-      state.mailboxDigestPanelOpen = false;
-      clearThreadAiSummaryState();
-      render();
-      break;
-    case "folderManager": {
-      state.view = "folderManager";
-      state.mailboxDigestPanelOpen = false;
-      clearThreadAiSummaryState();
-      const mb = snap.folderManagerSelectedMailbox ?? null;
-      state.folderManager.selectedMailbox = mb;
-      if (!mb) state.threads = [];
-      render();
-      if (mb) await fmSelectMailbox(mb, { skipHistory: true });
-      else await refreshFolderManagerTree();
-      break;
-    }
-    case "compose":
-      state.view = "compose";
-      render();
-      break;
-    default:
-      state.view = "list";
-      render();
-  }
-  window.requestAnimationFrame(() => {
-    navApplyPendingScrollRestore();
-  });
-}
-
-async function goBack(): Promise<void> {
-  const snap = navPop();
-  if (!snap) {
-    if (state.view === "folderManager" && state.folderManager.selectedMailbox) {
-      state.folderManager.selectedMailbox = null;
-      state.threads = [];
-      render();
-      return;
-    }
-    if (state.view !== "list") {
-      state.view = "list";
-      state.selectedThread = undefined;
-      state.selectedThreadId = undefined;
-      state.selectedContactEmail = undefined;
-      state.aiOpen = false;
-      clearThreadAiSummaryState();
-      render();
-    }
-    return;
-  }
-  navPushForward(captureCurrentNav());
-  await applyNavSnapshot(snap);
-}
-
-async function goForward(): Promise<void> {
-  const snap = navPopForward();
-  if (!snap) return;
-  navPushBackEntry(captureCurrentNav());
-  await applyNavSnapshot(snap);
-}
-
-function navigateToInbox(opts?: NavigateOpts): void {
-  beginNavigation("list", { resetStack: true, ...opts });
-  state.view = "list";
-  state.selectedContactEmail = undefined;
-  state.selectedThread = undefined;
-  state.selectedThreadId = undefined;
-  state.aiOpen = false;
-  clearThreadAiSummaryState();
-  render();
-}
-
 let tauriNativeDragDropUnlisten: (() => void) | undefined;
 
 let tauriNativeFileDropReady = false;
@@ -1006,48 +752,6 @@ export async function bindTauriNativeFileDropAsync(): Promise<void> {
   } catch (fallback) {
     console.error("[RustyMail] drag-drop natif impossible", fallback);
   }
-}
-
-async function loadAccountsFromBackend(options?: { silent?: boolean; timeoutMs?: number }): Promise<boolean> {
-  state.accountsLoadError = "";
-  if (!isTauriRuntime()) {
-    state.accounts = [];
-    state.accountsLoadError =
-      "Mode navigateur : pas de comptes ni de mails persistants. Lancez l’app bureau avec npm run tauri:dev.";
-    if (!options?.silent) toast(state.accountsLoadError);
-    return false;
-  }
-  try {
-    const raw = await withTimeout(
-      invoke<unknown[]>("list_accounts", {}),
-      options?.timeoutMs ?? ACCOUNTS_BOOT_TIMEOUT_MS
-    );
-    state.accounts = (Array.isArray(raw) ? raw : [])
-      .map((row) => normalizeAccountRow(row))
-      .filter((a): a is Account => a !== null);
-    if (!state.selectedAccountId || !state.accounts.some((a) => a.id === state.selectedAccountId)) {
-      state.selectedAccountId = state.accounts[0]?.id;
-    }
-    return state.accounts.length > 0;
-  } catch (error) {
-    console.error("list_accounts", error);
-    state.accounts = [];
-    state.accountsLoadError = tauriErrorMessage(error);
-    if (!options?.silent) {
-      toast(`Impossible de charger les comptes : ${state.accountsLoadError}`);
-    }
-    return false;
-  }
-}
-
-function resetFolderManagerPanelSearchState(): void {
-  state.listFilter = defaultListFilterFromPrefs();
-}
-
-function mailboxPathPrefixForCreate(): string {
-  const m = (state.selectedMailbox ?? "").trim();
-  if (!m || isVirtualMailbox(m)) return "";
-  return m.endsWith("/") ? m : `${m}/`;
 }
 
 async function refreshLlmRuntimeStatus(forceHardwareRescan?: boolean): Promise<void> {
@@ -1486,15 +1190,6 @@ export async function boot() {
     render();
     toast(msg);
   }
-}
-
-function threadReadingIsSimpleLayout(): boolean {
-  return true;
-}
-
-function aiSidePanelExpandedForShell(): boolean {
-  if (state.view === "contacts" || state.view === "contact") return false;
-  return state.aiOpen || mailboxDigestSlotInList();
 }
 
 async function refreshOrganizationReport(): Promise<void> {
@@ -2290,34 +1985,6 @@ function activeSecurityLlmAugmentCount(): number {
   }
   return n;
 }
-
-function orgApplyStatusMessage(
-  proposalId: string,
-  actionOverride?: import("../organizationView").OrgActionOverride | null,
-): string {
-  if (actionOverride === "trash") return "Mise en corbeille (lot)…";
-  if (actionOverride === "archive") return "Archivage (lot)…";
-  if (actionOverride === "markRead") return "Marquage comme lu (lot)…";
-  const p = state.organization.report?.proposals.find((x) => x.id === proposalId);
-  if (!p) return "Traitement organisation…";
-  switch (p.suggestedAction) {
-    case "retag":
-      return "Normalisation des tags (lot)…";
-    case "archive":
-      return "Archivage (lot)…";
-    case "trash":
-      return "Mise en corbeille (lot)…";
-    case "markRead":
-      return "Marquage comme lu (lot)…";
-    case "move":
-      return p.targetMailbox ? `Déplacement vers « ${p.targetMailbox} »…` : "Déplacement (lot)…";
-    case "deleteMailbox":
-      return "Suppression des dossiers vides…";
-    default:
-      return "Traitement organisation…";
-  }
-}
-
 
 async function onOrgSyncMailbox(mailbox: string): Promise<void> {
   const mb = mailbox.trim();
@@ -6000,43 +5667,6 @@ function normalizeCapabilities(raw: unknown): AppCapabilities {
   };
 }
 
-function normalizeServerSettings(raw: unknown): Account["imap"] {
-  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const sec = String(r.security ?? r.Security ?? "Tls");
-  const security: SecurityMode = sec === "StartTls" ? "StartTls" : "Tls";
-  return {
-    host: String(r.host ?? "").trim(),
-    port: Math.max(1, Math.floor(Number(r.port)) || 993),
-    security,
-    allowInvalidTls: Boolean(r.allowInvalidTls ?? r.allow_invalid_tls)
-  };
-}
-
-function normalizeAuthKind(raw: unknown): MailAuthKind | undefined {
-  const s = String(raw ?? "").trim();
-  if (s === "oauthGoogle" || s === "oauth_google") return "oauthGoogle";
-  if (s === "oauthMicrosoft" || s === "oauth_microsoft") return "oauthMicrosoft";
-  if (s === "password") return "password";
-  return undefined;
-}
-
-function normalizeAccountRow(raw: unknown): Account | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  const id = String(r.id ?? "").trim();
-  const email = String(r.email ?? "").trim();
-  if (!id && !email) return null;
-  const displayName = String(r.displayName ?? r.display_name ?? email).trim();
-  return {
-    id: id || email.toLowerCase(),
-    displayName: displayName || email,
-    email: email || id,
-    imap: normalizeServerSettings(r.imap),
-    smtp: normalizeServerSettings(r.smtp),
-    authKind: normalizeAuthKind(r.authKind ?? r.auth_kind)
-  };
-}
-
 function render() {
   syncMailboxDigestPanelWithFeaturePref();
   accountsFormIdentityScratch = undefined;
@@ -6309,7 +5939,6 @@ registerMailListDeps({
 
 registerOpenThreadDeps({
   openSavedDraftById,
-  beginNavigation,
   navPop,
   threadAiSummaryScoped,
   clearThreadAiSummaryState,
@@ -6373,11 +6002,6 @@ registerEmptyTrashMailboxDeps({
   loadMailboxUnread,
 });
 
-registerAppNavActionsDeps({
-  goBack,
-  navigateToInbox,
-  navigateToBreadcrumbIndex,
-});
 
 registerThreadListActionsDeps({
   loadMailboxUnread,
@@ -6427,10 +6051,6 @@ registerComposeSendDraftRunDeps({
   clearDraftSession,
 });
 
-registerComposeViewNavigationDeps({
-  beginNavigation,
-});
-
 registerComposeDraftPreviewDeps({
   persistDraft,
   sanitizePreviewHtml: (htmlRaw) => sanitizeEmailHtml(htmlRaw, { relocateUnsubscribe: false }).html,
@@ -6461,8 +6081,6 @@ registerThreadAiWireActionsDeps({
   llmInboxDigestUi,
   llmQaThreadUi,
 });
-
-registerAccountsLoadActionDeps({ loadAccountsFromBackend });
 
 registerSettingsWireActionsDeps({
   openSettingsView,
@@ -6556,6 +6174,13 @@ registerSwitchActiveAccountDeps({
   loadAddressBookSidebarCount,
   refreshSavedSearches,
   refreshSuggestedSavedViews,
+});
+
+registerAppNavigationStackDeps({
+  openThread,
+  openContactDetailView,
+  fmSelectMailbox,
+  refreshFolderManagerTree,
 });
 
 initMailboxDigest({

@@ -12,6 +12,7 @@ import { withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { invalidateIdleAiCachePrefetch } from "./idleAiCachePrefetch";
 import { startThreadActivityOpen } from "./threadActivityTracking";
+import { beginNavigation } from "./appNavigationStack";
 import { render } from "../dispatch";
 import { state } from "../state";
 
@@ -19,7 +20,6 @@ export type OpenThreadOptions = { preserveAi?: boolean; skipHistory?: boolean };
 
 export type OpenThreadDeps = {
   openSavedDraftById: (savedId: string) => Promise<void>;
-  beginNavigation: (view: "thread") => void;
   navPop: () => unknown;
   threadAiSummaryScoped: () => boolean;
   clearThreadAiSummaryState: () => void;
@@ -99,7 +99,7 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
       state.selectedAccountId = aid;
     }
   }
-  if (!opts?.skipHistory) openThreadDeps.beginNavigation("thread");
+  if (!opts?.skipHistory) beginNavigation("thread");
   const prev = state.selectedThreadId;
   const keepAi =
     opts?.preserveAi && openThreadDeps.threadAiSummaryScoped() && threadIdsMatch(state.aiThreadScope, tid);

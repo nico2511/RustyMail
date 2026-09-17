@@ -51,7 +51,7 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/lib/tagFamilyForInvoke.ts` | Normalisation famille tag pour invoke Rust |
 | `app/mail/bulkTrashList.ts` | Corbeille lot (liste visible) + `registerBulkTrashListDeps()` |
 | `app/mail/emptyTrashMailbox.ts` | Vider corbeille dossier + `registerEmptyTrashMailboxDeps()` |
-| `app/mail/appNavActions.ts` | `goBack` / `navigateToInbox` (facade deps) + `registerAppNavActionsDeps()` |
+| `app/mail/appNavActions.ts` | Facades `goBack` / `navigateToInbox` / fil d’Ariane |
 | `app/mail/mailboxManageAction.ts` | CRUD dossier IMAP (modale gérer) + `registerMailboxManageActionDeps()` |
 | `app/mail/threadActivityTracking.ts` | Activité fil / recherche (suggestions vues enregistrées) |
 | `app/mail/syncInboxAction.ts` | Facade `syncInbox()` + `registerSyncInboxActionDeps()` |
@@ -112,6 +112,12 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/oauthEphemeralRedirectWarn.ts` | Toast redirect OAuth éphémère |
 | `app/mail/searchMailboxBrowseExit.ts` | Sortie mode recherche (navigation dossier) |
 | `app/mail/syncImapAccountContext.ts` | Compte/timeout sync IMAP selon vue |
+| `app/mail/appNavigationStack.ts` | Pile navigation (retour, snapshots, `beginNavigation`) |
+| `app/mail/accountRowNormalize.ts` | Normalisation ligne compte (`list_accounts`) |
+| `app/mail/accountsLoadFromBackend.ts` | Chargement comptes backend |
+| `app/mail/folderManagerPanelState.ts` | État recherche panneau dossiers |
+| `app/mail/orgApplyStatusMessage.ts` | Libellés progression Organiser |
+| `app/mail/threadShellLayout.ts` | Layout lecture fil / panneau IA shell |
 | `app/mail/composeSendDraftAction.ts` | Ré-export `sendDraft()` |
 | `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
 | `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |
