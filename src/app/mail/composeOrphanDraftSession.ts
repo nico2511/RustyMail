@@ -8,54 +8,41 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { draftHasRecipientsExtra } from "./composeDraftRecipients";
-
-export type ComposeOrphanDraftSessionDeps = {
-  startNewDraftSession: () => void;
-  enterComposeView: (opts?: { skipHistory?: boolean }) => void;
-  loadComposeMarkdownIntoEditor: (markdown: string) => void;
-  syncPreviewOpenFromComposeLayout: () => void;
-  resetMarkdownEditorHistory: () => void;
-  computePreview: () => void | Promise<void>;
-  scheduleDraftRevisionSave: (delayMs?: number) => void;
-  upsertSavedDraftSilent: () => Promise<boolean>;
-};
-
-let composeOrphanDraftSessionDeps: ComposeOrphanDraftSessionDeps | null = null;
-
-export function registerComposeOrphanDraftSessionDeps(deps: ComposeOrphanDraftSessionDeps): void {
-  composeOrphanDraftSessionDeps = deps;
-}
-
-function orphanDeps(): ComposeOrphanDraftSessionDeps {
-  if (!composeOrphanDraftSessionDeps) throw new Error("registerComposeOrphanDraftSessionDeps not called");
-  return composeOrphanDraftSessionDeps;
-}
+import {
+  computePreview,
+  loadComposeMarkdownIntoEditor,
+  resetMarkdownEditorHistory,
+  scheduleDraftRevisionSave,
+} from "./composeComposerBridge";
+import { upsertSavedDraftSilent } from "./composeDraftLocalSave";
+import { startNewDraftSession } from "./composeDraftSession";
+import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
+import { enterComposeView } from "./composeViewWireActions";
 
 export async function resumeOrphanDraftSession(sessionId: string): Promise<void> {
   const sid = sessionId.trim();
   const accountId = currentAccount()?.id?.trim();
   if (!sid || !accountId || !isTauriRuntime()) return;
-  const d = orphanDeps();
   try {
     const draft = await withTimeout(
       invoke<Draft>("draft_orphan_session_open", { accountId, sessionId: sid }),
       MAIL_ACTION_TIMEOUT_MS,
     );
     state.resumeDraftModal = null;
-    d.startNewDraftSession();
+    startNewDraftSession();
     state.draftSessionId = sid;
     state.draft = draft;
-    d.loadComposeMarkdownIntoEditor(draft.markdownBody ?? "");
-    d.enterComposeView();
+    loadComposeMarkdownIntoEditor(draft.markdownBody ?? "");
+    enterComposeView();
     state.composeCcBccOpen = draftHasRecipientsExtra(draft);
     state.composeLayout = "split";
-    d.syncPreviewOpenFromComposeLayout();
-    d.resetMarkdownEditorHistory();
-    await d.upsertSavedDraftSilent();
+    syncPreviewOpenFromComposeLayout();
+    resetMarkdownEditorHistory();
+    await upsertSavedDraftSilent();
     toast("Brouillon repris.");
     render();
-    window.setTimeout(() => void d.computePreview(), 0);
-    d.scheduleDraftRevisionSave(350);
+    window.setTimeout(() => void computePreview(), 0);
+    scheduleDraftRevisionSave(350);
   } catch (e) {
     console.error("draft_orphan_session_open", e);
     toast(`Reprise impossible : ${tauriErrorMessage(e)}`);

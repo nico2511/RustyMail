@@ -256,7 +256,6 @@ import {
 } from "./mail/composeDraftRevisionDiff";
 import {
   dismissOrphanDraftSession,
-  registerComposeOrphanDraftSessionDeps,
   resumeOrphanDraftSession,
 } from "./mail/composeOrphanDraftSession";
 import { pickAttachments, registerComposePickAttachmentsDeps } from "./mail/composePickAttachments";
@@ -274,6 +273,14 @@ import {
 } from "./mail/composeDraftRevisionAutosave";
 import { persistDraft } from "./mail/composePersistDraft";
 import { composeChipsHandle } from "./mail/composeRecipientChipsWire";
+import { draftPayloadForRust } from "./mail/composeDraftPayload";
+import {
+  checkOrphanDraftSessionsOnBoot,
+  registerComposeDraftLocalSaveDeps,
+  saveDraftRevisionNow,
+} from "./mail/composeDraftLocalSave";
+import { composeDraftHasMeaningfulContent, startNewDraftSession } from "./mail/composeDraftSession";
+import { syncPreviewOpenFromComposeLayout } from "./mail/composeLayoutState";
 import {
   composePreviewPaneActive,
   registerComposeDraftPreviewDeps,
@@ -577,25 +584,6 @@ let senderBatchSummarizeAbort: AbortController | null = null;
 
 let senderBatchSummarizeActive = false;
 
-function draftPayloadForRust(d: Draft): Draft {
-  const pathsRaw = Array.isArray(d.attachmentPaths) ? d.attachmentPaths : [];
-  const attachmentPaths = Array.from(new Set(pathsRaw.map((p) => p.trim()).filter(Boolean)));
-  return {
-    id: d.id ?? "draft-local",
-    kind: d.kind ?? "New",
-    to: [...(d.to ?? [])],
-    cc: [...(d.cc ?? [])],
-    bcc: [...(d.bcc ?? [])],
-    subject: d.subject ?? "",
-    markdownBody: d.markdownBody ?? "",
-    sendHtml: d.sendHtml !== false,
-    inReplyTo: d.inReplyTo ?? null,
-    references: [...(d.references ?? [])],
-    attachmentPaths,
-    threadId: d.threadId ?? null,
-  };
-}
-
 async function rewriteDictatedSegmentWithTone(raw: string): Promise<string> {
   const t = raw.trim();
   if (!t || !isTauriRuntime() || state.view !== "compose") return raw;
@@ -638,155 +626,10 @@ async function refreshSettingsPathsFromBackend(): Promise<void> {
   render();
 }
 
-function syncPreviewOpenFromComposeLayout() {
-  state.previewOpen = state.composeLayout !== "write";
-}
-
-function newDraftSessionId(): string {
-  const anyCrypto = (globalThis as any).crypto as Crypto | undefined;
-  const gen = anyCrypto?.randomUUID?.bind(anyCrypto);
-  if (gen) return String(gen());
-  return `ds-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function startNewDraftSession() {
-  state.draftSessionId = newDraftSessionId();
-  state.savedDraftRecordId = null;
-  state.draftRevisionsLoading = false;
-  state.draftRevisions = [];
-  state.draftDiffRevisionId = null;
-  state.draftDiffLoading = false;
-  state.draftDiffLines = [];
-  state.draftDiffView = "preview";
-  state.draftDiffOtherBody = "";
-  state.draftRevisionPreview = null;
-  state.draftVersionsListExpanded = false;
-}
-
-async function saveDraftRevisionNow(): Promise<boolean> {
-  const accountId = currentAccount()?.id?.trim() ?? "";
-  const sessionId = state.draftSessionId?.trim() ?? "";
-  if (!isTauriRuntime() || !accountId || !sessionId) return false;
-  if (!state.draft) return false;
-  persistDraft();
-  try {
-    await withTimeout(
-      invoke("draft_revision_save", {
-        accountId,
-        sessionId,
-        draft: draftPayloadForRust(state.draft),
-      }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-    if (state.composeLayout === "historique") {
-      void refreshDraftRevisions(60);
-    }
-    // Autosave « Sauvés » : le brouillon survit à un crash même sans clic Enregistrer.
-    if (composeDraftHasMeaningfulContent()) {
-      await upsertSavedDraftSilent();
-    }
-    return true;
-  } catch (error) {
-    console.error("draft_revision_save", error);
-    toast(`Enregistrement local impossible : ${tauriErrorMessage(error)}`);
-    return false;
-  }
-}
-
-async function upsertSavedDraftSilent(): Promise<boolean> {
-  if (!isTauriRuntime()) return false;
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId || !state.draftSessionId?.trim() || !state.draft) return false;
-  const titleRaw = state.draft.subject?.trim() ?? "";
-  const title = titleRaw.length ? titleRaw : "Sans objet";
-  try {
-    const newId = await withTimeout(
-      invoke<string>("saved_draft_upsert", {
-        accountId,
-        sessionId: state.draftSessionId.trim(),
-        title,
-      }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-    const tid = newId.trim();
-    if (tid.length) state.savedDraftRecordId = tid;
-    void refreshSavedDraftsMailboxCount();
-    return true;
-  } catch (e) {
-    console.error("saved_draft_upsert (silent)", e);
-    return false;
-  }
-}
-
 async function flushDraftRevisionPending(): Promise<void> {
   await flushDraftRevisionPendingNow(
     () => state.view === "compose" && Boolean(state.draft && state.draftSessionId),
   );
-}
-
-function composeDraftHasMeaningfulContent(): boolean {
-  if (!state.draft) return false;
-  const d = state.draft;
-  if (d.subject.trim()) return true;
-  if (d.markdownBody.trim()) return true;
-  if (d.to.length > 0 || d.cc.length > 0 || d.bcc.length > 0) return true;
-  if ((d.attachmentPaths?.length ?? 0) > 0) return true;
-  return false;
-}
-
-async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }): Promise<boolean> {
-  if (!isTauriRuntime()) return false;
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId || !state.draftSessionId?.trim() || !state.draft) {
-    toast("Impossible d’enregistrer : session ou compte indisponible.");
-    return false;
-  }
-  persistDraft();
-  await saveDraftRevisionNow();
-  const titleRaw = state.draft.subject?.trim() ?? "";
-  const title = titleRaw.length ? titleRaw : "Sans objet";
-  try {
-    const newId = await withTimeout(
-      invoke<string>("saved_draft_upsert", {
-        accountId,
-        sessionId: state.draftSessionId.trim(),
-        title,
-      }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-    const tid = newId.trim();
-    if (tid.length) state.savedDraftRecordId = tid;
-    if (!opts?.silentToast) {
-      toast("Enregistré dans « Sauvés ».");
-    }
-    await refreshSavedDraftsMailboxCount();
-    if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-      await loadMailView(false);
-    }
-    render();
-    return true;
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-    return false;
-  }
-}
-
-async function checkOrphanDraftSessionsOnBoot(): Promise<void> {
-  if (!isTauriRuntime()) return;
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId) return;
-  try {
-    const sessions = await withTimeout(
-      invoke<OrphanDraftSessionItem[]>("draft_orphan_sessions_list", { accountId, limit: 10 }),
-      BOOT_INVOKE_TIMEOUT_MS
-    );
-    if (sessions?.length) {
-      state.resumeDraftModal = { sessions };
-      render();
-    }
-  } catch (e) {
-    console.error("draft_orphan_sessions_list", e);
-  }
 }
 
 let micTimer: number | undefined;
@@ -7715,6 +7558,11 @@ registerComposeDraftPreviewDeps({
   sanitizePreviewHtml: (htmlRaw) => sanitizeEmailHtml(htmlRaw, { relocateUnsubscribe: false }).html,
 });
 
+registerComposeDraftLocalSaveDeps({
+  refreshSavedDraftsMailboxCount,
+  loadMailView,
+});
+
 registerComposeDraftRevisionAutosaveDeps({
   canScheduleDraftRevisionSave: () =>
     isTauriRuntime() && Boolean(state.draft && state.draftSessionId),
@@ -7724,17 +7572,6 @@ registerComposeDraftRevisionAutosaveDeps({
 });
 
 registerComposeDraftRevisionDiffDeps({ persistDraft });
-
-registerComposeOrphanDraftSessionDeps({
-  startNewDraftSession,
-  enterComposeView,
-  loadComposeMarkdownIntoEditor,
-  syncPreviewOpenFromComposeLayout,
-  resetMarkdownEditorHistory,
-  computePreview,
-  scheduleDraftRevisionSave,
-  upsertSavedDraftSilent,
-});
 
 registerComposePickAttachmentsDeps({ scheduleDraftRevisionSave });
 
@@ -7837,8 +7674,6 @@ registerAgentWireActionsDeps({
 
 registerComposeViewWireActionsDeps({
   enterComposeView,
-  startNewDraftSession,
-  syncPreviewOpenFromComposeLayout,
 });
 
 registerComposeAssistWireActionsDeps({
@@ -7855,7 +7690,6 @@ registerAddressBookWireActionsDeps({
 registerAccountWireActionsDeps({
   micAction,
   saveAccount,
-  saveDraftToSavedListNow,
   refreshSavedDraftsMailboxCount,
 });
 

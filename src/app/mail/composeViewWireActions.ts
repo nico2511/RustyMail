@@ -1,7 +1,8 @@
+import { startNewDraftSession as startNewDraftSessionImpl } from "./composeDraftSession";
+import { syncPreviewOpenFromComposeLayout as syncPreviewOpenFromComposeLayoutImpl } from "./composeLayoutState";
+
 export type ComposeViewWireActionsDeps = {
   enterComposeView: (opts?: { skipHistory?: boolean }) => void;
-  startNewDraftSession: () => void;
-  syncPreviewOpenFromComposeLayout: () => void;
 };
 
 let composeViewWireActionsDeps: ComposeViewWireActionsDeps | null = null;
@@ -20,9 +21,9 @@ export function enterComposeView(opts?: { skipHistory?: boolean }): void {
 }
 
 export function startNewDraftSession(): void {
-  composeView().startNewDraftSession();
+  startNewDraftSessionImpl();
 }
 
 export function syncPreviewOpenFromComposeLayout(): void {
-  composeView().syncPreviewOpenFromComposeLayout();
+  syncPreviewOpenFromComposeLayoutImpl();
 }

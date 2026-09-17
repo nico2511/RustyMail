@@ -1,9 +1,9 @@
 import type { MicActionOpts } from "../types";
+import { saveDraftToSavedListNow as saveDraftToSavedListNowImpl } from "./composeDraftLocalSave";
 
 export type AccountWireActionsDeps = {
   micAction: (opts?: MicActionOpts) => void | Promise<void>;
   saveAccount: () => void | Promise<void>;
-  saveDraftToSavedListNow: (opts?: { silentToast?: boolean }) => Promise<boolean>;
   refreshSavedDraftsMailboxCount: () => Promise<void>;
 };
 
@@ -27,7 +27,7 @@ export function saveAccount(): void | Promise<void> {
 }
 
 export function saveDraftToSavedListNow(opts?: { silentToast?: boolean }): Promise<boolean> {
-  return accountWire().saveDraftToSavedListNow(opts);
+  return saveDraftToSavedListNowImpl(opts);
 }
 
 export function refreshSavedDraftsMailboxCount(): Promise<void> {

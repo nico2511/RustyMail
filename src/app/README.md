@@ -77,6 +77,10 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/composeRecipientChipsWire.ts` | Chips À/Cc/Cci + `composeChipsHandle` |
 | `app/mail/composeHtmlDropzone.ts` | Glisser-déposer PJ (navigateur) |
 | `app/mail/composeDraftRevisionAutosave.ts` | Debounce révisions locales + `scheduleDraftRevisionSave` |
+| `app/mail/composeDraftPayload.ts` | Normalisation brouillon pour invoke Rust |
+| `app/mail/composeDraftSession.ts` | Id session, reset état révisions, contenu « significatif » |
+| `app/mail/composeDraftLocalSave.ts` | Révisions, upsert Sauvés, orphelins au boot |
+| `app/mail/composeLayoutState.ts` | `syncPreviewOpenFromComposeLayout` |
 | `app/mail/newsletterRulesMatch.ts` | Correspondance expéditeur ↔ règle newsletter |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
 | `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |
