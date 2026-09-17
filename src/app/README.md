@@ -81,8 +81,15 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
 | `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
 | `app/mail/threadAiWireActions.ts` | Facades IA fil (synthèse, traduction, Q&R…) |
-| `app/mail/threadAiRun.ts` | Cœurs synthèse/traduction fil + synthèse batch expéditeur |
-| `app/mail/threadAiWireUiRun.ts` | Actions wire UI (synthèse, traduction, Q&R, réponses rapides, brief) |
+| `app/mail/threadAiRun.ts` | Barrel cœurs synthèse/traduction + batch expéditeur |
+| `app/mail/threadAiSummarizeCoreRun.ts` | `summarizeThreadCore` (stream + cache) |
+| `app/mail/threadAiTranslateCoreRun.ts` | `translateThreadCore` |
+| `app/mail/threadAiSenderBatchRun.ts` | Synthèse légère multi-fils (filtre expéditeur) |
+| `app/mail/threadAiWireUiRun.ts` | Barrel actions wire UI fil |
+| `app/mail/threadAiWireSummarizeRun.ts` | `summarizeThread` (wire) |
+| `app/mail/threadAiWireTranslateRun.ts` | Traduction fil/message + hydrate cache |
+| `app/mail/threadAiWireQuickReplyRun.ts` | Réponses rapides fil / compose |
+| `app/mail/threadAiWireQaDigestRun.ts` | Q&A fil + brief dossier |
 | `app/mail/agentWireActions.ts` | Facades agent assist (prepare reply, telemetry, plan) |
 | `app/mail/agentPrepareReplyRun.ts` | Assistant réponse — phases LLM (start / continue / plan) |
 | `app/mail/agentAssistSessionHelpers.ts` | Session assist (payload, télémetrie, merge reco) |
@@ -265,7 +272,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`threadAiWireUiRun`, `threadAiRun`, …)
+1. Découper d’autres modules mail > ~350 lignes (`agentPrepareReplyRun`, `searchLaunchQueries`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
