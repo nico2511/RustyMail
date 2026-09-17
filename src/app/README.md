@@ -66,7 +66,7 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/threadAiWireActions.ts` | Facades IA fil (synthèse, traduction, Q&R…) |
 | `app/mail/agentWireActions.ts` | Facades agent assist (prepare reply, telemetry, plan) |
 | `app/mail/composeAiWireActions.ts` | Facades IA compose + envoi split |
-| `app/mail/accountsLoadAction.ts` | Facade `loadAccountsFromBackend()` |
+| `app/mail/accountsLoadAction.ts` | Ré-export `loadAccountsFromBackend()` |
 | `app/mail/settingsWireActions.ts` | Facades paramètres (comptes, LLM, OAuth, micro…) |
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
 | `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
@@ -112,6 +112,12 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/oauthEphemeralRedirectWarn.ts` | Toast redirect OAuth éphémère |
 | `app/mail/searchMailboxBrowseExit.ts` | Sortie mode recherche (navigation dossier) |
 | `app/mail/syncImapAccountContext.ts` | Compte/timeout sync IMAP selon vue |
+| `app/mail/appNavigationStack.ts` | Pile navigation (retour, snapshots, `beginNavigation`) |
+| `app/mail/accountRowNormalize.ts` | Normalisation ligne compte (`list_accounts`) |
+| `app/mail/accountsLoadFromBackend.ts` | Chargement comptes backend |
+| `app/mail/folderManagerPanelState.ts` | État recherche panneau dossiers |
+| `app/mail/orgApplyStatusMessage.ts` | Libellés progression Organiser |
+| `app/mail/threadShellLayout.ts` | Layout lecture fil / panneau IA shell |
 | `app/mail/appNavigationStack.ts` | Pile navigation (retour, snapshots, `beginNavigation`) |
 | `app/mail/accountRowNormalize.ts` | Normalisation ligne compte (`list_accounts`) |
 | `app/mail/accountsLoadFromBackend.ts` | Chargement comptes backend |
