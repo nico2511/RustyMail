@@ -11,6 +11,7 @@ import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { invalidateIdleAiCachePrefetch } from "./idleAiCachePrefetch";
+import { startThreadActivityOpen } from "./threadActivityTracking";
 import { render } from "../dispatch";
 import { state } from "../state";
 
@@ -25,7 +26,6 @@ export type OpenThreadDeps = {
   threadIsAutoMail: (thread: DiscussionThreadView | undefined, tid: string) => boolean;
   stopAgentTelemetry: () => Promise<void>;
   loadNewsletterRules: () => Promise<void>;
-  startThreadActivityOpen: (threadId: string) => void;
   hydrateMessageTranslationsFromCacheForThread: (messages: DiscussionThreadView["messages"]) => void;
   scheduleSecurityLlmAugment: (message: DiscussionThreadView["messages"][number]) => void;
   summarizeThread: () => Promise<void>;
@@ -135,7 +135,7 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
   await markOpenedThreadReadIfUnread(tid);
   await openThreadDeps.loadNewsletterRules();
   state.view = "thread";
-  openThreadDeps.startThreadActivityOpen(tid);
+  startThreadActivityOpen(tid);
   if (isTauriRuntime()) void invoke("ai_user_activity_ping").catch(() => {});
   const hyd = state.selectedThread?.messages ?? [];
   if (isTauriRuntime() && hyd.length) void openThreadDeps.hydrateMessageTranslationsFromCacheForThread(hyd);

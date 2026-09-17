@@ -8,6 +8,7 @@ import {
 import { renderSavedSearchesSidebarHtml, renderSuggestedViewsCardHtml } from "../../../savedSearchView";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
+import { activityTrackingEnabled } from "../../mail/threadActivityTracking";
 import { state } from "../../state";
 import { renderSidebarAiQuickTrigger } from "./aiQuickPanelRender";
 import {
@@ -93,7 +94,7 @@ export function renderSidebar(): string {
         isTauriRuntime() && account
           ? `<div class="sidebar-saved-views" aria-label="Vues enregistrées">
               <div class="sidebar-section-label sidebar-section-label--saved-views"><span class="dim">Vues</span></div>
-              ${renderDeps().activityTrackingEnabled() ? renderSuggestedViewsCardHtml(state.suggestedSavedViews, escapeHtml, escapeAttr) : ""}
+              ${activityTrackingEnabled() ? renderSuggestedViewsCardHtml(state.suggestedSavedViews, escapeHtml, escapeAttr) : ""}
               ${renderSavedSearchesSidebarHtml(state.savedSearches, state.activeSavedSearchId, escapeHtml, escapeAttr)}
             </div>`
           : ""

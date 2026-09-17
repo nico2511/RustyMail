@@ -284,6 +284,10 @@ import { registerComposeAssistWireActionsDeps } from "./mail/composeAssistWireAc
 import { registerComposeViewWireActionsDeps } from "./mail/composeViewWireActions";
 import { registerAddressBookWireActionsDeps } from "./mail/addressBookWireActions";
 import { registerAccountWireActionsDeps } from "./mail/accountWireActions";
+import {
+  flushThreadActivityClosed,
+  syncActivityRecordingPrefs,
+} from "./mail/threadActivityTracking";
 import { registerMailContentWireActionsDeps } from "./mail/mailContentWireActions";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
@@ -623,70 +627,6 @@ async function rewriteDictatedSegmentWithTone(raw: string): Promise<string> {
   }
 }
 
-
-let threadActivityOpen: {
-  threadId: string;
-  startedAt: number;
-  sender?: string;
-  mailbox?: string;
-} | null = null;
-
-function activityTrackingEnabled(): boolean {
-  return state.appPrefs.general.activitySuggestionsEnabled !== false;
-}
-
-function syncActivityRecordingPrefs(): void {
-  const acc = currentAccount()?.id?.trim() ?? null;
-  setActivityAccountId(acc);
-  setActivityRecordingEnabled(activityTrackingEnabled() && Boolean(acc));
-}
-
-function flushThreadActivityClosed(): void {
-  if (!threadActivityOpen || !activityTrackingEnabled()) {
-    threadActivityOpen = null;
-    return;
-  }
-  const durationMs = Math.max(0, Date.now() - threadActivityOpen.startedAt);
-  recordActivity({
-    eventType: "thread_closed",
-    threadId: threadActivityOpen.threadId,
-    senderEmail: threadActivityOpen.sender ?? null,
-    mailbox: threadActivityOpen.mailbox ?? null,
-    durationMs,
-  });
-  threadActivityOpen = null;
-}
-
-function startThreadActivityOpen(threadId: string): void {
-  if (!activityTrackingEnabled()) return;
-  flushThreadActivityClosed();
-  const row = state.threads.find((t) => String(t.id) === String(threadId));
-  const sender = row?.participants[0]?.trim() || "";
-  threadActivityOpen = {
-    threadId: String(threadId),
-    startedAt: Date.now(),
-    sender: sender || undefined,
-    mailbox: row?.mailbox,
-  };
-  recordActivity({
-    eventType: "thread_opened",
-    threadId: String(threadId),
-    senderEmail: sender || null,
-    mailbox: row?.mailbox ?? null,
-  });
-}
-
-function recordSearchCommittedActivity(): void {
-  if (!activityTrackingEnabled()) return;
-  recordActivity({
-    eventType: "search_committed",
-    senderEmail: state.searchSenders[0] ?? null,
-    metaJson: JSON.stringify({
-      text: state.search.trim().slice(0, 120),
-      senders: state.searchSenders,
-    }),
-  });
-}
 
 function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
   const { threads, threadOffsetReset } = mergeServerThreadPage(state.threads, page, append);
@@ -8237,7 +8177,6 @@ registerRenderDeps({
   currentAccount,
   activeMessageTranslationJobCount,
   activeSecurityLlmAugmentCount,
-  activityTrackingEnabled,
   renderThread,
   renderComposer,
   renderSettings,
@@ -8346,7 +8285,6 @@ registerOpenThreadDeps({
   threadIsAutoMail,
   stopAgentTelemetry,
   loadNewsletterRules,
-  startThreadActivityOpen,
   hydrateMessageTranslationsFromCacheForThread,
   scheduleSecurityLlmAugment,
   summarizeThread,
@@ -8364,7 +8302,6 @@ registerSearchCommitDeps({
   threadsVisibleInList,
   clearThreadAiSummaryState,
   withLlmQueue,
-  recordSearchCommittedActivity,
   resolveSearchMailboxPath,
   resolveAccountIdFromRef,
   canonicalEmailForNlMatch,
@@ -8377,7 +8314,6 @@ registerSearchBarUiDeps({
 
 registerSavedSearchViewsDeps({
   resolveSearchMailboxPath,
-  activityTrackingEnabled,
 });
 
 registerSearchViewContextDeps({

@@ -41,7 +41,6 @@ export type RenderDeps = {
   currentAccount: () => Account | undefined;
   activeMessageTranslationJobCount: () => number;
   activeSecurityLlmAugmentCount: () => number;
-  activityTrackingEnabled: () => boolean;
   renderThread: () => string;
   renderComposer: () => string;
   renderSettings: () => string;

@@ -42,10 +42,10 @@ import {
 } from "./searchQueryContext";
 import { canSaveSearchView } from "./searchViewContext";
 import { searchThreads } from "./searchThreadsRun";
+import { activityTrackingEnabled } from "./threadActivityTracking";
 
 export type SavedSearchViewsDeps = {
   resolveSearchMailboxPath: (requested: string) => string | null;
-  activityTrackingEnabled: () => boolean;
 };
 
 let savedSearchViewsDeps: SavedSearchViewsDeps | null = null;
@@ -208,7 +208,7 @@ export async function saveCurrentSearchView(): Promise<void> {
 
 export async function refreshSuggestedSavedViews(): Promise<void> {
   const d = deps();
-  if (!isTauriRuntime() || !d.activityTrackingEnabled()) {
+  if (!isTauriRuntime() || !activityTrackingEnabled()) {
     state.suggestedSavedViews = [];
     clearSuggestionShownKeys();
     return;

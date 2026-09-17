@@ -134,6 +134,7 @@ Outils : `tools/degrade-extract-lib-modals.mjs`, `tools/degrade-extract-batch2.m
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Retirer `@ts-nocheck` sur **`wireEvents/deps.ts`** et typer `addressBookRowsCache()`
+1. Découper **`deps.ts`** en barrels par domaine (search, compose, settings…) si utile
+2. Réduire le corps d’**`application.ts`** via modules mail
 
 `npm run verify:ts` · `npm test`

@@ -23,6 +23,7 @@ import { openTextPromptModal } from "../modals/promptConfirm";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { searchThreads } from "./searchThreadsRun";
+import { recordSearchCommittedActivity } from "./threadActivityTracking";
 import {
   committedSearchCriteriaSnapshot,
   effectiveSearchMailboxPath,
@@ -37,7 +38,6 @@ export type SearchCommitDeps = {
   threadsVisibleInList: () => ThreadListItem[];
   clearThreadAiSummaryState: () => void;
   withLlmQueue: <T>(label: string, fn: (signal: AbortSignal) => Promise<T>) => Promise<T | null>;
-  recordSearchCommittedActivity: () => void;
   resolveSearchMailboxPath: (requested: string) => string | null;
   resolveAccountIdFromRef: (ref: string) => string | null;
   canonicalEmailForNlMatch: (raw: string) => string | null;
@@ -432,7 +432,7 @@ export function commitSearchQuery(opts?: { fromModal?: boolean }): void {
               ? " (dossier précis)"
               : "";
         toast(`Recherche NL : ${bits.join(" · ")}${scope}.`);
-        d.recordSearchCommittedActivity();
+        recordSearchCommittedActivity();
       });
       if (!ran) return;
       if (closeModal) state.searchModalOpen = false;
@@ -443,7 +443,7 @@ export function commitSearchQuery(opts?: { fromModal?: boolean }): void {
   } else {
     void applySearchBarQuery().then(() => {
       toastSearchBarResult();
-      d.recordSearchCommittedActivity();
+      recordSearchCommittedActivity();
       if (closeModal) state.searchModalOpen = false;
       if (state.view === "thread") d.clearThreadAiSummaryState();
       if (state.view !== "list") state.view = "list";
