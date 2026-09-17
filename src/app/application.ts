@@ -472,9 +472,7 @@ import {
 
 import {
   applyEngineConnectionMode,
-  engineConnectionMode,
   isSettingsAiModalId,
-  LLM_CONTEXT_PRESETS,
   normalizeSettingsAiModalId,
   type SettingsAiModalId,
   type SettingsAiPanelDeps,
