@@ -5,6 +5,10 @@ import {
   ensureValidSelectedMailbox as ensureValidSelectedMailboxImpl,
   persistDefaultAccountId as persistDefaultAccountIdImpl,
 } from "./accountDefaultPrefs";
+import { paintLlmPrefetchProgressDom as paintLlmPrefetchProgressDomImpl } from "./llmPrefetchProgressDom";
+import { paintStatusBarProgressDom as paintStatusBarProgressDomImpl } from "./statusBarProgressJobs";
+import { warnOAuthEphemeralRedirect as warnOAuthEphemeralRedirectImpl } from "./oauthEphemeralRedirectWarn";
+import { switchActiveAccount as switchActiveAccountImpl } from "./switchActiveAccountAction";
 
 export type SettingsWireActionsDeps = {
   openSettingsView: () => void | Promise<void>;
@@ -12,15 +16,11 @@ export type SettingsWireActionsDeps = {
   refreshSettingsPathsFromBackend: () => void | Promise<void>;
   openEnginesAiSettingsModal: () => void | Promise<void>;
   finalizeSettingsAiModalClose: () => void;
-  switchActiveAccount: (id: string) => Promise<void>;
   syncActivityRecordingPrefs: () => void;
   persistAiPrefsFromDom: (opts?: { silent?: boolean; skipRender?: boolean }) => void | Promise<void>;
   refreshLlmRuntimeStatus: (forceHardwareRescan?: boolean) => Promise<void>;
   autoDetectLlamaServerBinary: (opts?: { silent?: boolean; persist?: boolean }) => Promise<boolean>;
-  paintLlmPrefetchProgressDom: () => void;
-  paintStatusBarProgressDom: () => void;
   discoverMailServersAction: () => void | Promise<void>;
-  warnOAuthEphemeralRedirect: (outcome: import("../types").OAuthDesktopLoginOutcome) => void;
   finishOAuthNewAccountAfterLogin: (
     authKind: "oauthGoogle" | "oauthMicrosoft",
     email: string,
@@ -72,7 +72,7 @@ export function persistDefaultAccountId(id: string): Promise<void> {
 }
 
 export function switchActiveAccount(id: string): Promise<void> {
-  return settings().switchActiveAccount(id);
+  return switchActiveAccountImpl(id);
 }
 
 export function syncActivityRecordingPrefs(): void {
@@ -99,11 +99,11 @@ export function autoDetectLlamaServerBinary(opts?: {
 }
 
 export function paintLlmPrefetchProgressDom(): void {
-  settings().paintLlmPrefetchProgressDom();
+  paintLlmPrefetchProgressDomImpl();
 }
 
 export function paintStatusBarProgressDom(): void {
-  settings().paintStatusBarProgressDom();
+  paintStatusBarProgressDomImpl();
 }
 
 export function requestMicStream(): Promise<MediaStream> {
@@ -127,7 +127,7 @@ export function discoverMailServersAction(): void | Promise<void> {
 }
 
 export function warnOAuthEphemeralRedirect(outcome: import("../types").OAuthDesktopLoginOutcome): void {
-  settings().warnOAuthEphemeralRedirect(outcome);
+  warnOAuthEphemeralRedirectImpl(outcome);
 }
 
 export function finishOAuthNewAccountAfterLogin(

@@ -17,6 +17,7 @@ import {
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { renderMailboxDigestTriggerButton } from "../../mail/mailboxDigest";
 import { cleanThreadListPreview } from "../../mail/mailListPreviewClean";
+import { searchViewBatchJobStatusText } from "../../mail/searchViewBatch";
 import { iconSvg } from "../../lib/iconSvg";
 import { initials } from "../../lib/tags";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
@@ -258,7 +259,7 @@ export function renderList(mode: "full" | "threads-only" | "filters-only" = "ful
       : "Recherche"
     : mailboxTitleRaw;
   const mailboxLabel = escapeHtml(listTitle);
-  const batchJobMsg = d.searchViewBatchJobStatusText();
+  const batchJobMsg = searchViewBatchJobStatusText();
   const listSubtitle = searchContext
     ? `${visible.length} fil${visible.length === 1 ? "" : "s"} affiché${visible.length === 1 ? "" : "s"}${savedView && (savedView.newCount ?? 0) > 0 ? ` · ${savedView.newCount} nouveau${savedView.newCount === 1 ? "" : "x"}` : ""}${batchJobMsg ? ` · ${batchJobMsg}` : state.syncMessage ? ` · ${state.syncMessage}` : ""}`
     : `${visible.length} sur ${total} ${listEntityPlural}${state.syncMessage ? ` · ${state.syncMessage}` : ""}`;

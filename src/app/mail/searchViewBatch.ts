@@ -18,19 +18,28 @@ import { render } from "../dispatch";
 import { state } from "../state";
 import { isSearchActive } from "./searchQueryContext";
 import { searchThreads } from "./searchThreadsRun";
+import { clearStatusBarJob, scheduleStatusBarProgressPaint, upsertStatusBarJob } from "./statusBarProgressJobs";
+import { withLlmQueue } from "./llmJobQueue";
+
+export function searchViewBatchJobStatusText(): string {
+  const j = state.searchViewBatchJob;
+  if (!j) return "";
+  const target = j.target.trim() || "dossier";
+  if (j.phase === "create") return `Création « ${target} »…`;
+  return `Déplacement ${j.done}/${j.total} → ${target}…`;
+}
+
+export function setSearchViewBatchJob(job: SearchViewBatchJob | null, renderNow = true): void {
+  state.searchViewBatchJob = job;
+  if (renderNow) render();
+  else scheduleStatusBarProgressPaint();
+}
 
 export type SearchViewBatchDeps = {
   threadsVisibleInList: () => ThreadListItem[];
   sourceMailboxForThread: (threadId: string) => string;
-  upsertStatusBarJob: (
-    job: { id: string; label: string; done: number; total: number },
-    renderNow?: boolean,
-  ) => void;
-  clearStatusBarJob: (id: string) => void;
-  withLlmQueue: <T>(label: string, fn: (signal: AbortSignal) => Promise<T>) => Promise<T | null>;
   activeSavedSearchItem: () => { name?: string } | undefined;
   refreshMailboxesAfterImapChange: () => Promise<void>;
-  setSearchViewBatchJob: (job: SearchViewBatchJob | null, renderNow?: boolean) => void;
 };
 
 let searchViewBatchDeps: SearchViewBatchDeps | null = null;
@@ -82,7 +91,7 @@ export async function bulkMarkReadSearchViewThreads(): Promise<void> {
   let done = 0;
   const errors: string[] = [];
   const total = unreadTargets.length;
-  if (total > 0) d.upsertStatusBarJob({ id: "bulk-mark-read", label: "Marquage lu (lot)", done: 0, total }, true);
+  if (total > 0) upsertStatusBarJob({ id: "bulk-mark-read", label: "Marquage lu (lot)", done: 0, total }, true);
   try {
     for (let i = 0; i < unreadTargets.length; i++) {
       const t = unreadTargets[i]!;
@@ -98,10 +107,10 @@ export async function bulkMarkReadSearchViewThreads(): Promise<void> {
       } catch (err) {
         errors.push(tauriErrorMessage(err));
       }
-      d.upsertStatusBarJob({ id: "bulk-mark-read", label: "Marquage lu (lot)", done: i + 1, total });
+      upsertStatusBarJob({ id: "bulk-mark-read", label: "Marquage lu (lot)", done: i + 1, total });
     }
   } finally {
-    d.clearStatusBarJob("bulk-mark-read");
+    clearStatusBarJob("bulk-mark-read");
   }
   if (errors.length) toast(`Marquage partiel : ${errors[0]}`);
   else toast(done ? `${done} conversation(s) marquée(s) lue(s).` : "Aucun fil non lu dans la sélection.");
@@ -156,7 +165,7 @@ export async function bulkArchiveSearchViewThreads(): Promise<void> {
   const errors: string[] = [];
   const idList = [...ids];
   const total = idList.length;
-  d.upsertStatusBarJob({ id: "bulk-archive", label: "Archivage (lot)", done: 0, total }, true);
+  upsertStatusBarJob({ id: "bulk-archive", label: "Archivage (lot)", done: 0, total }, true);
   try {
     for (let i = 0; i < idList.length; i++) {
       const tid = idList[i]!;
@@ -170,10 +179,10 @@ export async function bulkArchiveSearchViewThreads(): Promise<void> {
       } catch (err) {
         errors.push(tauriErrorMessage(err));
       }
-      d.upsertStatusBarJob({ id: "bulk-archive", label: "Archivage (lot)", done: i + 1, total });
+      upsertStatusBarJob({ id: "bulk-archive", label: "Archivage (lot)", done: i + 1, total });
     }
   } finally {
-    d.clearStatusBarJob("bulk-archive");
+    clearStatusBarJob("bulk-archive");
   }
   if (errors.length) {
     clearThreadsRecentlyRemoved(ids);
@@ -216,7 +225,7 @@ export async function runFluxAffinerFromSearchView(): Promise<void> {
     mailbox: t.mailbox ?? state.selectedMailbox ?? "INBOX",
   }));
   try {
-    const result = await d.withLlmQueue("Affiner le flux", async (signal) => {
+    const result = await withLlmQueue("Affiner le flux", async (signal) => {
       if (signal.aborted) throw new Error("Annulé");
       return withTimeout(
         invoke<FluxAffinerResult>("llm_affiner_flux_cmd", {
@@ -240,13 +249,13 @@ export async function runFluxAffinerFromSearchView(): Promise<void> {
     if (!ok) return;
     const mailbox = result.folderTitle.trim();
     const total = visible.length;
-    d.setSearchViewBatchJob({ phase: "create", done: 0, total: 1, target: mailbox });
+    setSearchViewBatchJob({ phase: "create", done: 0, total: 1, target: mailbox });
     toast(`Création du dossier « ${mailbox} »…`, 4500);
     await withTimeout(
       invoke<string>("create_imap_mailbox", { accountId: account.id, mailbox }),
       MAIL_ACTION_TIMEOUT_MS,
     );
-    d.setSearchViewBatchJob({ phase: "move", done: 0, total, target: mailbox });
+    setSearchViewBatchJob({ phase: "move", done: 0, total, target: mailbox });
     toast(`Déplacement de ${total} fil(s) vers « ${mailbox} »…`, 5000);
     const ids = new Set(visible.map((t) => String(t.id)));
     let moved = 0;
@@ -265,12 +274,12 @@ export async function runFluxAffinerFromSearchView(): Promise<void> {
           MAIL_ACTION_TIMEOUT_MS,
         );
         moved++;
-        d.setSearchViewBatchJob({ phase: "move", done: moved, total, target: mailbox });
+        setSearchViewBatchJob({ phase: "move", done: moved, total, target: mailbox });
       } catch (err) {
         errors.push(tauriErrorMessage(err));
       }
     }
-    d.setSearchViewBatchJob(null, false);
+    setSearchViewBatchJob(null, false);
     if (moved > 0) {
       state.threads = state.threads.filter((row) => !ids.has(String(row.id)));
       if (state.view === "thread" && state.selectedThreadId && ids.has(String(state.selectedThreadId))) {
@@ -305,7 +314,7 @@ export async function runFluxAffinerFromSearchView(): Promise<void> {
       }, 3500);
     }
   } catch (e) {
-    d.setSearchViewBatchJob(null, false);
+    setSearchViewBatchJob(null, false);
     const msg = tauriErrorMessage(e);
     if (!msg.toLowerCase().includes("annul")) toast(msg);
   }

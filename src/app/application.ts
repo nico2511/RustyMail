@@ -36,7 +36,6 @@ import {
   SYNC_MAILBOXES_BATCH_SIZE,
   chunkStringList,
   mergeSyncMailboxesOutcomes,
-  syncInvokeTimeoutMs as syncInvokeTimeoutMsFor,
   type SyncMailboxesOutcome,
 } from "../imapSyncTypes";
 
@@ -93,7 +92,6 @@ import {
   ACCOUNTS_BOOT_TIMEOUT_MS,
   ACCOUNT_INVOKE_TIMEOUT_MS,
   OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
-  OAUTH_LOOPBACK_DEFAULT_PORT,
   SYNC_INVOKE_TIMEOUT_MS,
   MAIL_ACTION_TIMEOUT_MS,
   LLM_INVOKE_TIMEOUT_MS,
@@ -289,6 +287,16 @@ import {
 import { aiCacheKeySegment } from "./mail/aiCacheKeySegment";
 import { mailboxPathDelimiter, reparentMailboxPath } from "./mail/folderManagerPathUtil";
 import { abortLlmQueueJob, withLlmQueue } from "./mail/llmJobQueue";
+import { navMailboxSegment, navCurrentBreadcrumbSegment } from "./mail/navBreadcrumbSegments";
+import { exitSearchModeForMailboxBrowse } from "./mail/searchMailboxBrowseExit";
+import {
+  accountForImapSync,
+  syncAllAccountMailboxesRequested,
+  syncInvokeTimeoutMs,
+} from "./mail/syncImapAccountContext";
+import { paintLlmPrefetchProgressDom } from "./mail/llmPrefetchProgressDom";
+import { paintStatusBarProgressDom, scheduleStatusBarProgressPaint } from "./mail/statusBarProgressJobs";
+import { registerSwitchActiveAccountDeps } from "./mail/switchActiveAccountAction";
 import { bindMicPushToTalk } from "./mail/composeMicDictation";
 import { formatWhisperPttKeyLabel } from "./mail/composeMicPtt";
 import {
@@ -620,52 +628,6 @@ async function flushDraftRevisionPending(): Promise<void> {
 
 let composeInteractionsAbort: AbortController | undefined;
 
-function warnOAuthEphemeralRedirect(outcome: OAuthDesktopLoginOutcome): void {
-  if (!outcome.ephemeralRedirect) return;
-  const uri = (outcome.redirectUri ?? "").trim();
-  toast(
-    `OAuth : le port ${OAUTH_LOOPBACK_DEFAULT_PORT} est occupé — redirect éphémère ${uri || "(inconnu)"}. ` +
-      `N’utilisez pas ce flux sans ajouter cette URI dans Entra, ou fermez l’autre RustyMail / libérez le port ` +
-      `(netstat -ano | findstr :${OAUTH_LOOPBACK_DEFAULT_PORT}).`,
-    18_000,
-  );
-}
-
-function navMailboxSegment(mailbox?: string): string {
-  const { label } = threadMailboxListLabel(mailbox ?? state.selectedMailbox);
-  return label;
-}
-
-function navCurrentBreadcrumbSegment(): string | null {
-  switch (state.view) {
-    case "list":
-      return navMailboxSegment();
-    case "thread": {
-      const subj = state.selectedThread?.subject?.trim();
-      return subj ? (subj.length > 36 ? `${subj.slice(0, 33)}…` : subj) : "Fil";
-    }
-    case "compose":
-      return "Composer";
-    case "settings":
-      return "Paramètres";
-    case "contacts":
-      return "Carnet";
-    case "contact": {
-      const em = state.selectedContactEmail ?? getContactDetail()?.email;
-      const name = getContactDetail()?.displayName?.trim();
-      return name || em || "Contact";
-    }
-    case "organization":
-      return "Organiser";
-    case "organizationV2":
-      return "Organiser V2";
-    case "folderManager":
-      return "Dossiers";
-    default:
-      return null;
-  }
-}
-
 async function navigateToBreadcrumbIndex(stackIndex: number): Promise<void> {
   if (stackIndex < 0) {
     navigateToInbox();
@@ -937,34 +899,6 @@ function navigateToInbox(opts?: NavigateOpts): void {
   render();
 }
 
-async function switchActiveAccount(accountId: string): Promise<void> {
-  const id = accountId.trim();
-  if (!id || !state.accounts.some((a) => a.id === id)) return;
-  state.selectedAccountId = id;
-  state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: id }, [], BOOT_INVOKE_TIMEOUT_MS);
-  ensureValidSelectedMailbox();
-  state.search = "";
-  state.searchDraft = "";
-  state.searchNewsletterRule = null;
-  state.searchModifiersTouched = false;
-  state.activeSavedSearchId = null;
-  resetMailboxDigestForNavigation();
-  state.listFilter = defaultListFilterFromPrefs();
-  await loadMailView(false);
-  cancelMailboxDigestLiveDebounce();
-  if (mailboxDigestSlotInList()) {
-    void enqueueMailboxDigestRefreshWhenIdle(false);
-  }
-  await loadMailboxUnread();
-  await refreshSavedDraftsMailboxCount();
-  await loadAddressBookSidebarCount();
-  await refreshSavedSearches(true);
-  syncActivityRecordingPrefs();
-  await refreshSuggestedSavedViews();
-  state.selectedThreadId = state.threads[0]?.id;
-  state.selectedThread = undefined;
-}
-
 let tauriNativeDragDropUnlisten: (() => void) | undefined;
 
 let tauriNativeFileDropReady = false;
@@ -1072,24 +1006,6 @@ export async function bindTauriNativeFileDropAsync(): Promise<void> {
   } catch (fallback) {
     console.error("[RustyMail] drag-drop natif impossible", fallback);
   }
-}
-
-function syncInvokeTimeoutMs(mailboxCount: number): number {
-  return syncInvokeTimeoutMsFor(mailboxCount, SYNC_INVOKE_TIMEOUT_MS);
-}
-
-function accountForImapSync(): Account | undefined {
-  if (state.view === "settings" && state.settingsTab === "accounts" && state.settingsSelectedAccountId !== "new") {
-    return state.accounts.find((a) => a.id === state.settingsSelectedAccountId);
-  }
-  return currentAccount();
-}
-
-function syncAllAccountMailboxesRequested(options?: { allMailboxes?: boolean }): boolean {
-  return (
-    options?.allMailboxes === true ||
-    (options?.allMailboxes !== false && state.view === "settings" && state.settingsTab === "accounts")
-  );
 }
 
 async function loadAccountsFromBackend(options?: { silent?: boolean; timeoutMs?: number }): Promise<boolean> {
@@ -1729,23 +1645,6 @@ async function refreshOrganizationV2Report(): Promise<void> {
   } finally {
     if (state.view === "organizationV2") render();
   }
-}
-
-function exitSearchModeForMailboxBrowse(): void {
-  state.search = "";
-  state.searchDraft = "";
-  state.searchSenders = [];
-  state.searchMailboxPath = null;
-  state.searchAccountOverrideId = null;
-  state.searchTags = [];
-  state.searchNewsletterRule = null;
-  state.searchLanguageFilter = null;
-  state.searchNlMode = null;
-  state.searchModifiersTouched = false;
-  state.activeSavedSearchId = null;
-  document.querySelectorAll<HTMLInputElement>("#search-input, #search-modal-input").forEach((el) => {
-    el.value = "";
-  });
 }
 
 async function onOrgV2IgnoreMailboxUi(mailbox: string): Promise<void> {
@@ -2419,169 +2318,6 @@ function orgApplyStatusMessage(
   }
 }
 
-let statusBarProgressPaintQueued = false;
-
-function upsertStatusBarJob(job: StatusBarProgressJob, renderNow = false): void {
-  const idx = state.statusBarJobs.findIndex((j) => j.id === job.id);
-  if (idx >= 0) state.statusBarJobs[idx] = job;
-  else state.statusBarJobs.push(job);
-  if (renderNow) {
-    render();
-    return;
-  }
-  scheduleStatusBarProgressPaint();
-}
-
-function clearStatusBarJob(id: string, renderNow = false): void {
-  const before = state.statusBarJobs.length;
-  state.statusBarJobs = state.statusBarJobs.filter((j) => j.id !== id);
-  if (before === state.statusBarJobs.length && !renderNow) return;
-  if (renderNow) render();
-  else scheduleStatusBarProgressPaint();
-}
-
-function scheduleStatusBarProgressPaint(): void {
-  if (statusBarProgressPaintQueued) return;
-  statusBarProgressPaintQueued = true;
-  requestAnimationFrame(() => {
-    statusBarProgressPaintQueued = false;
-    paintStatusBarProgressDom();
-  });
-}
-
-function gatherStatusBarProgressJobs(): StatusBarProgressJob[] {
-  const byId = new Map<string, StatusBarProgressJob>();
-  const put = (job: StatusBarProgressJob) => {
-    byId.set(job.id, job);
-  };
-
-  for (const j of state.statusBarJobs) put(j);
-
-  const batch = state.searchViewBatchJob;
-  if (batch) {
-    const target = batch.target.trim() || "dossier";
-    put({
-      id: "search-view-batch",
-      label: batch.phase === "create" ? `Création « ${target} »` : `Déplacement → ${target}`,
-      done: batch.done,
-      total: batch.total,
-    });
-  }
-
-  if (state.syncInProgress) {
-    const batchProg = state.syncProgressBatch;
-    put({
-      id: "imap-sync",
-      label: (state.syncMessage || "Synchronisation IMAP").replace(/^Sync…\s*/i, "").trim() || "Synchronisation IMAP",
-      done: batchProg?.current ?? 0,
-      total: batchProg?.total ?? null,
-    });
-  }
-
-  if (state.organization.scanning) {
-    put({ id: "org-scan", label: "Analyse Organiser", done: 0, total: null });
-  } else if (state.organization.applying) {
-    const msg = (state.organization.applyMessage || "Application Organiser").replace(/…+$/, "").trim();
-    put({ id: "org-apply", label: msg || "Application Organiser", done: 0, total: null });
-  }
-
-  if (state.organizationV2.scanning) {
-    put({ id: "org-v2-scan", label: "Analyse Organiser V2", done: 0, total: null });
-  } else if (state.organizationV2.applying) {
-    const msg = (state.organizationV2.applyMessage || "Application Organiser V2").replace(/…+$/, "").trim();
-    put({
-      id: "org-v2-apply",
-      label: msg || "Application Organiser V2",
-      done: state.organizationV2.applyDone,
-      total: state.organizationV2.applyTotal,
-    });
-  }
-
-  if (state.folderManager.archiveProgress?.trim()) {
-    put({
-      id: "folder-archive",
-      label: state.folderManager.archiveProgress.replace(/…+$/, "").trim() || "Archivage dossier",
-      done: 0,
-      total: null,
-    });
-  }
-
-  if (state.llmJobLabel?.trim()) {
-    put({
-      id: "llm-queue",
-      label: state.llmJobLabel.trim(),
-      done: 0,
-      total: null,
-    });
-  }
-
-  if (state.llmPrefetchPercent != null) {
-    put({
-      id: "llm-prefetch",
-      label: "Téléchargement modèle LLM",
-      done: state.llmPrefetchPercent,
-      total: 100,
-    });
-  }
-
-  return Array.from(byId.values());
-}
-
-function paintLlmPrefetchProgressDom(): void {
-  const pct = state.llmPrefetchPercent;
-  const active = state.llmPrefetchInFlight || (pct != null && Number.isFinite(pct));
-  const pctRounded =
-    pct != null && Number.isFinite(pct) ? Math.min(100, Math.max(0, Math.round(pct))) : 0;
-  const labelHtml =
-    pct != null && Number.isFinite(pct)
-      ? `Téléchargement : <strong>${pctRounded}%</strong>`
-      : "Téléchargement du modèle…";
-  document.querySelectorAll<HTMLElement>("[data-llm-prefetch-block]").forEach((block) => {
-    block.hidden = !active;
-    if (!active) return;
-    const label = block.querySelector<HTMLElement>("[data-llm-prefetch-label]");
-    if (label) label.innerHTML = labelHtml;
-    const fill = block.querySelector<HTMLElement>("[data-llm-prefetch-fill]");
-    if (fill) fill.style.width = `${pctRounded}%`;
-    const track = block.querySelector<HTMLElement>("[data-llm-prefetch-track]");
-    if (track) track.setAttribute("aria-valuenow", String(pctRounded));
-    const cancelBtn = block.querySelector<HTMLButtonElement>('[data-action="cancel-llm-prefetch"]');
-    if (cancelBtn) cancelBtn.disabled = !state.llmPrefetchInFlight && pct == null;
-  });
-}
-
-function paintStatusBarProgressDom(): void {
-  const bar = document.querySelector<HTMLElement>(".status-bar-wrap > .status-bar");
-  if (!bar) return;
-  const jobs = gatherStatusBarProgressJobs();
-  const html = renderStatusBarProgressInlineHtml(jobs, escapeHtml, escapeAttr);
-  const existing = bar.querySelector(".status-bar-progress-slot");
-  if (!html) {
-    existing?.remove();
-    return;
-  }
-  if (existing) {
-    existing.outerHTML = html;
-    return;
-  }
-  const anchor = bar.querySelector(".status-bar-compact") ?? bar.querySelector(".status-bar-sep");
-  if (anchor) anchor.insertAdjacentHTML("afterend", html);
-  else bar.insertAdjacentHTML("beforeend", html);
-}
-
-function searchViewBatchJobStatusText(): string {
-  const j = state.searchViewBatchJob;
-  if (!j) return "";
-  const target = j.target.trim() || "dossier";
-  if (j.phase === "create") return `Création « ${target} »…`;
-  return `Déplacement ${j.done}/${j.total} → ${target}…`;
-}
-
-function setSearchViewBatchJob(job: SearchViewBatchJob | null, renderNow = true): void {
-  state.searchViewBatchJob = job;
-  if (renderNow) render();
-  else scheduleStatusBarProgressPaint();
-}
 
 async function onOrgSyncMailbox(mailbox: string): Promise<void> {
   const mb = mailbox.trim();
@@ -6478,7 +6214,6 @@ registerRenderDeps({
   searchViewCanOpenOrganizer,
   searchViewCanAffinerFlux,
   sourceMailboxForThread,
-  gatherStatusBarProgressJobs,
   currentAccount,
   activeMessageTranslationJobCount,
   activeSecurityLlmAugmentCount,
@@ -6515,7 +6250,6 @@ registerRenderDeps({
   renderList,
   threadsVisibleInList,
   isSearchActive,
-  searchViewBatchJobStatusText,
   folderManagerPanelMailbox,
   threadParticipantsWithEmails,
   threadQuickReplyTargetName,
@@ -6613,12 +6347,8 @@ registerSearchViewContextDeps({
 registerSearchViewBatchDeps({
   threadsVisibleInList,
   sourceMailboxForThread,
-  upsertStatusBarJob,
-  clearStatusBarJob,
-  withLlmQueue,
   activeSavedSearchItem,
   refreshMailboxesAfterImapChange,
-  setSearchViewBatchJob,
 });
 
 registerSearchLaunchDeps({
@@ -6629,8 +6359,6 @@ registerSearchLaunchDeps({
 registerBulkTrashListDeps({
   threadsVisibleInList,
   sourceMailboxForThread,
-  upsertStatusBarJob,
-  clearStatusBarJob,
   loadMailboxUnread,
   loadMailView,
 });
@@ -6742,15 +6470,11 @@ registerSettingsWireActionsDeps({
   refreshSettingsPathsFromBackend,
   openEnginesAiSettingsModal,
   finalizeSettingsAiModalClose,
-  switchActiveAccount,
   syncActivityRecordingPrefs,
   persistAiPrefsFromDom,
   refreshLlmRuntimeStatus,
   autoDetectLlamaServerBinary,
-  paintLlmPrefetchProgressDom,
-  paintStatusBarProgressDom,
   discoverMailServersAction,
-  warnOAuthEphemeralRedirect,
   finishOAuthNewAccountAfterLogin,
   deleteSettingsAccount,
   schedulePersistAiPrefsFromDom,
@@ -6823,6 +6547,15 @@ registerAddressBookWireActionsDeps({
 registerAccountWireActionsDeps({
   saveAccount,
   refreshSavedDraftsMailboxCount,
+});
+
+registerSwitchActiveAccountDeps({
+  loadMailView,
+  loadMailboxUnread,
+  refreshSavedDraftsMailboxCount,
+  loadAddressBookSidebarCount,
+  refreshSavedSearches,
+  refreshSuggestedSavedViews,
 });
 
 initMailboxDigest({

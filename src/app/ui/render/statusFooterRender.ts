@@ -5,6 +5,7 @@ import {
 } from "../../../statusBarProgress";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
+import { gatherStatusBarProgressJobs } from "../../mail/statusBarProgressJobs";
 import { renderDeps } from "./renderDeps";
 import { renderStatusBarAiQuickTrigger } from "./aiQuickPanelRender";
 
@@ -56,7 +57,7 @@ function organizationActivityChipHtml(): string {
 }
 
 export function renderStatusBarProgressInline(): string {
-  const jobs = renderDeps().gatherStatusBarProgressJobs();
+  const jobs = gatherStatusBarProgressJobs();
   return renderStatusBarProgressInlineHtml(jobs, escapeHtml, escapeAttr);
 }
 

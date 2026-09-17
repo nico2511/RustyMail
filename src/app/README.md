@@ -105,6 +105,13 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/folderManagerPathUtil.ts` | Chemins dossiers IMAP (délimiteur, reparent) |
 | `app/mail/llmJobQueue.ts` | File jobs LLM (`withLlmQueue`, annulation) |
 | `app/mail/composeAiComposeLlm.ts` | Réécriture / grammaire IA dans le compositeur |
+| `app/mail/switchActiveAccountAction.ts` | Changement de compte actif (liste, digest, sauvés) |
+| `app/mail/statusBarProgressJobs.ts` | Jobs barre d’état + peinture DOM |
+| `app/mail/llmPrefetchProgressDom.ts` | Barre progression prefetch LLM |
+| `app/mail/navBreadcrumbSegments.ts` | Segments fil d’Ariane navigation |
+| `app/mail/oauthEphemeralRedirectWarn.ts` | Toast redirect OAuth éphémère |
+| `app/mail/searchMailboxBrowseExit.ts` | Sortie mode recherche (navigation dossier) |
+| `app/mail/syncImapAccountContext.ts` | Compte/timeout sync IMAP selon vue |
 | `app/mail/composeSendDraftAction.ts` | Ré-export `sendDraft()` |
 | `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
 | `app/mail/composeDraftRecipients.ts` | Cc/Bcc visibles (`draftHasRecipientsExtra`) |

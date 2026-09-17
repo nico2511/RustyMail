@@ -15,15 +15,11 @@ import { openConfirmModal } from "../modals/promptConfirm";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { isSearchActive } from "./searchQueryContext";
+import { clearStatusBarJob, upsertStatusBarJob } from "./statusBarProgressJobs";
 
 export type BulkTrashListDeps = {
   threadsVisibleInList: () => ThreadListItem[];
   sourceMailboxForThread: (threadId: string) => string;
-  upsertStatusBarJob: (
-    job: { id: string; label: string; done: number; total: number },
-    renderNow?: boolean,
-  ) => void;
-  clearStatusBarJob: (id: string) => void;
   loadMailboxUnread: () => Promise<void>;
   loadMailView: (append?: boolean) => Promise<void>;
 };
@@ -107,7 +103,7 @@ export async function bulkTrashVisibleThreads(): Promise<void> {
   let moved = 0;
   const errors: string[] = [];
   const total = ids.length;
-  d.upsertStatusBarJob({ id: "bulk-trash", label: "Corbeille (lot)", done: 0, total }, true);
+  upsertStatusBarJob({ id: "bulk-trash", label: "Corbeille (lot)", done: 0, total }, true);
   try {
     for (let i = 0; i < ids.length; i++) {
       const tid = ids[i]!;
@@ -121,10 +117,10 @@ export async function bulkTrashVisibleThreads(): Promise<void> {
       } catch (err) {
         errors.push(`${tid}: ${tauriErrorMessage(err)}`);
       }
-      d.upsertStatusBarJob({ id: "bulk-trash", label: "Corbeille (lot)", done: i + 1, total });
+      upsertStatusBarJob({ id: "bulk-trash", label: "Corbeille (lot)", done: i + 1, total });
     }
   } finally {
-    d.clearStatusBarJob("bulk-trash");
+    clearStatusBarJob("bulk-trash");
   }
 
   if (errors.length) {
