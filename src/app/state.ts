@@ -3,16 +3,7 @@ import { defaultOrganizationState } from "../organizationView";
 import { defaultOrganizationV2State } from "../organizationViewV2";
 import { defaultFolderManagerState } from "../folderManagerView";
 import type { State } from "./types";
-
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "rustymail.sidebarCollapsed";
-
-function readSidebarCollapsedPreference(): boolean {
-  try {
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
+import { readSidebarCollapsedPreference } from "./lib/sidebarUiPref";
 
 export const state: State = {
   view: "list",

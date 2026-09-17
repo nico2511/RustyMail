@@ -60,6 +60,11 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/threadAutoMail.ts` | Détection fil newsletter / auto |
 | `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
 | `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
+| `app/lib/sidebarUiPref.ts` | Préférence sidebar repliée (localStorage) |
+| `app/mail/newsletterRuleInput.ts` | Lecture/normalisation règles expéditeurs auto (UI) |
+| `app/mail/threadAiSummaryState.ts` | Reset état synthèse / agent fil |
+| `app/mail/threadMessageAnchor.ts` | Id DOM ancre message fil |
+| `app/mail/threadScrollToMessage.ts` | Scroll + surbrillance message + `registerThreadScrollToMessageDeps()` |
 | `app/mail/mailListView.ts` | `loadMailView` + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |

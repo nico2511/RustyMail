@@ -14,6 +14,8 @@ import {
   downloadAllAttachmentsForMessage,
   loadNewsletterRules,
   sendQuickReply,
+  writeSidebarCollapsedPreference,
+  scrollToThreadMessage,
   loadMailView,
   loadMailboxUnread,
   render,
@@ -21,9 +23,6 @@ import {
   navigateToInbox,
   navigateToBreadcrumbIndex,
   persistAiFeaturePrefs,
-  enterComposeView,
-  startNewDraftSession,
-  syncPreviewOpenFromComposeLayout,
   refreshAddressBookList,
   loadAddressBookSidebarCount,
   saveDraftToSavedListNow,
@@ -357,7 +356,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
     case "toggle-sidebar":
       if (state.view === "compose") return true;
       state.sidebarCollapsed = !state.sidebarCollapsed;
-      callApp("writeSidebarCollapsedPreference", state.sidebarCollapsed);
+      writeSidebarCollapsedPreference(state.sidebarCollapsed);
       render();
       return true;
     case "leave-saved-drafts-mailbox":
@@ -648,7 +647,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "qa-open-message": {
       const mid = element?.dataset.msgId?.trim();
-      if (mid) callApp("scrollToThreadMessage", mid);
+      if (mid) scrollToThreadMessage(mid);
       return true;
     }
     case "address-book-refresh":

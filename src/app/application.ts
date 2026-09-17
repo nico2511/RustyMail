@@ -232,6 +232,14 @@ import {
 import { loadNewsletterRules } from "./mail/newsletterRulesLoad";
 import { threadIsAutoMail } from "./mail/threadAutoMail";
 import { toastSendDraftImapNotice } from "./mail/sendDraftImapNotice";
+import { clearThreadAiSummaryState } from "./mail/threadAiSummaryState";
+import { threadMessageAnchorId } from "./mail/threadMessageAnchor";
+import { registerThreadScrollToMessageDeps } from "./mail/threadScrollToMessage";
+import {
+  extractAddrSpec,
+  normalizeNlRuleInvokeInput,
+} from "./mail/newsletterRuleInput";
+import { writeSidebarCollapsedPreference } from "./lib/sidebarUiPref";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -650,8 +658,6 @@ function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
 
 let llmIdlePrefetchAfterBootScheduled = false;
 
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "rustymail.sidebarCollapsed";
-
 let subscribedLlmPrefetchProgress = false;
 
 let subscribedModelBootstrapProgress = false;
@@ -659,22 +665,6 @@ let subscribedModelBootstrapProgress = false;
 let skipAccountIdentityCaptureOnce = false;
 
 let accountsFormIdentityScratch: { displayName: string; email: string } | undefined;
-
-function readSidebarCollapsedPreference(): boolean {
-  try {
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function writeSidebarCollapsedPreference(collapsed: boolean) {
-  try {
-    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
-  } catch {
-    /* navigation privée, quota, etc. */
-  }
-}
 
 async function refreshSettingsPathsFromBackend(): Promise<void> {
   if (!isTauriRuntime()) return;
@@ -686,13 +676,6 @@ async function refreshSettingsPathsFromBackend(): Promise<void> {
     state.settingsPathsLoadError = tauriErrorMessage(e);
   }
   render();
-}
-
-function threadMessageAnchorId(messageId: string, index: number): string {
-  const raw = messageId.trim();
-  const tail = raw ? encodeURIComponent(raw).replace(/%/g, "_") : "empty";
-  const base = `msg-${index}-${tail}`;
-  return base.length > 240 ? base.slice(0, 240) : base;
 }
 
 function syncPreviewOpenFromComposeLayout() {
@@ -1958,35 +1941,6 @@ async function switchActiveAccount(accountId: string): Promise<void> {
   await refreshSuggestedSavedViews();
   state.selectedThreadId = state.threads[0]?.id;
   state.selectedThread = undefined;
-}
-
-function extractAddrSpec(raw: string): string {
-  const t = raw.trim();
-  if (!t) return "";
-  const lo = t.lastIndexOf("<");
-  const gc = t.lastIndexOf(">");
-  if (lo !== -1 && gc > lo) {
-    let inner = t.slice(lo + 1, gc).trim().replace(/^mailto:/i, "");
-    if (inner.includes("@")) return inner;
-  }
-  const loose = t.match(/[^\s<>,;]+@[^\s<>,;]+/);
-  return loose?.[0]?.replace(/[>,;]+$/, "") ?? "";
-}
-
-function readNlButtonRule(host: HTMLElement | undefined): string {
-  if (!host) return "";
-  const fromDs = typeof host.dataset?.rule === "string" ? host.dataset.rule.trim() : "";
-  if (fromDs) return fromDs;
-  const attr = host.getAttribute("data-rule");
-  return typeof attr === "string" ? attr.trim() : "";
-}
-
-function normalizeNlRuleInvokeInput(raw: string): string {
-  const t = raw.trim();
-  if (!t) return "";
-  if (!t.includes("@")) return t.toLowerCase();
-  const bare = extractAddrSpec(t) || t;
-  return bare.trim().toLowerCase();
 }
 
 function hostSuffixMatch(host: string, domain: string): boolean {
@@ -4794,26 +4748,6 @@ function cancelLlmQueueJob(): void {
   llmQueueAbort?.abort();
 }
 
-function scrollToThreadMessage(messageId: string): void {
-  const thread = state.selectedThread;
-  if (!thread) return;
-  const msgs = sortMessagesByReceivedDescending(thread.messages);
-  const idx = msgs.findIndex((m) => m.messageId === messageId.trim());
-  if (idx < 0) {
-    toast("Message introuvable dans ce fil.");
-    return;
-  }
-  const anchorId = threadMessageAnchorId(messageId, idx);
-  const el = document.getElementById(anchorId);
-  if (el) {
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.add("thread-msg--evidence-flash");
-    window.setTimeout(() => el.classList.remove("thread-msg--evidence-flash"), 2400);
-  } else {
-    toast("Message introuvable dans la vue.");
-  }
-}
-
 function normalizeRecipientEmailForDiff(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -5276,15 +5210,6 @@ function buildSettingsAiPanelDeps(): SettingsAiPanelDeps {
     bootstrapModelsCompleted: Boolean(state.appPrefs.general.bootstrapModelsCompleted),
     engineSettingsTab: state.aiEngineSettingsTab,
   };
-}
-
-function clearThreadAiSummaryState(): void {
-  state.aiOutput = "";
-  state.aiThreadScope = null;
-  state.quickReplySuggestions = [];
-  state.agentSession = null;
-  state.threadQaAnswer = null;
-  state.threadQaStreamText = "";
 }
 
 function threadAiSummaryLiveFor(threadId: string): boolean {
@@ -8603,7 +8528,6 @@ const addressBookEditEmailRef = {
 
 registerWireEventsBridge({
   syncPreviewOpenFromComposeLayout,
-  writeSidebarCollapsedPreference,
   refreshSettingsPathsFromBackend,
   computeDraftDiffAgainstRevision,
   finishOAuthNewAccountAfterLogin,
@@ -8627,7 +8551,6 @@ registerWireEventsBridge({
   warnOAuthEphemeralRedirect,
   defaultListFilterFromPrefs,
   ensureValidSelectedMailbox,
-  normalizeNlRuleInvokeInput,
   discardCurrentDraftSession,
   leaveComposeViewAfterClose,
   mediaBlobToWav16kMonoPcm16,
@@ -8636,7 +8559,6 @@ registerWireEventsBridge({
   scheduleDraftRevisionSave,
   micPermissionErrorMessage,
   paintStatusBarProgressDom,
-  clearThreadAiSummaryState,
   wireComposeRecipientChips,
   dismissOrphanDraftSession,
   navigateToBreadcrumbIndex,
@@ -8666,7 +8588,6 @@ registerWireEventsBridge({
   refreshAddressBookList,
   agentPrepareReplyStart,
   pickImgSrcForLightbox,
-  scrollToThreadMessage,
   schedulePreviewUpdate,
   refreshDraftRevisions,
   openFolderManagerView,
@@ -8692,7 +8613,6 @@ registerWireEventsBridge({
   cancelLlmQueueJob,
   confirmMoveDialog,
   enterComposeView,
-  readNlButtonRule,
   hydrateEmailHtml,
   openSettingsView,
   removeAttachment,
@@ -8960,6 +8880,10 @@ registerMailboxManageActionDeps({
 });
 
 registerSyncInboxActionDeps({ syncInbox });
+
+registerThreadScrollToMessageDeps({
+  sortMessagesByReceivedDescending,
+});
 
 registerComposeThreadReplyDeps({
   loadComposeMarkdownIntoEditor,

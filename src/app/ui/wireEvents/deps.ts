@@ -144,6 +144,13 @@ export { downloadAllAttachmentsForMessage } from "../mail/downloadAllAttachments
 export { loadNewsletterRules } from "../mail/newsletterRulesLoad";
 export { threadIsAutoMail } from "../mail/threadAutoMail";
 export { sendQuickReply } from "../mail/composeSendQuickReply";
+export { clearThreadAiSummaryState } from "../mail/threadAiSummaryState";
+export { scrollToThreadMessage } from "../mail/threadScrollToMessage";
+export { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";
+export {
+  normalizeNlRuleInvokeInput,
+  readNlButtonRule,
+} from "../mail/newsletterRuleInput";
 export {
   prepareForward,
   prepareForwardToMessage,

@@ -80,13 +80,19 @@ import {
   prepareReply,
   threadIsAutoMail,
   loadNewsletterRules,
+  clearThreadAiSummaryState,
+  enterComposeView,
+  startNewDraftSession,
+  syncPreviewOpenFromComposeLayout,
+  readNlButtonRule,
+  normalizeNlRuleInvokeInput,
 } from "./deps";
 
 export async function tryHandleComposeSettings(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
     case "compose":
       state.aiOpen = false;
-      callApp("clearThreadAiSummaryState");
+      clearThreadAiSummaryState();
       if (
         state.view === "thread" &&
         state.selectedThreadId?.trim() &&
@@ -95,8 +101,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         void prepareReply();
         return true;
       }
-      callApp("enterComposeView");
-      callApp("startNewDraftSession");
+      enterComposeView();
+      startNewDraftSession();
       state.draft = {
         id: "draft-local",
         kind: "New",
@@ -114,7 +120,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       state.composeBody = "";
       state.composeCanonicalBody = "";
       state.composeLayout = "split";
-      callApp("syncPreviewOpenFromComposeLayout");
+      syncPreviewOpenFromComposeLayout();
       state.preview = undefined;
       state.composeAdvancedOpen = false;
       state.composeCcBccOpen = false;
@@ -911,7 +917,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       return true;
     }
     case "newsletter-domain-remove": {
-      const dom = callApp("readNlButtonRule", element);
+      const dom = readNlButtonRule(element);
       if (!dom) {
         toast("Règle invalide ou manquante.");
         return true;
@@ -933,8 +939,8 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       return true;
     }
     case "newsletter-msg-add-rule": {
-      const raw = callApp("readNlButtonRule", element);
-      const rule = callApp("normalizeNlRuleInvokeInput", raw);
+      const raw = readNlButtonRule(element);
+      const rule = normalizeNlRuleInvokeInput(raw);
       if (!rule) {
         toast("Impossible de lire l’adresse (data-rule vide). Réouvrez le fil ou utilisez les paramètres.");
         return true;
@@ -965,7 +971,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       return true;
     }
     case "newsletter-msg-remove-rule": {
-      const dom = callApp("readNlButtonRule", element);
+      const dom = readNlButtonRule(element);
       if (!dom) {
         toast("Règle invalide ou manquante.");
         return true;
