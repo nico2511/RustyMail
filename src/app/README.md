@@ -37,7 +37,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` |
 | `app/mail/fetchOpenThread.ts` | `fetchOpenThreadOrNotify()` |
 | `app/mail/openThreadView.ts` | `openThread()` + `registerOpenThreadDeps()` |
-| `app/mail/searchCommitQuery.ts` | `commitSearchQuery`, barre, apply NL + `registerSearchCommitDeps()` |
+| `app/mail/searchCommitQuery.ts` | Barrel commit barre recherche |
+| `app/mail/searchCommitContext.ts` | `registerSearchCommitDeps` |
+| `app/mail/searchCommitStructuralRun.ts` | Parse barre → état, snapshots brouillon, apply NL |
+| `app/mail/searchCommitBarRun.ts` | `commitSearchQuery`, clear, toasts, reload |
 | `app/mail/searchNlQueryInvoke.ts` | `llm_search_nl` invoke + application état / fallbacks lexicaux |
 | `app/mail/searchNlAssistRun.ts` | Action « recherche NL » (prompt + `llm_search_nl`) |
 | `app/mail/searchCommitNlBarRun.ts` | Commit barre recherche via NL (`llm_search_nl` depuis la barre) |
@@ -262,7 +265,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`searchCommitQuery`, `threadAiWireUiRun`, …)
+1. Découper d’autres modules mail > ~350 lignes (`threadAiWireUiRun`, `threadAiRun`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
