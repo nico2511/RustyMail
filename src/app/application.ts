@@ -415,8 +415,6 @@ import {
   clearSuggestionShownKeys,
   flushActivityQueue,
   recordActivity,
-  setActivityAccountId,
-  setActivityRecordingEnabled,
   type SuggestedSavedView,
 } from "../activity";
 
