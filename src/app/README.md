@@ -49,7 +49,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchTagCatalog.ts` | `refreshSearchTagCatalog` + `registerSearchTagCatalogDeps()` |
 | `app/mail/searchAtAutocompleteWire.ts` | Câblage `@` / `#` (recherche + compose) + `registerSearchAtAutocompleteWireDeps()` |
 | `app/mail/searchViewContext.ts` | Critères vue enregistrée / contexte recherche inbox + `registerSearchViewContextDeps()` |
-| `app/mail/searchViewBatch.ts` | Actions lot recherche / vue (lu, archive, Affiner) + `registerSearchViewBatchDeps()` |
+| `app/mail/searchViewBatch.ts` | Barrel actions lot recherche / vue enregistrée |
+| `app/mail/searchViewBatchContext.ts` | Job batch + `registerSearchViewBatchDeps` |
+| `app/mail/searchViewBulkActionsRun.ts` | Marquer lus / archiver (lot) |
+| `app/mail/searchFluxAffinerRun.ts` | Affiner le flux (LLM + dossier IMAP) |
 | `app/lib/tagFamilyForInvoke.ts` | Normalisation famille tag pour invoke Rust |
 | `app/mail/bulkTrashList.ts` | Corbeille lot (liste visible) + `registerBulkTrashListDeps()` |
 | `app/mail/emptyTrashMailbox.ts` | Vider corbeille dossier + `registerEmptyTrashMailboxDeps()` |
@@ -248,7 +251,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`searchViewBatch`, `mailListView`, …)
+1. Découper d’autres modules mail > ~350 lignes (`mailListView`, `savedSearchViews`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
