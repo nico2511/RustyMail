@@ -3,26 +3,7 @@ import {
   pickImgSrcForLightbox as pickImgSrcForLightboxImpl,
   resolveSrcForMailImageLightbox as resolveSrcForMailImageLightboxImpl,
 } from "./mailHtmlShadowHydrate";
-
-export type MailContentWireActionsDeps = {
-  onAttachmentAction: (
-    kind: "download" | "open",
-    messageId: string,
-    attachmentId: string,
-    fileName?: string,
-  ) => void | Promise<void>;
-};
-
-let mailContentWireActionsDeps: MailContentWireActionsDeps | null = null;
-
-export function registerMailContentWireActionsDeps(deps: MailContentWireActionsDeps): void {
-  mailContentWireActionsDeps = deps;
-}
-
-function mailContent(): MailContentWireActionsDeps {
-  if (!mailContentWireActionsDeps) throw new Error("registerMailContentWireActionsDeps not called");
-  return mailContentWireActionsDeps;
-}
+import { onAttachmentAction as onAttachmentActionImpl } from "./mailAttachmentActions";
 
 export function hydrateEmailHtml(): void {
   return hydrateEmailHtmlImpl();
@@ -34,7 +15,7 @@ export function onAttachmentAction(
   attachmentId: string,
   fileName?: string,
 ): void | Promise<void> {
-  return mailContent().onAttachmentAction(kind, messageId, attachmentId, fileName);
+  return onAttachmentActionImpl(kind, messageId, attachmentId, fileName);
 }
 
 export function pickImgSrcForLightbox(img: HTMLImageElement): string {
