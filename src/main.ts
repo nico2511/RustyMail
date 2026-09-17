@@ -1,7 +1,11 @@
-import { boot } from "./app/application";
+import "./styles.css";
+
+import { registerAllAppModules } from "./app/mail/appModuleRegistry";
+import { boot } from "./app/mail/appBootRun";
 import { bindTauriNativeFileDropAsync } from "./app/mail/composeTauriNativeFileDrop";
 
-boot();
+registerAllAppModules();
+void boot();
 
 window.addEventListener(
   "load",

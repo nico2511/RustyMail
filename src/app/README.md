@@ -1,13 +1,13 @@
 # Front-end (`src/`)
 
-Découpage progressif du monolithe historique. **`application.ts` reste le cœur** (logique métier) ; le rendu et le câblage DOM sont extraits progressivement.
+Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les modules puis lance **`boot()`** ; le câblage vit dans **`app/mail/*`** (dont `appModuleRegistry.ts`).
 
 ## Point d’entrée
 
 | Fichier | Rôle |
 | ------- | ---- |
-| `main.ts` | Lance `boot()` |
-| `app/application.ts` | Comportement UI (sync, compose, IA, événements…) |
+| `main.ts` | CSS, `registerAllAppModules()`, `boot()`, file drop Tauri |
+| `app/application.ts` | Réexport legacy `boot` / `registerAllAppModules` |
 | `app/state.ts` | État global `state` |
 | `app/dispatch.ts` | `render()` / `registerRender()` |
 | `app/dom.ts` | Élément racine `#app` |
@@ -74,6 +74,8 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
 | `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
 | `app/mail/mailAttachmentActions.ts` | Téléchargement / ouverture PJ (confirm risque) |
+| `app/mail/appShellRender.ts` | Rendu DOM shell + enregistrement `render` / wireEvents context |
+| `app/ui/wireEvents/depsContext.ts` | Mutateurs contexte wireEvents (capture compte, carnet) |
 | `app/mail/appModuleRegistry.ts` | Enregistrement unique `register*Deps` + init digest / prefetch idle |
 | `app/mail/savedDraftOpenRun.ts` | Ouvrir un brouillon enregistré dans le composeur |
 | `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |

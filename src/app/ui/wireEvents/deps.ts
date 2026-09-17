@@ -1,6 +1,9 @@
 /** Shared imports for wireEvents DOM wiring and handleAction dispatchers. */
-import { wireEventsContext } from "./wireEventsContext";
-import type { AddressBookRow } from "../../types";
+export {
+  setSkipAccountIdentityCaptureOnce,
+  setAddressBookEditEmail,
+  addressBookRowsCache,
+} from "./depsContext";
 export { invoke } from "@tauri-apps/api/core";
 export { ipcThrottleMs } from "../../../ipc_bridge";
 export { clearSuggestionShownKeys } from "../../../activity";
@@ -290,14 +293,3 @@ export type {
   State,
 } from "../../types";
 
-export function setSkipAccountIdentityCaptureOnce(value: boolean): void {
-  wireEventsContext().skipAccountIdentityCaptureOnceRef.current = value;
-}
-
-export function setAddressBookEditEmail(value: string | null): void {
-  wireEventsContext().addressBookEditEmailRef.current = value;
-}
-
-export function addressBookRowsCache(): AddressBookRow[] {
-  return wireEventsContext().addressBookRowsCache();
-}

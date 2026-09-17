@@ -619,9 +619,6 @@ async function flushDraftRevisionPending(): Promise<void> {
   );
 }
 
-let persistAiPrefsDebounce: ReturnType<typeof setTimeout> | undefined;
-
-
 export function registerAllAppModules(): void {
   registerAppShellWireContext(getAddressBookRowsCache);
 
