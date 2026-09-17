@@ -139,6 +139,11 @@ export {
 } from "../mail/searchViewBatch";
 export { bulkTrashVisibleThreads } from "../mail/bulkTrashList";
 export { onEmptyTrashMailbox } from "../mail/emptyTrashMailbox";
+export { groupCollapsedQuotesByAttribution } from "../mail/collapsedQuotesGroup";
+export { downloadAllAttachmentsForMessage } from "../mail/downloadAllAttachments";
+export { loadNewsletterRules } from "../mail/newsletterRulesLoad";
+export { threadIsAutoMail } from "../mail/threadAutoMail";
+export { sendQuickReply } from "../mail/composeSendQuickReply";
 export {
   prepareForward,
   prepareForwardToMessage,

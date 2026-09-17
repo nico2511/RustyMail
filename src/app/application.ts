@@ -229,6 +229,9 @@ import {
   normalizeMailHrefForOpen,
   openExternalFromMailHref,
 } from "./mail/mailLinkOpen";
+import { loadNewsletterRules } from "./mail/newsletterRulesLoad";
+import { threadIsAutoMail } from "./mail/threadAutoMail";
+import { toastSendDraftImapNotice } from "./mail/sendDraftImapNotice";
 import { searchThreads } from "./mail/searchThreadsRun";
 import {
   refreshSearchTagCatalog,
@@ -2019,19 +2022,6 @@ function firstMatchingNewsletterRule(email: string): NewsletterRuleRow | null {
     if (lp === "*" || lp === local) return r;
   }
   return null;
-}
-
-async function loadNewsletterRules(): Promise<void> {
-  if (!isTauriRuntime()) {
-    state.newsletterRules = [];
-    return;
-  }
-  try {
-    state.newsletterRules = await withTimeout(invoke<NewsletterRuleRow[]>("list_newsletter_rules"), MAIL_ACTION_TIMEOUT_MS);
-  } catch (error) {
-    console.error("list_newsletter_rules", error);
-    state.newsletterRules = [];
-  }
 }
 
 let tauriNativeDragDropUnlisten: (() => void) | undefined;
@@ -4378,37 +4368,6 @@ function sortMessagesByReceivedDescending(messages: CleanedMessageView[]): Clean
   return sortMessagesByReceivedAt(messages, "desc");
 }
 
-function groupCollapsedQuotesByAttribution(lines: string[]): string[] {
-  const trimmed = lines.map((s) => s.replace(/\r$/, ""));
-  if (!trimmed.length) return [];
-
-  const isAttributionHeader = (raw: string) => {
-    const t = raw.trim();
-    return (
-      /^On\s+.+\bwrote:?/i.test(t) ||
-      /^Le\s.+a\s+[éeè]crit\s*:?/i.test(t) ||
-      /^[\s_*-]*(forwarded message|original message|\|)\s*[:\-_]?\s*$/i.test(t) ||
-      /^[\s_-]{3,}.{0,80}(forwarded|message original)/i.test(t)
-    );
-  };
-
-  const groups: string[] = [];
-  let buf: string[] = [];
-
-  const flush = () => {
-    const joined = buf.join("\n").trimEnd();
-    buf = [];
-    if (joined.length) groups.push(joined);
-  };
-
-  for (const line of trimmed) {
-    if (isAttributionHeader(line) && buf.length > 0) flush();
-    buf.push(line);
-  }
-  flush();
-  return groups;
-}
-
 function sortMessagesByReceivedAt(messages: CleanedMessageView[], direction: "asc" | "desc"): CleanedMessageView[] {
   const cmp = direction === "asc" ? 1 : -1;
   const indexed = messages.map((m, index) => ({ m, index, t: parseMaybeDate(m.receivedAt)?.getTime() ?? Number.NaN }));
@@ -5067,14 +5026,6 @@ function effectiveMessageViewMode(message: CleanedMessageView, userMode: Message
   if (!ENABLE_CLEAN_MESSAGE_VIEW) return "original";
   if (userMode === "original") return "original";
   return messagePrefersCleanByDefault(message) ? "clean" : "original";
-}
-
-function threadIsAutoMail(thread?: { isNewsletterThread?: boolean } | null, threadId?: string | null): boolean {
-  if (thread?.isNewsletterThread) return true;
-  const tid = threadId ?? state.selectedThreadId;
-  if (!tid) return false;
-  const row = state.threads.find((t) => String(t.id) === String(tid));
-  return Boolean(row?.isNewsletterThread);
 }
 
 function threadSuppressAutoEnvelopeMeta(
@@ -5981,43 +5932,6 @@ async function openAttachmentWithRiskHandling(
   }
 }
 
-async function downloadAllAttachmentsForMessage(messageId: string) {
-  if (!messageId.trim()) return;
-  if (!isTauriRuntime()) {
-    toast("Téléchargement : lancez l’application bureau Tauri.");
-    return;
-  }
-  const msg = state.selectedThread?.messages.find((m) => m.messageId === messageId);
-  const atts = msg?.attachments ?? [];
-  if (atts.length < 2) {
-    toast("Ce message n’a pas plusieurs pièces jointes à regrouper.");
-    return;
-  }
-  let ok = 0;
-  const errors: string[] = [];
-  for (const att of atts) {
-    try {
-      await withTimeout(
-        invoke<string>("download_attachment", {
-          req: { messageId, attachmentId: att.id },
-        }),
-        MAIL_ACTION_TIMEOUT_MS
-      );
-      ok++;
-    } catch (e) {
-      errors.push(`${att.fileName}: ${tauriErrorMessage(e)}`);
-    }
-  }
-  if (errors.length === 0) {
-    toast(
-      `${ok} pièce${ok > 1 ? "s" : ""} jointe${ok > 1 ? "s" : ""} enregistrée${ok > 1 ? "s" : ""} dans Téléchargements`
-    );
-  } else {
-    const hint = errors.slice(0, 2).join(" · ");
-    toast(`${ok}/${atts.length} téléchargée(s). ${hint}${errors.length > 2 ? "…" : ""}`);
-  }
-}
-
 async function onAttachmentAction(
   kind: "download" | "open",
   messageId: string,
@@ -6893,57 +6807,6 @@ async function syncInbox(options?: { background?: boolean; allMailboxes?: boolea
   }
 }
 
-async function sendQuickReply(kind: "reply" | "reply-all") {
-  const quickInput = document.querySelector<HTMLInputElement>("[data-quick-reply]");
-  const body = quickInput?.value.trim() ?? "";
-  if (!body) {
-    toast("Le quick reply est vide.");
-    return;
-  }
-  const threadId = currentThreadIdForReply();
-  if (!threadId) {
-    toast("Aucun fil sélectionné.");
-    return;
-  }
-  const command = kind === "reply" ? "prepare_reply" : "prepare_reply_all";
-  let draft: Draft;
-  try {
-    draft = await withTimeout(
-      invoke<Draft>(command, kind === "reply" ? { threadId, messageId: null } : { threadId }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-  } catch (error) {
-    console.error(`Tauri command failed: ${command}`, error);
-    toast(`Impossible de préparer la réponse: ${tauriErrorMessage(error)}`);
-    return;
-  }
-  draft.markdownBody = `${body}\n`;
-  try {
-    const sendOutcome = await withTimeout(
-      invoke<SendDraftOutcome>("send_draft", {
-        accountId: currentAccount()?.id ?? null,
-        draft,
-        sendAck: "send-draft",
-      }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-    toast(kind === "reply" ? "Réponse envoyée." : "Réponse à tous envoyée.");
-    toastSendDraftImapNotice(sendOutcome);
-    if (quickInput) quickInput.value = "";
-    await loadMailView(false);
-    await loadMailboxUnread();
-    if (state.selectedThreadId) {
-      const tid = state.selectedThreadId;
-      const refreshed = await fetchOpenThreadOrNotify(tid);
-      if (refreshed) state.selectedThread = refreshed;
-    }
-    render();
-  } catch (error) {
-    console.error("send_draft (quick reply)", error);
-    toast(`Envoi échoué: ${tauriErrorMessage(error)}`);
-  }
-}
-
 async function cycleComposeLayout() {
   persistDraft();
   const order: ComposeLayout[] = ["split", "write", "preview"];
@@ -6983,13 +6846,6 @@ function schedulePreviewUpdate(delayMs: number = 250) {
   if (!composePreviewPaneActive()) return;
   if (previewTimer) window.clearTimeout(previewTimer);
   previewTimer = window.setTimeout(() => void computePreview(), delayMs);
-}
-
-function toastSendDraftImapNotice(outcome: SendDraftOutcome | undefined) {
-  const note = outcome?.imapNotice?.trim();
-  if (!note) return;
-  const shorten = (s: string, n = 220) => (s.length <= n ? s : `${s.slice(0, n)}…`);
-  toast(`Information : ${shorten(note)}`);
 }
 
 function toastSplitImapNotices(notes: Array<string | null | undefined> | undefined) {
@@ -8746,9 +8602,7 @@ const addressBookEditEmailRef = {
 };
 
 registerWireEventsBridge({
-  groupCollapsedQuotesByAttribution,
   syncPreviewOpenFromComposeLayout,
-  downloadAllAttachmentsForMessage,
   writeSidebarCollapsedPreference,
   refreshSettingsPathsFromBackend,
   computeDraftDiffAgainstRevision,
@@ -8828,7 +8682,6 @@ registerWireEventsBridge({
   orgV2DismissProposal,
   llmTranslateThreadUi,
   switchActiveAccount,
-  loadNewsletterRules,
   mailboxManageAction,
   orgV2SnoozeProposal,
   applyMarkdownAction,
@@ -8841,7 +8694,6 @@ registerWireEventsBridge({
   enterComposeView,
   readNlButtonRule,
   hydrateEmailHtml,
-  threadIsAutoMail,
   openSettingsView,
   removeAttachment,
   clearAttachments,
@@ -8858,7 +8710,6 @@ registerWireEventsBridge({
   summarizeThread,
   openMoveDialog,
   onThreadMoveTo,
-  sendQuickReply,
   computePreview,
   bytesToBase64,
   switchMailbox,

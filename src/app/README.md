@@ -54,6 +54,12 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/syncInboxAction.ts` | Facade `syncInbox()` + `registerSyncInboxActionDeps()` |
 | `app/mail/composeThreadReply.ts` | Répondre / transférer depuis un fil + `registerComposeThreadReplyDeps()` |
 | `app/mail/mailLinkOpen.ts` | Liens mail (normalisation href, ouverture externe) |
+| `app/mail/collapsedQuotesGroup.ts` | Regroupement citations repliées (modale fil) |
+| `app/mail/downloadAllAttachments.ts` | Téléchargement groupé des PJ d’un message |
+| `app/mail/newsletterRulesLoad.ts` | Chargement règles expéditeurs auto |
+| `app/mail/threadAutoMail.ts` | Détection fil newsletter / auto |
+| `app/mail/composeSendQuickReply.ts` | Envoi quick reply depuis la vue fil |
+| `app/mail/sendDraftImapNotice.ts` | Toast notice IMAP après envoi |
 | `app/mail/mailListView.ts` | `loadMailView` + `registerMailListDeps()` |
 | `app/mail/mailboxPanelContext.ts` | Contexte dossier (gestionnaire, payload `list_threads`) |
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |

@@ -78,6 +78,8 @@ import {
   type AssistSkillId,
   type State,
   prepareReply,
+  threadIsAutoMail,
+  loadNewsletterRules,
 } from "./deps";
 
 export async function tryHandleComposeSettings(action: string, element?: HTMLElement): Promise<boolean> {
@@ -88,7 +90,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
       if (
         state.view === "thread" &&
         state.selectedThreadId?.trim() &&
-        !callApp("threadIsAutoMail", state.selectedThread, state.selectedThreadId)
+        !threadIsAutoMail(state.selectedThread, state.selectedThreadId)
       ) {
         void prepareReply();
         return true;
@@ -168,7 +170,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         state.settingsTab = tab;
         render();
-        if (tab === "autoSenders") void callApp("loadNewsletterRules").then(() => render());
+        if (tab === "autoSenders") void loadNewsletterRules().then(() => render());
         if (tab === "ai") void callApp("refreshSemanticEmbeddingCounts");
         if (tab === "addressBook") void callApp("refreshAddressBookList").then(() => render());
         if (tab === "storage") void callApp("refreshSettingsPathsFromBackend");
@@ -897,7 +899,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           await withTimeout(invoke("add_newsletter_rule", { input: raw }), MAIL_ACTION_TIMEOUT_MS);
-          await callApp("loadNewsletterRules");
+          await loadNewsletterRules();
           const inp = document.querySelector<HTMLInputElement>("#newsletter-domain-input");
           if (inp) inp.value = "";
           toast("Règle enregistrée.");
@@ -921,7 +923,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           await withTimeout(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
-          await callApp("loadNewsletterRules");
+          await loadNewsletterRules();
           toast("Règle supprimée.");
           render();
         } catch (error) {
@@ -948,7 +950,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           await withTimeout(invoke("add_newsletter_rule", { input: rule }), MAIL_ACTION_TIMEOUT_MS);
-          await callApp("loadNewsletterRules");
+          await loadNewsletterRules();
           if (state.selectedThreadId) {
             const tid = state.selectedThreadId;
             const refreshed = await callApp("fetchOpenThreadOrNotify", tid);
@@ -975,7 +977,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
         }
         try {
           await withTimeout(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
-          await callApp("loadNewsletterRules");
+          await loadNewsletterRules();
           if (state.selectedThreadId) {
             const tid = state.selectedThreadId;
             const refreshed = await callApp("fetchOpenThreadOrNotify", tid);

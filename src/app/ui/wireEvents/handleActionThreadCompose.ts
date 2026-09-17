@@ -10,6 +10,10 @@ import {
   prepareReply,
   prepareReplyAll,
   prepareReplyToMessage,
+  groupCollapsedQuotesByAttribution,
+  downloadAllAttachmentsForMessage,
+  loadNewsletterRules,
+  sendQuickReply,
   loadMailView,
   loadMailboxUnread,
   render,
@@ -169,7 +173,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       const msg = state.selectedThread.messages.find((x) => x.messageId === mid);
       const raw = msg?.collapsedQuotes ?? [];
       if (!raw.length) return true;
-      const merged = callApp("groupCollapsedQuotesByAttribution", raw);
+      const merged = groupCollapsedQuotesByAttribution(raw);
       if (!merged.length) return true;
       state.quoteFoldModal = {
         senderLabel: (msg?.sender ?? "").trim() || mid,
@@ -227,7 +231,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       return true;
     case "download-all-attachments": {
       const mid = element?.dataset.msgId?.trim();
-      if (mid) void callApp("downloadAllAttachmentsForMessage", mid);
+      if (mid) void downloadAllAttachmentsForMessage(mid);
       return true;
     }
     case "contacts-entity-open": {
@@ -253,7 +257,7 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       void (async () => {
         try {
           await withTimeout(invoke("add_newsletter_rule", { input: email }), MAIL_ACTION_TIMEOUT_MS);
-          await callApp("loadNewsletterRules");
+          await loadNewsletterRules();
           toast(t("toast.newsletterRuleAdded"));
           render();
         } catch (e) {
@@ -469,10 +473,10 @@ export async function tryHandleThreadCompose(action: string, element?: HTMLEleme
       callApp("removeAttachment", element?.dataset.path ?? "");
       return true;
     case "quick-reply-send":
-      await callApp("sendQuickReply", "reply");
+      await sendQuickReply("reply");
       return true;
     case "quick-reply-send-all":
-      await callApp("sendQuickReply", "reply-all");
+      await sendQuickReply("reply-all");
       return true;
     case "quick-reply-compose": {
       const qrRaw = element?.dataset.qrIndex;

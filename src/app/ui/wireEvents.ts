@@ -78,6 +78,7 @@ import { syncSearchBarChrome } from "../mail/searchBarUi";
 import { refreshSearchTagCatalog } from "../mail/searchTagCatalog";
 import { wireAtAutocompleteFields } from "../mail/searchAtAutocompleteWire";
 import { normalizeMailHrefForOpen, openExternalFromMailHref } from "../mail/mailLinkOpen";
+import { sendQuickReply } from "../mail/composeSendQuickReply";
 import { render } from "../dispatch";
 import { callApp } from "./callApp";
 import { app } from "./wireEventsBridge";
@@ -734,7 +735,7 @@ export function wireEvents() {
   document.querySelector<HTMLInputElement>("[data-quick-reply]")?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      void callApp("sendQuickReply", "reply");
+      void sendQuickReply("reply");
     }
   });
 
