@@ -311,10 +311,11 @@ import {
   resetFolderManagerPanelSearchState,
 } from "./mail/folderManagerPanelState";
 import { orgApplyStatusMessage } from "./mail/orgApplyStatusMessage";
-import {
-  aiSidePanelExpandedForShell,
-  threadReadingIsSimpleLayout,
-} from "./mail/threadShellLayout";
+import { aiSidePanelExpandedForShell, threadReadingIsSimpleLayout } from "./mail/threadShellLayout";
+import { bindTauriNativeFileDropAsync } from "./mail/composeTauriNativeFileDrop";
+import { refreshLlmRuntimeStatus } from "./mail/settingsLlmRuntime";
+import { activeMessageTranslationJobCount } from "./mail/threadStatusJobCounts";
+import { refreshSavedDraftsMailboxCount } from "./mail/savedDraftsMailboxCountRefresh";
 import { bindMicPushToTalk } from "./mail/composeMicDictation";
 import { formatWhisperPttKeyLabel } from "./mail/composeMicPtt";
 import {
@@ -323,7 +324,7 @@ import {
   threadQaMicButtonTitle,
 } from "./mail/composeMicUiHints";
 import { registerThreadAiWireActionsDeps } from "./mail/threadAiWireActions";
-import { registerSettingsWireActionsDeps } from "./mail/settingsWireActions";
+import { registerSettingsWireActionsDeps, finalizeSettingsAiModalClose } from "./mail/settingsWireActions";
 import { registerOrgFolderWireActionsDeps } from "./mail/orgFolderWireActions";
 import { registerAgentWireActionsDeps } from "./mail/agentWireActions";
 import { registerComposeAssistWireActionsDeps } from "./mail/composeAssistWireActions";
@@ -625,18 +626,6 @@ let skipAccountIdentityCaptureOnce = false;
 
 let accountsFormIdentityScratch: { displayName: string; email: string } | undefined;
 
-async function refreshSettingsPathsFromBackend(): Promise<void> {
-  if (!isTauriRuntime()) return;
-  state.settingsPathsLoadError = "";
-  try {
-    state.lastAppPaths = await withTimeout(invoke<AppPathsView>("app_paths", {}), BOOT_INVOKE_TIMEOUT_MS);
-  } catch (e) {
-    state.lastAppPaths = null;
-    state.settingsPathsLoadError = tauriErrorMessage(e);
-  }
-  render();
-}
-
 async function flushDraftRevisionPending(): Promise<void> {
   await flushDraftRevisionPendingNow(
     () => state.view === "compose" && Boolean(state.draft && state.draftSessionId),
@@ -644,251 +633,6 @@ async function flushDraftRevisionPending(): Promise<void> {
 }
 
 let composeInteractionsAbort: AbortController | undefined;
-
-let tauriNativeDragDropUnlisten: (() => void) | undefined;
-
-let tauriNativeFileDropReady = false;
-
-function tauriCurrentWebviewLabel(): string | undefined {
-  try {
-    const w = window as unknown as {
-      __TAURI_INTERNALS__?: { metadata?: { currentWebview?: { label?: string } } };
-    };
-    const label = w.__TAURI_INTERNALS__?.metadata?.currentWebview?.label;
-    return typeof label === "string" && label.trim() ? label.trim() : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function pathsFromTauriDragPayload(payload: unknown): string[] {
-  if (payload === null || typeof payload !== "object") return [];
-  const rec = payload as Record<string, unknown>;
-  if (!Array.isArray(rec.paths)) return [];
-  return rec.paths.map((x) => String(x).trim()).filter(Boolean);
-}
-
-function setComposerNativeDragHighlight(on: boolean): void {
-  const shell = document.querySelector<HTMLElement>(".composer-mail-shell");
-  const composeBody = document.querySelector<HTMLElement>(".composer-body");
-  shell?.classList.toggle("composer-mail-shell--drag-over", on);
-  composeBody?.classList.toggle("drag-over", on);
-}
-
-function applyNativeDroppedFilePaths(dropped: string[]): void {
-  if (!dropped.length) return;
-  if (state.view !== "compose" || !state.draft) {
-    toast(`${dropped.length} fichier(s) détecté(s) — ouvrez le composeur pour les ajouter.`);
-    return;
-  }
-  const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...dropped]));
-  state.draft.attachmentPaths = merged;
-  const attachmentsField = document.querySelector<HTMLInputElement>("#compose-attachments");
-  if (attachmentsField) attachmentsField.value = attachmentPathsJoinedForHiddenField(merged);
-  toast(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
-  render();
-}
-
-export async function bindTauriNativeFileDropAsync(): Promise<void> {
-  if (!isTauriRuntime() || tauriNativeFileDropReady) return;
-
-  for (let i = 0; i < 60 && !tauriCurrentWebviewLabel(); i++) {
-    await new Promise((r) => window.setTimeout(r, 16));
-  }
-
-  tauriNativeDragDropUnlisten?.();
-  tauriNativeDragDropUnlisten = undefined;
-
-  const runDrop = (pathsRaw: string[]): void => {
-    setComposerNativeDragHighlight(false);
-    applyNativeDroppedFilePaths(pathsRaw);
-  };
-
-  try {
-    const wv = getCurrentWebview();
-    tauriNativeDragDropUnlisten = await wv.onDragDropEvent((event) => {
-      const p = event.payload;
-      if (p.type === "enter") {
-        if (state.view === "compose") setComposerNativeDragHighlight(true);
-        return;
-      }
-      if (p.type === "leave") {
-        setComposerNativeDragHighlight(false);
-        return;
-      }
-      if (p.type === "over") return;
-      if (p.type === "drop") {
-        const dropped = p.paths.map((x) => String(x).trim()).filter(Boolean);
-        runDrop(dropped);
-      }
-    });
-    tauriNativeFileDropReady = true;
-    return;
-  } catch (primary) {
-    console.warn("[RustyMail] onDragDropEvent indisponible, repli listen()", primary);
-  }
-
-  try {
-    const unsubs: Array<() => void> = [];
-    unsubs.push(
-      await listen(TauriEvent.DRAG_ENTER, () => {
-        if (state.view === "compose") setComposerNativeDragHighlight(true);
-      })
-    );
-    unsubs.push(
-      await listen(TauriEvent.DRAG_LEAVE, () => {
-        setComposerNativeDragHighlight(false);
-      })
-    );
-    unsubs.push(
-      await listen(TauriEvent.DRAG_DROP, (e) => {
-        runDrop(pathsFromTauriDragPayload(e.payload));
-      })
-    );
-    tauriNativeDragDropUnlisten = () => {
-      for (const u of unsubs) u();
-    };
-    tauriNativeFileDropReady = true;
-  } catch (fallback) {
-    console.error("[RustyMail] drag-drop natif impossible", fallback);
-  }
-}
-
-async function refreshLlmRuntimeStatus(forceHardwareRescan?: boolean): Promise<void> {
-  if (!isTauriRuntime()) {
-    state.llmRuntimeStatus = null;
-    state.llmCachedGgufFilenames = [];
-    return;
-  }
-  try {
-    state.llmRuntimeStatus = await withTimeout(
-      invoke<LlmRuntimeStatus>(forceHardwareRescan ? "llm_status_refresh_hardware" : "llm_status", {}),
-      MAIL_ACTION_TIMEOUT_MS,
-    );
-  } catch {
-    state.llmRuntimeStatus = null;
-  }
-  try {
-    state.llmCachedGgufFilenames = await withTimeout(invoke<string[]>("list_cached_gguf_models", {}), 10_000);
-  } catch {
-    state.llmCachedGgufFilenames = [];
-  }
-}
-
-function syncAiEngineSettingsTabFromPrefs(): void {
-  state.aiEngineSettingsTab = engineConnectionMode(state.appPrefs.ai);
-}
-
-async function autoDetectLlamaServerBinary(opts?: { silent?: boolean; persist?: boolean }): Promise<boolean> {
-  if (!isTauriRuntime()) return false;
-  const prev = state.appPrefs.ai.llamaServerBinaryPath.trim();
-  try {
-    const det = await invoke<{
-      onPath: boolean;
-      wingetInstalled: boolean;
-      resolvedPath?: string | null;
-    }>("llama_server_detect", {
-      binaryHint: prev || "llama-server",
-    });
-    let next = prev;
-    if (det.resolvedPath?.trim()) {
-      next = det.resolvedPath.trim();
-    } else if ((det.onPath || det.wingetInstalled) && !prev) {
-      next = "llama-server";
-    }
-    if (next && next !== prev) {
-      state.appPrefs.ai.llamaServerBinaryPath = next;
-      if (opts?.persist !== false) {
-        await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
-      }
-      if (!opts?.silent) toast(`llama-server : ${next}`);
-      return true;
-    }
-    if (!opts?.silent && (det.onPath || det.wingetInstalled)) {
-      toast(`llama-server détecté${det.resolvedPath ? ` (${det.resolvedPath})` : ""}.`);
-    } else if (!opts?.silent && !det.onPath && !det.wingetInstalled) {
-      toast("llama-server introuvable (PATH et winget).");
-    }
-  } catch (e) {
-    if (!opts?.silent) toast(tauriErrorMessage(e));
-  }
-  return false;
-}
-
-async function openEnginesAiSettingsModal(): Promise<void> {
-  state.settingsAiModal = "engines";
-  syncAiEngineSettingsTabFromPrefs();
-  await autoDetectLlamaServerBinary({ silent: true });
-  await refreshLlmRuntimeStatus(false);
-  render();
-}
-
-function applyContextSliderIndex(idx: number): void {
-  const clamped = Math.max(0, Math.min(LLM_CONTEXT_PRESETS.length - 1, Math.trunc(idx)));
-  const n = LLM_CONTEXT_PRESETS[clamped] ?? 4096;
-  state.appPrefs.ai.localLlmContextSize = n;
-  const hidden = document.querySelector<HTMLInputElement>("#prefs-local-llm-ctx");
-  const display = document.querySelector<HTMLElement>("#prefs-local-llm-ctx-display");
-  const range = document.querySelector<HTMLInputElement>("#prefs-local-llm-ctx-range");
-  if (hidden) hidden.value = String(n);
-  if (display) display.textContent = String(n);
-  if (range) range.value = String(clamped);
-  document.querySelectorAll<HTMLElement>(".settings-ctx-slider__tick").forEach((el, i) => {
-    el.classList.toggle("settings-ctx-slider__tick--active", i === clamped);
-  });
-}
-
-async function persistEngineCheckboxToggle(message: string): Promise<void> {
-  if (!isTauriRuntime()) return;
-  try {
-    await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
-    toast(message);
-    await refreshLlmRuntimeStatus(false);
-    if (state.settingsAiModal === "engines") render();
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-}
-
-async function refreshSavedDraftsMailboxCount(): Promise<void> {
-  const accountId = currentAccount()?.id?.trim();
-  if (!accountId || !isTauriRuntime()) {
-    state.savedDraftsMailboxCount = 0;
-    return;
-  }
-  try {
-    const n = await withTimeout(invoke<number>("saved_drafts_count", { accountId }), BOOT_INVOKE_TIMEOUT_MS);
-    state.savedDraftsMailboxCount =
-      typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-  } catch {
-    state.savedDraftsMailboxCount = 0;
-  }
-}
-
-async function refreshSemanticEmbeddingCounts(): Promise<void> {
-  if (!isTauriRuntime()) {
-    state.semanticEmbeddingCounts = null;
-    return;
-  }
-  const account = currentAccount();
-  const aid = account?.id?.trim();
-  const mailbox = state.selectedMailbox || "INBOX";
-  if (!aid || !mailbox) {
-    state.semanticEmbeddingCounts = null;
-    return;
-  }
-  try {
-    state.semanticEmbeddingCounts = await withTimeout(
-      invoke<SemanticEmbeddingCountsSnapshot>("semantic_embedding_counts", { accountId: aid, mailbox }),
-      MAIL_ACTION_TIMEOUT_MS
-    );
-  } catch {
-    state.semanticEmbeddingCounts = null;
-  }
-  if (state.view === "settings" && state.settingsTab === "ai") {
-    render();
-  }
-}
 
 async function switchMailbox(nextMailbox: string) {
   if (state.view === "folderManager") return;
@@ -1972,10 +1716,6 @@ async function loadAddressBookSidebarCount(): Promise<void> {
   } catch {
     state.addressBookSidebarCount = null;
   }
-}
-
-function activeMessageTranslationJobCount(): number {
-  return Object.values(state.messageTranslationBusy).filter(Boolean).length;
 }
 
 function activeSecurityLlmAugmentCount(): number {
@@ -3486,22 +3226,6 @@ function threadAiSummaryShownInZen(): boolean {
   return state.view === "thread" && Boolean(state.selectedThread) && threadAiSummaryForCurrentThread();
 }
 
-function openSettingsView() {
-  beginNavigation("settings", { resetStack: true });
-  state.view = "settings";
-  state.aiOpen = false;
-  clearThreadAiSummaryState();
-  state.settingsTab = "accounts";
-  clearDiscoveredServerSnap();
-  state.settingsSelectedAccountId =
-    state.selectedAccountId && state.accounts.some((a) => a.id === state.selectedAccountId)
-      ? state.selectedAccountId
-      : (state.accounts[0]?.id ?? "new");
-  accountFieldTouched.serverFields = false;
-  state.accountServersPanelOpen = state.settingsSelectedAccountId !== "new";
-  render();
-}
-
 function agentOfferSlotsStep(session: NonNullable<typeof state.agentSession>): boolean {
   return session.plan?.offerSlotStep ?? session.offerSlotsStep;
 }
@@ -3965,63 +3689,6 @@ const AI_PREFS_IMMEDIATE_CHECKBOX_IDS = new Set([
   "prefs-ai-cloud-fallback",
   "prefs-semantic-search",
 ]);
-
-async function persistAiPrefsFromDom(opts?: {
-  silent?: boolean;
-  skipRender?: boolean;
-  /** N’enregistre que `state.appPrefs` (ex. après changement de mode PC/cloud/hybride). */
-  skipDomCapture?: boolean;
-}): Promise<void> {
-  if (!isTauriRuntime()) {
-    if (!opts?.silent) toast("Enregistrement : lancez l’app Tauri.");
-    return;
-  }
-  if (!opts?.skipDomCapture) {
-    captureAiPrefsFieldsFromDom(state.appPrefs);
-  }
-  if (state.view === "thread" && state.selectedThread) {
-    state.aiOpen = true;
-  }
-  try {
-    await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
-    try {
-      state.appPrefs = await withTimeout(invoke<AppPrefs>("get_app_prefs", {}), MAIL_ACTION_TIMEOUT_MS);
-      state.appPrefs.ai = normalizeAiPrefsMerged({
-        ...defaultAppPrefs().ai,
-        ...state.appPrefs.ai,
-      });
-    } catch {
-      /* ignore reload failures */
-    }
-    if (!opts?.silent) toast("Réglages IA enregistrés.");
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-  if (!opts?.skipRender) render();
-}
-
-function schedulePersistAiPrefsFromDom(opts?: { skipDomCapture?: boolean }): void {
-  if (persistAiPrefsDebounce) clearTimeout(persistAiPrefsDebounce);
-  const skipDomCapture = Boolean(opts?.skipDomCapture);
-  persistAiPrefsDebounce = window.setTimeout(() => {
-    persistAiPrefsDebounce = undefined;
-    void persistAiPrefsFromDom({ silent: true, skipDomCapture });
-  }, 480);
-}
-
-function flushPendingAiPrefsPersist(): void {
-  if (persistAiPrefsDebounce) {
-    clearTimeout(persistAiPrefsDebounce);
-    persistAiPrefsDebounce = undefined;
-  }
-}
-
-function finalizeSettingsAiModalClose(): void {
-  captureAiPrefsFieldsFromDom(state.appPrefs);
-  flushPendingAiPrefsPersist();
-  void persistAiPrefsFromDom({ silent: true, skipDomCapture: true, skipRender: true });
-}
-
 
 async function openAttachmentWithRiskHandling(
   messageId: string,
@@ -6083,21 +5750,10 @@ registerThreadAiWireActionsDeps({
 });
 
 registerSettingsWireActionsDeps({
-  openSettingsView,
-  refreshSemanticEmbeddingCounts,
-  refreshSettingsPathsFromBackend,
-  openEnginesAiSettingsModal,
-  finalizeSettingsAiModalClose,
   syncActivityRecordingPrefs,
-  persistAiPrefsFromDom,
-  refreshLlmRuntimeStatus,
-  autoDetectLlamaServerBinary,
   discoverMailServersAction,
   finishOAuthNewAccountAfterLogin,
   deleteSettingsAccount,
-  schedulePersistAiPrefsFromDom,
-  applyContextSliderIndex,
-  persistEngineCheckboxToggle,
 });
 
 registerOrgFolderWireActionsDeps({
@@ -6164,7 +5820,6 @@ registerAddressBookWireActionsDeps({
 
 registerAccountWireActionsDeps({
   saveAccount,
-  refreshSavedDraftsMailboxCount,
 });
 
 registerSwitchActiveAccountDeps({

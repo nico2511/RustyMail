@@ -5,21 +5,28 @@ import {
   ensureValidSelectedMailbox as ensureValidSelectedMailboxImpl,
   persistDefaultAccountId as persistDefaultAccountIdImpl,
 } from "./accountDefaultPrefs";
+import {
+  finalizeSettingsAiModalClose as finalizeSettingsAiModalCloseImpl,
+  persistAiPrefsFromDom as persistAiPrefsFromDomImpl,
+  schedulePersistAiPrefsFromDom as schedulePersistAiPrefsFromDomImpl,
+} from "./settingsAiPrefsPersistDom";
 import { paintLlmPrefetchProgressDom as paintLlmPrefetchProgressDomImpl } from "./llmPrefetchProgressDom";
+import {
+  applyContextSliderIndex as applyContextSliderIndexImpl,
+  autoDetectLlamaServerBinary as autoDetectLlamaServerBinaryImpl,
+  openEnginesAiSettingsModal as openEnginesAiSettingsModalImpl,
+  persistEngineCheckboxToggle as persistEngineCheckboxToggleImpl,
+  refreshLlmRuntimeStatus as refreshLlmRuntimeStatusImpl,
+} from "./settingsLlmRuntime";
+import { openSettingsView as openSettingsViewImpl } from "./settingsOpenView";
+import { refreshSemanticEmbeddingCounts as refreshSemanticEmbeddingCountsImpl } from "./settingsSemanticEmbeddingCounts";
+import { refreshSettingsPathsFromBackend as refreshSettingsPathsFromBackendImpl } from "./settingsPathsRefresh";
 import { paintStatusBarProgressDom as paintStatusBarProgressDomImpl } from "./statusBarProgressJobs";
 import { warnOAuthEphemeralRedirect as warnOAuthEphemeralRedirectImpl } from "./oauthEphemeralRedirectWarn";
 import { switchActiveAccount as switchActiveAccountImpl } from "./switchActiveAccountAction";
 
 export type SettingsWireActionsDeps = {
-  openSettingsView: () => void | Promise<void>;
-  refreshSemanticEmbeddingCounts: () => Promise<void>;
-  refreshSettingsPathsFromBackend: () => void | Promise<void>;
-  openEnginesAiSettingsModal: () => void | Promise<void>;
-  finalizeSettingsAiModalClose: () => void;
   syncActivityRecordingPrefs: () => void;
-  persistAiPrefsFromDom: (opts?: { silent?: boolean; skipRender?: boolean }) => void | Promise<void>;
-  refreshLlmRuntimeStatus: (forceHardwareRescan?: boolean) => Promise<void>;
-  autoDetectLlamaServerBinary: (opts?: { silent?: boolean; persist?: boolean }) => Promise<boolean>;
   discoverMailServersAction: () => void | Promise<void>;
   finishOAuthNewAccountAfterLogin: (
     authKind: "oauthGoogle" | "oauthMicrosoft",
@@ -27,9 +34,6 @@ export type SettingsWireActionsDeps = {
     displayName: string,
   ) => void | Promise<void>;
   deleteSettingsAccount: () => void | Promise<void>;
-  schedulePersistAiPrefsFromDom: (opts?: { skipDomCapture?: boolean }) => void;
-  applyContextSliderIndex: (idx: number) => void;
-  persistEngineCheckboxToggle: (message: string) => void | Promise<void>;
 };
 
 let settingsWireActionsDeps: SettingsWireActionsDeps | null = null;
@@ -43,8 +47,8 @@ function settings(): SettingsWireActionsDeps {
   return settingsWireActionsDeps;
 }
 
-export function openSettingsView(): void | Promise<void> {
-  return settings().openSettingsView();
+export function openSettingsView(): void {
+  openSettingsViewImpl();
 }
 
 export function ensureValidSelectedMailbox(): void {
@@ -52,19 +56,19 @@ export function ensureValidSelectedMailbox(): void {
 }
 
 export function refreshSemanticEmbeddingCounts(): Promise<void> {
-  return settings().refreshSemanticEmbeddingCounts();
+  return refreshSemanticEmbeddingCountsImpl();
 }
 
-export function refreshSettingsPathsFromBackend(): void | Promise<void> {
-  return settings().refreshSettingsPathsFromBackend();
+export function refreshSettingsPathsFromBackend(): Promise<void> {
+  return refreshSettingsPathsFromBackendImpl();
 }
 
-export function openEnginesAiSettingsModal(): void | Promise<void> {
-  return settings().openEnginesAiSettingsModal();
+export function openEnginesAiSettingsModal(): Promise<void> {
+  return openEnginesAiSettingsModalImpl();
 }
 
 export function finalizeSettingsAiModalClose(): void {
-  settings().finalizeSettingsAiModalClose();
+  finalizeSettingsAiModalCloseImpl();
 }
 
 export function persistDefaultAccountId(id: string): Promise<void> {
@@ -84,18 +88,18 @@ export function defaultListFilterFromPrefs(): import("../types").State["listFilt
 }
 
 export function persistAiPrefsFromDom(opts?: { silent?: boolean; skipRender?: boolean }): void | Promise<void> {
-  return settings().persistAiPrefsFromDom(opts);
+  return persistAiPrefsFromDomImpl(opts);
 }
 
 export function refreshLlmRuntimeStatus(forceHardwareRescan?: boolean): Promise<void> {
-  return settings().refreshLlmRuntimeStatus(forceHardwareRescan);
+  return refreshLlmRuntimeStatusImpl(forceHardwareRescan);
 }
 
 export function autoDetectLlamaServerBinary(opts?: {
   silent?: boolean;
   persist?: boolean;
 }): Promise<boolean> {
-  return settings().autoDetectLlamaServerBinary(opts);
+  return autoDetectLlamaServerBinaryImpl(opts);
 }
 
 export function paintLlmPrefetchProgressDom(): void {
@@ -143,13 +147,13 @@ export function deleteSettingsAccount(): void | Promise<void> {
 }
 
 export function schedulePersistAiPrefsFromDom(opts?: { skipDomCapture?: boolean }): void {
-  settings().schedulePersistAiPrefsFromDom(opts);
+  schedulePersistAiPrefsFromDomImpl(opts);
 }
 
 export function applyContextSliderIndex(idx: number): void {
-  settings().applyContextSliderIndex(idx);
+  applyContextSliderIndexImpl(idx);
 }
 
 export function persistEngineCheckboxToggle(message: string): void | Promise<void> {
-  return settings().persistEngineCheckboxToggle(message);
+  return persistEngineCheckboxToggleImpl(message);
 }

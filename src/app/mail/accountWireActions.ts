@@ -1,10 +1,10 @@
 import type { MicActionOpts } from "../types";
 import { saveDraftToSavedListNow as saveDraftToSavedListNowImpl } from "./composeDraftLocalSave";
 import { micAction as micActionImpl } from "./composeMicDictation";
+import { refreshSavedDraftsMailboxCount as refreshSavedDraftsMailboxCountImpl } from "./savedDraftsMailboxCountRefresh";
 
 export type AccountWireActionsDeps = {
   saveAccount: () => void | Promise<void>;
-  refreshSavedDraftsMailboxCount: () => Promise<void>;
 };
 
 let accountWireActionsDeps: AccountWireActionsDeps | null = null;
@@ -31,5 +31,5 @@ export function saveDraftToSavedListNow(opts?: { silentToast?: boolean }): Promi
 }
 
 export function refreshSavedDraftsMailboxCount(): Promise<void> {
-  return accountWire().refreshSavedDraftsMailboxCount();
+  return refreshSavedDraftsMailboxCountImpl();
 }

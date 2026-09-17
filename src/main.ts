@@ -1,4 +1,5 @@
-import { boot, bindTauriNativeFileDropAsync } from "./app/application";
+import { boot } from "./app/application";
+import { bindTauriNativeFileDropAsync } from "./app/mail/composeTauriNativeFileDrop";
 
 boot();
 
