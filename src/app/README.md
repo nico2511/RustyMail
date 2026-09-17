@@ -143,8 +143,16 @@ Découpage progressif du monolithe historique. **`application.ts` reste le cœur
 | `app/mail/mailUnsubscribeLinks.ts` | Détection / tri liens désinscription HTML |
 | `app/mail/addressBookListState.ts` | Cache liste carnet + `refreshAddressBookList()` |
 | `app/mail/orgOpenOrganizationMailbox.ts` | Ouvrir un dossier depuis Organiser |
-| `app/mail/orgRowSyncMailbox.ts` | Sync IMAP d’une ligne org + `registerOrgRowSyncMailboxDeps()` |
-| `app/mail/orgDeleteMailboxOneAction.ts` | Suppression dossier vide (org) + `registerOrgDeleteMailboxOneDeps()` |
+| `app/mail/orgRowSyncMailbox.ts` | Sync IMAP d’une ligne org (rapport via `orgOrganizationReportRefresh`) |
+| `app/mail/orgDeleteMailboxOneAction.ts` | Suppression dossier vide (org) |
+| `app/mail/orgRefreshMailboxesAfterImap.ts` | Rafraîchir `state.mailboxes` après changement IMAP |
+| `app/mail/orgOrganizationReportRefresh.ts` | Rescan rapports Organiser v1/v2 |
+| `app/mail/orgOrganizationOpenViews.ts` | Ouverture vues Organiser v1/v2 |
+| `app/mail/orgApplyRun.ts` | Appliquer propositions org v1 + `registerOrgApplyRunDeps()` |
+| `app/mail/orgV2ApplyRun.ts` | Appliquer propositions org v2 + `registerOrgV2ApplyRunDeps()` |
+| `app/mail/orgV2ProposalUi.ts` | Ignorer / reporter / mémoire dossiers org v2 |
+| `app/mail/folderManagerActions.ts` | Vue Dossiers IMAP (fm*, arbre) + `registerFolderManagerRunDeps()` |
+| `app/mail/folderManagerDnD.ts` | Glisser-déposer dossiers / fils (vue Dossiers) |
 | `app/lib/sidebarUiPref.ts` | Préférence sidebar repliée (localStorage) |
 | `app/mail/newsletterRuleInput.ts` | Lecture/normalisation règles expéditeurs auto (UI) |
 | `app/mail/threadAiSummaryState.ts` | Reset état synthèse / agent fil |

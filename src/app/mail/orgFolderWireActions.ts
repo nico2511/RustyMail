@@ -1,3 +1,12 @@
+import {
+  fmConfirmArchiveMailbox as fmConfirmArchiveMailboxImpl,
+  fmConfirmDeleteMailbox as fmConfirmDeleteMailboxImpl,
+  fmCreateMailbox as fmCreateMailboxImpl,
+  fmSelectMailbox as fmSelectMailboxImpl,
+  fmSyncMailbox as fmSyncMailboxImpl,
+  openFolderManagerView as openFolderManagerViewImpl,
+  refreshFolderManagerTree as refreshFolderManagerTreeImpl,
+} from "./folderManagerActions";
 import type { OrgProposal } from "../../organizationView";
 import type { OrgActionOverride } from "../../organizationView";
 import { openContactsView as openContactsViewImpl } from "./contactsViewNavigation";
@@ -24,27 +33,6 @@ import {
   orgV2SnoozeProposal as orgV2SnoozeProposalImpl,
 } from "./orgV2ProposalUi";
 
-export type OrgFolderWireActionsDeps = {
-  openFolderManagerView: () => void | Promise<void>;
-  refreshFolderManagerTree: () => void | Promise<void>;
-  fmCreateMailbox: (parent?: string) => void | Promise<void>;
-  fmSelectMailbox: (mailbox: string) => void | Promise<void>;
-  fmSyncMailbox: (mailbox: string) => void | Promise<void>;
-  fmConfirmArchiveMailbox: () => void | Promise<void>;
-  fmConfirmDeleteMailbox: () => void | Promise<void>;
-};
-
-let orgFolderWireActionsDeps: OrgFolderWireActionsDeps | null = null;
-
-export function registerOrgFolderWireActionsDeps(deps: OrgFolderWireActionsDeps): void {
-  orgFolderWireActionsDeps = deps;
-}
-
-function orgFolder(): OrgFolderWireActionsDeps {
-  if (!orgFolderWireActionsDeps) throw new Error("registerOrgFolderWireActionsDeps not called");
-  return orgFolderWireActionsDeps;
-}
-
 export function openContactsView(): Promise<void> {
   return openContactsViewImpl();
 }
@@ -53,32 +41,32 @@ export function openOrganizationView(): Promise<void> {
   return openOrganizationViewImpl();
 }
 
-export function openFolderManagerView(): void | Promise<void> {
-  return orgFolder().openFolderManagerView();
+export function openFolderManagerView(): Promise<void> {
+  return openFolderManagerViewImpl();
 }
 
-export function refreshFolderManagerTree(): void | Promise<void> {
-  return orgFolder().refreshFolderManagerTree();
+export function refreshFolderManagerTree(): Promise<void> {
+  return refreshFolderManagerTreeImpl();
 }
 
-export function fmCreateMailbox(parent?: string): void | Promise<void> {
-  return orgFolder().fmCreateMailbox(parent);
+export function fmCreateMailbox(parent?: string): Promise<void> {
+  return fmCreateMailboxImpl(parent);
 }
 
-export function fmSelectMailbox(mailbox: string): void | Promise<void> {
-  return orgFolder().fmSelectMailbox(mailbox);
+export function fmSelectMailbox(mailbox: string, opts?: { skipHistory?: boolean }): Promise<void> {
+  return fmSelectMailboxImpl(mailbox, opts);
 }
 
-export function fmSyncMailbox(mailbox: string): void | Promise<void> {
-  return orgFolder().fmSyncMailbox(mailbox);
+export function fmSyncMailbox(mailbox: string): Promise<void> {
+  return fmSyncMailboxImpl(mailbox);
 }
 
-export function fmConfirmArchiveMailbox(): void | Promise<void> {
-  return orgFolder().fmConfirmArchiveMailbox();
+export function fmConfirmArchiveMailbox(): Promise<void> {
+  return fmConfirmArchiveMailboxImpl();
 }
 
-export function fmConfirmDeleteMailbox(): void | Promise<void> {
-  return orgFolder().fmConfirmDeleteMailbox();
+export function fmConfirmDeleteMailbox(): Promise<void> {
+  return fmConfirmDeleteMailboxImpl();
 }
 
 export function openOrganizationMailbox(mailbox: string): Promise<void> {

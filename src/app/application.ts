@@ -290,7 +290,10 @@ import {
   ensureValidSelectedMailbox,
 } from "./mail/accountDefaultPrefs";
 import { aiCacheKeySegment } from "./mail/aiCacheKeySegment";
-import { mailboxPathDelimiter, reparentMailboxPath } from "./mail/folderManagerPathUtil";
+import {
+  fmSelectMailbox,
+  refreshFolderManagerTree,
+} from "./mail/orgFolderWireActions";
 import { abortLlmQueueJob, withLlmQueue } from "./mail/llmJobQueue";
 import { navMailboxSegment, navCurrentBreadcrumbSegment } from "./mail/navBreadcrumbSegments";
 import { exitSearchModeForMailboxBrowse } from "./mail/searchMailboxBrowseExit";
@@ -315,7 +318,6 @@ import { normalizeAccountRow } from "./mail/accountRowNormalize";
 import { loadAccountsFromBackend } from "./mail/accountsLoadFromBackend";
 import {
   mailboxPathPrefixForCreate,
-  resetFolderManagerPanelSearchState,
 } from "./mail/folderManagerPanelState";
 import { orgApplyStatusMessage } from "./mail/orgApplyStatusMessage";
 import { aiSidePanelExpandedForShell, threadReadingIsSimpleLayout } from "./mail/threadShellLayout";
@@ -332,7 +334,8 @@ import {
 } from "./mail/composeMicUiHints";
 import { registerThreadAiWireActionsDeps } from "./mail/threadAiWireActions";
 import { registerSettingsWireActionsDeps, finalizeSettingsAiModalClose } from "./mail/settingsWireActions";
-import { registerOrgFolderWireActionsDeps } from "./mail/orgFolderWireActions";
+import { registerFolderManagerRunDeps } from "./mail/folderManagerActions";
+import { wireFolderManagerDnD } from "./mail/folderManagerDnD";
 import { registerOrgApplyRunDeps } from "./mail/orgApplyRun";
 import { registerOrgV2ApplyRunDeps } from "./mail/orgV2ApplyRun";
 import { refreshMailboxesAfterImapChange } from "./mail/orgRefreshMailboxesAfterImap";
@@ -597,8 +600,6 @@ import {
 } from "../folderManagerView";
 
 import {
-  isDescendantMailboxPath,
-  loadFolderTreeExpanded,
   saveFolderTreeExpanded,
   splitMailboxSegments,
 } from "../mailboxTree";
@@ -903,290 +904,6 @@ export async function boot() {
     render();
     toast(msg);
   }
-}
-
-async function refreshFolderManagerTree(): Promise<void> {
-  const acc = currentAccount();
-  if (!acc?.id) return;
-  state.folderManager.loading = true;
-  render();
-  try {
-    state.folderManager.report = await fetchMailboxTree(acc.id);
-    state.folderManager.message = `${state.folderManager.report.entries.length} dossier(s) personnel(s)`;
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  } finally {
-    state.folderManager.loading = false;
-    if (state.view === "folderManager") render();
-  }
-}
-
-async function fmSelectMailbox(mailbox: string, opts?: { skipHistory?: boolean }): Promise<void> {
-  const mb = mailbox.trim();
-  if (!mb) return;
-  const prev = state.folderManager.selectedMailbox;
-  if (
-    !opts?.skipHistory &&
-    state.view === "folderManager" &&
-    prev !== mb
-  ) {
-    navPushBackEntry(captureCurrentNav());
-    navClearForward();
-  }
-  state.folderManager.selectedMailbox = mb;
-  resetFolderManagerPanelSearchState();
-  render();
-  try {
-    await loadMailView(false);
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-  render();
-}
-
-async function openFolderManagerView(): Promise<void> {
-  const acc = currentAccount();
-  if (!acc?.id) {
-    toast("Configurez un compte pour gérer les dossiers.");
-    return;
-  }
-  if (!isTauriRuntime()) {
-    toast("Vue Dossiers : disponible dans l’app Tauri.");
-    return;
-  }
-  beginNavigation("folderManager");
-  state.view = "folderManager";
-  state.mailboxDigestPanelOpen = false;
-  state.aiOpen = false;
-  state.folderManager.selectedMailbox = null;
-  state.threads = [];
-  state.folderManager.expandedNodes = loadFolderTreeExpanded();
-  render();
-  await refreshFolderManagerTree();
-}
-
-async function fmSyncMailbox(mailbox: string): Promise<void> {
-  const acc = currentAccount();
-  const mb = mailbox.trim();
-  if (!acc?.id || !mb) return;
-  state.folderManager.busyMailbox = mb;
-  state.folderManager.busyAction = "sync";
-  render();
-  try {
-    await withTimeout(
-      invoke<SyncMailboxesOutcome>("sync_mailboxes", { accountId: acc.id, mailboxes: [mb] }),
-      MAIL_ACTION_TIMEOUT_MS,
-    );
-    await refreshFolderManagerTree();
-    if (state.folderManager.selectedMailbox === mb) await fmSelectMailbox(mb);
-    toast(`Dossier synchronisé : ${mb}`);
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  } finally {
-    state.folderManager.busyMailbox = null;
-    state.folderManager.busyAction = null;
-    render();
-  }
-}
-
-async function fmCreateMailbox(parentPrefix?: string): Promise<void> {
-  const acc = currentAccount();
-  if (!acc?.id) return;
-  const prefix = parentPrefix?.trim() ? `${parentPrefix.trim().replace(/[/.]$/, "")}${mailboxPathDelimiter(parentPrefix)}` : "";
-  const name =
-    (await openTextPromptModal({
-      title: "Créer un dossier IMAP",
-      body: prefix ? `Préfixe parent : ${prefix}` : "Chemin du dossier (ex. Projets/2025)",
-      label: "Chemin du dossier",
-      defaultValue: prefix,
-    }))?.trim() ?? "";
-  if (!name) return;
-  try {
-    await withTimeout(invoke<string>("create_imap_mailbox", { accountId: acc.id, mailbox: name }), MAIL_ACTION_TIMEOUT_MS);
-    await refreshMailboxesAfterImapChange();
-    await refreshFolderManagerTree();
-    await fmSelectMailbox(name);
-    toast(`Dossier créé : ${name}`);
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-}
-
-async function fmRenameMailbox(from: string): Promise<void> {
-  const acc = currentAccount();
-  if (!acc?.id) return;
-  const to =
-    (await openTextPromptModal({
-      title: "Renommer le dossier",
-      label: "Nouveau chemin",
-      defaultValue: from,
-    }))?.trim() ?? "";
-  if (!to || to === from) return;
-  try {
-    await withTimeout(
-      invoke<string>("rename_imap_mailbox", { accountId: acc.id, fromMailbox: from, toMailbox: to }),
-      MAIL_ACTION_TIMEOUT_MS,
-    );
-    await refreshMailboxesAfterImapChange();
-    await refreshFolderManagerTree();
-    await fmSelectMailbox(to);
-    toast(`Dossier renommé : ${to}`);
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  }
-}
-
-async function fmMoveFolder(from: string, newParent: string): Promise<void> {
-  const acc = currentAccount();
-  if (!acc?.id) return;
-  if (from.trim().toLowerCase() === newParent.trim().toLowerCase()) return;
-  if (isDescendantMailboxPath(from, newParent)) {
-    toast("Impossible de déplacer un dossier dans l’un de ses descendants.");
-    return;
-  }
-  const to = reparentMailboxPath(from, newParent);
-  if (to.toLowerCase() === from.trim().toLowerCase()) return;
-  state.folderManager.busyMailbox = from;
-  state.folderManager.busyAction = "move";
-  render();
-  try {
-    await withTimeout(
-      invoke<string>("rename_imap_mailbox", { accountId: acc.id, fromMailbox: from, toMailbox: to }),
-      MAIL_ACTION_TIMEOUT_MS,
-    );
-    await refreshMailboxesAfterImapChange();
-    await refreshFolderManagerTree();
-    await fmSelectMailbox(to);
-    toast(`Dossier déplacé : ${to}`);
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  } finally {
-    state.folderManager.busyMailbox = null;
-    state.folderManager.busyAction = null;
-    state.folderManager.dragFolder = null;
-    state.folderManager.dropTarget = null;
-    render();
-  }
-}
-
-async function fmConfirmArchiveMailbox(): Promise<void> {
-  const acc = currentAccount();
-  const mb = state.folderManager.pendingArchiveMailbox?.trim();
-  if (!acc?.id || !mb) return;
-  const remember = state.folderManager.archiveRemember;
-  state.folderManager.archiveProgress = "Archivage…";
-  render();
-  try {
-    const out = await archiveMailboxThreads(acc.id, mb, remember);
-    state.folderManager.archiveConfirmOpen = false;
-    state.folderManager.pendingArchiveMailbox = null;
-    await refreshFolderManagerTree();
-    if (state.folderManager.selectedMailbox === mb) await fmSelectMailbox(mb);
-    if (out.errors.length) toast(`Archivage partiel : ${out.errors[0]}`);
-    else toast(`${out.archived} conversation(s) archivée(s).`);
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  } finally {
-    state.folderManager.archiveProgress = null;
-    render();
-  }
-}
-
-async function fmConfirmDeleteMailbox(): Promise<void> {
-  const acc = currentAccount();
-  const mb = state.folderManager.pendingDeleteMailbox?.trim();
-  if (!acc?.id || !mb || !state.folderManager.deleteConfirmChecked) return;
-  state.folderManager.busyMailbox = mb;
-  state.folderManager.busyAction = "delete";
-  render();
-  try {
-    const out = await deleteMailboxWithContents(acc.id, mb);
-    state.folderManager.deleteConfirmOpen = false;
-    state.folderManager.pendingDeleteMailbox = null;
-    state.folderManager.deleteConfirmChecked = false;
-    await refreshMailboxesAfterImapChange();
-    await refreshFolderManagerTree();
-    const remaining = state.folderManager.report?.entries.map((e) => e.mailbox) ?? [];
-    if (remaining.length) await fmSelectMailbox(remaining[0]!);
-    else {
-      state.folderManager.selectedMailbox = null;
-      state.threads = [];
-    }
-    if (out.errors.length) toast(`Suppression partielle : ${out.errors[0]}`);
-    else toast(`${out.deletedMailboxes} dossier(s) supprimé(s).`);
-  } catch (e) {
-    toast(tauriErrorMessage(e));
-  } finally {
-    state.folderManager.busyMailbox = null;
-    state.folderManager.busyAction = null;
-    render();
-  }
-}
-
-function wireFolderManagerDnD(): void {
-  if (state.view !== "folderManager") return;
-  document.querySelectorAll<HTMLElement>(".folder-tree-act, .folder-tree-chevron, .folder-tree-drag-handle").forEach((el) => {
-    el.addEventListener("click", (e) => e.stopPropagation());
-  });
-  document.querySelectorAll<HTMLElement>("[data-action=fm-drag-start]").forEach((el) => {
-    el.addEventListener("dragstart", (ev) => {
-      const mb = el.dataset.mailbox?.trim();
-      if (!mb) return;
-      state.folderManager.dragFolder = mb;
-      ev.dataTransfer?.setData("text/plain", mb);
-      ev.dataTransfer!.effectAllowed = "move";
-    });
-    el.addEventListener("dragend", () => {
-      state.folderManager.dragFolder = null;
-      state.folderManager.dropTarget = null;
-      render();
-    });
-  });
-  document.querySelectorAll<HTMLElement>("[data-drop-mailbox]").forEach((el) => {
-    el.addEventListener("dragover", (ev) => {
-      const target = el.dataset.dropMailbox?.trim();
-      if (!target) return;
-      const isThread = ev.dataTransfer?.types.includes("application/x-rustymail-thread");
-      const from = state.folderManager.dragFolder;
-      if (isThread) {
-        ev.preventDefault();
-        state.folderManager.dropTarget = target;
-        ev.dataTransfer!.dropEffect = "move";
-        return;
-      }
-      if (!from || target === from || isDescendantMailboxPath(from, target)) return;
-      ev.preventDefault();
-      state.folderManager.dropTarget = target;
-      ev.dataTransfer!.dropEffect = "move";
-    });
-    el.addEventListener("dragleave", () => {
-      state.folderManager.dropTarget = null;
-    });
-    el.addEventListener("drop", (ev) => {
-      ev.preventDefault();
-      const target = el.dataset.dropMailbox?.trim();
-      const tid = ev.dataTransfer?.getData("application/x-rustymail-thread")?.trim();
-      const from = state.folderManager.dragFolder ?? ev.dataTransfer?.getData("text/plain")?.trim();
-      state.folderManager.dropTarget = null;
-      if (tid && target) {
-        void onThreadMoveTo(tid, target).then(async () => {
-          await refreshFolderManagerTree();
-          if (state.folderManager.selectedMailbox) await fmSelectMailbox(state.folderManager.selectedMailbox);
-        });
-        return;
-      }
-      if (from && target) void fmMoveFolder(from, target);
-    });
-  });
-  document.querySelectorAll<HTMLElement>(".inbox-thread-row[data-thread-id]").forEach((el) => {
-    el.setAttribute("draggable", "true");
-    el.addEventListener("dragstart", (ev) => {
-      const tid = el.dataset.threadId?.trim();
-      if (!tid) return;
-      ev.dataTransfer?.setData("application/x-rustymail-thread", tid);
-      ev.dataTransfer!.effectAllowed = "move";
-    });
-  });
 }
 
 function activeSecurityLlmAugmentCount(): number {
@@ -5012,16 +4729,7 @@ registerSettingsWireActionsDeps({
   deleteSettingsAccount,
 });
 
-registerOrgFolderWireActionsDeps({
-  openFolderManagerView,
-  refreshFolderManagerTree,
-  fmCreateMailbox,
-  fmSelectMailbox,
-  fmSyncMailbox,
-  fmConfirmArchiveMailbox,
-  fmConfirmDeleteMailbox,
-});
-
+registerFolderManagerRunDeps({ loadMailView });
 registerOrgApplyRunDeps({ loadMailView });
 registerOrgV2ApplyRunDeps({ loadMailView });
 
