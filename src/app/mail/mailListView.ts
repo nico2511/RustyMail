@@ -21,6 +21,11 @@ import {
   listThreadsPayload,
 } from "./mailboxPanelContext";
 import { mergeMailboxFolderStatsForUi, sidebarFolderNamesForCounts } from "./mailboxSidebarStats";
+import {
+  effectiveSearchMailboxPath,
+  searchAccountIdForQuery,
+  searchQueryMailboxForList,
+} from "./searchQueryContext";
 import { state } from "../state";
 
 export type MailListDeps = {
@@ -28,7 +33,6 @@ export type MailListDeps = {
   searchQueryUsesThreadsApi: () => boolean;
   usesSearchContextLoader: () => boolean;
   searchThreads: () => Promise<void>;
-  loadThreadsForSearchContext: (append: boolean) => Promise<void>;
 };
 
 let mailListDeps: MailListDeps = {
@@ -36,16 +40,10 @@ let mailListDeps: MailListDeps = {
   searchQueryUsesThreadsApi: () => false,
   usesSearchContextLoader: () => false,
   searchThreads: async () => {},
-  loadThreadsForSearchContext: async () => {},
 };
 
 export function registerMailListDeps(next: Partial<MailListDeps>): void {
   mailListDeps = { ...mailListDeps, ...next };
-}
-
-/** Liste threads en contexte recherche / vue enregistrée (impl. enregistrée via registerMailListDeps). */
-export async function loadThreadsForSearchContext(append = false): Promise<void> {
-  await mailListDeps.loadThreadsForSearchContext(append);
 }
 
 function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
@@ -92,7 +90,7 @@ export async function reloadCurrentThreadList(append = false): Promise<void> {
     return;
   }
   if (mailListDeps.usesSearchContextLoader() || mailListDeps.isSearchActive()) {
-    await mailListDeps.loadThreadsForSearchContext(append);
+    await loadThreadsForSearchContext(append);
     return;
   }
   await loadMailView(append);
@@ -269,6 +267,62 @@ export async function loadMailView(append: boolean = false) {
   scheduleIdleAiCachePrefetch();
   void loadInboxFilterCounts().then(() => render());
 }
+
+/** Liste threads en contexte recherche / vue enregistrée. */
+export async function loadThreadsForSearchContext(append = false): Promise<void> {
+  if (isSavedDraftsVirtualMailbox(listMailboxForPanel())) {
+    await loadMailView(append);
+    return;
+  }
+  const accountId = searchAccountIdForQuery();
+  if (!accountId || !isTauriRuntime()) {
+    state.threads = [];
+    state.threadOffset = 0;
+    state.hasMoreThreads = false;
+    return;
+  }
+  const payload: Record<string, unknown> = {
+    accountId,
+    pageSize: state.threadPageSize,
+    pageOffset: append ? state.threadOffset : 0,
+    followedOnly: state.listFilter === "starred",
+  };
+  const explicitMb = effectiveSearchMailboxPath() ?? state.searchMailboxPath?.trim();
+  if (state.searchScope === "account" && !explicitMb) {
+    payload.accountWide = true;
+  } else {
+    payload.mailbox = searchQueryMailboxForList();
+  }
+  let page: ThreadListItem[];
+  try {
+    page = await withTimeout(invoke<ThreadListItem[]>("list_threads", payload), BOOT_INVOKE_TIMEOUT_MS);
+    state.mailListError = "";
+  } catch (error) {
+    const detail = tauriErrorMessage(error);
+    console.error("list_threads (search context)", error);
+    state.mailListError = `Impossible de charger les conversations : ${detail}`;
+    if (!append) {
+      state.threads = [];
+      state.threadOffset = 0;
+      state.hasMoreThreads = false;
+    }
+    return;
+  }
+  if (append) {
+    applyServerThreadPage(page, true);
+  } else {
+    applyServerThreadPage(page, false);
+  }
+  state.threadOffset = state.threads.length;
+  state.hasMoreThreads = page.length >= state.threadPageSize;
+  if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
+    state.selectedThreadId = state.threads[0]?.id;
+    state.selectedThread = undefined;
+  }
+  scheduleMailboxDigestRefresh();
+  scheduleIdleAiCachePrefetch();
+}
+
 export async function loadMailboxUnread() {
   const account = currentAccount();
   if (!account) {

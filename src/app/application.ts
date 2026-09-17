@@ -47,8 +47,6 @@ import {
 
 import { notifyImapWatchFocusedMailbox as notifyImapWatchFocusedMailboxCore } from "../imapWatchFocus";
 
-import { mergeServerThreadPage } from "../mailListPage";
-
 import {
   formatFriendlyThreadListDate,
   parseThreadListActivityDate,
@@ -135,6 +133,7 @@ import {
   applyListFilter,
   loadMailView,
   loadMailboxUnread,
+  loadThreadsForSearchContext,
   registerMailListDeps,
   reloadCurrentThreadList,
 } from "./mail/mailListView";
@@ -625,12 +624,6 @@ async function rewriteDictatedSegmentWithTone(raw: string): Promise<string> {
   }
 }
 
-
-function applyServerThreadPage(page: ThreadListItem[], append: boolean): void {
-  const { threads, threadOffsetReset } = mergeServerThreadPage(state.threads, page, append);
-  state.threads = threads;
-  if (threadOffsetReset) state.threadOffset = 0;
-}
 
 let llmIdlePrefetchAfterBootScheduled = false;
 
@@ -1846,60 +1839,6 @@ function resolveAccountIdFromRef(ref: string): string | null {
       (a.displayName ?? "").toLowerCase().includes(q)
   );
   return hit?.id ?? null;
-}
-
-async function loadThreadsForSearchContext(append = false): Promise<void> {
-  if (isSavedDraftsVirtualMailbox(listMailboxForPanel())) {
-    await loadMailView(append);
-    return;
-  }
-  const accountId = searchAccountIdForQuery();
-  if (!accountId || !isTauriRuntime()) {
-    state.threads = [];
-    state.threadOffset = 0;
-    state.hasMoreThreads = false;
-    return;
-  }
-  const payload: Record<string, unknown> = {
-    accountId,
-    pageSize: state.threadPageSize,
-    pageOffset: append ? state.threadOffset : 0,
-    followedOnly: state.listFilter === "starred",
-  };
-  const explicitMb = effectiveSearchMailboxPath() ?? state.searchMailboxPath?.trim();
-  if (state.searchScope === "account" && !explicitMb) {
-    payload.accountWide = true;
-  } else {
-    payload.mailbox = searchQueryMailboxForList();
-  }
-  let page: ThreadListItem[];
-  try {
-    page = await withTimeout(invoke<ThreadListItem[]>("list_threads", payload), BOOT_INVOKE_TIMEOUT_MS);
-    state.mailListError = "";
-  } catch (error) {
-    const detail = tauriErrorMessage(error);
-    console.error("list_threads (search context)", error);
-    state.mailListError = `Impossible de charger les conversations : ${detail}`;
-    if (!append) {
-      state.threads = [];
-      state.threadOffset = 0;
-      state.hasMoreThreads = false;
-    }
-    return;
-  }
-  if (append) {
-    applyServerThreadPage(page, true);
-  } else {
-    applyServerThreadPage(page, false);
-  }
-  state.threadOffset = state.threads.length;
-  state.hasMoreThreads = page.length >= state.threadPageSize;
-  if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
-    state.selectedThreadId = state.threads[0]?.id;
-    state.selectedThread = undefined;
-  }
-  scheduleMailboxDigestRefresh();
-  scheduleIdleAiCachePrefetch();
 }
 
 async function refreshLlmRuntimeStatus(forceHardwareRescan?: boolean): Promise<void> {
@@ -8269,7 +8208,6 @@ registerMailListDeps({
   searchQueryUsesThreadsApi,
   usesSearchContextLoader,
   searchThreads,
-  loadThreadsForSearchContext,
 });
 
 registerSearchQueryContext({ resolveSearchMailboxPath });
