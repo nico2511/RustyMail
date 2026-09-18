@@ -198,7 +198,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeMicPtt.ts` | Push-to-talk (raccourci, correspondance touche) |
 | `app/mail/composeMicUiHints.ts` | Titres micro / aria (compose + Q&R fil) |
 | `app/mail/composeDictationRewrite.ts` | Réécriture segment dicté (ton) |
-| `app/mail/composeMicDictation.ts` | `micAction`, enregistrement, PTT |
+| `app/mail/composeMicDictation.ts` | Barrel dictée (`micAction`, PTT) |
+| `app/mail/composeMicDictationContext.ts` | État module enregistreur / PTT |
+| `app/mail/composeMicDictationApplyRun.ts` | Cible compose vs thread-QA, injection texte |
+| `app/mail/composeMicDictationPttRun.ts` | `bindMicPushToTalk` |
+| `app/mail/composeMicDictationMicActionRun.ts` | Enregistrement + transcription |
 | `app/mail/accountDefaultPrefs.ts` | Compte/dossier par défaut, filtre liste, boîte valide |
 | `app/mail/mailListPreviewClean.ts` | Aperçu liste sans HTML/CSS bruit |
 | `app/mail/aiCacheKeySegment.ts` | Segment clé cache LLM (`ai_cache_llm_segment`) |
@@ -325,7 +329,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`settingsLlmRuntime`, `composeMicDictation`, …)
+1. Découper d’autres gros modules (`settingsLlmRuntime` en sous-modules, `wireEvents/handleAction*`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
