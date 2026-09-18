@@ -44,7 +44,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchCommitQuery.ts` | Barrel commit barre recherche |
 | `app/mail/searchCommitContext.ts` | `registerSearchCommitDeps` |
 | `app/mail/searchCommitStructuralRun.ts` | Re-exports parse barre / NL |
-| `app/mail/searchCommitStructuralBarRun.ts` | Parse barre → état, snapshots brouillon |
+| `app/mail/searchCommitStructuralBarRun.ts` | Barrel parse barre → état / snapshots |
+| `app/mail/searchStructuralBarApplyRun.ts` | `applyParsedSearchBar*` + merge tag |
+| `app/mail/searchStructuralBarSnapshotRun.ts` | Snapshots brouillon, reset filtres NL |
 | `app/mail/searchCommitStructuralNlRun.ts` | Application requête NL à l’état |
 | `app/mail/searchCommitBarRun.ts` | `commitSearchQuery` + re-exports |
 | `app/mail/searchCommitBarQueryRun.ts` | Critères barre, toast résultat, clear, apply query |
@@ -62,7 +64,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchLaunchQueries.ts` | Barrel lancements recherche |
 | `app/mail/searchLaunchContext.ts` | `registerSearchLaunchDeps` |
 | `app/mail/searchLaunchPresetsRun.ts` | Tag, contact, domaine |
-| `app/mail/searchLaunchHashAutocompleteRun.ts` | Hits `#` autocomplete + filtres inbox |
+| `app/mail/searchLaunchHashAutocompleteRun.ts` | Barrel hits `#` autocomplete |
+| `app/mail/searchLaunchHashHitStateRun.ts` | Appliquer hit → état recherche |
+| `app/mail/searchLaunchHashHitApplyRun.ts` | Appliquer hit → requête / toast inbox |
 | `app/mail/searchTagCatalog.ts` | `refreshSearchTagCatalog` + `registerSearchTagCatalogDeps()` |
 | `app/mail/searchAtAutocompleteWire.ts` | Câblage `@` / `#` (recherche + compose) + `registerSearchAtAutocompleteWireDeps()` |
 | `app/mail/searchViewContext.ts` | Critères vue enregistrée / contexte recherche inbox + `registerSearchViewContextDeps()` |
@@ -176,7 +180,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appShellKeyboardPlainShortcutsRun.ts` | Raccourcis une touche (n, r, /, …) |
 | `app/mail/appShellMouseNavRun.ts` | Boutons souris retour / avant |
 | `app/mail/appShellDraftFlushRun.ts` | Flush révisions brouillon (visibility) |
-| `app/mail/mailEmailHtmlSanitize.ts` | DOMPurify + liens/images + `sanitizeEmailHtml()` |
+| `app/mail/mailEmailHtmlSanitize.ts` | Affichage HTML message + barrel sanitize |
+| `app/mail/mailEmailHtmlSanitizeCoreRun.ts` | DOMPurify, liens/images, désabonnement |
+| `app/mail/mailEmailHtmlOutlookStripRun.ts` | Nettoyage bruit Outlook / citations |
 | `app/mail/idleAiCachePrefetchContext.ts` | `initIdleAiCachePrefetch`, gen / abort |
 | `app/mail/idleAiCachePrefetchScheduleRun.ts` | Planification debounce / idle |
 | `app/mail/idleAiCachePrefetchPickRun.ts` | Sélection fils + miss cache synthèse/traduction |
@@ -232,7 +238,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/newsletterRulesWireRun.ts` | Actions wire add/remove règles newsletter (+ `tryHandleNewsletterRulesWire`) |
 | `app/mail/newsletterRulesMatch.ts` | Correspondance expéditeur ↔ règle newsletter |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
-| `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |
+| `app/mail/composeDraftRevisionDiff.ts` | Barrel diff vs révision |
+| `app/mail/composeDraftRevisionDiffContext.ts` | `registerComposeDraftRevisionDiffDeps` |
+| `app/mail/composeDraftRevisionDiffAlgoRun.ts` | Myers diff lignes brouillon |
+| `app/mail/composeDraftRevisionDiffRun.ts` | `computeDraftDiffAgainstRevision` |
 | `app/mail/composeOrphanDraftSession.ts` | Reprise / rejet brouillons orphelins |
 | `app/mail/composePickAttachments.ts` | Picker pièces jointes Tauri |
 | `app/mail/composeCloseFlow.ts` | Fermeture compositeur, discard, `clearDraftSession` |
@@ -263,7 +272,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/llmJobQueue.ts` | File jobs LLM (`withLlmQueue`, annulation) |
 | `app/mail/composeAiComposeLlm.ts` | Réécriture / grammaire IA dans le compositeur |
 | `app/mail/switchActiveAccountAction.ts` | Changement de compte actif (liste, digest, sauvés) |
-| `app/mail/statusBarProgressJobs.ts` | Jobs barre d’état + peinture DOM |
+| `app/mail/statusBarProgressJobs.ts` | Barrel jobs barre d’état |
+| `app/mail/statusBarProgressQueueRun.ts` | Upsert / clear jobs + schedule paint |
+| `app/mail/statusBarProgressGatherRun.ts` | Agrégation jobs (sync, org, LLM, …) |
+| `app/mail/statusBarProgressPaintRun.ts` | Peinture DOM barre de progression |
 | `app/mail/llmPrefetchProgressDom.ts` | Barre progression prefetch LLM |
 | `app/mail/navBreadcrumbSegments.ts` | Segments fil d’Ariane navigation |
 | `app/mail/oauthEphemeralRedirectWarn.ts` | Toast redirect OAuth éphémère |
@@ -418,7 +430,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomOrgMailboxRun.ts` | Actions org inline + checkboxes modales confirm |
 | `app/mail/wireEventsDomThreadAttachmentsRun.ts` | PJ fil + hydrate HTML message |
 | `app/mail/wireEventsDomComposeSearchAccountRun.ts` | Barrel compose / recherche / compte (DOM) |
-| `app/mail/wireEventsDomComposeEditorRun.ts` | Preview compose, markdown, collage image, quick reply |
+| `app/mail/wireEventsDomComposeEditorRun.ts` | Orchestration wire composeur |
+| `app/mail/wireEventsDomComposePreviewRun.ts` | Preview compose (liens, lightbox) |
+| `app/mail/wireEventsDomComposeBodyRun.ts` | Textarea compose, collage, raccourcis MD |
 | `app/mail/wireEventsDomSearchBarRun.ts` | Barres recherche + commit Enter |
 | `app/mail/wireEventsDomAccountFormRun.ts` | Sélecteur compte, préréglage domaine, champs serveur |
 | `app/mail/wireEventsDomThreadQaRun.ts` | Saisie Q&A fil (`#thread-qa-input`) |
