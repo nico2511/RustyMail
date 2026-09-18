@@ -89,10 +89,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/lib/tagFamilyForInvoke.ts` | Normalisation famille tag pour invoke Rust |
 | `app/mail/bulkTrashList.ts` | Re-export corbeille lot + registry |
 | `app/mail/bulkTrashListDepsRun.ts` | `registerBulkTrashListDeps` |
-| `app/mail/bulkTrashListRun.ts` | `bulkTrashVisibleThreads` |
+| `app/mail/bulkTrashListRun.ts` | `bulkTrashVisibleThreads` (garde-fous + optimiste) |
+| `app/mail/bulkTrashListInvokeRun.ts` | Boucle invoke corbeille lot |
 | `app/mail/emptyTrashMailbox.ts` | Vider corbeille dossier + `registerEmptyTrashMailboxDeps()` |
 | `app/mail/appNavActions.ts` | Facades `goBack` / `navigateToInbox` / fil d’Ariane |
-| `app/mail/mailboxManageAction.ts` | CRUD dossier IMAP (modale gérer) + `registerMailboxManageActionDeps()` |
+| `app/mail/mailboxManageAction.ts` | Facade CRUD dossier IMAP (modale gérer) |
+| `app/mail/mailboxManageActionContext.ts` | `registerMailboxManageActionDeps` |
+| `app/mail/mailboxManageKindInvokeRun.ts` | Modales + invoke create/rename/delete/subscribe |
 | `app/mail/threadActivityTracking.ts` | Activité fil / recherche (suggestions vues enregistrées) |
 | `app/mail/syncInboxAction.ts` | Facade `syncInbox()` |
 | `app/mail/syncInboxRun.ts` | Orchestration `syncInbox`, re-exports watch / push refresh |
@@ -251,7 +254,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeDraftSavedListRun.ts` | Enregistrer dans « Sauvés » |
 | `app/mail/composeDraftOrphanBootRun.ts` | Modale sessions brouillon orphelines au boot |
 | `app/mail/composeLayoutState.ts` | `syncPreviewOpenFromComposeLayout` |
-| `app/mail/newsletterRulesWireRun.ts` | Actions wire add/remove règles newsletter (+ `tryHandleNewsletterRulesWire`) |
+| `app/mail/newsletterRulesWireRun.ts` | Barrel + `tryHandleNewsletterRulesWire` |
+| `app/mail/newsletterRulesDomainWireRun.ts` | Wire règles domaine (paramètres) |
+| `app/mail/newsletterRulesMessageWireRun.ts` | Wire règles depuis message fil |
+| `app/mail/newsletterRulesRefreshThreadRun.ts` | Refresh fil après changement règle |
 | `app/mail/newsletterRulesMatch.ts` | Correspondance expéditeur ↔ règle newsletter |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
 | `app/mail/composeDraftRevisionDiff.ts` | Barrel diff vs révision |
@@ -300,6 +306,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appNavigationStack.ts` | Barrel pile navigation |
 | `app/mail/appNavigationStackContext.ts` | `registerAppNavigationStackDeps` |
 | `app/mail/appNavigationSnapshotRun.ts` | `captureCurrentNav`, `beginNavigation` |
+| `app/mail/appNavigationSnapshotLabelsRun.ts` | Labels fil d’Ariane par vue |
 | `app/mail/appNavigationApplyRun.ts` | Re-export `applyNavSnapshot` |
 | `app/mail/appNavigationApplyViewsRun.ts` | Restauration champs + switch vues nav |
 | `app/mail/appNavigationHistoryRun.ts` | `goBack`, `goForward`, inbox, fil d’Ariane |
@@ -394,7 +401,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/folderManagerConfirmRun.ts` | Archiver / supprimer dossier (confirm) |
 | `app/mail/threadListActions.ts` | Barrel actions liste fils |
 | `app/mail/threadListActionsContext.ts` | Deps + `sourceMailboxForThread` |
-| `app/mail/threadListMoveRun.ts` | Corbeille, archive, déplacer |
+| `app/mail/threadListMoveRun.ts` | Barrel corbeille / archive / déplacer |
+| `app/mail/threadListMoveTrashArchiveRun.ts` | `onThreadMove` trash / archive |
+| `app/mail/threadListMoveDialogRun.ts` | Modale déplacement dossier |
+| `app/mail/threadListMoveTargetRun.ts` | `onThreadMoveTo`, `confirmMoveDialog` |
 | `app/mail/threadListMoveOptimisticRun.ts` | UI optimiste liste avant confirm IMAP |
 | `app/mail/threadListReadFollowRun.ts` | Lu/non-lu, suivi |
 | `app/mail/folderManagerDnD.ts` | Glisser-déposer dossiers / fils (vue Dossiers) |
