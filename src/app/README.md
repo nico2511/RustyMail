@@ -240,6 +240,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsLlmRuntimeLlamaDetectRun.ts` | Détection binaire `llama-server` |
 | `app/mail/settingsGeneralPrefsPersistRun.ts` | Persistance prefs générales depuis le DOM |
 | `app/mail/settingsAiModalShellRun.ts` | Ouverture / fermeture modale IA réglages |
+| `app/mail/settingsAiDomWireRun.ts` | Listeners DOM prefs IA (features, modale, llama, arrière-plan) |
+| `app/mail/contactsWireActionsRun.ts` | Actions wire contacts / vCard (depuis `handleActionContactsWireRun`) |
 | `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
@@ -318,7 +320,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
 | `wireEvents/handleActionInboxSearch.ts` | Inbox / recherche — dispatch vers sous-handlers |
-| `wireEvents/handleActionContactsWireRun.ts` | Contacts + import/export vCard |
+| `wireEvents/handleActionContactsWireRun.ts` | Re-export `contactsWireActionsRun` |
 | `wireEvents/handleActionAgentAssistWireRun.ts` | Agent, mic, sync, corbeille bulk |
 | `wireEvents/handleActionSearchViewsWireRun.ts` | Vues enregistrées, chips recherche, filtres liste |
 | `wireEvents/handleActionListThreadWireRun.ts` | Fil liste, déplacement, brouillons sauvés |
@@ -356,7 +358,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
 | `wireEvents/handleActionAddressBookSidebarWireRun.ts` | Carnet (sidebar réglages) |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
-| `wireEvents/wireEventsDomSettingsAiRun.ts` | Listeners DOM prefs IA (modale, llama, arrière-plan) |
+| `wireEvents/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` (IDs checkbox immédiats via context) |
 | `wireEvents/wireEventsDomContactsAgentRun.ts` | Contacts scroll/recherche, `[data-action]`, agent / digest mode |
 | `wireEvents/wireEventsDomInboxThreadRun.ts` | Liste fil, PJ, org inline, modales org confirm |
 | `wireEvents/wireEventsDomComposeSearchAccountRun.ts` | Compose, recherche, compte, setup serveur |
@@ -388,7 +390,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 ## Prochaines extractions (ordre suggéré)
 
 1. Affiner encore les imports wire si de nouveaux handlers grossissent
-2. Extraire d’autres blocs DOM si `wireEventsDom*` grossissent (p.ex. prefs IA → mail)
+2. Déplacer `searchViewsWire` / `listThreadWire` vers `app/mail/*` (handlers ~200 lignes)
 3. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
