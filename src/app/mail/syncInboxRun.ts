@@ -1,13 +1,7 @@
-import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
-import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { refreshSavedSearches, refreshSuggestedSavedViews } from "./savedSearchViews";
-import {
-  accountForImapSync,
-  syncAllAccountMailboxesRequested,
-} from "./syncImapAccountContext";
 import {
   applySyncedMailboxAliases,
   refreshMailboxListAfterSyncIfNeeded,
@@ -20,6 +14,11 @@ import {
   restoreThreadSelectionAfterReload,
 } from "./syncInboxListReloadRun";
 import {
+  beginSyncInboxProgress,
+  finishSyncInboxProgress,
+  prepareSyncInboxOrNotify,
+} from "./syncInboxPrepareRun";
+import {
   buildSyncStatusMessage,
   maybeTriggerSemanticReindex,
   notifySyncCompletionToasts,
@@ -28,51 +27,10 @@ import {
 export type { SyncInboxOptions } from "./syncInboxBatchRun";
 
 export async function syncInbox(options?: SyncInboxOptions): Promise<void> {
-  if (state.syncInProgress) return;
-  if (!isTauriRuntime()) {
-    state.syncMessage = "Sync IMAP: disponible seulement dans l’app Tauri.";
-    render();
-    toast(state.syncMessage);
-    return;
-  }
-
-  const syncAllFolders = syncAllAccountMailboxesRequested(options);
-
-  if (syncAllFolders && state.settingsSelectedAccountId === "new") {
-    toast("Enregistrez d’abord le compte avant de synchroniser tous les dossiers.");
-    return;
-  }
-
-  const account = accountForImapSync();
-  if (!account) {
-    state.accountMessage = syncAllFolders
-      ? "Aucun compte sélectionné — enregistrez ou choisissez un compte dans la liste."
-      : "Aucun compte — enregistrez d’abord un compte IMAP.";
-    state.syncMessage = state.accountMessage;
-    render();
-    toast(state.syncMessage);
-    return;
-  }
-
-  if (!syncAllFolders && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast("Pas de synchronisation IMAP pour les brouillons locaux.");
-    return;
-  }
-
-  const mailbox =
-    syncAllFolders && isSavedDraftsVirtualMailbox(state.selectedMailbox) ?
-      "INBOX"
-    : state.selectedMailbox || "INBOX";
-  const keepThreadId = state.view === "thread" ? state.selectedThreadId : undefined;
-  state.syncInProgress = true;
-  state.syncProgressBatch = null;
-  state.syncMessage =
-    syncAllFolders ?
-      `Sync… tous les dossiers · ${account.email}`
-    : account.imap.allowInvalidTls ?
-      `Sync… (TLS non vérifié) · ${mailbox}`
-    : `Sync… · ${mailbox}`;
-  render();
+  const prepared = prepareSyncInboxOrNotify(options);
+  if (!prepared) return;
+  const { account, mailbox, syncAllFolders, keepThreadId } = prepared;
+  beginSyncInboxProgress(account, mailbox, syncAllFolders);
 
   try {
     const targets = await resolveImapSyncTargets(account, mailbox, syncAllFolders, options);
@@ -104,17 +62,7 @@ export async function syncInbox(options?: SyncInboxOptions): Promise<void> {
     toast(state.syncMessage);
     render();
   } finally {
-    state.syncInProgress = false;
-    state.syncProgressBatch = null;
-    if (options?.background) {
-      window.setTimeout(() => {
-        if (!state.syncInProgress) {
-          state.syncMessage = "";
-          render();
-        }
-      }, 1800);
-    }
-    render();
+    finishSyncInboxProgress(options);
   }
 }
 

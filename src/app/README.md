@@ -68,7 +68,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchLaunchHashHitStateRun.ts` | Appliquer hit → état recherche |
 | `app/mail/searchLaunchHashHitApplyRun.ts` | Appliquer hit → requête / toast inbox |
 | `app/mail/searchTagCatalog.ts` | `refreshSearchTagCatalog` + `registerSearchTagCatalogDeps()` |
-| `app/mail/searchAtAutocompleteWire.ts` | Câblage `@` / `#` (recherche + compose) + `registerSearchAtAutocompleteWireDeps()` |
+| `app/mail/searchAtAutocompleteWire.ts` | Orchestration câblage `@` / `#` |
+| `app/mail/searchAtAutocompleteWireContext.ts` | `registerSearchAtAutocompleteWireDeps` |
+| `app/mail/searchAtAutocompleteSearchFieldsRun.ts` | Autocomplete recherche + hash |
+| `app/mail/searchAtAutocompleteComposeFieldsRun.ts` | Autocomplete destinataires + mentions |
 | `app/mail/searchViewContext.ts` | Critères vue enregistrée / contexte recherche inbox + `registerSearchViewContextDeps()` |
 | `app/mail/searchViewBatch.ts` | Barrel actions lot recherche / vue enregistrée |
 | `app/mail/searchViewBatchContext.ts` | Job batch + `registerSearchViewBatchDeps` |
@@ -89,7 +92,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/syncInboxAction.ts` | Facade `syncInbox()` |
 | `app/mail/syncInboxRun.ts` | Orchestration `syncInbox`, re-exports watch / push refresh |
 | `app/mail/syncInboxStatusRun.ts` | Message statut sync, toasts fin, réindex sémantique |
-| `app/mail/syncInboxBatchRun.ts` | Cibles IMAP, batches `sync_mailboxes`, aliases |
+| `app/mail/syncInboxBatchRun.ts` | Barrel sync IMAP par lots |
+| `app/mail/syncInboxTargetsRun.ts` | Cibles dossiers `resolveImapSyncTargets` |
+| `app/mail/syncInboxBatchInvokeRun.ts` | Boucles `sync_mailboxes` |
+| `app/mail/syncInboxPostSyncRun.ts` | Refresh liste + aliases après sync |
 | `app/mail/syncInboxListReloadRun.ts` | Rechargement liste + fil ouvert après sync |
 | `app/mail/syncInboxPushRefreshRun.ts` | `refreshUiAfterImapPush` (IDLE) |
 | `app/mail/syncInboxImapWatch.ts` | Focus dossier pour watch IMAP |
@@ -468,7 +474,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
 | `app/mail/accountSettingsRun.ts` | Barrel save/delete/OAuth/discovery (voir `account*Run.ts`) |
 | `app/mail/accountSaveRun.ts` | Re-export `saveAccount`, `saveAccountProgrammatic` |
-| `app/mail/accountSaveFormRun.ts` | Enregistrement depuis formulaire paramètres |
+| `app/mail/accountSaveFormRun.ts` | `saveAccountFromSettingsForm` |
+| `app/mail/accountSaveFormRequestRun.ts` | Lecture / validation formulaire compte |
+| `app/mail/accountSaveFormPersistRun.ts` | Invoke save + reload mailboxes |
 | `app/mail/accountSaveProgrammaticRun.ts` | Enregistrement programmatique (OAuth finish) |
 | `app/mail/accountDeleteRun.ts` | `deleteSettingsAccount` |
 | `app/mail/accountServerDiscoveryRun.ts` | Détection IMAP/SMTP (formulaire + OAuth snap) |
