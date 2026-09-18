@@ -252,8 +252,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailSecurityLlmAugmentRun.ts` | Enrichissement LLM async + cache |
 | `app/mail/composeFormLabels.ts` | Libellés compose (type brouillon, horodatage révision) |
 | `app/mail/settingsAccountsFormState.ts` | Scratch identité formulaire comptes (DOM) |
-| `app/mail/settingsRenderHelpers.ts` | Profil comptes + bloc stats sémantiques + deps panneau IA |
-| `app/mail/threadAiStreamDom.ts` | Peinture stream IA fil/QA/agent + libellés assist |
+| `app/mail/settingsRenderHelpers.ts` | Barrel profil comptes + deps panneau IA |
+| `app/mail/settingsAccountsFormProfileRun.ts` | `settingsDraftProfile`, merge OAuth/snap |
+| `app/mail/settingsSemanticStatsRenderRun.ts` | Bloc HTML stats embeddings sémantiques |
+| `app/mail/threadAiStreamDom.ts` | Barrel stream IA fil/QA/agent + assist UI |
+| `app/mail/threadAiStreamPaintRun.ts` | RAF peinture résumé / QA / brouillon agent |
+| `app/mail/threadAiSummaryScopeRun.ts` | Portée résumé IA vs fil courant |
+| `app/mail/threadAgentUiHelpersRun.ts` | Étapes / skills assistant réponse |
 | `app/mail/composeComposerBridge.ts` | Ré-exports éditeur compositeur (markdown, preview, PJ, chips) |
 | `app/mail/composeMarkdownEditor.ts` | Barrel éditeur markdown compositeur |
 | `app/mail/composeMarkdownEditorState.ts` | Corps / canonical / undo stacks |
