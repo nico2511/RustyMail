@@ -41,7 +41,6 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchQueryContext.ts` | Payload recherche, `isSearchActive`, critères engagés, dossier effectif |
 | `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` |
 | `app/mail/fetchOpenThread.ts` | `fetchOpenThreadOrNotify()` |
-| `app/mail/openThreadView.ts` | `openThread()` + `registerOpenThreadDeps()` |
 | `app/mail/searchCommitQuery.ts` | Barrel commit barre recherche |
 | `app/mail/searchCommitContext.ts` | `registerSearchCommitDeps` |
 | `app/mail/searchCommitStructuralRun.ts` | Re-exports parse barre / NL |
@@ -329,6 +328,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadListActions.ts` | Barrel actions liste fils |
 | `app/mail/threadListActionsContext.ts` | Deps + `sourceMailboxForThread` |
 | `app/mail/threadListMoveRun.ts` | Corbeille, archive, déplacer |
+| `app/mail/threadListMoveOptimisticRun.ts` | UI optimiste liste avant confirm IMAP |
 | `app/mail/threadListReadFollowRun.ts` | Lu/non-lu, suivi |
 | `app/mail/folderManagerDnD.ts` | Glisser-déposer dossiers / fils (vue Dossiers) |
 | `app/lib/sidebarUiPref.ts` | Préférence sidebar repliée (localStorage) |
