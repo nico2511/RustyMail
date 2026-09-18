@@ -44,7 +44,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/openThreadView.ts` | `openThread()` + `registerOpenThreadDeps()` |
 | `app/mail/searchCommitQuery.ts` | Barrel commit barre recherche |
 | `app/mail/searchCommitContext.ts` | `registerSearchCommitDeps` |
-| `app/mail/searchCommitStructuralRun.ts` | Parse barre → état, snapshots brouillon, apply NL |
+| `app/mail/searchCommitStructuralRun.ts` | Re-exports parse barre / NL |
+| `app/mail/searchCommitStructuralBarRun.ts` | Parse barre → état, snapshots brouillon |
+| `app/mail/searchCommitStructuralNlRun.ts` | Application requête NL à l’état |
 | `app/mail/searchCommitBarRun.ts` | `commitSearchQuery`, clear, toasts, reload |
 | `app/mail/searchNlQueryInvoke.ts` | `llm_search_nl` invoke + application état / fallbacks lexicaux |
 | `app/mail/searchNlAssistRun.ts` | Action « recherche NL » (prompt + `llm_search_nl`) |
@@ -115,8 +117,14 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsWireActionsAiRun.ts` | Prefs IA, moteurs LLM, barres progression |
 | `app/mail/settingsWireActionsMicRun.ts` | Micro / dictée (util audio) |
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
-| `app/mail/orgV1WireActionsRun.ts` | Actions wire org v1 (scan, apply, modales, retag) |
-| `app/mail/orgV2WireActionsRun.ts` | Actions wire org v2 (scan, apply, undo, modales) |
+| `app/mail/orgV1WireActionsRun.ts` | Barrel actions wire org v1 |
+| `app/mail/orgV1WireScanRun.ts` | Scan org v1, retag compte |
+| `app/mail/orgV1WireApplyRun.ts` | Appliquer propositions org v1 |
+| `app/mail/orgV1WireConfirmRun.ts` | Modales confirm corbeille / dossier org v1 |
+| `app/mail/orgV2WireActionsRun.ts` | Barrel actions wire org v2 |
+| `app/mail/orgV2WireScanUndoRun.ts` | Scan org v2, undo lot |
+| `app/mail/orgV2WireProposalRun.ts` | Propositions org v2 (apply, snooze, dismiss) |
+| `app/mail/orgV2WireConfirmRun.ts` | Modales confirm org v2 |
 | `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
 | `app/mail/mailAttachmentActions.ts` | Téléchargement / ouverture PJ (confirm risque) |
 | `app/mail/appShellRender.ts` | Barrel rendu DOM shell |
@@ -398,7 +406,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
 | `app/mail/accountSettingsRun.ts` | Barrel save/delete/OAuth/discovery (voir `account*Run.ts`) |
-| `app/mail/accountSaveRun.ts` | `saveAccount`, `saveAccountProgrammatic` |
+| `app/mail/accountSaveRun.ts` | Re-export `saveAccount`, `saveAccountProgrammatic` |
+| `app/mail/accountSaveFormRun.ts` | Enregistrement depuis formulaire paramètres |
+| `app/mail/accountSaveProgrammaticRun.ts` | Enregistrement programmatique (OAuth finish) |
 | `app/mail/accountDeleteRun.ts` | `deleteSettingsAccount` |
 | `app/mail/accountServerDiscoveryRun.ts` | Détection IMAP/SMTP (formulaire + OAuth snap) |
 | `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
