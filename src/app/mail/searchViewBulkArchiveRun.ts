@@ -3,41 +3,23 @@ import {
   clearThreadsRecentlyRemoved,
   markThreadsRecentlyRemoved,
 } from "../../recentlyRemovedThreads";
-import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
-import { currentAccount } from "../core/accountContext";
-import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { openConfirmModal } from "../modals/promptConfirm";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { SAVED_VIEW_BATCH_MAX } from "../lib/savedViewBatch";
-import { isSearchActive } from "./searchQueryContext";
 import { searchThreads } from "./searchThreadsRun";
-import { searchViewBatchThreads } from "./searchViewBatchContext";
+import { requireSearchViewBulkPreflight } from "./searchViewBulkPreflightRun";
 import { invokeBulkArchiveThreadIds } from "./searchViewBulkArchiveInvokeRun";
 
 export async function bulkArchiveSearchViewThreads(): Promise<void> {
-  if (!isTauriRuntime()) {
-    toast("Archivage : IMAP requiert l’app Tauri.");
-    return;
-  }
-  if (!isSearchActive() && !state.activeSavedSearchId) {
-    toast("Actions lot : ouvrez une recherche ou une vue enregistrée.");
-    return;
-  }
-  if (!currentAccount()) {
-    toast("Configurez d’abord un compte IMAP.");
-    return;
-  }
-  if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast("Archivage : actions IMAP uniquement.");
-    return;
-  }
-  const visible = searchViewBatchThreads();
-  if (!visible.length) {
-    toast("Aucune conversation dans cette vue.");
-    return;
-  }
+  const pre = requireSearchViewBulkPreflight({
+    blockSavedDraftsMailbox: true,
+    tauriRequiredLabel: "Archivage",
+    imapOnlyLabel: "Archivage",
+  });
+  if (!pre) return;
+  const { visible } = pre;
   const ok = await openConfirmModal({
     title: "Archiver le lot ?",
     body: `Archiver jusqu’à ${visible.length} conversation(s) (plafond ${SAVED_VIEW_BATCH_MAX}).`,

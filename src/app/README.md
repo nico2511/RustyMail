@@ -83,15 +83,20 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchViewBatch.ts` | Barrel actions lot recherche / vue enregistrée |
 | `app/mail/searchViewBatchContext.ts` | Job batch + `registerSearchViewBatchDeps` |
 | `app/mail/searchViewBulkActionsRun.ts` | Re-export lot recherche / vue |
-| `app/mail/searchViewBulkMarkReadRun.ts` | Marquer lus (lot) |
-| `app/mail/searchViewBulkArchiveRun.ts` | Archiver (lot) |
+| `app/mail/searchViewBulkMarkReadRun.ts` | Marquer lus lot (confirm) |
+| `app/mail/searchViewBulkMarkReadInvokeRun.ts` | Boucle IMAP marquer lus + barre d’état |
+| `app/mail/searchViewBulkPreflightRun.ts` | Garde-fous communs actions lot recherche |
+| `app/mail/searchViewBulkArchiveRun.ts` | Archiver lot (confirm + optimiste) |
+| `app/mail/searchViewBulkArchiveInvokeRun.ts` | Boucle IMAP archivage + barre d’état |
 | `app/mail/searchFluxAffinerRun.ts` | Orchestration Affiner le flux |
 | `app/mail/searchFluxAffinerSuggestRun.ts` | LLM + confirmation modale Affiner |
 | `app/mail/searchFluxAffinerApplyRun.ts` | Création dossier IMAP + déplacement lot |
 | `app/lib/tagFamilyForInvoke.ts` | Normalisation famille tag pour invoke Rust |
 | `app/mail/bulkTrashList.ts` | Re-export corbeille lot + registry |
 | `app/mail/bulkTrashListDepsRun.ts` | `registerBulkTrashListDeps` |
-| `app/mail/bulkTrashListRun.ts` | `bulkTrashVisibleThreads` (garde-fous + optimiste) |
+| `app/mail/bulkTrashListRun.ts` | Orchestration `bulkTrashVisibleThreads` |
+| `app/mail/bulkTrashListPreflightRun.ts` | Garde-fous + confirm corbeille (liste) |
+| `app/mail/bulkTrashListOptimisticRun.ts` | UI optimiste / rollback corbeille lot |
 | `app/mail/bulkTrashListInvokeRun.ts` | Boucle invoke corbeille lot |
 | `app/mail/emptyTrashMailbox.ts` | Vider corbeille dossier + `registerEmptyTrashMailboxDeps()` |
 | `app/mail/appNavActions.ts` | Facades `goBack` / `navigateToInbox` / fil d’Ariane |
@@ -280,7 +285,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeAttachmentsAction.ts` | Retrait PJ compositeur |
 | `app/mail/cycleComposeLayout.ts` | Cycle split / write / preview / historique |
 | `app/mail/llmQueueCancel.ts` | Annulation file jobs LLM |
-| `app/mail/composeSendDraftRun.ts` | `sendDraft` + re-exports split / deps |
+| `app/mail/composeSendDraftRun.ts` | `sendDraft` (validation + orchestration) |
+| `app/mail/composeSendDraftPlanRun.ts` | Analyse `plan_split_send` |
+| `app/mail/composeSendDraftInvokeRun.ts` | Invoke `send_draft` + post-envoi |
 | `app/mail/composeSendDraftFinishRun.ts` | Fin envoi compose, deps registry, notices IMAP split |
 | `app/mail/composeSendDraftSplitRun.ts` | `confirmAndExecuteSplitSend` |
 | `app/mail/composeViewNavigation.ts` | `enterComposeView` (historique nav) |
@@ -557,7 +564,8 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/accountServerDiscoverySnapRun.ts` | Snap serveurs (OAuth / preset) |
 | `app/mail/accountServerDiscoveryFormRun.ts` | Action détection formulaire compte |
 | `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
-| `app/mail/accountOAuthDesktopConnectRun.ts` | Login OAuth Google / Microsoft (desktop) |
+| `app/mail/accountOAuthDesktopConnectRun.ts` | Entrées OAuth Google / Microsoft (desktop) |
+| `app/mail/accountOAuthDesktopConnectCoreRun.ts` | Invoke login + enchaînement finish compte |
 | `app/mail/accountOAuthFinishRun.ts` | Orchestration post-login OAuth nouveau compte |
 | `app/mail/accountOAuthWizardPhaseRun.ts` | Phases UI assistant OAuth compte |
 | `app/mail/accountOAuthFinishReadyRun.ts` | Inbox, sync, fin wizard après save OAuth |
