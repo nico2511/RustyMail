@@ -187,7 +187,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appShellRender.ts` | Barrel rendu DOM shell |
 | `app/mail/appShellRenderRefs.ts` | Refs wire (compose, carnet, prefs IA immédiates) |
 | `app/mail/appShellRenderContext.ts` | `registerAppShellWireContext` + `registerRender` |
-| `app/mail/appShellRenderRun.ts` | `renderAppShell` |
+| `app/mail/appShellRenderRun.ts` | `renderAppShell` (orchestration) |
+| `app/mail/appShellRenderMarkupRun.ts` | Classes CSS shell, largeur panneau IA, HTML inner |
 | `app/mail/loadBootDeferredPrefs.ts` | Orchestration prefs différées au boot |
 | `app/mail/bootDeferredPrefsFetchRun.ts` | `get_app_prefs`, statuts clés API |
 | `app/mail/bootDeferredPrefsListenersRun.ts` | Events bootstrap modèles / prefetch LLM |
