@@ -59,7 +59,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/savedSearchViews.ts` | Barrel vues enregistrées |
 | `app/mail/savedSearchViewsHelpers.ts` | Sync brouillon recherche, nom suggéré, règle newsletter |
 | `app/mail/savedSearchListRun.ts` | Liste / refresh / marquer vue active vue |
-| `app/mail/savedSearchCrudRun.ts` | Enregistrer, appliquer, supprimer une vue |
+| `app/mail/savedSearchCrudRun.ts` | Barrel vues enregistrées (CRUD) |
+| `app/mail/savedSearchSaveRun.ts` | Enregistrer la vue courante |
+| `app/mail/savedSearchApplyViewRun.ts` | Appliquer une vue enregistrée |
+| `app/mail/savedSearchDeleteRun.ts` | Supprimer une vue |
 | `app/mail/savedSearchSuggestionsRun.ts` | Suggestions de vues (activité) |
 | `app/mail/searchLaunchQueries.ts` | Barrel lancements recherche |
 | `app/mail/searchLaunchContext.ts` | `registerSearchLaunchDeps` |
@@ -91,6 +94,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadActivityTracking.ts` | Activité fil / recherche (suggestions vues enregistrées) |
 | `app/mail/syncInboxAction.ts` | Facade `syncInbox()` |
 | `app/mail/syncInboxRun.ts` | Orchestration `syncInbox`, re-exports watch / push refresh |
+| `app/mail/syncInboxPrepareRun.ts` | Garde-fous + début/fin progression sync |
 | `app/mail/syncInboxStatusRun.ts` | Message statut sync, toasts fin, réindex sémantique |
 | `app/mail/syncInboxBatchRun.ts` | Barrel sync IMAP par lots |
 | `app/mail/syncInboxTargetsRun.ts` | Cibles dossiers `resolveImapSyncTargets` |
@@ -177,7 +181,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appAccountOrgWireRegistry.ts` | Compte, réglages, org/dossiers, nav + services digest/prefetch |
 | `app/mail/savedDraftOpenRun.ts` | Ouvrir un brouillon enregistré dans le composeur |
 | `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |
-| `app/mail/appBootRun.ts` | Séquence `boot()` (status, comptes, sync initiale, listeners) |
+| `app/mail/appBootRun.ts` | Facade `boot()` |
+| `app/mail/appBootRuntimeRun.ts` | Shell UI, status, capabilities, chemins |
+| `app/mail/appBootAccountsRun.ts` | Comptes + listener IMAP push + sync initiale |
+| `app/mail/appBootMailDataRun.ts` | Mailboxes, liste, brouillons, vues, règles NL |
+| `app/mail/appBootLlmDeferRun.ts` | Statut LLM au boot + prefetch différé |
 | `app/mail/appShellBindings.ts` | Barrel raccourcis clavier / souris / flush brouillon |
 | `app/mail/appShellInputGuards.ts` | Overlays bloquant navigation / raccourcis |
 | `app/mail/appShellKeyboardRun.ts` | Barrel `bindKeyboard` |
