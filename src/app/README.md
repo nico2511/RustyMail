@@ -35,7 +35,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailboxDigestContext.ts` | `initMailboxDigest`, feature flag, gen requêtes |
 | `app/mail/mailboxDigestScheduleRun.ts` | Debounce / idle refresh |
 | `app/mail/mailboxDigestPanelRun.ts` | Ouvrir / fermer panneau, éligibilité |
-| `app/mail/mailboxDigestFetchRun.ts` | `llm_inbox_digest`, bannières erreur |
+| `app/mail/mailboxDigestFetchRun.ts` | `llm_inbox_digest` (invoke + état) |
+| `app/mail/mailboxDigestBriefBannerRun.ts` | Bannières brief indisponible / erreur |
 | `app/mail/mailboxDigestRenderRun.ts` | Bouton toolbar Brief |
 | `app/mail/idleAiCachePrefetch.ts` | Barrel préchargement cache LLM au idle |
 | `app/mail/searchQueryContext.ts` | Payload recherche, `isSearchActive`, critères engagés, dossier effectif |
@@ -392,7 +393,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsApiKeysPersistRun.ts` | Re-export clés API (trousseau) |
 | `app/mail/settingsApiKeysPersistHelpersRun.ts` | Garde Tauri + refresh modale moteurs |
 | `app/mail/settingsApiKeysCloudRun.ts` | Clé cloud combinée OpenRouter + dictée |
-| `app/mail/settingsApiKeysIndividualRun.ts` | Clés OpenRouter, dictée, llama-server |
+| `app/mail/settingsApiKeysIndividualRun.ts` | Barrel clés OpenRouter, dictée, llama-server |
+| `app/mail/settingsApiKeysDictationRun.ts` | Persist / clear clé dictée |
+| `app/mail/settingsApiKeysOpenrouterRun.ts` | Persist / clear clé OpenRouter |
+| `app/mail/settingsApiKeysLlamaServerRun.ts` | Persist / clear clé llama-server |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
 | `app/mail/settingsOpenView.ts` | Ouverture vue Paramètres |
@@ -554,7 +558,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/accountServerDiscoveryFormRun.ts` | Action détection formulaire compte |
 | `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
 | `app/mail/accountOAuthDesktopConnectRun.ts` | Login OAuth Google / Microsoft (desktop) |
-| `app/mail/accountOAuthFinishRun.ts` | Post-login OAuth nouveau compte |
+| `app/mail/accountOAuthFinishRun.ts` | Orchestration post-login OAuth nouveau compte |
+| `app/mail/accountOAuthWizardPhaseRun.ts` | Phases UI assistant OAuth compte |
+| `app/mail/accountOAuthFinishReadyRun.ts` | Inbox, sync, fin wizard après save OAuth |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
