@@ -10,7 +10,7 @@ import { agentRefreshPlanFromDraft } from "../../mail/agentWireActions";
 import { enqueueMailboxDigestRefreshWhenIdle, mailboxDigestSlotInList } from "../../mail/mailboxDigest";
 import { state } from "../../state";
 import { render } from "../../dispatch";
-import { handleAction } from "./handleAction";
+import { handleAction } from "../../mail/handleActionRun";
 
 export function wireEventsDomContactsAgent(signal: AbortSignal): void {
   const actionHosts = document.querySelectorAll<HTMLElement>("[data-action]");
