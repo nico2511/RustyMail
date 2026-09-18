@@ -1,6 +1,6 @@
 // @ts-nocheck — DOM wiring; tighten types incrementally.
-import { isAtAutocompletePanelOpen } from "../../../atAutocomplete";
-import { isHashAutocompletePanelOpen } from "../../../hashAutocomplete";
+import { isAtAutocompletePanelOpen } from "../../atAutocomplete";
+import { isHashAutocompletePanelOpen } from "../../hashAutocomplete";
 import { commitSearchQuery } from "./searchCommitQuery";
 import { syncSearchBarChrome } from "./searchBarUi";
 import { refreshSearchTagCatalog } from "./searchTagCatalog";

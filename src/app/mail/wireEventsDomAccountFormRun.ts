@@ -4,7 +4,7 @@ import {
   applyDomainPresetIfSafe,
   serverFieldSelectors,
   serverSidesFromPreset,
-} from "../../../accountSetup";
+} from "../../accountSetup";
 import { setDiscoveredServersFormSnap } from "../account/discoveredServerSnap";
 import { switchActiveAccount } from "./settingsWireActions";
 import { state } from "../state";
