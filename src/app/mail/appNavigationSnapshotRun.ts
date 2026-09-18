@@ -1,5 +1,4 @@
 import {
-  getContactDetail,
   getContactsKeywordDraft,
   getContactsListQuery,
 } from "../../contactsView";
@@ -12,64 +11,14 @@ import {
   readListScrollY,
   type NavSnapshot,
 } from "../../navigation";
-import { threadMailboxListLabel } from "../../mailboxKinds";
 import { flushThreadActivityClosed } from "./threadActivityTracking";
 import type { NavigateOpts, View } from "../types";
 import { state } from "../state";
-import { navMailboxSegment } from "./navBreadcrumbSegments";
+import { navSnapshotLabelsForView } from "./appNavigationSnapshotLabelsRun";
 
 export function captureCurrentNav(): NavSnapshot {
   const view = state.view;
-  let backLabel = "Boîte de réception";
-  let breadcrumb: string[] = ["Boîte"];
-  switch (view) {
-    case "list":
-      backLabel = navMailboxSegment();
-      breadcrumb = [navMailboxSegment()];
-      break;
-    case "thread":
-      backLabel = navMailboxSegment();
-      breadcrumb = [navMailboxSegment()];
-      break;
-    case "contacts":
-      backLabel = "Carnet";
-      breadcrumb = ["Carnet"];
-      break;
-    case "contact": {
-      const name = getContactDetail()?.displayName?.trim() || state.selectedContactEmail || "Contact";
-      backLabel = "Contact";
-      breadcrumb = ["Carnet", name];
-      break;
-    }
-    case "settings":
-      backLabel = "Paramètres";
-      breadcrumb = ["Paramètres"];
-      break;
-    case "organization":
-      backLabel = "Organiser";
-      breadcrumb = ["Organiser"];
-      break;
-    case "organizationV2":
-      backLabel = "Organiser V2";
-      breadcrumb = ["Organiser V2"];
-      break;
-    case "folderManager": {
-      const mb = state.folderManager.selectedMailbox?.trim();
-      if (mb) {
-        const label = threadMailboxListLabel(mb).label;
-        backLabel = label;
-        breadcrumb = ["Dossiers", label];
-      } else {
-        backLabel = "Dossiers";
-        breadcrumb = ["Dossiers"];
-      }
-      break;
-    }
-    case "compose":
-      backLabel = state.selectedThread ? "Fil" : navMailboxSegment();
-      breadcrumb = state.selectedThread ? ["Fil", "Composer"] : [navMailboxSegment(), "Composer"];
-      break;
-  }
+  const { backLabel, breadcrumb } = navSnapshotLabelsForView(view);
   return {
     view,
     backLabel,

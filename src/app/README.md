@@ -66,7 +66,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/savedSearchSuggestionsRun.ts` | Suggestions de vues (activité) |
 | `app/mail/searchLaunchQueries.ts` | Barrel lancements recherche |
 | `app/mail/searchLaunchContext.ts` | `registerSearchLaunchDeps` |
-| `app/mail/searchLaunchPresetsRun.ts` | Tag, contact, domaine |
+| `app/mail/searchLaunchPresetsRun.ts` | Barrel lancements recherche preset |
+| `app/mail/searchLaunchTagPresetRun.ts` | Recherche depuis tag |
+| `app/mail/searchLaunchContactPresetRun.ts` | Recherche contact / domaine |
 | `app/mail/searchLaunchHashAutocompleteRun.ts` | Barrel hits `#` autocomplete |
 | `app/mail/searchLaunchHashHitStateRun.ts` | Appliquer hit → état recherche |
 | `app/mail/searchLaunchHashHitApplyRun.ts` | Appliquer hit → requête / toast inbox |
@@ -298,7 +300,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appNavigationStack.ts` | Barrel pile navigation |
 | `app/mail/appNavigationStackContext.ts` | `registerAppNavigationStackDeps` |
 | `app/mail/appNavigationSnapshotRun.ts` | `captureCurrentNav`, `beginNavigation` |
-| `app/mail/appNavigationApplyRun.ts` | Restauration snapshot (`applyNavSnapshot`) |
+| `app/mail/appNavigationApplyRun.ts` | Re-export `applyNavSnapshot` |
+| `app/mail/appNavigationApplyViewsRun.ts` | Restauration champs + switch vues nav |
 | `app/mail/appNavigationHistoryRun.ts` | `goBack`, `goForward`, inbox, fil d’Ariane |
 | `app/mail/accountRowNormalize.ts` | Normalisation ligne compte (`list_accounts`) |
 | `app/mail/accountsLoadFromBackend.ts` | Chargement comptes backend |
@@ -384,7 +387,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/folderManagerActions.ts` | Barrel vue Dossiers IMAP |
 | `app/mail/folderManagerContext.ts` | `registerFolderManagerRunDeps` |
 | `app/mail/folderManagerTreeRun.ts` | Arbre, sélection dossier, ouverture vue |
-| `app/mail/folderManagerCrudRun.ts` | Sync / créer / renommer / déplacer dossier |
+| `app/mail/folderManagerCrudRun.ts` | Barrel CRUD dossier (gestionnaire) |
+| `app/mail/folderManagerSyncRun.ts` | Sync dossier IMAP |
+| `app/mail/folderManagerMailboxCrudRun.ts` | Créer / renommer dossier |
+| `app/mail/folderManagerMoveRun.ts` | Déplacer dossier (reparent) |
 | `app/mail/folderManagerConfirmRun.ts` | Archiver / supprimer dossier (confirm) |
 | `app/mail/threadListActions.ts` | Barrel actions liste fils |
 | `app/mail/threadListActionsContext.ts` | Deps + `sourceMailboxForThread` |
