@@ -245,7 +245,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsAiDomWireRun.ts` | Listeners DOM prefs IA (features, modale, llama, arrière-plan) |
 | `app/mail/settingsAiRuntimeWireActionsRun.ts` | Wire réglages IA : statut LLM, mode moteur, setup recommandé |
 | `app/mail/settingsAiPrefetchWireActionsRun.ts` | Wire prefetch LLM / MiniLM / Whisper, réindex sémantique |
-| `app/mail/settingsAiDictationWireActionsRun.ts` | Wire test micro dictée |
+| `app/mail/settingsGeneralPrefsWireActionsRun.ts` | Wire prefs générales + compte par défaut |
+| `app/mail/settingsNavWireActionsRun.ts` | Wire navigation réglages (onglets, reload comptes) |
+| `app/mail/settingsAiModalShellWireActionsRun.ts` | Wire sous-modale IA (open/close/tabs) |
+| `app/mail/settingsShellWireActionsRun.ts` | Barrel wire shell réglages |
+| `app/mail/threadReplyWireActionsRun.ts` | Wire reply/forward/PJ/liens mail |
+| `app/mail/threadNavWireActionsRun.ts` | Wire navigation fil / sidebar |
+| `app/mail/addressBookSidebarWireActionsRun.ts` | Wire carnet d’adresses (sidebar réglages) |
 | `app/mail/contactsWireActionsRun.ts` | Actions wire contacts / vCard (depuis `handleActionContactsWireRun`) |
 | `app/mail/searchViewsWireActionsRun.ts` | Vues enregistrées, chips recherche, filtres liste (wire) |
 | `app/mail/listThreadWireActionsRun.ts` | Fil liste, déplacement, brouillons sauvés (wire) |
@@ -340,10 +346,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes — dispatch vers sous-handlers |
 | `wireEvents/handleActionModalsWireRun.ts` | Modales confirm / text prompt |
 | `wireEvents/handleActionComposeEntryWireRun.ts` | Action `compose` (nouveau brouillon) |
-| `wireEvents/handleActionSettingsShellWireRun.ts` | Barrel onglets réglages / modale IA / prefs générales |
-| `wireEvents/handleActionSettingsNavWireRun.ts` | Ouverture réglages, onglets, reload comptes |
-| `wireEvents/handleActionSettingsAiModalShellWireRun.ts` | Sous-modale IA (semantic, engines, …) |
-| `wireEvents/handleActionSettingsGeneralPrefsWireRun.ts` | Compte par défaut + prefs générales |
+| `wireEvents/handleActionSettingsShellWireRun.ts` | Re-export `settingsShellWireActionsRun` |
+| `wireEvents/handleActionSettingsNavWireRun.ts` | Re-export `settingsNavWireActionsRun` |
+| `wireEvents/handleActionSettingsAiModalShellWireRun.ts` | Re-export `settingsAiModalShellWireActionsRun` |
+| `wireEvents/handleActionSettingsGeneralPrefsWireRun.ts` | Re-export `settingsGeneralPrefsWireActionsRun` |
 | `wireEvents/handleActionSettingsAiWireRun.ts` | Barrel prefs IA (runtime + prefetch + dictée) |
 | `wireEvents/handleActionSettingsAiRuntimeWireRun.ts` | Re-export `settingsAiRuntimeWireActionsRun` |
 | `wireEvents/handleActionSettingsAiPrefetchWireRun.ts` | Re-export `settingsAiPrefetchWireActionsRun` |
