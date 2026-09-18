@@ -141,7 +141,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appBootRun.ts` | Séquence `boot()` (status, comptes, sync initiale, listeners) |
 | `app/mail/appShellBindings.ts` | Barrel raccourcis clavier / souris / flush brouillon |
 | `app/mail/appShellInputGuards.ts` | Overlays bloquant navigation / raccourcis |
-| `app/mail/appShellKeyboardRun.ts` | `bindKeyboard` |
+| `app/mail/appShellKeyboardRun.ts` | Barrel `bindKeyboard` |
+| `app/mail/appShellKeyboardChordsRun.ts` | Alt+1-9 vues, Ctrl+T recherche, Ctrl+F5 sync |
+| `app/mail/appShellKeyboardEscapeRun.ts` | Touche Échap (modales, retour, panneaux) |
+| `app/mail/appShellKeyboardPlainShortcutsRun.ts` | Raccourcis une touche (n, r, /, …) |
 | `app/mail/appShellMouseNavRun.ts` | Boutons souris retour / avant |
 | `app/mail/appShellDraftFlushRun.ts` | Flush révisions brouillon (visibility) |
 | `app/mail/mailEmailHtmlSanitize.ts` | DOMPurify + liens/images + `sanitizeEmailHtml()` |
@@ -261,7 +264,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchViewsWireActionsRun.ts` | Barrel vues enregistrées, chips, filtres liste |
 | `app/mail/searchViewsSavedWireActionsRun.ts` | Vues enregistrées, lot recherche, suggestions |
 | `app/mail/searchViewsClearFiltersWireActionsRun.ts` | Effacer chips recherche, portée, filtres liste / digest |
-| `app/mail/listThreadWireActionsRun.ts` | Fil liste, déplacement, brouillons sauvés (wire) |
+| `app/mail/listThreadWireActionsRun.ts` | Barrel fil liste / déplacement / brouillons |
+| `app/mail/listThreadMoveWireActionsRun.ts` | Corbeille, archive, lu/suivi, modale déplacer |
+| `app/mail/listThreadMailboxWireActionsRun.ts` | Modale gérer dossier IMAP |
+| `app/mail/listThreadSavedDraftWireActionsRun.ts` | Brouillons enregistrés liste |
+| `app/mail/listThreadQuickWireActionsRun.ts` | Copie suggestion quick reply |
 | `app/mail/threadLlmWireActionsRun.ts` | IA fil, QA, démo playground, réponses rapides (wire) |
 | `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
