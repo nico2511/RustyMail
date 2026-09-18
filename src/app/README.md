@@ -332,38 +332,38 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `aiPanelRender.ts` | Panneau Détails / brief dossier / agent IA |
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
-| `wireEvents/handleActionInboxSearch.ts` | Inbox / recherche — dispatch vers sous-handlers |
+| `wireEvents/handleActionInboxSearch.ts` | Re-export `inboxSearchWireDispatchRun` |
 | `wireEvents/handleActionContactsWireRun.ts` | Re-export `contactsWireActionsRun` |
 | `wireEvents/handleActionAgentAssistWireRun.ts` | Re-export `agentAssistWireActionsRun` |
 | `wireEvents/handleActionSearchViewsWireRun.ts` | Re-export `searchViewsWireActionsRun` |
 | `wireEvents/handleActionListThreadWireRun.ts` | Re-export `listThreadWireActionsRun` |
-| `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — dispatch vers sous-handlers |
+| `wireEvents/handleActionOrgFolder.ts` | Re-export `orgFolderWireDispatchRun` |
 | `wireEvents/handleActionOrgFolderNavRun.ts` | Re-export `orgFolderNavWireActionsRun` |
 | `wireEvents/handleActionFolderManagerRun.ts` | Re-export `folderManagerWireActionsRun` |
 | `wireEvents/handleActionOrgV2WireRun.ts` | Re-export `orgV2WireActionsRun` |
 | `wireEvents/handleActionOrgV1WireRun.ts` | Re-export `orgV1WireActionsRun` |
-| `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes — dispatch vers sous-handlers |
+| `wireEvents/handleActionComposeSettings.ts` | Re-export `composeSettingsWireDispatchRun` |
 | `wireEvents/handleActionModalsWireRun.ts` | Re-export `modalsWireActionsRun` |
 | `wireEvents/handleActionComposeEntryWireRun.ts` | Re-export `composeEntryWireActionsRun` |
 | `wireEvents/handleActionSettingsShellWireRun.ts` | Re-export `settingsShellWireActionsRun` |
 | `wireEvents/handleActionSettingsNavWireRun.ts` | Re-export `settingsNavWireActionsRun` |
 | `wireEvents/handleActionSettingsAiModalShellWireRun.ts` | Re-export `settingsAiModalShellWireActionsRun` |
 | `wireEvents/handleActionSettingsGeneralPrefsWireRun.ts` | Re-export `settingsGeneralPrefsWireActionsRun` |
-| `wireEvents/handleActionSettingsAiWireRun.ts` | Barrel prefs IA (runtime + prefetch + dictée) |
+| `wireEvents/handleActionSettingsAiWireRun.ts` | Re-export `settingsAiWireDispatchRun` |
 | `wireEvents/handleActionSettingsAiRuntimeWireRun.ts` | Re-export `settingsAiRuntimeWireActionsRun` |
 | `wireEvents/handleActionSettingsAiPrefetchWireRun.ts` | Re-export `settingsAiPrefetchWireActionsRun` |
 | `wireEvents/handleActionSettingsAiDictationWireRun.ts` | Re-export `settingsAiDictationWireActionsRun` |
-| `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Dispatch clés API → `settingsApiKeysPersistRun` |
+| `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Re-export `settingsApiKeysWireActionsRun` |
 | `wireEvents/handleActionSettingsLlamaBinaryWireRun.ts` | Re-export `settingsLlamaBinaryWireActionsRun` |
 | `wireEvents/handleActionNewsletterRulesWireRun.ts` | Re-export `newsletterRulesWireRun` |
 | `wireEvents/handleActionAccountSetupWireRun.ts` | Re-export `accountSetupWireActionsRun` |
-| `wireEvents/handleActionThreadCompose.ts` | Compose / fil — dispatch vers sous-handlers |
+| `wireEvents/handleActionThreadCompose.ts` | Re-export `threadComposeWireDispatchRun` |
 | `wireEvents/handleActionThreadNavWireRun.ts` | Re-export `threadNavWireActionsRun` |
-| `wireEvents/handleActionThreadViewWireRun.ts` | Barrel UI fil / réponses / sécurité |
+| `wireEvents/handleActionThreadViewWireRun.ts` | Re-export `threadViewWireDispatchRun` |
 | `wireEvents/handleActionThreadViewUiWireRun.ts` | Re-export `threadViewUiWireActionsRun` |
 | `wireEvents/handleActionThreadReplyWireRun.ts` | Re-export `threadReplyWireActionsRun` |
 | `wireEvents/handleActionThreadSecurityWireRun.ts` | Re-export `threadSecurityWireActionsRun` |
-| `wireEvents/handleActionComposeWireRun.ts` | Barrel compose (fermeture, historique, éditeur) |
+| `wireEvents/handleActionComposeWireRun.ts` | Re-export `composeWireDispatchRun` |
 | `wireEvents/handleActionComposeCloseWireRun.ts` | Re-export `composeCloseWireActionsRun` |
 | `wireEvents/handleActionComposeDraftHistoryWireRun.ts` | Re-export `composeDraftHistoryWireActionsRun` |
 | `wireEvents/handleActionComposeEditorWireRun.ts` | Re-export `composeEditorWireActionsRun` |
@@ -420,8 +420,8 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Déplacer les derniers dispatchers wire (`handleActionSettingsApiKeysWireRun`, barrels compose/thread) vers `app/mail/*`
-2. Fusionner `newsletterRulesWireActionsRun` / `newsletterRulesWireRun` si redondant
-3. Poursuivre découpage render si de nouveaux god-modules apparaissent
+1. Optionnel : supprimer les fichiers `handleAction*` wire (re-exports) au profit d’imports directs depuis `handleActionRun`
+2. Poursuivre découpage render / registries si de nouveaux god-modules apparaissent
+3. Documenter table modules après stabilisation PR
 
 `npm run verify:ts` · `npm test`
