@@ -244,6 +244,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/contactsWireActionsRun.ts` | Actions wire contacts / vCard (depuis `handleActionContactsWireRun`) |
 | `app/mail/searchViewsWireActionsRun.ts` | Vues enregistrées, chips recherche, filtres liste (wire) |
 | `app/mail/listThreadWireActionsRun.ts` | Fil liste, déplacement, brouillons sauvés (wire) |
+| `app/mail/threadLlmWireActionsRun.ts` | IA fil, QA, démo playground, réponses rapides (wire) |
 | `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
@@ -356,7 +357,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionComposeCloseWireRun.ts` | Fermer / sauver brouillon, orphelins |
 | `wireEvents/handleActionComposeDraftHistoryWireRun.ts` | Versions brouillon, diff, restauration |
 | `wireEvents/handleActionComposeEditorWireRun.ts` | Layout, envoi, PJ, rewrite IA |
-| `wireEvents/handleActionThreadLlmWireRun.ts` | IA fil, QA, démo, réponses rapides |
+| `wireEvents/handleActionThreadLlmWireRun.ts` | Re-export `threadLlmWireActionsRun` |
 | `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
 | `wireEvents/handleActionAddressBookSidebarWireRun.ts` | Carnet (sidebar réglages) |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
@@ -392,7 +393,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 ## Prochaines extractions (ordre suggéré)
 
 1. Affiner encore les imports wire si de nouveaux handlers grossissent
-2. Déplacer `handleActionThreadLlmWireRun` et autres handlers wire restants vers `app/mail/*`
+2. Déplacer org v1/v2 wire et handlers settings IA restants vers `app/mail/*`
 3. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
