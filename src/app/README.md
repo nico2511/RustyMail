@@ -268,9 +268,6 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
 | `app/core/accountContext.ts` | `currentAccount()` |
 | `app/lib/threadIdsMatch.ts` | Comparaison d’identifiants fil |
-| `app/mail/idleAiCachePrefetchContext.ts` | `initIdleAiCachePrefetch`, gen / abort |
-| `app/mail/idleAiCachePrefetchScheduleRun.ts` | Planification debounce / idle |
-| `app/mail/idleAiCachePrefetchPassRun.ts` | Pass synthèse / traduction prefetch |
 
 ### Rendu UI (`app/ui/render/`)
 
