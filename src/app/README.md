@@ -37,7 +37,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailboxDigestPanelRun.ts` | Ouvrir / fermer panneau, éligibilité |
 | `app/mail/mailboxDigestFetchRun.ts` | `llm_inbox_digest`, bannières erreur |
 | `app/mail/mailboxDigestRenderRun.ts` | Bouton toolbar Brief |
-| `app/mail/idleAiCachePrefetch.ts` | Préchargement cache LLM au idle |
+| `app/mail/idleAiCachePrefetch.ts` | Barrel préchargement cache LLM au idle |
 | `app/mail/searchQueryContext.ts` | Payload recherche, `isSearchActive`, critères engagés, dossier effectif |
 | `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` |
 | `app/mail/fetchOpenThread.ts` | `fetchOpenThreadOrNotify()` |
@@ -142,7 +142,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appShellMouseNavRun.ts` | Boutons souris retour / avant |
 | `app/mail/appShellDraftFlushRun.ts` | Flush révisions brouillon (visibility) |
 | `app/mail/mailEmailHtmlSanitize.ts` | DOMPurify + liens/images + `sanitizeEmailHtml()` |
-| `app/mail/mailHtmlShadowHydrate.ts` | Shadow DOM message HTML + lightbox CID |
+| `app/mail/idleAiCachePrefetchContext.ts` | `initIdleAiCachePrefetch`, gen / abort |
+| `app/mail/idleAiCachePrefetchScheduleRun.ts` | Planification debounce / idle |
+| `app/mail/idleAiCachePrefetchPassRun.ts` | Pass synthèse / traduction prefetch |
+| `app/mail/mailHtmlShadowHydrate.ts` | Barrel shadow DOM message HTML |
+| `app/mail/mailHtmlImageLightboxRun.ts` | Lightbox, résolution `cid:` |
+| `app/mail/mailHtmlShadowInnerRun.ts` | Styles + inner HTML shadow |
+| `app/mail/mailHtmlShadowHydrateRun.ts` | Hydratation DOM + clics shadow |
 | `app/mail/threadMessageSort.ts` | Tri messages fil, dates (`parseMaybeDate`, `dayKey`) |
 | `app/mail/threadLangGuessSamples.ts` | Échantillon texte + `normalizeIso639Primary` |
 | `app/mail/threadLangGuess.ts` | Barrel heuristiques langue + offres traduction |
@@ -262,7 +268,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailboxSidebarStats.ts` | Compteurs non lus sidebar |
 | `app/core/accountContext.ts` | `currentAccount()` |
 | `app/lib/threadIdsMatch.ts` | Comparaison d’identifiants fil |
-| `app/mail/idleAiCachePrefetch.ts` | Préchargement cache LLM au idle |
+| `app/mail/idleAiCachePrefetchContext.ts` | `initIdleAiCachePrefetch`, gen / abort |
+| `app/mail/idleAiCachePrefetchScheduleRun.ts` | Planification debounce / idle |
+| `app/mail/idleAiCachePrefetchPassRun.ts` | Pass synthèse / traduction prefetch |
 
 ### Rendu UI (`app/ui/render/`)
 
@@ -314,7 +322,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`mailHtmlShadowHydrate`, `idleAiCachePrefetch`, …)
+1. Découper d’autres modules mail > ~350 lignes (`threadViewUiHelpers`, `settingsLlmRuntime`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
