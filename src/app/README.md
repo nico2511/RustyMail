@@ -334,12 +334,12 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents.ts` | Re-export `wireEvents` + `handleAction` depuis `app/mail` |
 | `app/mail/wireEventsDomOrchestratorRun.ts` | Orchestration DOM (abort compose, modules `wireEventsDom*`) |
 | `app/mail/handleActionRun.ts` | Point d’entrée actions UI (`data-action`) |
-| `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
-| `wireEvents/depsContext.ts` | Mutateurs contexte (capture compte, édition carnet) |
-| `wireEvents/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` (IDs checkbox immédiats via context) |
-| `wireEvents/wireEventsDomContactsAgentRun.ts` | Contacts scroll/recherche, `[data-action]` → `handleActionRun`, agent / digest |
-| `wireEvents/wireEventsDomInboxThreadRun.ts` | Liste fil, PJ, org inline, modales org confirm |
-| `wireEvents/wireEventsDomComposeSearchAccountRun.ts` | Compose, recherche, compte, setup serveur |
+| `app/mail/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
+| `app/mail/wireEventsDepsContext.ts` | Mutateurs contexte wire (capture compte, édition carnet) |
+| `app/mail/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` |
+| `app/mail/wireEventsDomContactsAgentRun.ts` | Contacts, `[data-action]` → `handleActionRun`, agent / digest |
+| `app/mail/wireEventsDomInboxThreadRun.ts` | Liste fil, PJ, org inline, modales org confirm |
+| `app/mail/wireEventsDomComposeSearchAccountRun.ts` | Compose, recherche, compte, setup serveur |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeWireActionsRun.ts` | Fermeture compose wire, restauration révision, grammaire |
 | `app/mail/composeCloseWireActionsRun.ts` | Wire fermeture compose / brouillons orphelins |
@@ -382,8 +382,8 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Déplacer `wireEventsDom*` sous `app/mail/` (derniers fichiers UI wire avec logique)
+1. Consolider doc README (doublons table modules) après merge PR #1
 2. Poursuivre découpage render / registries si de nouveaux god-modules apparaissent
-3. Stabiliser doc module table post-merge PR #1
+3. `@ts-nocheck` DOM wire : typer progressivement `wireEventsDom*`
 
 `npm run verify:ts` · `npm test`

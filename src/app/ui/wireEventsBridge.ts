@@ -3,4 +3,4 @@ export {
   registerWireEventsContext,
   wireEventsContext,
   type WireEventsContext,
-} from "./wireEvents/wireEventsContext";
+} from "../mail/wireEventsContext";
