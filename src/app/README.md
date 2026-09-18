@@ -334,7 +334,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionListThreadWireRun.ts` | Re-export `listThreadWireActionsRun` |
 | `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — dispatch vers sous-handlers |
 | `wireEvents/handleActionOrgFolderNavRun.ts` | Ouverture vues org / contacts / FM |
-| `wireEvents/handleActionFolderManagerRun.ts` | Actions gestionnaire dossiers (`fm-*`) |
+| `wireEvents/handleActionFolderManagerRun.ts` | Re-export `folderManagerWireActionsRun` |
 | `wireEvents/handleActionOrgV2WireRun.ts` | Re-export `orgV2WireActionsRun` |
 | `wireEvents/handleActionOrgV1WireRun.ts` | Re-export `orgV1WireActionsRun` |
 | `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes — dispatch vers sous-handlers |
@@ -355,13 +355,13 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionThreadCompose.ts` | Compose / fil — dispatch vers sous-handlers |
 | `wireEvents/handleActionThreadNavWireRun.ts` | Navigation fil / sidebar / brouillons sauvés |
 | `wireEvents/handleActionThreadViewWireRun.ts` | Barrel UI fil / réponses / sécurité |
-| `wireEvents/handleActionThreadViewUiWireRun.ts` | Panneau IA, citations, tags, digest |
+| `wireEvents/handleActionThreadViewUiWireRun.ts` | Re-export `threadViewUiWireActionsRun` |
 | `wireEvents/handleActionThreadReplyWireRun.ts` | Reply, forward, PJ, liens mail |
 | `wireEvents/handleActionThreadSecurityWireRun.ts` | Actions sécurité → `threadSecurityActionsRun` |
 | `wireEvents/handleActionComposeWireRun.ts` | Barrel compose (fermeture, historique, éditeur) |
 | `wireEvents/handleActionComposeCloseWireRun.ts` | Fermer / sauver brouillon, orphelins |
 | `wireEvents/handleActionComposeDraftHistoryWireRun.ts` | Versions brouillon, diff, restauration |
-| `wireEvents/handleActionComposeEditorWireRun.ts` | Layout, envoi, PJ, rewrite IA |
+| `wireEvents/handleActionComposeEditorWireRun.ts` | Re-export `composeEditorWireActionsRun` |
 | `wireEvents/handleActionThreadLlmWireRun.ts` | Re-export `threadLlmWireActionsRun` |
 | `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
 | `wireEvents/handleActionAddressBookSidebarWireRun.ts` | Carnet (sidebar réglages) |
@@ -372,6 +372,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/wireEventsDomComposeSearchAccountRun.ts` | Compose, recherche, compte, setup serveur |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeWireActionsRun.ts` | Fermeture compose wire, restauration révision, grammaire |
+| `app/mail/composeEditorWireActionsRun.ts` | Wire éditeur compose (layout, envoi, PJ, rewrite IA) |
+| `app/mail/threadViewUiWireActionsRun.ts` | Wire UI fil (panneau IA, citations, tags, digest) |
+| `app/mail/folderManagerWireActionsRun.ts` | Wire gestionnaire dossiers (`fm-*`) |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
@@ -398,7 +401,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 ## Prochaines extractions (ordre suggéré)
 
 1. Affiner encore les imports wire si de nouveaux handlers grossissent
-2. Déplacer handlers wire restants (compose editor, thread view UI, folder manager) vers `app/mail/*`
+2. Extraire handlers wire restants (thread reply/nav, settings shell, address book) vers `app/mail/*`
 3. Affiner imports `deps*` si des barrels grossissent encore
 
 `npm run verify:ts` · `npm test`
