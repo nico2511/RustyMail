@@ -1,27 +1,18 @@
-import {
-  render,
-  state,
-  toast,
-  invoke,
-  isTauriRuntime,
-  OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
-  withTimeout,
-  tauriErrorMessage,
-  setSkipAccountIdentityCaptureOnce,
-} from "./depsCore";
-import type {
-  OAuthDesktopLoginOutcome,
-} from "./depsCore";
+import { render, state } from "./depsCore";
 import {
   accountFieldTouched,
-  clearDiscoveredServerSnap,
-  resetNewAccountSetupState,
   clearAccountOAuthWizard,
-  discoverMailServersAction,
-  warnOAuthEphemeralRedirect,
-  finishOAuthNewAccountAfterLogin,
+  clearDiscoveredServerSnap,
   deleteSettingsAccount,
+  discoverMailServersAction,
+  finishOAuthNewAccountAfterLogin,
+  resetNewAccountSetupState,
 } from "./depsSettingsAccount";
+import {
+  connectOAuthGoogleDesktop,
+  connectOAuthMicrosoftDesktop,
+} from "../../mail/accountOAuthDesktopConnectRun";
+import { setSkipAccountIdentityCaptureOnce } from "./depsContext";
 
 export async function tryHandleAccountSetupWire(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -54,56 +45,12 @@ export async function tryHandleAccountSetupWire(action: string, element?: HTMLEl
       state.accountServersPanelOpen = !state.accountServersPanelOpen;
       render();
       return true;
-    case "oauth-google-connect": {
-      void (async () => {
-        if (!isTauriRuntime()) {
-          toast("OAuth2 : lancez l’application bureau Tauri.");
-          return;
-        }
-        try {
-          const o = await withTimeout(
-            invoke<OAuthDesktopLoginOutcome>("oauth_google_desktop_login_cmd", {}),
-            OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
-          );
-          warnOAuthEphemeralRedirect(o);
-          const email = (o.email ?? "").trim();
-          if (!email.includes("@")) {
-            toast("OAuth Google : adresse e-mail absente ou invalide.");
-            return;
-          }
-          setSkipAccountIdentityCaptureOnce(true);
-          await finishOAuthNewAccountAfterLogin("oauthGoogle", email, (o.displayName ?? "").trim());
-        } catch (e) {
-          toast(tauriErrorMessage(e));
-        }
-      })();
+    case "oauth-google-connect":
+      void connectOAuthGoogleDesktop();
       return true;
-    }
-    case "oauth-microsoft-connect": {
-      void (async () => {
-        if (!isTauriRuntime()) {
-          toast("OAuth2 : lancez l’application bureau Tauri.");
-          return;
-        }
-        try {
-          const o = await withTimeout(
-            invoke<OAuthDesktopLoginOutcome>("oauth_microsoft_desktop_login_cmd", {}),
-            OAUTH_DESKTOP_LOGIN_TIMEOUT_MS,
-          );
-          warnOAuthEphemeralRedirect(o);
-          const email = (o.email ?? "").trim();
-          if (!email.includes("@")) {
-            toast("OAuth Microsoft : adresse e-mail absente ou invalide.");
-            return;
-          }
-          setSkipAccountIdentityCaptureOnce(true);
-          await finishOAuthNewAccountAfterLogin("oauthMicrosoft", email, (o.displayName ?? "").trim());
-        } catch (e) {
-          toast(tauriErrorMessage(e));
-        }
-      })();
+    case "oauth-microsoft-connect":
+      void connectOAuthMicrosoftDesktop();
       return true;
-    }
     case "account-auth-password-mode":
       clearAccountOAuthWizard();
       state.accountPasswordSetupExpanded = true;

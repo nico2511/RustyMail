@@ -184,6 +184,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeDraftLocalSave.ts` | Révisions, upsert Sauvés, orphelins au boot |
 | `app/mail/composeLayoutState.ts` | `syncPreviewOpenFromComposeLayout` |
 | `app/mail/newsletterRulesWireRun.ts` | Actions wire add/remove règles newsletter |
+| `app/mail/newsletterRulesMatch.ts` | Correspondance expéditeur ↔ règle newsletter |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
 | `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |
 | `app/mail/composeOrphanDraftSession.ts` | Reprise / rejet brouillons orphelins |
@@ -336,7 +337,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionAccountSetupWireRun.ts` | Comptes, OAuth, suppression |
 | `wireEvents/handleActionThreadCompose.ts` | Compose / fil — dispatch vers sous-handlers |
 | `wireEvents/handleActionThreadNavWireRun.ts` | Navigation fil / sidebar / brouillons sauvés |
-| `wireEvents/handleActionThreadViewWireRun.ts` | UI fil, réponses, sécurité, pièces jointes |
+| `wireEvents/handleActionThreadViewWireRun.ts` | Barrel UI fil / réponses / sécurité |
+| `wireEvents/handleActionThreadViewUiWireRun.ts` | Panneau IA, citations, tags, digest |
+| `wireEvents/handleActionThreadReplyWireRun.ts` | Reply, forward, PJ, liens mail |
+| `wireEvents/handleActionThreadSecurityWireRun.ts` | Actions sécurité → `threadSecurityActionsRun` |
 | `wireEvents/handleActionComposeWireRun.ts` | Fermeture compose, brouillon, envoi, PJ |
 | `wireEvents/handleActionThreadLlmWireRun.ts` | IA fil, QA, démo, réponses rapides |
 | `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
@@ -350,7 +354,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/accountSaveRun.ts` | `saveAccount`, `saveAccountProgrammatic` |
 | `app/mail/accountDeleteRun.ts` | `deleteSettingsAccount` |
 | `app/mail/accountServerDiscoveryRun.ts` | Détection IMAP/SMTP (formulaire + OAuth snap) |
+| `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
+| `app/mail/accountOAuthDesktopConnectRun.ts` | Login OAuth Google / Microsoft (desktop) |
 | `app/mail/accountOAuthFinishRun.ts` | Post-login OAuth nouveau compte |
+| `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
 | `wireEvents/depsCore.ts` | invoke, toast, state, render, loaders, nav, modales — réexporte `depsContext` |
 | `wireEvents/depsSearchMail.ts` | inbox, recherche, agent, carnet, entrée compose |
 | `wireEvents/depsComposeThread.ts` | compose, fil, LLM compose |
