@@ -254,8 +254,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadReplyWireActionsRun.ts` | Wire reply/forward/PJ/liens mail |
 | `app/mail/threadNavWireActionsRun.ts` | Wire navigation fil / sidebar |
 | `app/mail/addressBookSidebarWireActionsRun.ts` | Wire carnet d’adresses (sidebar réglages) |
-| `app/mail/contactsWireActionsRun.ts` | Actions wire contacts / vCard |
-| `app/mail/searchViewsWireActionsRun.ts` | Vues enregistrées, chips recherche, filtres liste (wire) |
+| `app/mail/contactsWireActionsRun.ts` | Barrel actions wire contacts / vCard |
+| `app/mail/contactsWireActionsListRun.ts` | Navigation liste contacts, refresh, ouverture fil |
+| `app/mail/contactsWireActionsDetailRun.ts` | Compose, favori, profil IA, recherches contact |
+| `app/mail/contactsWireActionsAddressBookRun.ts` | Import / export vCard carnet |
+| `app/mail/searchViewsWireActionsRun.ts` | Barrel vues enregistrées, chips, filtres liste |
+| `app/mail/searchViewsSavedWireActionsRun.ts` | Vues enregistrées, lot recherche, suggestions |
+| `app/mail/searchViewsClearFiltersWireActionsRun.ts` | Effacer chips recherche, portée, filtres liste / digest |
 | `app/mail/listThreadWireActionsRun.ts` | Fil liste, déplacement, brouillons sauvés (wire) |
 | `app/mail/threadLlmWireActionsRun.ts` | IA fil, QA, démo playground, réponses rapides (wire) |
 | `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
@@ -339,7 +344,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `app/mail/wireEventsDepsContext.ts` | Mutateurs contexte wire (capture compte, édition carnet) |
 | `app/mail/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` |
-| `app/mail/wireEventsDomContactsAgentRun.ts` | Contacts, `[data-action]` → `handleActionRun`, agent / digest |
+| `app/mail/wireEventsDomContactsAgentRun.ts` | Barrel contacts + dispatch `[data-action]` |
+| `app/mail/wireEventsDomContactsListRun.ts` | Recherche / scroll infini liste contacts |
+| `app/mail/wireEventsDomDataActionDispatchRun.ts` | Clic `data-action`, agent assist, brief dossier |
 | `app/mail/wireEventsDomInboxThreadRun.ts` | Barrel inbox/fil (liste, org, PJ, ton) |
 | `app/mail/wireEventsDomInboxListRun.ts` | Navigation liste, moves, sélecteur déplacement |
 | `app/mail/wireEventsDomOrgMailboxRun.ts` | Actions org inline + checkboxes modales confirm |
