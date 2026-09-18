@@ -3,7 +3,7 @@ import { OAUTH_DESKTOP_LOGIN_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
-import { setSkipAccountIdentityCaptureOnce } from "../ui/wireEvents/depsContext";
+import { setSkipAccountIdentityCaptureOnce } from "./wireEventsDepsContext";
 import type { OAuthDesktopLoginOutcome } from "../types";
 import { finishOAuthNewAccountAfterLogin } from "./accountSettingsRun";
 import { warnOAuthEphemeralRedirect } from "./oauthEphemeralRedirectWarn";

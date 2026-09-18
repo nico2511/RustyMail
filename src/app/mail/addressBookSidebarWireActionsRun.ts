@@ -4,7 +4,7 @@ import { render } from "../dispatch";
 import { toast } from "../lib/toast";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage } from "../lib/tauriCommand";
-import { addressBookRowsCache, setAddressBookEditEmail } from "../ui/wireEvents/depsContext";
+import { addressBookRowsCache, setAddressBookEditEmail } from "./wireEventsDepsContext";
 import { loadAddressBookSidebarCount, refreshAddressBookList } from "./addressBookWireActions";
 
 export async function tryHandleAddressBookSidebarWire(action: string, element?: HTMLElement): Promise<boolean> {

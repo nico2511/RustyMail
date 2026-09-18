@@ -3,7 +3,7 @@ import { clearAccountOAuthWizard, resetNewAccountSetupState } from "../account/a
 import { clearDiscoveredServerSnap } from "../account/discoveredServerSnap";
 import { render } from "../dispatch";
 import { state } from "../state";
-import { setSkipAccountIdentityCaptureOnce } from "../ui/wireEvents/depsContext";
+import { setSkipAccountIdentityCaptureOnce } from "./wireEventsDepsContext";
 import { connectOAuthGoogleDesktop, connectOAuthMicrosoftDesktop } from "./accountOAuthDesktopConnectRun";
 import { deleteSettingsAccount, discoverMailServersAction, finishOAuthNewAccountAfterLogin } from "./accountSettingsRun";
 
