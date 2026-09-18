@@ -239,6 +239,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsLlmRuntimeStatusRun.ts` | `refreshLlmRuntimeStatus`, cache GGUF |
 | `app/mail/settingsLlmRuntimeLlamaDetectRun.ts` | Détection binaire `llama-server` |
 | `app/mail/settingsGeneralPrefsPersistRun.ts` | Persistance prefs générales depuis le DOM |
+| `app/mail/settingsAiModalShellRun.ts` | Ouverture / fermeture modale IA réglages |
 | `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
@@ -355,6 +356,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
 | `wireEvents/handleActionAddressBookSidebarWireRun.ts` | Carnet (sidebar réglages) |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
+| `wireEvents/wireEventsDomSettingsAiRun.ts` | Listeners DOM prefs IA (modale, llama, arrière-plan) |
+| `wireEvents/wireEventsDomContactsAgentRun.ts` | Contacts scroll/recherche, `[data-action]`, agent / digest mode |
+| `wireEvents/wireEventsDomInboxThreadRun.ts` | Liste fil, PJ, org inline, modales org confirm |
+| `wireEvents/wireEventsDomComposeSearchAccountRun.ts` | Compose, recherche, compte, setup serveur |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeWireActionsRun.ts` | Fermeture compose wire, restauration révision, grammaire |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
@@ -383,6 +388,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 ## Prochaines extractions (ordre suggéré)
 
 1. Affiner encore les imports wire si de nouveaux handlers grossissent
-2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
+2. Extraire d’autres blocs DOM si `wireEventsDom*` grossissent (p.ex. prefs IA → mail)
+3. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
