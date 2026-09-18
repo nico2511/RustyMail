@@ -266,7 +266,12 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeDraftRevisionDiffRun.ts` | `computeDraftDiffAgainstRevision` |
 | `app/mail/composeOrphanDraftSession.ts` | Reprise / rejet brouillons orphelins |
 | `app/mail/composePickAttachments.ts` | Picker pièces jointes Tauri |
-| `app/mail/composeCloseFlow.ts` | Fermeture compositeur, discard, `clearDraftSession` |
+| `app/mail/composeCloseFlow.ts` | Barrel fermeture compositeur |
+| `app/mail/composeCloseFlowContext.ts` | `registerComposeCloseFlowDeps` |
+| `app/mail/composeCloseDraftClearRun.ts` | `clearDraftSession` |
+| `app/mail/composeCloseNavigateRun.ts` | `leaveComposeViewAfterClose` |
+| `app/mail/composeCloseDiscardRun.ts` | `discardCurrentDraftSession` |
+| `app/mail/composeCloseFinalizeRun.ts` | `finalizeCloseComposeFromUser` |
 | `app/mail/composeAttachmentsAction.ts` | Retrait PJ compositeur |
 | `app/mail/cycleComposeLayout.ts` | Cycle split / write / preview / historique |
 | `app/mail/llmQueueCancel.ts` | Annulation file jobs LLM |
@@ -321,7 +326,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsGeneralPrefsPersistRun.ts` | Persistance prefs générales depuis le DOM |
 | `app/mail/settingsAiModalShellRun.ts` | Ouverture / fermeture modale IA réglages |
 | `app/mail/settingsAiDomWireRun.ts` | Barrel listeners DOM prefs IA |
-| `app/mail/settingsAiDomWireModalRun.ts` | Modale réglages IA (change/input debounced) |
+| `app/mail/settingsAiDomWireModalRun.ts` | Barrel listeners modale réglages IA |
+| `app/mail/settingsAiDomWireModalChangeRun.ts` | Change/input debounced modale IA |
+| `app/mail/settingsAiDomWireModalHandlersRun.ts` | Handlers select moteur / preset modale IA |
 | `app/mail/settingsAiDomWireEnginesRun.ts` | llama-server + prefs arrière-plan immédiates |
 | `app/mail/settingsAiDomWirePersistRun.ts` | `persistAiPrefsImmediateFromDom` |
 | `app/mail/settingsAiRuntimeWireActionsRun.ts` | Wire réglages IA : statut LLM, mode moteur, setup recommandé |
@@ -340,7 +347,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/addressBookSidebarWireActionsRun.ts` | Wire carnet d’adresses (sidebar réglages) |
 | `app/mail/contactsWireActionsRun.ts` | Barrel actions wire contacts / vCard |
 | `app/mail/contactsWireActionsListRun.ts` | Navigation liste contacts, refresh, ouverture fil |
-| `app/mail/contactsWireActionsDetailRun.ts` | Compose, favori, profil IA, recherches contact |
+| `app/mail/contactsWireActionsDetailRun.ts` | Dispatch wire fiche contact |
+| `app/mail/contactsDetailComposeWireRun.ts` | Compose depuis fiche contact |
+| `app/mail/contactsDetailProfileWireRun.ts` | Favori, profil IA, recherche domaine |
+| `app/mail/contactsDetailSearchWireRun.ts` | Recherches depuis fiche contact |
 | `app/mail/contactsWireActionsAddressBookRun.ts` | Import / export vCard carnet |
 | `app/mail/searchViewsWireActionsRun.ts` | Barrel vues enregistrées, chips, filtres liste |
 | `app/mail/searchViewsSavedWireActionsRun.ts` | Vues enregistrées, lot recherche, suggestions |
@@ -348,7 +358,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchViewsClearFiltersWireRun.ts` | Effacer chips recherche, portée, NL |
 | `app/mail/searchViewsListWireRun.ts` | Filtres liste, load-more, digest dossier |
 | `app/mail/listThreadWireActionsRun.ts` | Barrel fil liste / déplacement / brouillons |
-| `app/mail/listThreadMoveWireActionsRun.ts` | Corbeille, archive, lu/suivi, modale déplacer |
+| `app/mail/listThreadMoveWireActionsRun.ts` | Barrel déplacement / meta liste fil |
+| `app/mail/listThreadMoveActionsWireRun.ts` | Corbeille, archive, lu/suivi, modale déplacer |
+| `app/mail/listThreadMetaWireRun.ts` | Retag org, lu/non-lu, suivi fil (liste) |
 | `app/mail/listThreadMailboxWireActionsRun.ts` | Modale gérer dossier IMAP |
 | `app/mail/listThreadSavedDraftWireActionsRun.ts` | Brouillons enregistrés liste |
 | `app/mail/listThreadQuickWireActionsRun.ts` | Copie suggestion quick reply |
@@ -383,7 +395,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/orgRefreshMailboxesAfterImap.ts` | Rafraîchir `state.mailboxes` après changement IMAP |
 | `app/mail/orgOrganizationReportRefresh.ts` | Rescan rapports Organiser v1/v2 |
 | `app/mail/orgOrganizationOpenViews.ts` | Ouverture vues Organiser v1/v2 |
-| `app/mail/orgApplyRun.ts` | Appliquer propositions org v1 + `registerOrgApplyRunDeps()` |
+| `app/mail/orgApplyRun.ts` | Barrel apply org v1 |
+| `app/mail/orgApplyRunContext.ts` | `registerOrgApplyRunDeps()` |
+| `app/mail/orgApplyConfirmRun.ts` | Confirm + preview apply org v1 |
+| `app/mail/orgApplyExecuteRun.ts` | Exécution apply org v1 |
 | `app/mail/orgV2ApplyRun.ts` | Barrel apply org v2 |
 | `app/mail/orgV2ApplyContext.ts` | `registerOrgV2ApplyRunDeps()` |
 | `app/mail/orgV2ApplyBatchRun.ts` | Orchestration apply org v2 |
@@ -491,8 +506,14 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/settingsAiWireDispatchRun.ts` | Dispatch prefs IA runtime / prefetch / dictée |
 | `app/mail/settingsApiKeysWireActionsRun.ts` | Wire clés API (persist / clear) |
 | `app/mail/composeEditorWireActionsRun.ts` | Wire éditeur compose (layout, envoi, PJ, rewrite IA) |
-| `app/mail/threadViewUiWireActionsRun.ts` | Wire UI fil (panneau IA, citations, tags, digest) |
-| `app/mail/folderManagerWireActionsRun.ts` | Wire gestionnaire dossiers (`fm-*`) |
+| `app/mail/threadViewUiWireActionsRun.ts` | Barrel wire UI fil |
+| `app/mail/threadViewUiAiWireRun.ts` | Panneau IA, quick reply, digest |
+| `app/mail/threadViewUiModalsWireRun.ts` | Citations, tags, image, mode message |
+| `app/mail/folderManagerWireActionsRun.ts` | Dispatch wire gestionnaire (`fm-*`) |
+| `app/mail/folderManagerWireCrudRun.ts` | Wire CRUD / sync dossier |
+| `app/mail/folderManagerWireArchiveRun.ts` | Wire archivage dossier |
+| `app/mail/folderManagerWireDeleteRun.ts` | Wire suppression dossier |
+| `app/mail/folderManagerWireTreeRun.ts` | Wire arbre (verrou, nœuds, inbox) |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
@@ -503,7 +524,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/accountSaveFormPersistRun.ts` | Invoke save + reload mailboxes |
 | `app/mail/accountSaveProgrammaticRun.ts` | Enregistrement programmatique (OAuth finish) |
 | `app/mail/accountDeleteRun.ts` | `deleteSettingsAccount` |
-| `app/mail/accountServerDiscoveryRun.ts` | Détection IMAP/SMTP (formulaire + OAuth snap) |
+| `app/mail/accountServerDiscoveryRun.ts` | Barrel détection IMAP/SMTP |
+| `app/mail/accountServerDiscoverySnapRun.ts` | Snap serveurs (OAuth / preset) |
+| `app/mail/accountServerDiscoveryFormRun.ts` | Action détection formulaire compte |
 | `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
 | `app/mail/accountOAuthDesktopConnectRun.ts` | Login OAuth Google / Microsoft (desktop) |
 | `app/mail/accountOAuthFinishRun.ts` | Post-login OAuth nouveau compte |
