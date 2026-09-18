@@ -68,7 +68,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchViewContext.ts` | Critères vue enregistrée / contexte recherche inbox + `registerSearchViewContextDeps()` |
 | `app/mail/searchViewBatch.ts` | Barrel actions lot recherche / vue enregistrée |
 | `app/mail/searchViewBatchContext.ts` | Job batch + `registerSearchViewBatchDeps` |
-| `app/mail/searchViewBulkActionsRun.ts` | Marquer lus / archiver (lot) |
+| `app/mail/searchViewBulkActionsRun.ts` | Re-export lot recherche / vue |
+| `app/mail/searchViewBulkMarkReadRun.ts` | Marquer lus (lot) |
+| `app/mail/searchViewBulkArchiveRun.ts` | Archiver (lot) |
 | `app/mail/searchFluxAffinerRun.ts` | Affiner le flux (LLM + dossier IMAP) |
 | `app/lib/tagFamilyForInvoke.ts` | Normalisation famille tag pour invoke Rust |
 | `app/mail/bulkTrashList.ts` | Corbeille lot (liste visible) + `registerBulkTrashListDeps()` |
@@ -232,7 +234,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeMicDictationContext.ts` | État module enregistreur / PTT |
 | `app/mail/composeMicDictationApplyRun.ts` | Cible compose vs thread-QA, injection texte |
 | `app/mail/composeMicDictationPttRun.ts` | `bindMicPushToTalk` |
-| `app/mail/composeMicDictationMicActionRun.ts` | Enregistrement + transcription |
+| `app/mail/composeMicDictationMicActionRun.ts` | Toggle dictée (idle ↔ recording) |
+| `app/mail/composeMicDictationStartRun.ts` | Démarrage enregistrement micro |
+| `app/mail/composeMicDictationStopRun.ts` | Stop + transcription + application cible |
 | `app/mail/accountDefaultPrefs.ts` | Compte/dossier par défaut, filtre liste, boîte valide |
 | `app/mail/mailListPreviewClean.ts` | Aperçu liste sans HTML/CSS bruit |
 | `app/mail/aiCacheKeySegment.ts` | Segment clé cache LLM (`ai_cache_llm_segment`) |
@@ -338,7 +342,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadScrollToMessage.ts` | Scroll + surbrillance message + `registerThreadScrollToMessageDeps()` |
 | `app/mail/mailListView.ts` | Barrel loaders liste / sidebar |
 | `app/mail/mailListViewContext.ts` | `registerMailListDeps`, fusion pages threads |
-| `app/mail/mailListMailboxLoadRun.ts` | `loadMailView` (unifiée, brouillons, dossier) |
+| `app/mail/mailListMailboxLoadRun.ts` | `loadMailView` (orchestration dossier standard) |
+| `app/mail/mailListLoadUnifiedRun.ts` | Page boîte unifiée |
+| `app/mail/mailListLoadSavedDraftsRun.ts` | Liste brouillons enregistrés |
 | `app/mail/mailListSearchContextRun.ts` | `loadThreadsForSearchContext` |
 | `app/mail/mailListSidebarRun.ts` | Compteurs filtre inbox + non-lus sidebar |
 | `app/mail/mailListRouterRun.ts` | `reloadCurrentThreadList`, `applyListFilter` |
