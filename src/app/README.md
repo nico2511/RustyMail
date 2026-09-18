@@ -145,7 +145,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailHtmlShadowHydrate.ts` | Shadow DOM message HTML + lightbox CID |
 | `app/mail/threadMessageSort.ts` | Tri messages fil, dates (`parseMaybeDate`, `dayKey`) |
 | `app/mail/threadLangGuessSamples.ts` | Échantillon texte + `normalizeIso639Primary` |
-| `app/mail/threadLangGuess.ts` | Heuristiques langue + offres traduction |
+| `app/mail/threadLangGuess.ts` | Barrel heuristiques langue + offres traduction |
+| `app/mail/threadLangGuessHints.ts` | Indices mots par langue (ISO) |
+| `app/mail/threadLangGuessDetectRun.ts` | Détection ISO639 depuis texte / tags |
+| `app/mail/threadLangGuessOfferRun.ts` | `shouldOffer*Translate` |
 | `app/mail/threadViewUiHelpers.ts` | Participants fil, zen summary, mode vue message |
 | `app/mail/mailSecurityDisplay.ts` | Signaux sécurité + enrichissement LLM async |
 | `app/mail/composeFormLabels.ts` | Libellés compose (type brouillon, horodatage révision) |
@@ -153,7 +156,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsRenderHelpers.ts` | Profil comptes + bloc stats sémantiques + deps panneau IA |
 | `app/mail/threadAiStreamDom.ts` | Peinture stream IA fil/QA/agent + libellés assist |
 | `app/mail/composeComposerBridge.ts` | Ré-exports éditeur compositeur (markdown, preview, PJ, chips) |
-| `app/mail/composeMarkdownEditor.ts` | Corps markdown compositeur + barre d’outils |
+| `app/mail/composeMarkdownEditor.ts` | Barrel éditeur markdown compositeur |
+| `app/mail/composeMarkdownEditorState.ts` | Corps / canonical / undo stacks |
+| `app/mail/composeMarkdownLineEditsRun.ts` | Listes, titres, wrap sélection |
+| `app/mail/composeMarkdownToolbarRun.ts` | `applyMarkdownAction` |
 | `app/mail/composeDraftPreview.ts` | Aperçu brouillon (`preview_draft`) + debounce |
 | `app/mail/composePersistDraft.ts` | Lecture DOM → `state.draft` avant envoi / preview |
 | `app/mail/composeRecipientChipsWire.ts` | Chips À/Cc/Cci + `composeChipsHandle` |
@@ -308,7 +314,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`composeMarkdownEditor`, `threadLangGuess`, …)
+1. Découper d’autres modules mail > ~350 lignes (`mailHtmlShadowHydrate`, `idleAiCachePrefetch`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
