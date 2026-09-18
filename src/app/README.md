@@ -40,6 +40,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/idleAiCachePrefetch.ts` | Barrel préchargement cache LLM au idle |
 | `app/mail/searchQueryContext.ts` | Payload recherche, `isSearchActive`, critères engagés, dossier effectif |
 | `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` |
+| `app/mail/searchThreadsFocusRun.ts` | Génération requête + focus/sélection champ recherche |
 | `app/mail/fetchOpenThread.ts` | `fetchOpenThreadOrNotify()` |
 | `app/mail/searchCommitQuery.ts` | Barrel commit barre recherche |
 | `app/mail/searchCommitContext.ts` | `registerSearchCommitDeps` |

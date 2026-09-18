@@ -13,46 +13,18 @@ import {
   searchAccountIdForQuery,
 } from "./searchQueryContext";
 import { state } from "../state";
+import {
+  bumpSearchThreadsGeneration,
+  captureSearchInputFocusState,
+  getSearchThreadsGeneration,
+  restoreSearchInputSelection,
+} from "./searchThreadsFocusRun";
 
-let searchThreadsGeneration = 0;
-
-export function getSearchThreadsGeneration(): number {
-  return searchThreadsGeneration;
-}
-
-function restoreSearchInputSelection(selStart: number, selEnd: number, genAtCapture: number) {
-  const apply = () => {
-    if (genAtCapture !== searchThreadsGeneration) return;
-    const inp = document.querySelector<HTMLInputElement>("#search-input");
-    if (!inp) return;
-    inp.focus();
-    const len = inp.value.length;
-    try {
-      inp.setSelectionRange(Math.min(selStart, len), Math.min(selEnd, len));
-    } catch {
-      /* type=search */
-    }
-  };
-  requestAnimationFrame(() => requestAnimationFrame(apply));
-}
+export { getSearchThreadsGeneration } from "./searchThreadsFocusRun";
 
 export async function searchThreads(): Promise<void> {
-  const gen = ++searchThreadsGeneration;
-
-  const inputBefore = document.querySelector<HTMLInputElement>("#search-input");
-  const searchHadFocus = document.activeElement === inputBefore;
-  let selStart = state.searchDraft.length;
-  let selEnd = selStart;
-  if (searchHadFocus && inputBefore) {
-    try {
-      const a = inputBefore.selectionStart;
-      const b = inputBefore.selectionEnd;
-      if (typeof a === "number" && a >= 0) selStart = a;
-      if (typeof b === "number" && b >= 0) selEnd = b;
-    } catch {
-      /* Safari / certains navigateurs avec type=search */
-    }
-  }
+  const gen = bumpSearchThreadsGeneration();
+  const { searchHadFocus, selStart, selEnd } = captureSearchInputFocusState();
 
   if (isTauriRuntime() && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
     await loadMailView(false);
@@ -64,7 +36,7 @@ export async function searchThreads(): Promise<void> {
         return subj.includes(q) || who.includes(q);
       });
     }
-    if (gen !== searchThreadsGeneration) return;
+    if (gen !== getSearchThreadsGeneration()) return;
     render();
     if (!searchHadFocus) return;
     restoreSearchInputSelection(selStart, selEnd, gen);
@@ -74,7 +46,7 @@ export async function searchThreads(): Promise<void> {
   const accountId = searchAccountIdForQuery();
   if (!accountId) {
     state.threads = [];
-    if (gen !== searchThreadsGeneration) return;
+    if (gen !== getSearchThreadsGeneration()) return;
     render();
     if (!searchHadFocus) return;
     restoreSearchInputSelection(selStart, selEnd, gen);
@@ -91,7 +63,7 @@ export async function searchThreads(): Promise<void> {
     ),
   );
 
-  if (gen !== searchThreadsGeneration) {
+  if (gen !== getSearchThreadsGeneration()) {
     return;
   }
 
