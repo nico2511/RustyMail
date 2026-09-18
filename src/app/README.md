@@ -229,7 +229,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsLlmRuntime.ts` | Barrel statut LLM, llama-server, modale moteurs |
 | `app/mail/settingsLlmRuntimeStatusRun.ts` | `refreshLlmRuntimeStatus`, cache GGUF |
 | `app/mail/settingsLlmRuntimeLlamaDetectRun.ts` | Détection binaire `llama-server` |
-| `app/mail/settingsLlmRuntimeUiRun.ts` | Modale moteurs, slider contexte, toggles moteur |
+| `app/mail/settingsDictationMicTestRun.ts` | Test micro dictée (réglages IA) |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
 | `app/mail/settingsOpenView.ts` | Ouverture vue Paramètres |
