@@ -241,7 +241,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsLlmRuntimeLlamaDetectRun.ts` | Détection binaire `llama-server` |
 | `app/mail/settingsGeneralPrefsPersistRun.ts` | Persistance prefs générales depuis le DOM |
 | `app/mail/settingsAiModalShellRun.ts` | Ouverture / fermeture modale IA réglages |
-| `app/mail/settingsAiDomWireRun.ts` | Listeners DOM prefs IA (features, modale, llama, arrière-plan) |
+| `app/mail/settingsAiDomWireRun.ts` | Barrel listeners DOM prefs IA |
+| `app/mail/settingsAiDomWireModalRun.ts` | Modale réglages IA (change/input debounced) |
+| `app/mail/settingsAiDomWireEnginesRun.ts` | llama-server + prefs arrière-plan immédiates |
+| `app/mail/settingsAiDomWirePersistRun.ts` | `persistAiPrefsImmediateFromDom` |
 | `app/mail/settingsAiRuntimeWireActionsRun.ts` | Wire réglages IA : statut LLM, mode moteur, setup recommandé |
 | `app/mail/settingsAiPrefetchWireActionsRun.ts` | Wire prefetch LLM / MiniLM / Whisper, réindex sémantique |
 | `app/mail/settingsGeneralPrefsWireActionsRun.ts` | Wire prefs générales + compte par défaut |
@@ -337,7 +340,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDepsContext.ts` | Mutateurs contexte wire (capture compte, édition carnet) |
 | `app/mail/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` |
 | `app/mail/wireEventsDomContactsAgentRun.ts` | Contacts, `[data-action]` → `handleActionRun`, agent / digest |
-| `app/mail/wireEventsDomInboxThreadRun.ts` | Liste fil, PJ, org inline, modales org confirm |
+| `app/mail/wireEventsDomInboxThreadRun.ts` | Barrel inbox/fil (liste, org, PJ, ton) |
+| `app/mail/wireEventsDomInboxListRun.ts` | Navigation liste, moves, sélecteur déplacement |
+| `app/mail/wireEventsDomOrgMailboxRun.ts` | Actions org inline + checkboxes modales confirm |
+| `app/mail/wireEventsDomThreadAttachmentsRun.ts` | PJ fil + hydrate HTML message |
 | `app/mail/wireEventsDomComposeSearchAccountRun.ts` | Barrel compose / recherche / compte (DOM) |
 | `app/mail/wireEventsDomComposeEditorRun.ts` | Preview compose, markdown, collage image, quick reply |
 | `app/mail/wireEventsDomSearchBarRun.ts` | Barres recherche + commit Enter |
