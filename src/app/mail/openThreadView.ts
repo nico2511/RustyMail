@@ -1,90 +1,24 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppPrefsAi } from "../../prefs_defaults";
-import { isAiFeatureEnabled } from "../../aiFeatures";
 import { isUnifiedInboxMailbox, savedDraftIdFromThreadId } from "../../mailboxKinds";
-import type { DiscussionThreadView } from "../types";
-import { currentAccount } from "../core/accountContext";
 import { fetchOpenThreadOrNotify } from "./fetchOpenThread";
-import { loadMailboxUnread } from "./mailListView";
 import { threadIdsMatch } from "../lib/threadIdsMatch";
-import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
-import { withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { invalidateIdleAiCachePrefetch } from "./idleAiCachePrefetch";
 import { startThreadActivityOpen } from "./threadActivityTracking";
 import { beginNavigation } from "./appNavigationStack";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { requireOpenThreadDeps, type OpenThreadOptions } from "./openThreadViewDepsRun";
+import {
+  markOpenedThreadReadIfUnread,
+  maybeAutoSummarizeThreadOnOpen,
+} from "./openThreadViewEffectsRun";
 
-export type OpenThreadOptions = { preserveAi?: boolean; skipHistory?: boolean };
-
-export type OpenThreadDeps = {
-  openSavedDraftById: (savedId: string) => Promise<void>;
-  navPop: () => unknown;
-  threadAiSummaryScoped: () => boolean;
-  clearThreadAiSummaryState: () => void;
-  threadIsAutoMail: (thread: DiscussionThreadView | undefined, tid: string) => boolean;
-  stopAgentTelemetry: () => Promise<void>;
-  loadNewsletterRules: () => Promise<void>;
-  hydrateMessageTranslationsFromCacheForThread: (messages: DiscussionThreadView["messages"]) => void;
-  scheduleSecurityLlmAugment: (message: DiscussionThreadView["messages"][number]) => void;
-  summarizeThread: () => Promise<void>;
-  sourceMailboxForThread: (threadId: string) => string;
-  isSenderBatchSummarizeActive: () => boolean;
-  getAutoThreadSummaryDoneFor: () => string | null;
-  setAutoThreadSummaryDoneFor: (threadId: string | null) => void;
-};
-
-let openThreadDeps: OpenThreadDeps | null = null;
-
-export function registerOpenThreadDeps(deps: OpenThreadDeps): void {
-  openThreadDeps = deps;
-}
-
-async function markOpenedThreadReadIfUnread(threadId: string): Promise<void> {
-  if (!openThreadDeps) return;
-  if (savedDraftIdFromThreadId(threadId)) return;
-  if (!isTauriRuntime()) return;
-  const unread = Boolean(state.selectedThread?.unread);
-  if (!unread) return;
-  const account = currentAccount();
-  const accountId = account?.id?.trim();
-  if (!accountId) return;
-  try {
-    const mailbox = openThreadDeps.sourceMailboxForThread(threadId);
-    await withTimeout(invoke<string>("thread_mark_read", { accountId, mailbox, threadId }), MAIL_ACTION_TIMEOUT_MS);
-    if (state.selectedThread) state.selectedThread = { ...state.selectedThread, unread: false };
-    const ti = state.threads.findIndex((t) => String(t.id) === String(threadId));
-    if (ti >= 0) {
-      state.threads[ti] = { ...state.threads[ti], unread: false };
-    }
-    await loadMailboxUnread();
-  } catch (e) {
-    console.warn("thread_mark_read (ouverture)", e);
-  }
-}
-
-async function maybeAutoSummarizeThreadOnOpen(
-  threadId: string,
-  thread: { messages?: Array<{ messageId?: string }> },
-): Promise<void> {
-  if (!openThreadDeps) return;
-  const ai = state.appPrefs.ai as AppPrefsAi & {
-    featureAutoThreadSummaryEnabled?: boolean;
-    autoThreadSummaryMinMessages?: number;
-  };
-  if (!ai.featureAutoThreadSummaryEnabled) return;
-  if (openThreadDeps.isSenderBatchSummarizeActive()) return;
-  if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")) return;
-  const min = ai.autoThreadSummaryMinMessages ?? 6;
-  if ((thread.messages?.length ?? 0) < min) return;
-  if (openThreadDeps.getAutoThreadSummaryDoneFor() === threadId) return;
-  openThreadDeps.setAutoThreadSummaryDoneFor(threadId);
-  await openThreadDeps.summarizeThread();
-}
+export type { OpenThreadOptions, OpenThreadDeps } from "./openThreadViewDepsRun";
+export { registerOpenThreadDeps } from "./openThreadViewDepsRun";
 
 export async function openThread(threadId: string, opts?: OpenThreadOptions): Promise<void> {
-  if (!openThreadDeps) return;
+  const openThreadDeps = requireOpenThreadDeps();
   invalidateIdleAiCachePrefetch();
   const savedId = savedDraftIdFromThreadId(threadId);
   if (savedId) {
@@ -132,7 +66,7 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
   if (state.aiOutput?.trim() && threadIdsMatch(state.aiThreadScope, tid)) {
     state.aiThreadScope = String(tid);
   }
-  await markOpenedThreadReadIfUnread(tid);
+  await markOpenedThreadReadIfUnread(tid, openThreadDeps);
   await openThreadDeps.loadNewsletterRules();
   state.view = "thread";
   startThreadActivityOpen(tid);
@@ -140,6 +74,6 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
   const hyd = state.selectedThread?.messages ?? [];
   if (isTauriRuntime() && hyd.length) void openThreadDeps.hydrateMessageTranslationsFromCacheForThread(hyd);
   for (const m of hyd) openThreadDeps.scheduleSecurityLlmAugment(m);
-  void maybeAutoSummarizeThreadOnOpen(tid, opened);
+  void maybeAutoSummarizeThreadOnOpen(tid, opened, openThreadDeps);
   render();
 }

@@ -47,7 +47,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchCommitStructuralRun.ts` | Re-exports parse barre / NL |
 | `app/mail/searchCommitStructuralBarRun.ts` | Parse barre → état, snapshots brouillon |
 | `app/mail/searchCommitStructuralNlRun.ts` | Application requête NL à l’état |
-| `app/mail/searchCommitBarRun.ts` | `commitSearchQuery`, clear, toasts, reload |
+| `app/mail/searchCommitBarRun.ts` | `commitSearchQuery` + re-exports |
+| `app/mail/searchCommitBarQueryRun.ts` | Critères barre, toast résultat, clear, apply query |
 | `app/mail/searchNlQueryInvoke.ts` | `llm_search_nl` invoke + application état / fallbacks lexicaux |
 | `app/mail/searchNlAssistRun.ts` | Action « recherche NL » (prompt + `llm_search_nl`) |
 | `app/mail/searchCommitNlBarRun.ts` | Commit barre recherche via NL (`llm_search_nl` depuis la barre) |
@@ -83,7 +84,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/syncInboxListReloadRun.ts` | Rechargement liste + fil ouvert après sync |
 | `app/mail/syncInboxPushRefreshRun.ts` | `refreshUiAfterImapPush` (IDLE) |
 | `app/mail/syncInboxImapWatch.ts` | Focus dossier pour watch IMAP |
-| `app/mail/composeThreadReply.ts` | Répondre / transférer depuis un fil + `registerComposeThreadReplyDeps()` |
+| `app/mail/composeThreadReply.ts` | Re-export répondre / transférer + `registerComposeThreadReplyDeps` |
+| `app/mail/composeThreadReplyDepsRun.ts` | Registry deps, `currentThreadIdForReply`, after-compose hooks |
+| `app/mail/composeThreadReplyPrepareRun.ts` | `prepareReply`, `prepareReplyAll`, quote message |
+| `app/mail/composeThreadReplyForwardRun.ts` | `prepareForward`, transfert ciblé message |
+| `app/mail/openThreadView.ts` | `openThread()` orchestration |
+| `app/mail/openThreadViewDepsRun.ts` | `registerOpenThreadDeps` |
+| `app/mail/openThreadViewEffectsRun.ts` | Marquer lu à l’ouverture, synthèse auto |
 | `app/mail/mailLinkOpen.ts` | Liens mail (normalisation href, ouverture externe) |
 | `app/mail/collapsedQuotesGroup.ts` | Regroupement citations repliées (modale fil) |
 | `app/mail/downloadAllAttachments.ts` | Téléchargement groupé des PJ d’un message |
@@ -212,7 +219,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeAttachmentsAction.ts` | Retrait PJ compositeur |
 | `app/mail/cycleComposeLayout.ts` | Cycle split / write / preview / historique |
 | `app/mail/llmQueueCancel.ts` | Annulation file jobs LLM |
-| `app/mail/composeSendDraftRun.ts` | Envoi brouillon + split send |
+| `app/mail/composeSendDraftRun.ts` | `sendDraft` + re-exports split / deps |
+| `app/mail/composeSendDraftFinishRun.ts` | Fin envoi compose, deps registry, notices IMAP split |
+| `app/mail/composeSendDraftSplitRun.ts` | `confirmAndExecuteSplitSend` |
 | `app/mail/composeViewNavigation.ts` | `enterComposeView` (historique nav) |
 | `app/mail/mailListThreadFilter.ts` | Filtres liste (`threadsVisibleInList`, suivi) |
 | `app/mail/micAudioUtil.ts` | WAV 16 kHz mono + base64 (dictée) |
@@ -309,7 +318,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/orgApplyRun.ts` | Appliquer propositions org v1 + `registerOrgApplyRunDeps()` |
 | `app/mail/orgV2ApplyRun.ts` | Barrel apply org v2 |
 | `app/mail/orgV2ApplyContext.ts` | `registerOrgV2ApplyRunDeps()` |
-| `app/mail/orgV2ApplyBatchRun.ts` | Confirm + application par chunks |
+| `app/mail/orgV2ApplyBatchRun.ts` | Application org v2 par chunks |
+| `app/mail/orgV2ApplyConfirmRun.ts` | Confirm + preview avant apply org v2 |
 | `app/mail/orgV2ProposalUi.ts` | Ignorer / reporter / mémoire dossiers org v2 |
 | `app/mail/folderManagerActions.ts` | Barrel vue Dossiers IMAP |
 | `app/mail/folderManagerContext.ts` | `registerFolderManagerRunDeps` |
