@@ -1,6 +1,6 @@
 import type { AddressBookRow } from "../types";
 import { registerRender } from "../dispatch";
-import { registerWireEventsContext } from "../ui/wireEventsBridge";
+import { registerWireEventsContext } from "./wireEventsContext";
 import {
   AI_PREFS_IMMEDIATE_CHECKBOX_IDS,
   addressBookEditEmailRef,

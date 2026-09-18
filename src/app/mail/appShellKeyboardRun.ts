@@ -3,7 +3,7 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
-import { handleAction } from "../ui/wireEvents";
+import { handleAction } from "./handleActionRun";
 import { goBack } from "./appNavigationStack";
 import {
   dismissMailboxDigestPanel,

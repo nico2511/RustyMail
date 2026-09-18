@@ -1,7 +1,7 @@
 import { navApplyPendingScrollRestore } from "../../navigation";
 import { root as appShell } from "../dom";
 import { isTextPromptOpen, renderConfirmModal, renderTextPromptModal } from "../modals/promptConfirm";
-import { wireEvents } from "../ui/wireEvents";
+import { wireEvents } from "./wireEventsDomOrchestratorRun";
 import { renderAiPanel } from "../ui/render/aiPanelRender";
 import { renderAiQuickPanelOverlay } from "../ui/render/aiQuickPanelRender";
 import { renderComposer } from "../ui/render/composerRender";

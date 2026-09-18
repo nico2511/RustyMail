@@ -331,8 +331,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `settingsRender.ts` | Paramètres (onglets, modale IA réglages) |
 | `aiPanelRender.ts` | Panneau Détails / brief dossier / agent IA |
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
-| `wireEvents.ts` | Re-export `wireEvents` + `handleAction` depuis `app/mail` |
-| `app/mail/wireEventsDomOrchestratorRun.ts` | Orchestration DOM (abort compose, modules `wireEventsDom*`) |
+| `app/mail/wireEventsDomOrchestratorRun.ts` | Orchestration DOM (`wireEvents()` ; shell render) |
 | `app/mail/handleActionRun.ts` | Point d’entrée actions UI (`data-action`) |
 | `app/mail/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `app/mail/wireEventsDepsContext.ts` | Mutateurs contexte wire (capture compte, édition carnet) |
