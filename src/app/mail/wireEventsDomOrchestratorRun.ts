@@ -5,10 +5,8 @@ import { wireEventsContext } from "./wireEventsContext";
 import { wireEventsDomSettingsAi } from "./wireEventsDomSettingsAiRun";
 import { wireEventsDomContactsAgent } from "./wireEventsDomContactsAgentRun";
 import { wireEventsDomInboxThread } from "./wireEventsDomInboxThreadRun";
-import {
-  wireEventsDomComposeSearchAccount,
-  wireEventsDomThreadQaInput,
-} from "./wireEventsDomComposeSearchAccountRun";
+import { wireEventsDomComposeSearchAccount } from "./wireEventsDomComposeSearchAccountRun";
+import { wireEventsDomThreadQaInput } from "./wireEventsDomThreadQaRun";
 
 export function wireEvents(): void {
   const composeAbortRef = wireEventsContext().composeInteractionsAbortRef;

@@ -338,7 +338,12 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` |
 | `app/mail/wireEventsDomContactsAgentRun.ts` | Contacts, `[data-action]` → `handleActionRun`, agent / digest |
 | `app/mail/wireEventsDomInboxThreadRun.ts` | Liste fil, PJ, org inline, modales org confirm |
-| `app/mail/wireEventsDomComposeSearchAccountRun.ts` | Compose, recherche, compte, setup serveur |
+| `app/mail/wireEventsDomComposeSearchAccountRun.ts` | Barrel compose / recherche / compte (DOM) |
+| `app/mail/wireEventsDomComposeEditorRun.ts` | Preview compose, markdown, collage image, quick reply |
+| `app/mail/wireEventsDomSearchBarRun.ts` | Barres recherche + commit Enter |
+| `app/mail/wireEventsDomAccountFormRun.ts` | Sélecteur compte, préréglage domaine, champs serveur |
+| `app/mail/wireEventsDomThreadQaRun.ts` | Saisie Q&A fil (`#thread-qa-input`) |
+| `app/mail/appShellRenderChromeRun.ts` | Capture formulaire compte, scroll/focus post-render shell |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeWireActionsRun.ts` | Fermeture compose wire, restauration révision, grammaire |
 | `app/mail/composeCloseWireActionsRun.ts` | Wire fermeture compose / brouillons orphelins |
