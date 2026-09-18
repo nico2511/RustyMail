@@ -155,7 +155,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadLangGuessHints.ts` | Indices mots par langue (ISO) |
 | `app/mail/threadLangGuessDetectRun.ts` | Détection ISO639 depuis texte / tags |
 | `app/mail/threadLangGuessOfferRun.ts` | `shouldOffer*Translate` |
-| `app/mail/threadViewUiHelpers.ts` | Participants fil, zen summary, mode vue message |
+| `app/mail/threadViewUiHelpers.ts` | Barrel participants fil, zen summary, mode vue message |
+| `app/mail/threadViewUiMojibakeRun.ts` | Réparation mojibake UTF-8 + résumé zen texte |
+| `app/mail/threadViewUiParticipantsRun.ts` | Expéditeurs uniques, dédup participant, `isOwnSender` |
+| `app/mail/threadViewUiRecipientPresenceRun.ts` | Diff To/Cc par message (événements présence) |
+| `app/mail/threadViewUiLayoutRun.ts` | Lanes arbre fil, accent expéditeur, cible réponse rapide |
+| `app/mail/threadViewUiZenHtmlRun.ts` | Fragments HTML résumé zen (listes / paragraphes) |
+| `app/mail/threadViewUiCleanModeRun.ts` | Mode vue message original vs nettoyé |
 | `app/mail/mailSecurityDisplay.ts` | Signaux sécurité + enrichissement LLM async |
 | `app/mail/composeFormLabels.ts` | Libellés compose (type brouillon, horodatage révision) |
 | `app/mail/settingsAccountsFormState.ts` | Scratch identité formulaire comptes (DOM) |
@@ -319,7 +325,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`threadViewUiHelpers`, `settingsLlmRuntime`, …)
+1. Découper d’autres modules mail > ~350 lignes (`settingsLlmRuntime`, `composeMicDictation`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
