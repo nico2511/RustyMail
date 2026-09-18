@@ -114,6 +114,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsWireActionsAiRun.ts` | Prefs IA, moteurs LLM, barres progression |
 | `app/mail/settingsWireActionsMicRun.ts` | Micro / dictée (util audio) |
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
+| `app/mail/orgV1WireActionsRun.ts` | Actions wire org v1 (scan, apply, modales, retag) |
+| `app/mail/orgV2WireActionsRun.ts` | Actions wire org v2 (scan, apply, undo, modales) |
 | `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
 | `app/mail/mailAttachmentActions.ts` | Téléchargement / ouverture PJ (confirm risque) |
 | `app/mail/appShellRender.ts` | Barrel rendu DOM shell |
@@ -330,8 +332,8 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — dispatch vers sous-handlers |
 | `wireEvents/handleActionOrgFolderNavRun.ts` | Ouverture vues org / contacts / FM |
 | `wireEvents/handleActionFolderManagerRun.ts` | Actions gestionnaire dossiers (`fm-*`) |
-| `wireEvents/handleActionOrgV2WireRun.ts` | Wire org v2 (scan, apply, modales) |
-| `wireEvents/handleActionOrgV1WireRun.ts` | Wire org v1 (scan, apply, retag) |
+| `wireEvents/handleActionOrgV2WireRun.ts` | Re-export `orgV2WireActionsRun` |
+| `wireEvents/handleActionOrgV1WireRun.ts` | Re-export `orgV1WireActionsRun` |
 | `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes — dispatch vers sous-handlers |
 | `wireEvents/handleActionModalsWireRun.ts` | Modales confirm / text prompt |
 | `wireEvents/handleActionComposeEntryWireRun.ts` | Action `compose` (nouveau brouillon) |
@@ -393,7 +395,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 ## Prochaines extractions (ordre suggéré)
 
 1. Affiner encore les imports wire si de nouveaux handlers grossissent
-2. Déplacer org v1/v2 wire et handlers settings IA restants vers `app/mail/*`
+2. Déplacer handlers settings IA wire (`AiRuntime`, `AiPrefetch`, …) vers `app/mail/*`
 3. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
