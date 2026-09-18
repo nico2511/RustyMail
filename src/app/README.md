@@ -316,7 +316,15 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionFolderManagerRun.ts` | Actions gestionnaire dossiers (`fm-*`) |
 | `wireEvents/handleActionOrgV2WireRun.ts` | Wire org v2 (scan, apply, modales) |
 | `wireEvents/handleActionOrgV1WireRun.ts` | Wire org v1 (scan, apply, retag) |
-| `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes / prefs IA — **typé** |
+| `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes — dispatch vers sous-handlers |
+| `wireEvents/handleActionModalsWireRun.ts` | Modales confirm / text prompt |
+| `wireEvents/handleActionComposeEntryWireRun.ts` | Action `compose` (nouveau brouillon) |
+| `wireEvents/handleActionSettingsShellWireRun.ts` | Onglets réglages, prefs générales, modale IA |
+| `wireEvents/handleActionSettingsAiWireRun.ts` | Prefs IA, prefetch LLM / sémantique / Whisper |
+| `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Clés API cloud / dictée / OpenRouter |
+| `wireEvents/handleActionSettingsLlamaBinaryWireRun.ts` | Binaire llama-server (detect, winget, chemin) |
+| `wireEvents/handleActionNewsletterRulesWireRun.ts` | Règles newsletter (domaine / message) |
+| `wireEvents/handleActionAccountSetupWireRun.ts` | Comptes, OAuth, suppression |
 | `wireEvents/handleActionThreadCompose.ts` | Compose / fil — dispatch vers sous-handlers |
 | `wireEvents/handleActionThreadNavWireRun.ts` | Navigation fil / sidebar / brouillons sauvés |
 | `wireEvents/handleActionThreadViewWireRun.ts` | UI fil, réponses, sécurité, pièces jointes |
@@ -339,6 +347,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/depsComposeThread.ts` | compose, fil, LLM compose |
 | `wireEvents/depsSettingsAccount.ts` | réglages, OAuth, prefs IA, setup compte |
 | `wireEvents/depsOrgFolder.ts` | org / gestionnaire dossiers |
+| `wireEvents/handleAction*WireRun.ts` | Sous-handlers : imports ciblés (`depsCore` / `deps*` selon usage) |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
@@ -348,7 +357,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper `wireEvents/handleActionComposeSettings` (~1100 lignes)
+1. Affiner encore les imports wire si de nouveaux handlers grossissent
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`

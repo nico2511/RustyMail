@@ -1,4 +1,7 @@
-import type { OrgApplyProgress, OrgProposal, OrgScanReport } from "../../../organizationView";
+import type {
+  OrgApplyProgress,
+  OrgScanReport,
+} from "../../../organizationView";
 import {
   currentAccount,
   render,

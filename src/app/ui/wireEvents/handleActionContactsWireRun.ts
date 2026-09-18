@@ -1,7 +1,6 @@
 import {
   currentAccount,
   invoke,
-  isTauriRuntime,
   navCanGoBack,
   render,
   state,

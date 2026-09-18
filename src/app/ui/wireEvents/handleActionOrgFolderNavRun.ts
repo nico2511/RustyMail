@@ -1,4 +1,6 @@
-import { render, state } from "./depsCore";
+import {
+  state,
+} from "./depsCore";
 import {
   openContactsView,
   openFolderManagerView,
