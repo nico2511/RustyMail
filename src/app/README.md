@@ -180,7 +180,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appRenderRegistryPagesRun.ts` | Rendu pages Organiser / Dossiers |
 | `app/mail/appRenderRegistryDepsRun.ts` | Barrel `buildAppRenderDeps()` |
 | `app/mail/appRenderRegistryDepsShellRun.ts` | Fragment RenderDeps liste / réglages / org |
-| `app/mail/appRenderRegistryDepsThreadRun.ts` | Fragment RenderDeps fil / compose / sécurité |
+| `app/mail/appRenderRegistryDepsThreadRun.ts` | Barrel fragment RenderDeps fil / compose / IA |
+| `app/mail/appRenderRegistryDepsThreadMessageRun.ts` | Message fil, sécurité, participants |
+| `app/mail/appRenderRegistryDepsThreadComposeRun.ts` | Labels compositeur + `renderComposer` |
+| `app/mail/appRenderRegistryDepsThreadAiRun.ts` | IA fil, agent, compteurs jobs traduction |
 | `app/mail/appSearchWireRegistry.ts` | Liste + recherche + vues enregistrées / batch |
 | `app/mail/appThreadWireRegistry.ts` | Ouverture fil, actions liste, changement boîte |
 | `app/mail/appComposeWireRegistry.ts` | Compose, brouillons, file LLM |
@@ -314,7 +317,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appNavigationSnapshotRun.ts` | `captureCurrentNav`, `beginNavigation` |
 | `app/mail/appNavigationSnapshotLabelsRun.ts` | Labels fil d’Ariane par vue |
 | `app/mail/appNavigationApplyRun.ts` | Re-export `applyNavSnapshot` |
-| `app/mail/appNavigationApplyViewsRun.ts` | Restauration champs + switch vues nav |
+| `app/mail/appNavigationApplyViewsRun.ts` | Restauration champs nav + dispatch vues |
+| `app/mail/appNavigationApplyViewsMailRun.ts` | Snapshot liste / fil / réglages / compose |
+| `app/mail/appNavigationApplyViewsContactsRun.ts` | Snapshot carnet / fiche contact |
+| `app/mail/appNavigationApplyViewsOrgRun.ts` | Snapshot Organiser v1/v2 / dossiers |
 | `app/mail/appNavigationHistoryRun.ts` | `goBack`, `goForward`, inbox, fil d’Ariane |
 | `app/mail/accountRowNormalize.ts` | Normalisation ligne compte (`list_accounts`) |
 | `app/mail/accountsLoadFromBackend.ts` | Chargement comptes backend |
@@ -334,7 +340,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsAiDomWireLlamaServerRun.ts` | Checkboxes spawn / override CPU llama-server |
 | `app/mail/settingsAiDomWireBackgroundPrefsRun.ts` | Prefs arrière-plan IA + recherche sémantique |
 | `app/mail/settingsAiDomWirePersistRun.ts` | `persistAiPrefsImmediateFromDom` |
-| `app/mail/settingsAiRuntimeWireActionsRun.ts` | Wire réglages IA : statut LLM, mode moteur, setup recommandé |
+| `app/mail/settingsAiRuntimeWireActionsRun.ts` | Dispatch wire runtime IA (statut, reco, mode) |
+| `app/mail/settingsAiRuntimeStatusWireRun.ts` | Sauvegarde prefs, refresh statut / rescan matériel |
+| `app/mail/settingsAiRuntimeRecommendedWireRun.ts` | Poids recommandés, setup LLM recommandé |
+| `app/mail/settingsAiRuntimeEngineModeWireRun.ts` | Bascule mode moteur local / cloud / hybride |
 | `app/mail/settingsAiPrefetchWireActionsRun.ts` | Barrel wire prefetch IA (modèles / index) |
 | `app/mail/settingsAiPrefetchLlmWireRun.ts` | Wire prefetch / annulation modèle LLM |
 | `app/mail/settingsAiPrefetchSemanticWireRun.ts` | Wire MiniLM, réindex sémantique, compteurs |
@@ -362,7 +371,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchViewsClearFiltersTextRun.ts` | Texte, filtre liste, filtres NL |
 | `app/mail/searchViewsClearFiltersCriteriaRun.ts` | Expéditeur, dossier, compte, tags, NL rule |
 | `app/mail/searchViewsClearFiltersScopeRun.ts` | Bascule portée compte / dossier |
-| `app/mail/searchViewsListWireRun.ts` | Filtres liste, load-more, digest dossier |
+| `app/mail/searchViewsListWireRun.ts` | Dispatch filtres liste, load-more, digest |
+| `app/mail/searchViewsListFilterWireRun.ts` | Filtres liste + pagination « load-more » |
+| `app/mail/searchViewsListDigestWireRun.ts` | Fermer panneau digest dossier |
 | `app/mail/listThreadWireActionsRun.ts` | Barrel fil liste / déplacement / brouillons |
 | `app/mail/listThreadMoveWireActionsRun.ts` | Barrel déplacement / meta liste fil |
 | `app/mail/listThreadMoveActionsWireRun.ts` | Corbeille, archive, lu/suivi, modale déplacer |
