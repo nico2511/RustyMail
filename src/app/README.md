@@ -65,7 +65,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/savedSearchSaveRun.ts` | Enregistrer la vue courante |
 | `app/mail/savedSearchApplyViewRun.ts` | Appliquer une vue enregistrée |
 | `app/mail/savedSearchDeleteRun.ts` | Supprimer une vue |
-| `app/mail/savedSearchSuggestionsRun.ts` | Suggestions de vues (activité) |
+| `app/mail/savedSearchSuggestionsRun.ts` | Barrel suggestions de vues (activité) |
+| `app/mail/savedSearchSuggestionsRefreshRun.ts` | Charger suggestions depuis activité |
+| `app/mail/savedSearchSuggestionsActionsRun.ts` | Accepter / ignorer suggestion de vue |
 | `app/mail/searchLaunchQueries.ts` | Barrel lancements recherche |
 | `app/mail/searchLaunchContext.ts` | `registerSearchLaunchDeps` |
 | `app/mail/searchLaunchPresetsRun.ts` | Barrel lancements recherche preset |
@@ -148,7 +150,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/agentPrepareReplyPipelineRun.ts` | Barrel phases LLM assistant réponse |
 | `app/mail/agentPrepareReplyExtractRun.ts` | Facts + skills post-extract + cohérence |
 | `app/mail/agentPrepareReplyDraftRun.ts` | Stream brouillon + refresh plan |
-| `app/mail/agentPrepareReplyContinueRun.ts` | `agentPrepareReplyContinue` |
+| `app/mail/agentPrepareReplyContinueRun.ts` | Dispatch `agentPrepareReplyContinue` |
+| `app/mail/agentPrepareReplyContinueClarifyRun.ts` | Suite assistant après clarification |
+| `app/mail/agentPrepareReplyContinueAnalyzeRun.ts` | Suite assistant après analyse intent |
+| `app/mail/agentPrepareReplyContinueSlotsRun.ts` | Suite brouillon → créneaux |
 | `app/mail/agentAssistSessionHelpers.ts` | Session assist (payload, télémetrie, merge reco) |
 | `app/mail/agentInsertDraftRun.ts` | Insertion brouillon agent dans le composeur |
 | `app/mail/agentSchedulingDraftFormat.ts` | Format créneaux dans le corps de réponse |
@@ -515,7 +520,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomThreadQaRun.ts` | Saisie Q&A fil (`#thread-qa-input`) |
 | `app/mail/appShellRenderChromeRun.ts` | Capture formulaire compte, scroll/focus post-render shell |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
-| `app/mail/composeWireActionsRun.ts` | Fermeture compose wire, restauration révision, grammaire |
+| `app/mail/composeWireActionsRun.ts` | Barrel fermeture compose wire, révision, grammaire |
+| `app/mail/composeWireCloseRun.ts` | Fermer compose sans sauver / sauver et fermer |
+| `app/mail/composeWireRevisionRestoreRun.ts` | Restaurer révision brouillon (wire) |
+| `app/mail/composeWireGrammarRun.ts` | Appliquer suggestion grammaire compose |
 | `app/mail/composeCloseWireActionsRun.ts` | Wire fermeture compose / brouillons orphelins |
 | `app/mail/composeDraftHistoryWireActionsRun.ts` | Wire historique versions brouillon |
 | `app/mail/agentAssistWireActionsRun.ts` | Barrel agent assist + sync / corbeille (wire) |
