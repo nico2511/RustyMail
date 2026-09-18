@@ -321,7 +321,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appNavigationApplyViewsMailRun.ts` | Snapshot liste / fil / réglages / compose |
 | `app/mail/appNavigationApplyViewsContactsRun.ts` | Snapshot carnet / fiche contact |
 | `app/mail/appNavigationApplyViewsOrgRun.ts` | Snapshot Organiser v1/v2 / dossiers |
-| `app/mail/appNavigationHistoryRun.ts` | `goBack`, `goForward`, inbox, fil d’Ariane |
+| `app/mail/appNavigationHistoryRun.ts` | Barrel `goBack`, inbox, fil d’Ariane |
+| `app/mail/appNavigationHistoryBackRun.ts` | Pile nav : retour / avant |
+| `app/mail/appNavigationHistoryJumpRun.ts` | Inbox, index fil d’Ariane |
 | `app/mail/accountRowNormalize.ts` | Normalisation ligne compte (`list_accounts`) |
 | `app/mail/accountsLoadFromBackend.ts` | Chargement comptes backend |
 | `app/mail/folderManagerPanelState.ts` | État recherche panneau dossiers |
@@ -356,7 +358,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadReplyComposeWireRun.ts` | Wire reply / forward |
 | `app/mail/threadReplyMailLinksWireRun.ts` | Wire PJ, contacts, désabonnement |
 | `app/mail/threadNavWireActionsRun.ts` | Wire navigation fil / sidebar |
-| `app/mail/addressBookSidebarWireActionsRun.ts` | Wire carnet d’adresses (sidebar réglages) |
+| `app/mail/addressBookSidebarWireActionsRun.ts` | Dispatch wire carnet (sidebar réglages) |
+| `app/mail/addressBookSidebarSyncWireRun.ts` | Refresh liste, réindex carnet |
+| `app/mail/addressBookSidebarCrudWireRun.ts` | Édition / save / delete / favori carnet |
 | `app/mail/contactsWireActionsRun.ts` | Barrel actions wire contacts / vCard |
 | `app/mail/contactsWireActionsListRun.ts` | Navigation liste contacts, refresh, ouverture fil |
 | `app/mail/contactsWireActionsDetailRun.ts` | Dispatch wire fiche contact |
@@ -522,7 +526,11 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/threadViewWireDispatchRun.ts` | Dispatch UI fil / reply / sécurité |
 | `app/mail/settingsAiWireDispatchRun.ts` | Dispatch prefs IA runtime / prefetch / dictée |
 | `app/mail/settingsApiKeysWireActionsRun.ts` | Wire clés API (persist / clear) |
-| `app/mail/composeEditorWireActionsRun.ts` | Wire éditeur compose (layout, envoi, PJ, rewrite IA) |
+| `app/mail/composeEditorWireActionsRun.ts` | Dispatch wire éditeur compose |
+| `app/mail/composeEditorLayoutWireRun.ts` | Layout, preview, Cc/Bcc, options avancées |
+| `app/mail/composeEditorSendWireRun.ts` | Envoi, confirmation envoi fractionné |
+| `app/mail/composeEditorAttachmentsWireRun.ts` | Picker et retrait PJ compose |
+| `app/mail/composeEditorAiWireRun.ts` | Rewrite / grammaire IA compose |
 | `app/mail/threadViewUiWireActionsRun.ts` | Barrel wire UI fil |
 | `app/mail/threadViewUiAiWireRun.ts` | Panneau IA, quick reply, digest |
 | `app/mail/threadViewUiModalsWireRun.ts` | Citations, tags, image, mode message |
