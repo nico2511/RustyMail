@@ -108,7 +108,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/agentSchedulingDraftFormat.ts` | Format créneaux dans le corps de réponse |
 | `app/mail/composeAiWireActions.ts` | Facades IA compose + envoi split |
 | `app/mail/accountsLoadAction.ts` | Ré-export `loadAccountsFromBackend()` |
-| `app/mail/settingsWireActions.ts` | Facades paramètres (comptes, LLM, OAuth, micro…) |
+| `app/mail/settingsWireActions.ts` | Barrel facades paramètres (wire) |
+| `app/mail/settingsWireActionsContext.ts` | `registerSettingsWireActionsDeps` |
+| `app/mail/settingsWireActionsAccountRun.ts` | Comptes, OAuth, chemins, carnet |
+| `app/mail/settingsWireActionsAiRun.ts` | Prefs IA, moteurs LLM, barres progression |
+| `app/mail/settingsWireActionsMicRun.ts` | Micro / dictée (util audio) |
 | `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
 | `app/mail/mailContentWireActions.ts` | Hydratation HTML fil, PJ, lightbox images |
 | `app/mail/mailAttachmentActions.ts` | Téléchargement / ouverture PJ (confirm risque) |
@@ -122,14 +126,15 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/bootDeferredPrefsAfterLoadRun.ts` | Wizard, compte défaut, filtre liste, brief gate |
 | `app/ui/wireEvents/depsContext.ts` | Mutateurs contexte wireEvents (capture compte, carnet) |
 | `app/mail/appModuleRegistry.ts` | Orchestrateur `registerAllAppModules()` (~20 lignes) |
-| `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` → `registerRenderDeps` |
+| `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` (barrel) |
+| `app/mail/appRenderRegistryPagesRun.ts` | Rendu pages Organiser / Dossiers |
+| `app/mail/appRenderRegistryDepsRun.ts` | Assemblage objet `RenderDeps` |
 | `app/mail/appSearchWireRegistry.ts` | Liste + recherche + vues enregistrées / batch |
 | `app/mail/appThreadWireRegistry.ts` | Ouverture fil, actions liste, changement boîte |
 | `app/mail/appComposeWireRegistry.ts` | Compose, brouillons, file LLM |
 | `app/mail/appAccountOrgWireRegistry.ts` | Compte, réglages, org/dossiers, nav + services digest/prefetch |
 | `app/mail/savedDraftOpenRun.ts` | Ouvrir un brouillon enregistré dans le composeur |
 | `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |
-| `app/mail/loadBootDeferredPrefs.ts` | Orchestration prefs différées boot (barrel) |
 | `app/mail/appBootRun.ts` | Séquence `boot()` (status, comptes, sync initiale, listeners) |
 | `app/mail/appShellBindings.ts` | Barrel raccourcis clavier / souris / flush brouillon |
 | `app/mail/appShellInputGuards.ts` | Overlays bloquant navigation / raccourcis |
@@ -303,7 +308,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres modules mail > ~350 lignes (`appRenderRegistry`, `settingsWireActions`, …)
+1. Découper d’autres modules mail > ~350 lignes (`composeMarkdownEditor`, `threadLangGuess`, …)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
