@@ -128,7 +128,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appModuleRegistry.ts` | Orchestrateur `registerAllAppModules()` (~20 lignes) |
 | `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` (barrel) |
 | `app/mail/appRenderRegistryPagesRun.ts` | Rendu pages Organiser / Dossiers |
-| `app/mail/appRenderRegistryDepsRun.ts` | Assemblage objet `RenderDeps` |
+| `app/mail/appRenderRegistryDepsRun.ts` | Barrel `buildAppRenderDeps()` |
+| `app/mail/appRenderRegistryDepsShellRun.ts` | Fragment RenderDeps liste / réglages / org |
+| `app/mail/appRenderRegistryDepsThreadRun.ts` | Fragment RenderDeps fil / compose / sécurité |
 | `app/mail/appSearchWireRegistry.ts` | Liste + recherche + vues enregistrées / batch |
 | `app/mail/appThreadWireRegistry.ts` | Ouverture fil, actions liste, changement boîte |
 | `app/mail/appComposeWireRegistry.ts` | Compose, brouillons, file LLM |
@@ -181,7 +183,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeDraftSession.ts` | Id session, reset état révisions, contenu « significatif » |
 | `app/mail/composeDraftLocalSave.ts` | Révisions, upsert Sauvés, orphelins au boot |
 | `app/mail/composeLayoutState.ts` | `syncPreviewOpenFromComposeLayout` |
-| `app/mail/newsletterRulesMatch.ts` | Correspondance expéditeur ↔ règle newsletter |
+| `app/mail/newsletterRulesWireRun.ts` | Actions wire add/remove règles newsletter |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
 | `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |
 | `app/mail/composeOrphanDraftSession.ts` | Reprise / rejet brouillons orphelins |
@@ -229,7 +231,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsLlmRuntime.ts` | Barrel statut LLM, llama-server, modale moteurs |
 | `app/mail/settingsLlmRuntimeStatusRun.ts` | `refreshLlmRuntimeStatus`, cache GGUF |
 | `app/mail/settingsLlmRuntimeLlamaDetectRun.ts` | Détection binaire `llama-server` |
-| `app/mail/settingsDictationMicTestRun.ts` | Test micro dictée (réglages IA) |
+| `app/mail/settingsGeneralPrefsPersistRun.ts` | Persistance prefs générales depuis le DOM |
+| `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
 | `app/mail/settingsOpenView.ts` | Ouverture vue Paramètres |
@@ -319,14 +322,17 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes — dispatch vers sous-handlers |
 | `wireEvents/handleActionModalsWireRun.ts` | Modales confirm / text prompt |
 | `wireEvents/handleActionComposeEntryWireRun.ts` | Action `compose` (nouveau brouillon) |
-| `wireEvents/handleActionSettingsShellWireRun.ts` | Onglets réglages, prefs générales, modale IA |
+| `wireEvents/handleActionSettingsShellWireRun.ts` | Barrel onglets réglages / modale IA / prefs générales |
+| `wireEvents/handleActionSettingsNavWireRun.ts` | Ouverture réglages, onglets, reload comptes |
+| `wireEvents/handleActionSettingsAiModalShellWireRun.ts` | Sous-modale IA (semantic, engines, …) |
+| `wireEvents/handleActionSettingsGeneralPrefsWireRun.ts` | Compte par défaut + prefs générales |
 | `wireEvents/handleActionSettingsAiWireRun.ts` | Barrel prefs IA (runtime + prefetch + dictée) |
 | `wireEvents/handleActionSettingsAiRuntimeWireRun.ts` | Statut LLM, mode moteur, setup recommandé |
 | `wireEvents/handleActionSettingsAiPrefetchWireRun.ts` | Prefetch LLM / MiniLM / Whisper, réindex sémantique |
 | `wireEvents/handleActionSettingsAiDictationWireRun.ts` | Action `dictation-test-mic` |
-| `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Clés API cloud / dictée / OpenRouter |
+| `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Dispatch clés API → `settingsApiKeysPersistRun` |
 | `wireEvents/handleActionSettingsLlamaBinaryWireRun.ts` | Binaire llama-server (detect, winget, chemin) |
-| `wireEvents/handleActionNewsletterRulesWireRun.ts` | Règles newsletter (domaine / message) |
+| `wireEvents/handleActionNewsletterRulesWireRun.ts` | Dispatch règles newsletter → `newsletterRulesWireRun` |
 | `wireEvents/handleActionAccountSetupWireRun.ts` | Comptes, OAuth, suppression |
 | `wireEvents/handleActionThreadCompose.ts` | Compose / fil — dispatch vers sous-handlers |
 | `wireEvents/handleActionThreadNavWireRun.ts` | Navigation fil / sidebar / brouillons sauvés |
