@@ -110,7 +110,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadAiSenderBatchRun.ts` | Synthèse légère multi-fils (filtre expéditeur) |
 | `app/mail/threadAiWireUiRun.ts` | Barrel actions wire UI fil |
 | `app/mail/threadAiWireSummarizeRun.ts` | `summarizeThread` (wire) |
-| `app/mail/threadAiWireTranslateRun.ts` | Traduction fil/message + hydrate cache |
+| `app/mail/threadAiWireTranslateRun.ts` | Barrel traduction fil/message + cache |
+| `app/mail/threadAiWireTranslateThreadRun.ts` | `llmTranslateThreadUi` |
+| `app/mail/threadAiWireTranslateMessageRun.ts` | `llmTranslateMessageUi` |
+| `app/mail/threadAiWireTranslateCacheRun.ts` | Hydrate traductions message depuis cache |
 | `app/mail/threadAiWireQuickReplyRun.ts` | Réponses rapides fil / compose |
 | `app/mail/threadAiWireQaDigestRun.ts` | Q&A fil + brief dossier |
 | `app/mail/agentWireActions.ts` | Facades agent assist (prepare reply, telemetry, plan) |
@@ -210,7 +213,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeMarkdownEditor.ts` | Barrel éditeur markdown compositeur |
 | `app/mail/composeMarkdownEditorState.ts` | Corps / canonical / undo stacks |
 | `app/mail/composeMarkdownLineEditsRun.ts` | Listes, titres, wrap sélection |
-| `app/mail/composeMarkdownToolbarRun.ts` | `applyMarkdownAction` |
+| `app/mail/composeMarkdownToolbarRun.ts` | `applyMarkdownAction` (dispatch) |
+| `app/mail/composeMarkdownToolbarUrlPromptRun.ts` | Lien / image (modale URL) |
+| `app/mail/composeMarkdownToolbarInlineRun.ts` | Gras, titres, listes, table, code |
 | `app/mail/composeDraftPreview.ts` | Aperçu brouillon (`preview_draft`) + debounce |
 | `app/mail/composePersistDraft.ts` | Lecture DOM → `state.draft` avant envoi / preview |
 | `app/mail/composeRecipientChipsWire.ts` | Chips À/Cc/Cci + `composeChipsHandle` |
@@ -218,7 +223,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeDraftRevisionAutosave.ts` | Debounce révisions locales + `scheduleDraftRevisionSave` |
 | `app/mail/composeDraftPayload.ts` | Normalisation brouillon pour invoke Rust |
 | `app/mail/composeDraftSession.ts` | Id session, reset état révisions, contenu « significatif » |
-| `app/mail/composeDraftLocalSave.ts` | Révisions, upsert Sauvés, orphelins au boot |
+| `app/mail/composeDraftLocalSave.ts` | Barrel révisions / Sauvés / orphelins |
+| `app/mail/composeDraftLocalSaveContext.ts` | `registerComposeDraftLocalSaveDeps` |
+| `app/mail/composeDraftRevisionSaveRun.ts` | Révision locale + upsert silencieux |
+| `app/mail/composeDraftSavedListRun.ts` | Enregistrer dans « Sauvés » |
+| `app/mail/composeDraftOrphanBootRun.ts` | Modale sessions brouillon orphelines au boot |
 | `app/mail/composeLayoutState.ts` | `syncPreviewOpenFromComposeLayout` |
 | `app/mail/newsletterRulesWireRun.ts` | Actions wire add/remove règles newsletter (+ `tryHandleNewsletterRulesWire`) |
 | `app/mail/newsletterRulesMatch.ts` | Correspondance expéditeur ↔ règle newsletter |
