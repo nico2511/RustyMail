@@ -243,6 +243,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsGeneralPrefsPersistRun.ts` | Persistance prefs générales depuis le DOM |
 | `app/mail/settingsAiModalShellRun.ts` | Ouverture / fermeture modale IA réglages |
 | `app/mail/settingsAiDomWireRun.ts` | Listeners DOM prefs IA (features, modale, llama, arrière-plan) |
+| `app/mail/settingsAiRuntimeWireActionsRun.ts` | Wire réglages IA : statut LLM, mode moteur, setup recommandé |
+| `app/mail/settingsAiPrefetchWireActionsRun.ts` | Wire prefetch LLM / MiniLM / Whisper, réindex sémantique |
+| `app/mail/settingsAiDictationWireActionsRun.ts` | Wire test micro dictée |
 | `app/mail/contactsWireActionsRun.ts` | Actions wire contacts / vCard (depuis `handleActionContactsWireRun`) |
 | `app/mail/searchViewsWireActionsRun.ts` | Vues enregistrées, chips recherche, filtres liste (wire) |
 | `app/mail/listThreadWireActionsRun.ts` | Fil liste, déplacement, brouillons sauvés (wire) |
