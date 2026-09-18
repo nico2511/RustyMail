@@ -280,7 +280,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsAiDomWireEnginesRun.ts` | llama-server + prefs arrière-plan immédiates |
 | `app/mail/settingsAiDomWirePersistRun.ts` | `persistAiPrefsImmediateFromDom` |
 | `app/mail/settingsAiRuntimeWireActionsRun.ts` | Wire réglages IA : statut LLM, mode moteur, setup recommandé |
-| `app/mail/settingsAiPrefetchWireActionsRun.ts` | Wire prefetch LLM / MiniLM / Whisper, réindex sémantique |
+| `app/mail/settingsAiPrefetchWireActionsRun.ts` | Barrel wire prefetch IA (modèles / index) |
+| `app/mail/settingsAiPrefetchLlmWireRun.ts` | Wire prefetch / annulation modèle LLM |
+| `app/mail/settingsAiPrefetchSemanticWireRun.ts` | Wire MiniLM, réindex sémantique, compteurs |
+| `app/mail/settingsAiPrefetchWhisperWireRun.ts` | Wire prefetch Whisper GGML |
 | `app/mail/settingsGeneralPrefsWireActionsRun.ts` | Wire prefs générales + compte par défaut |
 | `app/mail/settingsNavWireActionsRun.ts` | Wire navigation réglages (onglets, reload comptes) |
 | `app/mail/settingsAiModalShellWireActionsRun.ts` | Wire sous-modale IA (open/close/tabs) |
@@ -296,7 +299,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/contactsWireActionsAddressBookRun.ts` | Import / export vCard carnet |
 | `app/mail/searchViewsWireActionsRun.ts` | Barrel vues enregistrées, chips, filtres liste |
 | `app/mail/searchViewsSavedWireActionsRun.ts` | Vues enregistrées, lot recherche, suggestions |
-| `app/mail/searchViewsClearFiltersWireActionsRun.ts` | Effacer chips recherche, portée, filtres liste / digest |
+| `app/mail/searchViewsClearFiltersWireActionsRun.ts` | Barrel effacer chips / filtres recherche |
+| `app/mail/searchViewsClearFiltersWireRun.ts` | Effacer chips recherche, portée, NL |
+| `app/mail/searchViewsListWireRun.ts` | Filtres liste, load-more, digest dossier |
 | `app/mail/listThreadWireActionsRun.ts` | Barrel fil liste / déplacement / brouillons |
 | `app/mail/listThreadMoveWireActionsRun.ts` | Corbeille, archive, lu/suivi, modale déplacer |
 | `app/mail/listThreadMailboxWireActionsRun.ts` | Modale gérer dossier IMAP |
@@ -336,7 +341,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/orgApplyRun.ts` | Appliquer propositions org v1 + `registerOrgApplyRunDeps()` |
 | `app/mail/orgV2ApplyRun.ts` | Barrel apply org v2 |
 | `app/mail/orgV2ApplyContext.ts` | `registerOrgV2ApplyRunDeps()` |
-| `app/mail/orgV2ApplyBatchRun.ts` | Application org v2 par chunks |
+| `app/mail/orgV2ApplyBatchRun.ts` | Orchestration apply org v2 |
+| `app/mail/orgV2ApplyChunkLoopRun.ts` | Boucle chunks `orgApplyProposal` |
+| `app/mail/orgV2ApplyOutcomeRun.ts` | Toasts, IMAP refresh, rapport org v2 |
 | `app/mail/orgV2ApplyConfirmRun.ts` | Confirm + preview avant apply org v2 |
 | `app/mail/orgV2ProposalUi.ts` | Ignorer / reporter / mémoire dossiers org v2 |
 | `app/mail/folderManagerActions.ts` | Barrel vue Dossiers IMAP |
