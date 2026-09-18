@@ -154,7 +154,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadMessageSort.ts` | Tri messages fil, dates (`parseMaybeDate`, `dayKey`) |
 | `app/mail/threadLangGuessSamples.ts` | Échantillon texte + `normalizeIso639Primary` |
 | `app/mail/threadLangGuess.ts` | Barrel heuristiques langue + offres traduction |
-| `app/mail/threadLangGuessHints.ts` | Indices mots par langue (ISO) |
+| `app/mail/threadLangGuessHints.ts` | Barrel indices mots par langue (ISO) |
+| `app/mail/threadLangGuessHintsFr.ts` | Indices FR |
+| `app/mail/threadLangGuessHintsEn.ts` | Indices EN |
+| `app/mail/threadLangGuessHintsIt.ts` | Indices IT |
+| `app/mail/threadLangGuessHintsDe.ts` | Indices DE |
+| `app/mail/threadLangGuessHintsEs.ts` | Indices ES |
+| `app/mail/threadLangGuessHintsPt.ts` | Indices PT |
 | `app/mail/threadLangGuessDetectRun.ts` | Détection ISO639 depuis texte / tags |
 | `app/mail/threadLangGuessOfferRun.ts` | `shouldOffer*Translate` |
 | `app/mail/threadViewUiHelpers.ts` | Barrel participants fil, zen summary, mode vue message |
@@ -349,6 +355,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
 | `wireEvents/handleActionAddressBookSidebarWireRun.ts` | Carnet (sidebar réglages) |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
+| `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeWireActionsRun.ts` | Fermeture compose wire, restauration révision, grammaire |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
