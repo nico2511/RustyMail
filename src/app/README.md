@@ -341,12 +341,15 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionThreadViewUiWireRun.ts` | Panneau IA, citations, tags, digest |
 | `wireEvents/handleActionThreadReplyWireRun.ts` | Reply, forward, PJ, liens mail |
 | `wireEvents/handleActionThreadSecurityWireRun.ts` | Actions sécurité → `threadSecurityActionsRun` |
-| `wireEvents/handleActionComposeWireRun.ts` | Fermeture compose, brouillon, envoi, PJ |
+| `wireEvents/handleActionComposeWireRun.ts` | Barrel compose (fermeture, historique, éditeur) |
+| `wireEvents/handleActionComposeCloseWireRun.ts` | Fermer / sauver brouillon, orphelins |
+| `wireEvents/handleActionComposeDraftHistoryWireRun.ts` | Versions brouillon, diff, restauration |
+| `wireEvents/handleActionComposeEditorWireRun.ts` | Layout, envoi, PJ, rewrite IA |
 | `wireEvents/handleActionThreadLlmWireRun.ts` | IA fil, QA, démo, réponses rapides |
 | `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
 | `wireEvents/handleActionAddressBookSidebarWireRun.ts` | Carnet (sidebar réglages) |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
-| `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
+| `app/mail/composeWireActionsRun.ts` | Fermeture compose wire, restauration révision, grammaire |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
 | `app/mail/addressBookWireActions.ts` | Carnet d’adresses (fiche contact, compteur sidebar) |
 | `app/mail/accountWireActions.ts` | Compte / micro / brouillons sauvegardés |
@@ -357,7 +360,6 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
 | `app/mail/accountOAuthDesktopConnectRun.ts` | Login OAuth Google / Microsoft (desktop) |
 | `app/mail/accountOAuthFinishRun.ts` | Post-login OAuth nouveau compte |
-| `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
 | `wireEvents/depsCore.ts` | invoke, toast, state, render, loaders, nav, modales — réexporte `depsContext` |
 | `wireEvents/depsSearchMail.ts` | inbox, recherche, agent, carnet, entrée compose |
 | `wireEvents/depsComposeThread.ts` | compose, fil, LLM compose |
