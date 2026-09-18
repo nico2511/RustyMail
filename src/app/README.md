@@ -345,9 +345,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionSettingsAiModalShellWireRun.ts` | Sous-modale IA (semantic, engines, …) |
 | `wireEvents/handleActionSettingsGeneralPrefsWireRun.ts` | Compte par défaut + prefs générales |
 | `wireEvents/handleActionSettingsAiWireRun.ts` | Barrel prefs IA (runtime + prefetch + dictée) |
-| `wireEvents/handleActionSettingsAiRuntimeWireRun.ts` | Statut LLM, mode moteur, setup recommandé |
-| `wireEvents/handleActionSettingsAiPrefetchWireRun.ts` | Prefetch LLM / MiniLM / Whisper, réindex sémantique |
-| `wireEvents/handleActionSettingsAiDictationWireRun.ts` | Action `dictation-test-mic` |
+| `wireEvents/handleActionSettingsAiRuntimeWireRun.ts` | Re-export `settingsAiRuntimeWireActionsRun` |
+| `wireEvents/handleActionSettingsAiPrefetchWireRun.ts` | Re-export `settingsAiPrefetchWireActionsRun` |
+| `wireEvents/handleActionSettingsAiDictationWireRun.ts` | Re-export `settingsAiDictationWireActionsRun` |
 | `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Dispatch clés API → `settingsApiKeysPersistRun` |
 | `wireEvents/handleActionSettingsLlamaBinaryWireRun.ts` | Binaire llama-server (detect, winget, chemin) |
 | `wireEvents/handleActionNewsletterRulesWireRun.ts` | Dispatch règles newsletter → `newsletterRulesWireRun` |
@@ -398,7 +398,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 ## Prochaines extractions (ordre suggéré)
 
 1. Affiner encore les imports wire si de nouveaux handlers grossissent
-2. Déplacer handlers settings IA wire (`AiRuntime`, `AiPrefetch`, …) vers `app/mail/*`
-3. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
+2. Déplacer handlers wire restants (compose editor, thread view UI, folder manager) vers `app/mail/*`
+3. Affiner imports `deps*` si des barrels grossissent encore
 
 `npm run verify:ts` · `npm test`
