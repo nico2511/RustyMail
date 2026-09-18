@@ -317,7 +317,13 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionOrgV2WireRun.ts` | Wire org v2 (scan, apply, modales) |
 | `wireEvents/handleActionOrgV1WireRun.ts` | Wire org v1 (scan, apply, retag) |
 | `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes / prefs IA — **typé** |
-| `wireEvents/handleActionThreadCompose.ts` | Compose / fil / brouillons — **typé** |
+| `wireEvents/handleActionThreadCompose.ts` | Compose / fil — dispatch vers sous-handlers |
+| `wireEvents/handleActionThreadNavWireRun.ts` | Navigation fil / sidebar / brouillons sauvés |
+| `wireEvents/handleActionThreadViewWireRun.ts` | UI fil, réponses, sécurité, pièces jointes |
+| `wireEvents/handleActionComposeWireRun.ts` | Fermeture compose, brouillon, envoi, PJ |
+| `wireEvents/handleActionThreadLlmWireRun.ts` | IA fil, QA, démo, réponses rapides |
+| `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
+| `wireEvents/handleActionAddressBookSidebarWireRun.ts` | Carnet (sidebar réglages) |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeAssistWireActions.ts` | Assist IA compose (résumé expéditeur, quick replies) |
@@ -342,7 +348,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper `wireEvents/handleActionThreadCompose`, `handleActionComposeSettings`
+1. Découper `wireEvents/handleActionComposeSettings` (~1100 lignes)
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
