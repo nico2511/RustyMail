@@ -76,6 +76,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadActivityTracking.ts` | Activité fil / recherche (suggestions vues enregistrées) |
 | `app/mail/syncInboxAction.ts` | Facade `syncInbox()` |
 | `app/mail/syncInboxRun.ts` | Orchestration `syncInbox`, re-exports watch / push refresh |
+| `app/mail/syncInboxStatusRun.ts` | Message statut sync, toasts fin, réindex sémantique |
 | `app/mail/syncInboxBatchRun.ts` | Cibles IMAP, batches `sync_mailboxes`, aliases |
 | `app/mail/syncInboxListReloadRun.ts` | Rechargement liste + fil ouvert après sync |
 | `app/mail/syncInboxPushRefreshRun.ts` | `refreshUiAfterImapPush` (IDLE) |
@@ -269,7 +270,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/listThreadMailboxWireActionsRun.ts` | Modale gérer dossier IMAP |
 | `app/mail/listThreadSavedDraftWireActionsRun.ts` | Brouillons enregistrés liste |
 | `app/mail/listThreadQuickWireActionsRun.ts` | Copie suggestion quick reply |
-| `app/mail/threadLlmWireActionsRun.ts` | IA fil, QA, démo playground, réponses rapides (wire) |
+| `app/mail/threadLlmWireActionsRun.ts` | Barrel IA fil / QA / démo (wire) |
+| `app/mail/threadLlmQuickReplyWireActionsRun.ts` | Envoi / insertion quick reply |
+| `app/mail/threadLlmAiUiWireActionsRun.ts` | Synthèse, traduction, digest, Q&A fil |
+| `app/mail/threadLlmDemoWireActionsRun.ts` | Reset / suppression boîte démo playground |
 | `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
@@ -368,7 +372,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/composeWireActionsRun.ts` | Fermeture compose wire, restauration révision, grammaire |
 | `app/mail/composeCloseWireActionsRun.ts` | Wire fermeture compose / brouillons orphelins |
 | `app/mail/composeDraftHistoryWireActionsRun.ts` | Wire historique versions brouillon |
-| `app/mail/agentAssistWireActionsRun.ts` | Wire agent, sync, mic, bulk corbeille |
+| `app/mail/agentAssistWireActionsRun.ts` | Barrel agent assist + sync / corbeille (wire) |
+| `app/mail/agentAssistSessionWireActionsRun.ts` | Préparer réponse agent, insertion brouillon |
+| `app/mail/agentAssistComposeWireActionsRun.ts` | Mic, quick replies compose, synthèse expéditeur |
+| `app/mail/agentAssistMailboxWireActionsRun.ts` | Enregistrer compte, sync, vider corbeille, bulk |
 | `app/mail/accountSetupWireActionsRun.ts` | Wire setup compte / OAuth réglages |
 | `app/mail/modalsWireActionsRun.ts` | Wire modales confirm / text prompt |
 | `app/mail/composeEntryWireActionsRun.ts` | Wire action `compose` (nouveau brouillon / reply) |
