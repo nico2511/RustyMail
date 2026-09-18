@@ -77,7 +77,11 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchLaunchContactPresetRun.ts` | Recherche contact / domaine |
 | `app/mail/searchLaunchHashAutocompleteRun.ts` | Barrel hits `#` autocomplete |
 | `app/mail/searchLaunchHashHitStateRun.ts` | Appliquer hit → état recherche |
-| `app/mail/searchLaunchHashHitApplyRun.ts` | Appliquer hit → requête / toast inbox |
+| `app/mail/searchLaunchHashHitApplyRun.ts` | Dispatch hit hash → inbox / recherche |
+| `app/mail/searchLaunchHashHitRefreshRun.ts` | Requête barre après hit (si critères) |
+| `app/mail/searchLaunchHashHitMailboxRun.ts` | Hit dossier / compte |
+| `app/mail/searchLaunchHashHitCriteriaRun.ts` | Hit tag / portée |
+| `app/mail/searchLaunchHashHitListRun.ts` | Hit filtre liste / règle NL |
 | `app/mail/searchTagCatalog.ts` | `refreshSearchTagCatalog` + `registerSearchTagCatalogDeps()` |
 | `app/mail/searchAtAutocompleteWire.ts` | Orchestration câblage `@` / `#` |
 | `app/mail/searchAtAutocompleteWireContext.ts` | `registerSearchAtAutocompleteWireDeps` |
@@ -217,7 +221,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appShellMouseNavRun.ts` | Boutons souris retour / avant |
 | `app/mail/appShellDraftFlushRun.ts` | Flush révisions brouillon (visibility) |
 | `app/mail/mailEmailHtmlSanitize.ts` | Affichage HTML message + barrel sanitize |
-| `app/mail/mailEmailHtmlSanitizeCoreRun.ts` | DOMPurify, liens/images, désabonnement |
+| `app/mail/mailEmailHtmlSanitizeCoreRun.ts` | Orchestration DOMPurify + collecte désabonnement |
+| `app/mail/mailEmailHtmlSanitizeDomRun.ts` | Styles, liens, images dans doc HTML mail |
 | `app/mail/mailEmailHtmlOutlookStripRun.ts` | Nettoyage bruit Outlook / citations |
 | `app/mail/idleAiCachePrefetchContext.ts` | `initIdleAiCachePrefetch`, gen / abort |
 | `app/mail/idleAiCachePrefetchScheduleRun.ts` | Planification debounce / idle |
@@ -424,7 +429,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsOpenView.ts` | Ouverture vue Paramètres |
 | `app/mail/settingsAiPrefsPersistDom.ts` | Persistance prefs IA depuis le DOM |
 | `app/mail/savedDraftsMailboxCountRefresh.ts` | Compteur dossier Brouillons sauvés |
-| `app/mail/composeTauriNativeFileDrop.ts` | Glisser-déposer natif Tauri (PJ compose) |
+| `app/mail/composeTauriNativeFileDrop.ts` | Bind drag-drop natif Tauri (compose) |
+| `app/mail/composeTauriNativeFileDropApplyRun.ts` | Highlight + fusion PJ droppées |
 | `app/mail/threadStatusJobCounts.ts` | Compteurs jobs traduction (barre d’état) |
 | `app/mail/composeSendDraftAction.ts` | Ré-export `sendDraft()` |
 | `app/mail/composeAttachmentPaths.ts` | Join chemins PJ (champ caché) |
