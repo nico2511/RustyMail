@@ -1,15 +1,8 @@
 /** Account, settings, org/folder navigation wire deps */
-import { currentAccount } from "../core/accountContext";
-import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { openContactDetailView } from "./addressBookWireActions";
 import { registerAppNavigationStackDeps } from "./appNavigationStack";
 import { fmSelectMailbox, refreshFolderManagerTree } from "./orgFolderWireActions";
 import { registerFolderManagerRunDeps } from "./folderManagerActions";
-import { aiCacheKeySegment } from "./aiCacheKeySegment";
-import {
-  initIdleAiCachePrefetch,
-} from "./idleAiCachePrefetch";
-import { initMailboxDigest } from "./mailboxDigest";
 import {
   loadMailView,
   loadMailboxUnread,
@@ -20,16 +13,10 @@ import { registerOrgV2ApplyRunDeps } from "./orgV2ApplyRun";
 import { refreshSavedDraftsMailboxCount } from "./savedDraftsMailboxCountRefresh";
 import { refreshSavedSearches, refreshSuggestedSavedViews } from "./savedSearchViews";
 import { registerSettingsWireActionsDeps } from "./settingsWireActions";
-import { refreshLlmRuntimeStatus } from "./settingsLlmRuntime";
 import { syncActivityRecordingPrefs } from "./threadActivityTracking";
 import { registerSwitchActiveAccountDeps } from "./switchActiveAccountAction";
-import {
-  summarizeThreadCore,
-  translateThreadCore,
-} from "./threadAiRun";
-import { threadIsAutoMail } from "./threadAutoMail";
-import { langFromKindTags } from "./threadLangGuess";
-import { normalizeIso639Primary } from "./threadLangGuessSamples";
+
+export { registerAppBackgroundServices } from "./appAccountOrgWireRegistryBackgroundRun";
 
 export function registerAppAccountOrgWireDeps(): void {
   registerSettingsWireActionsDeps({
@@ -53,26 +40,5 @@ export function registerAppAccountOrgWireDeps(): void {
     openContactDetailView,
     fmSelectMailbox,
     refreshFolderManagerTree,
-  });
-}
-
-export function registerAppBackgroundServices(): void {
-  initMailboxDigest({
-    withTimeout,
-    currentAccount,
-    refreshLlmRuntimeStatus,
-    tauriErrorMessage,
-  });
-
-  initIdleAiCachePrefetch({
-    withTimeout,
-    currentAccount,
-    aiCacheKeySegment,
-    refreshLlmRuntimeStatus,
-    threadIsAutoMail,
-    langFromKindTags,
-    normalizeIso639Primary,
-    summarizeThreadCore,
-    translateThreadCore,
   });
 }

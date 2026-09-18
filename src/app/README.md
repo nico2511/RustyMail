@@ -201,13 +201,18 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appRenderRegistryDepsThreadMessageRun.ts` | Message fil, sécurité, participants |
 | `app/mail/appRenderRegistryDepsThreadComposeRun.ts` | Labels compositeur + `renderComposer` |
 | `app/mail/appRenderRegistryDepsThreadAiRun.ts` | IA fil, agent, compteurs jobs traduction |
-| `app/mail/appSearchWireRegistry.ts` | Liste + recherche + vues enregistrées / batch |
-| `app/mail/appThreadWireRegistry.ts` | Ouverture fil, actions liste, changement boîte |
+| `app/mail/appSearchWireRegistry.ts` | Barrel recherche (list / UI) |
+| `app/mail/appSearchWireRegistryListRun.ts` | Liste mail, commit query, corbeille bulk |
+| `app/mail/appSearchWireRegistryUiRun.ts` | Barre recherche, vues, batch, lancement, @ autocomplete |
+| `app/mail/appThreadWireRegistry.ts` | Barrel fil / boîtes (open / mailbox) |
+| `app/mail/appThreadWireRegistryOpenRun.ts` | `registerOpenThreadDeps` + auto-résumé fil |
+| `app/mail/appThreadWireRegistryMailboxRun.ts` | Vide corbeille, actions liste, scroll, switch mailbox |
 | `app/mail/appComposeWireRegistry.ts` | Barrel compose wire (close / draft / LLM) |
 | `app/mail/appComposeWireRegistryCloseRun.ts` | Fermeture compose, pièces jointes, layout, envoi |
 | `app/mail/appComposeWireRegistryDraftRun.ts` | Preview, autosave révisions, reply thread |
 | `app/mail/appComposeWireRegistryLlmRun.ts` | Annulation file LLM / prefetch idle |
-| `app/mail/appAccountOrgWireRegistry.ts` | Compte, réglages, org/dossiers, nav + services digest/prefetch |
+| `app/mail/appAccountOrgWireRegistry.ts` | Compte, réglages, org/dossiers, pile nav |
+| `app/mail/appAccountOrgWireRegistryBackgroundRun.ts` | Digest mailbox + prefetch cache IA idle |
 | `app/mail/savedDraftOpenRun.ts` | Ouvrir un brouillon enregistré dans le composeur |
 | `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |
 | `app/mail/appBootRun.ts` | Facade `boot()` |
