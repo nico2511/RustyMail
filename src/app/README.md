@@ -330,7 +330,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsAiDomWireModalRun.ts` | Barrel listeners modale réglages IA |
 | `app/mail/settingsAiDomWireModalChangeRun.ts` | Change/input debounced modale IA |
 | `app/mail/settingsAiDomWireModalHandlersRun.ts` | Handlers select moteur / preset modale IA |
-| `app/mail/settingsAiDomWireEnginesRun.ts` | llama-server + prefs arrière-plan immédiates |
+| `app/mail/settingsAiDomWireEnginesRun.ts` | Barrel wire llama-server + prefs arrière-plan |
+| `app/mail/settingsAiDomWireLlamaServerRun.ts` | Checkboxes spawn / override CPU llama-server |
+| `app/mail/settingsAiDomWireBackgroundPrefsRun.ts` | Prefs arrière-plan IA + recherche sémantique |
 | `app/mail/settingsAiDomWirePersistRun.ts` | `persistAiPrefsImmediateFromDom` |
 | `app/mail/settingsAiRuntimeWireActionsRun.ts` | Wire réglages IA : statut LLM, mode moteur, setup recommandé |
 | `app/mail/settingsAiPrefetchWireActionsRun.ts` | Barrel wire prefetch IA (modèles / index) |
@@ -356,7 +358,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchViewsWireActionsRun.ts` | Barrel vues enregistrées, chips, filtres liste |
 | `app/mail/searchViewsSavedWireActionsRun.ts` | Vues enregistrées, lot recherche, suggestions |
 | `app/mail/searchViewsClearFiltersWireActionsRun.ts` | Barrel effacer chips / filtres recherche |
-| `app/mail/searchViewsClearFiltersWireRun.ts` | Effacer chips recherche, portée, NL |
+| `app/mail/searchViewsClearFiltersWireRun.ts` | Dispatch effacer chips / portée recherche |
+| `app/mail/searchViewsClearFiltersTextRun.ts` | Texte, filtre liste, filtres NL |
+| `app/mail/searchViewsClearFiltersCriteriaRun.ts` | Expéditeur, dossier, compte, tags, NL rule |
+| `app/mail/searchViewsClearFiltersScopeRun.ts` | Bascule portée compte / dossier |
 | `app/mail/searchViewsListWireRun.ts` | Filtres liste, load-more, digest dossier |
 | `app/mail/listThreadWireActionsRun.ts` | Barrel fil liste / déplacement / brouillons |
 | `app/mail/listThreadMoveWireActionsRun.ts` | Barrel déplacement / meta liste fil |

@@ -1,107 +1,33 @@
+import { navApplyPendingScrollRestore, navQueueScrollRestore, type NavSnapshot } from "../../navigation";
 import {
   clearContactProfile,
-  loadContactsList,
   setContactsKeywordDraft,
   setContactsListQuery,
 } from "../../contactsView";
-import { navApplyPendingScrollRestore, navQueueScrollRestore, type NavSnapshot } from "../../navigation";
 import { render } from "../dispatch";
-import { currentAccount } from "../core/accountContext";
-import { tauriErrorMessage } from "../lib/tauriCommand";
-import { toast } from "../lib/toast";
 import { state } from "../state";
-import { defaultListFilterFromPrefs } from "./accountDefaultPrefs";
 import type { AppNavigationStackDeps } from "./appNavigationStackContext";
 import { requireAppNavigationStackDeps } from "./appNavigationStackContext";
-import { searchThreads } from "./searchThreadsRun";
-import { clearThreadAiSummaryState } from "./threadAiSummaryState";
+import { applyNavSnapshotContactsViews } from "./appNavigationApplyViewsContactsRun";
+import { applyNavSnapshotMailViews } from "./appNavigationApplyViewsMailRun";
+import { applyNavSnapshotOrgViews } from "./appNavigationApplyViewsOrgRun";
 
 export async function applyNavSnapshotView(snap: NavSnapshot, d: AppNavigationStackDeps): Promise<void> {
   switch (snap.view) {
     case "list":
-      state.view = "list";
-      state.selectedThread = undefined;
-      state.selectedThreadId = undefined;
-      clearThreadAiSummaryState();
-      render();
-      if (
-        (snap.search?.trim() ?? "") ||
-        (snap.searchSenders?.length ?? 0) > 0 ||
-        snap.listFilter !== defaultListFilterFromPrefs()
-      ) {
-        void searchThreads();
-      }
-      break;
-    case "thread": {
-      const tid = snap.selectedThreadId?.trim();
-      if (!tid) {
-        state.view = "list";
-        render();
-        break;
-      }
-      await d.openThread(tid, { skipHistory: true, preserveAi: snap.aiOpen });
-      break;
-    }
-    case "contacts": {
-      state.view = "contacts";
-      state.selectedContactEmail = undefined;
-      clearContactProfile();
-      clearThreadAiSummaryState();
-      render();
-      const acc = currentAccount();
-      if (acc?.id) {
-        try {
-          await loadContactsList(acc.id, { reset: true, query: snap.contactsListQuery });
-        } catch (e) {
-          toast(tauriErrorMessage(e));
-        }
-      }
-      render();
-      break;
-    }
-    case "contact": {
-      const em = snap.selectedContactEmail?.trim();
-      if (!em) {
-        state.view = "contacts";
-        render();
-        break;
-      }
-      await d.openContactDetailView(em, { skipHistory: true });
-      break;
-    }
+    case "thread":
+    case "compose":
     case "settings":
-      state.view = "settings";
-      state.settingsTab = snap.settingsTab ?? state.settingsTab;
-      clearThreadAiSummaryState();
-      render();
+      await applyNavSnapshotMailViews(snap, d);
+      break;
+    case "contacts":
+    case "contact":
+      await applyNavSnapshotContactsViews(snap, d);
       break;
     case "organization":
-      state.view = "organization";
-      state.mailboxDigestPanelOpen = false;
-      clearThreadAiSummaryState();
-      render();
-      break;
     case "organizationV2":
-      state.view = "organizationV2";
-      state.mailboxDigestPanelOpen = false;
-      clearThreadAiSummaryState();
-      render();
-      break;
-    case "folderManager": {
-      state.view = "folderManager";
-      state.mailboxDigestPanelOpen = false;
-      clearThreadAiSummaryState();
-      const mb = snap.folderManagerSelectedMailbox ?? null;
-      state.folderManager.selectedMailbox = mb;
-      if (!mb) state.threads = [];
-      render();
-      if (mb) await d.fmSelectMailbox(mb, { skipHistory: true });
-      else await d.refreshFolderManagerTree();
-      break;
-    }
-    case "compose":
-      state.view = "compose";
-      render();
+    case "folderManager":
+      await applyNavSnapshotOrgViews(snap, d);
       break;
     default:
       state.view = "list";
