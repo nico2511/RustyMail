@@ -39,7 +39,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailboxDigestBriefBannerRun.ts` | Bannières brief indisponible / erreur |
 | `app/mail/mailboxDigestRenderRun.ts` | Bouton toolbar Brief |
 | `app/mail/idleAiCachePrefetch.ts` | Barrel préchargement cache LLM au idle |
-| `app/mail/searchQueryContext.ts` | Payload recherche, `isSearchActive`, critères engagés, dossier effectif |
+| `app/mail/searchQueryContext.ts` | Barrel payload recherche / critères / dossier |
+| `app/mail/searchQueryContextActiveRun.ts` | `isSearchActive`, dossier effectif, loader contexte |
+| `app/mail/searchQueryContextBuildRun.ts` | `buildSearchQueryFromCurrentState`, compte requête |
 | `app/mail/searchThreadsRun.ts` | Exécution `searchThreads()` |
 | `app/mail/searchThreadsFocusRun.ts` | Génération requête + focus/sélection champ recherche |
 | `app/mail/fetchOpenThread.ts` | `fetchOpenThreadOrNotify()` |
@@ -244,7 +246,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadViewUiLayoutRun.ts` | Lanes arbre fil, accent expéditeur, cible réponse rapide |
 | `app/mail/threadViewUiZenHtmlRun.ts` | Fragments HTML résumé zen (listes / paragraphes) |
 | `app/mail/threadViewUiCleanModeRun.ts` | Mode vue message original vs nettoyé |
-| `app/mail/mailSecurityDisplay.ts` | Signaux sécurité + enrichissement LLM async |
+| `app/mail/mailSecurityDisplay.ts` | Barrel signaux sécurité fil |
+| `app/mail/mailSecurityDefaultsRun.ts` | Signaux sécurité par défaut |
+| `app/mail/mailSecurityDisplaySignalsRun.ts` | Affichage findings / tier CSS |
+| `app/mail/mailSecurityLlmAugmentRun.ts` | Enrichissement LLM async + cache |
 | `app/mail/composeFormLabels.ts` | Libellés compose (type brouillon, horodatage révision) |
 | `app/mail/settingsAccountsFormState.ts` | Scratch identité formulaire comptes (DOM) |
 | `app/mail/settingsRenderHelpers.ts` | Profil comptes + bloc stats sémantiques + deps panneau IA |
@@ -424,7 +429,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/switchMailboxRun.ts` | Changement de dossier IMAP (sidebar) |
 | `app/mail/contactsViewNavigation.ts` | Carnet : `openContactsView`, `openContactDetailView` |
 | `app/mail/loadAddressBookSidebarCount.ts` | Compteur contacts sidebar |
-| `app/mail/mailUnsubscribeLinks.ts` | Détection / tri liens désinscription HTML |
+| `app/mail/mailUnsubscribeLinks.ts` | Barrel liens désinscription HTML |
+| `app/mail/mailUnsubscribeHrefScoreRun.ts` | Score / tri href désinscription |
+| `app/mail/mailUnsubscribeLinkDetectRun.ts` | Heuristiques anchor désinscription |
+| `app/mail/mailUnsubscribeLinkDomRun.ts` | Collecte DOM + masquage sections déplacées |
 | `app/mail/addressBookListState.ts` | Cache liste carnet + `refreshAddressBookList()` |
 | `app/mail/orgOpenOrganizationMailbox.ts` | Ouvrir un dossier depuis Organiser |
 | `app/mail/orgRowSyncMailbox.ts` | Sync IMAP d’une ligne org (rapport via `orgOrganizationReportRefresh`) |
