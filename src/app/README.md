@@ -320,7 +320,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionModalsWireRun.ts` | Modales confirm / text prompt |
 | `wireEvents/handleActionComposeEntryWireRun.ts` | Action `compose` (nouveau brouillon) |
 | `wireEvents/handleActionSettingsShellWireRun.ts` | Onglets réglages, prefs générales, modale IA |
-| `wireEvents/handleActionSettingsAiWireRun.ts` | Prefs IA, prefetch LLM / sémantique / Whisper |
+| `wireEvents/handleActionSettingsAiWireRun.ts` | Barrel prefs IA (runtime + prefetch + dictée) |
+| `wireEvents/handleActionSettingsAiRuntimeWireRun.ts` | Statut LLM, mode moteur, setup recommandé |
+| `wireEvents/handleActionSettingsAiPrefetchWireRun.ts` | Prefetch LLM / MiniLM / Whisper, réindex sémantique |
+| `wireEvents/handleActionSettingsAiDictationWireRun.ts` | Action `dictation-test-mic` |
 | `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Clés API cloud / dictée / OpenRouter |
 | `wireEvents/handleActionSettingsLlamaBinaryWireRun.ts` | Binaire llama-server (detect, winget, chemin) |
 | `wireEvents/handleActionNewsletterRulesWireRun.ts` | Règles newsletter (domaine / message) |

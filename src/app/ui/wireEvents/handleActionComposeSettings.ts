@@ -12,7 +12,7 @@ export async function tryHandleComposeSettings(action: string, element?: HTMLEle
   if (await tryHandleComposeEntryWire(action, element)) return true;
   if (await tryHandleSettingsShellWire(action, element)) return true;
   if (await tryHandleSettingsAiWire(action, element)) return true;
-  if (await tryHandleSettingsApiKeysWire(action, element)) return true;
+  if (await tryHandleSettingsApiKeysWire(action)) return true;
   if (await tryHandleSettingsLlamaBinaryWire(action, element)) return true;
   if (await tryHandleNewsletterRulesWire(action, element)) return true;
   if (await tryHandleAccountSetupWire(action, element)) return true;
