@@ -226,7 +226,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/folderManagerPanelState.ts` | État recherche panneau dossiers |
 | `app/mail/orgApplyStatusMessage.ts` | Libellés progression Organiser |
 | `app/mail/threadShellLayout.ts` | Layout lecture fil / panneau IA shell |
-| `app/mail/settingsLlmRuntime.ts` | Statut LLM, llama-server, modale moteurs, contexte |
+| `app/mail/settingsLlmRuntime.ts` | Barrel statut LLM, llama-server, modale moteurs |
+| `app/mail/settingsLlmRuntimeStatusRun.ts` | `refreshLlmRuntimeStatus`, cache GGUF |
+| `app/mail/settingsLlmRuntimeLlamaDetectRun.ts` | Détection binaire `llama-server` |
+| `app/mail/settingsLlmRuntimeUiRun.ts` | Modale moteurs, slider contexte, toggles moteur |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
 | `app/mail/settingsOpenView.ts` | Ouverture vue Paramètres |
@@ -251,7 +254,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/orgOrganizationReportRefresh.ts` | Rescan rapports Organiser v1/v2 |
 | `app/mail/orgOrganizationOpenViews.ts` | Ouverture vues Organiser v1/v2 |
 | `app/mail/orgApplyRun.ts` | Appliquer propositions org v1 + `registerOrgApplyRunDeps()` |
-| `app/mail/orgV2ApplyRun.ts` | Appliquer propositions org v2 + `registerOrgV2ApplyRunDeps()` |
+| `app/mail/orgV2ApplyRun.ts` | Barrel apply org v2 |
+| `app/mail/orgV2ApplyContext.ts` | `registerOrgV2ApplyRunDeps()` |
+| `app/mail/orgV2ApplyBatchRun.ts` | Confirm + application par chunks |
 | `app/mail/orgV2ProposalUi.ts` | Ignorer / reporter / mémoire dossiers org v2 |
 | `app/mail/folderManagerActions.ts` | Barrel vue Dossiers IMAP |
 | `app/mail/folderManagerContext.ts` | `registerFolderManagerRunDeps` |
@@ -302,7 +307,11 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
 | `wireEvents/handleActionInboxSearch.ts` | Inbox / recherche / fil / agents — **typé** |
-| `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — **typé** (+ fix `return true` sur modales) |
+| `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — dispatch vers sous-handlers |
+| `wireEvents/handleActionOrgFolderNavRun.ts` | Ouverture vues org / contacts / FM |
+| `wireEvents/handleActionFolderManagerRun.ts` | Actions gestionnaire dossiers (`fm-*`) |
+| `wireEvents/handleActionOrgV2WireRun.ts` | Wire org v2 (scan, apply, modales) |
+| `wireEvents/handleActionOrgV1WireRun.ts` | Wire org v1 (scan, apply, retag) |
 | `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes / prefs IA — **typé** |
 | `wireEvents/handleActionThreadCompose.ts` | Compose / fil / brouillons — **typé** |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
@@ -329,7 +338,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Découper d’autres gros modules (`settingsLlmRuntime` en sous-modules, `wireEvents/handleAction*`, …)
+1. Découper `wireEvents/handleActionInboxSearch`, `handleActionThreadCompose`, `handleActionComposeSettings`
 2. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
