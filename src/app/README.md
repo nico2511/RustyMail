@@ -203,7 +203,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appRenderRegistryDepsThreadAiRun.ts` | IA fil, agent, compteurs jobs traduction |
 | `app/mail/appSearchWireRegistry.ts` | Liste + recherche + vues enregistrées / batch |
 | `app/mail/appThreadWireRegistry.ts` | Ouverture fil, actions liste, changement boîte |
-| `app/mail/appComposeWireRegistry.ts` | Compose, brouillons, file LLM |
+| `app/mail/appComposeWireRegistry.ts` | Barrel compose wire (close / draft / LLM) |
+| `app/mail/appComposeWireRegistryCloseRun.ts` | Fermeture compose, pièces jointes, layout, envoi |
+| `app/mail/appComposeWireRegistryDraftRun.ts` | Preview, autosave révisions, reply thread |
+| `app/mail/appComposeWireRegistryLlmRun.ts` | Annulation file LLM / prefetch idle |
 | `app/mail/appAccountOrgWireRegistry.ts` | Compte, réglages, org/dossiers, nav + services digest/prefetch |
 | `app/mail/savedDraftOpenRun.ts` | Ouvrir un brouillon enregistré dans le composeur |
 | `app/mail/appRuntimeFallbacks.ts` | Fallback `app_status` / `capabilities` hors Tauri |
