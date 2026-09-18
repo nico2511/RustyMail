@@ -196,9 +196,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` (barrel) |
 | `app/mail/appRenderRegistryPagesRun.ts` | Rendu pages Organiser / Dossiers |
 | `app/mail/appRenderRegistryDepsRun.ts` | Barrel `buildAppRenderDeps()` |
-| `app/mail/appRenderRegistryDepsShellRun.ts` | Fragment RenderDeps liste / réglages / org |
+| `app/mail/appRenderRegistryDepsShellRun.ts` | Barrel fragment shell RenderDeps |
+| `app/mail/appRenderRegistryDepsShellSearchRun.ts` | Recherche / vues enregistrées |
+| `app/mail/appRenderRegistryDepsShellListRun.ts` | Liste, org, fil d’Ariane |
+| `app/mail/appRenderRegistryDepsShellSettingsRun.ts` | Réglages, contacts, carnet |
 | `app/mail/appRenderRegistryDepsThreadRun.ts` | Barrel fragment RenderDeps fil / compose / IA |
-| `app/mail/appRenderRegistryDepsThreadMessageRun.ts` | Message fil, sécurité, participants |
+| `app/mail/appRenderRegistryDepsThreadMessageRun.ts` | Message fil, participants, HTML |
+| `app/mail/appRenderRegistryDepsThreadMessageSecurityRun.ts` | Affichage sécurité mail |
 | `app/mail/appRenderRegistryDepsThreadComposeRun.ts` | Labels compositeur + `renderComposer` |
 | `app/mail/appRenderRegistryDepsThreadAiRun.ts` | IA fil, agent, compteurs jobs traduction |
 | `app/mail/appSearchWireRegistry.ts` | Barrel recherche (list / UI) |

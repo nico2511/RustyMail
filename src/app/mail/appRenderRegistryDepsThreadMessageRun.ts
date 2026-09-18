@@ -5,11 +5,6 @@ import {
   extractUnsubscribeLinksFromHtml,
   messageHtmlForDisplay,
 } from "./mailEmailHtmlSanitize";
-import {
-  mailSecurityFindingsForDisplay,
-  mailSecurityTierClass,
-  normalizedMailSecurity,
-} from "./mailSecurityDisplay";
 import { threadIdsMatch } from "../lib/threadIdsMatch";
 import { threadIsAutoMail } from "./threadAutoMail";
 import { shouldOfferPerMessageTranslate } from "./threadLangGuess";
@@ -34,6 +29,7 @@ import {
   threadTreeLaneRight,
   zenSummaryHtmlFragments,
 } from "./threadViewUiHelpers";
+import { buildThreadMessageSecurityRenderDepsFragment } from "./appRenderRegistryDepsThreadMessageSecurityRun";
 
 export function buildThreadMessageRenderDepsFragment(): Pick<
   RenderDeps,
@@ -65,6 +61,7 @@ export function buildThreadMessageRenderDepsFragment(): Pick<
   | "threadIdsMatch"
 > {
   return {
+    ...buildThreadMessageSecurityRenderDepsFragment(),
     normalizeThreadSenderLabel,
     formatThreadReadingWhen,
     sortMessagesByReceivedDescending,
@@ -84,9 +81,6 @@ export function buildThreadMessageRenderDepsFragment(): Pick<
     messageHtmlForDisplay,
     extractUnsubscribeLinksFromHtml,
     threadMessageAnchorId,
-    normalizedMailSecurity,
-    mailSecurityTierClass,
-    mailSecurityFindingsForDisplay,
     zenSummaryHtmlFragments,
     parseMaybeDate,
     dayKey,
