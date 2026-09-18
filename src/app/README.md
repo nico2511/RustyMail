@@ -190,7 +190,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/composeDraftSession.ts` | Id session, reset état révisions, contenu « significatif » |
 | `app/mail/composeDraftLocalSave.ts` | Révisions, upsert Sauvés, orphelins au boot |
 | `app/mail/composeLayoutState.ts` | `syncPreviewOpenFromComposeLayout` |
-| `app/mail/newsletterRulesWireRun.ts` | Actions wire add/remove règles newsletter |
+| `app/mail/newsletterRulesWireRun.ts` | Actions wire add/remove règles newsletter (+ `tryHandleNewsletterRulesWire`) |
 | `app/mail/newsletterRulesMatch.ts` | Correspondance expéditeur ↔ règle newsletter |
 | `app/mail/composeDraftRevisions.ts` | Liste révisions brouillon |
 | `app/mail/composeDraftRevisionDiff.ts` | Diff vs révision |
@@ -355,7 +355,7 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionSettingsAiDictationWireRun.ts` | Re-export `settingsAiDictationWireActionsRun` |
 | `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Dispatch clés API → `settingsApiKeysPersistRun` |
 | `wireEvents/handleActionSettingsLlamaBinaryWireRun.ts` | Re-export `settingsLlamaBinaryWireActionsRun` |
-| `wireEvents/handleActionNewsletterRulesWireRun.ts` | Re-export `newsletterRulesWireActionsRun` |
+| `wireEvents/handleActionNewsletterRulesWireRun.ts` | Re-export `newsletterRulesWireRun` |
 | `wireEvents/handleActionAccountSetupWireRun.ts` | Re-export `accountSetupWireActionsRun` |
 | `wireEvents/handleActionThreadCompose.ts` | Compose / fil — dispatch vers sous-handlers |
 | `wireEvents/handleActionThreadNavWireRun.ts` | Re-export `threadNavWireActionsRun` |
@@ -387,7 +387,15 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/settingsLlamaBinaryWireActionsRun.ts` | Wire binaire llama-server (detect, winget, chemin) |
 | `app/mail/threadSecurityWireActionsRun.ts` | Wire actions sécurité fil |
 | `app/mail/orgFolderNavWireActionsRun.ts` | Wire navigation org / contacts / FM |
-| `app/mail/newsletterRulesWireActionsRun.ts` | Wire règles newsletter (dispatch → `newsletterRulesWireRun`) |
+| `app/mail/handleActionRun.ts` | Orchestrateur `handleAction` (compose / fil / org / inbox) |
+| `app/mail/composeSettingsWireDispatchRun.ts` | Dispatch modales, réglages, compte |
+| `app/mail/threadComposeWireDispatchRun.ts` | Dispatch fil + compose + recherche modale |
+| `app/mail/inboxSearchWireDispatchRun.ts` | Dispatch contacts, agent, recherche, liste |
+| `app/mail/orgFolderWireDispatchRun.ts` | Dispatch org v1/v2, FM, nav |
+| `app/mail/composeWireDispatchRun.ts` | Dispatch compose close / historique / éditeur |
+| `app/mail/threadViewWireDispatchRun.ts` | Dispatch UI fil / reply / sécurité |
+| `app/mail/settingsAiWireDispatchRun.ts` | Dispatch prefs IA runtime / prefetch / dictée |
+| `app/mail/settingsApiKeysWireActionsRun.ts` | Wire clés API (persist / clear) |
 | `app/mail/composeEditorWireActionsRun.ts` | Wire éditeur compose (layout, envoi, PJ, rewrite IA) |
 | `app/mail/threadViewUiWireActionsRun.ts` | Wire UI fil (panneau IA, citations, tags, digest) |
 | `app/mail/folderManagerWireActionsRun.ts` | Wire gestionnaire dossiers (`fm-*`) |

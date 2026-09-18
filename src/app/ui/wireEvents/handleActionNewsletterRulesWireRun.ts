@@ -1,1 +1,1 @@
-export { tryHandleNewsletterRulesWire } from "../../mail/newsletterRulesWireActionsRun";
+export { tryHandleNewsletterRulesWire } from "../../mail/newsletterRulesWireRun";
