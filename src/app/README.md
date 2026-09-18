@@ -126,7 +126,6 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/bootDeferredPrefsFetchRun.ts` | `get_app_prefs`, statuts clés API |
 | `app/mail/bootDeferredPrefsListenersRun.ts` | Events bootstrap modèles / prefetch LLM |
 | `app/mail/bootDeferredPrefsAfterLoadRun.ts` | Wizard, compte défaut, filtre liste, brief gate |
-| `app/ui/wireEvents/depsContext.ts` | Mutateurs contexte wireEvents (capture compte, carnet) |
 | `app/mail/appModuleRegistry.ts` | Orchestrateur `registerAllAppModules()` (~20 lignes) |
 | `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` (barrel) |
 | `app/mail/appRenderRegistryPagesRun.ts` | Rendu pages Organiser / Dossiers |
@@ -335,17 +334,17 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents.ts` | `wireEvents()` (câblage DOM) |
 | `wireEvents/handleActionInboxSearch.ts` | Inbox / recherche — dispatch vers sous-handlers |
 | `wireEvents/handleActionContactsWireRun.ts` | Re-export `contactsWireActionsRun` |
-| `wireEvents/handleActionAgentAssistWireRun.ts` | Agent, mic, sync, corbeille bulk |
+| `wireEvents/handleActionAgentAssistWireRun.ts` | Re-export `agentAssistWireActionsRun` |
 | `wireEvents/handleActionSearchViewsWireRun.ts` | Re-export `searchViewsWireActionsRun` |
 | `wireEvents/handleActionListThreadWireRun.ts` | Re-export `listThreadWireActionsRun` |
 | `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — dispatch vers sous-handlers |
-| `wireEvents/handleActionOrgFolderNavRun.ts` | Ouverture vues org / contacts / FM |
+| `wireEvents/handleActionOrgFolderNavRun.ts` | Re-export `orgFolderNavWireActionsRun` |
 | `wireEvents/handleActionFolderManagerRun.ts` | Re-export `folderManagerWireActionsRun` |
 | `wireEvents/handleActionOrgV2WireRun.ts` | Re-export `orgV2WireActionsRun` |
 | `wireEvents/handleActionOrgV1WireRun.ts` | Re-export `orgV1WireActionsRun` |
 | `wireEvents/handleActionComposeSettings.ts` | Paramètres / comptes — dispatch vers sous-handlers |
-| `wireEvents/handleActionModalsWireRun.ts` | Modales confirm / text prompt |
-| `wireEvents/handleActionComposeEntryWireRun.ts` | Action `compose` (nouveau brouillon) |
+| `wireEvents/handleActionModalsWireRun.ts` | Re-export `modalsWireActionsRun` |
+| `wireEvents/handleActionComposeEntryWireRun.ts` | Re-export `composeEntryWireActionsRun` |
 | `wireEvents/handleActionSettingsShellWireRun.ts` | Re-export `settingsShellWireActionsRun` |
 | `wireEvents/handleActionSettingsNavWireRun.ts` | Re-export `settingsNavWireActionsRun` |
 | `wireEvents/handleActionSettingsAiModalShellWireRun.ts` | Re-export `settingsAiModalShellWireActionsRun` |
@@ -355,21 +354,21 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionSettingsAiPrefetchWireRun.ts` | Re-export `settingsAiPrefetchWireActionsRun` |
 | `wireEvents/handleActionSettingsAiDictationWireRun.ts` | Re-export `settingsAiDictationWireActionsRun` |
 | `wireEvents/handleActionSettingsApiKeysWireRun.ts` | Dispatch clés API → `settingsApiKeysPersistRun` |
-| `wireEvents/handleActionSettingsLlamaBinaryWireRun.ts` | Binaire llama-server (detect, winget, chemin) |
-| `wireEvents/handleActionNewsletterRulesWireRun.ts` | Dispatch règles newsletter → `newsletterRulesWireRun` |
-| `wireEvents/handleActionAccountSetupWireRun.ts` | Comptes, OAuth, suppression |
+| `wireEvents/handleActionSettingsLlamaBinaryWireRun.ts` | Re-export `settingsLlamaBinaryWireActionsRun` |
+| `wireEvents/handleActionNewsletterRulesWireRun.ts` | Re-export `newsletterRulesWireActionsRun` |
+| `wireEvents/handleActionAccountSetupWireRun.ts` | Re-export `accountSetupWireActionsRun` |
 | `wireEvents/handleActionThreadCompose.ts` | Compose / fil — dispatch vers sous-handlers |
 | `wireEvents/handleActionThreadNavWireRun.ts` | Re-export `threadNavWireActionsRun` |
 | `wireEvents/handleActionThreadViewWireRun.ts` | Barrel UI fil / réponses / sécurité |
 | `wireEvents/handleActionThreadViewUiWireRun.ts` | Re-export `threadViewUiWireActionsRun` |
 | `wireEvents/handleActionThreadReplyWireRun.ts` | Re-export `threadReplyWireActionsRun` |
-| `wireEvents/handleActionThreadSecurityWireRun.ts` | Actions sécurité → `threadSecurityActionsRun` |
+| `wireEvents/handleActionThreadSecurityWireRun.ts` | Re-export `threadSecurityWireActionsRun` |
 | `wireEvents/handleActionComposeWireRun.ts` | Barrel compose (fermeture, historique, éditeur) |
-| `wireEvents/handleActionComposeCloseWireRun.ts` | Fermer / sauver brouillon, orphelins |
-| `wireEvents/handleActionComposeDraftHistoryWireRun.ts` | Versions brouillon, diff, restauration |
+| `wireEvents/handleActionComposeCloseWireRun.ts` | Re-export `composeCloseWireActionsRun` |
+| `wireEvents/handleActionComposeDraftHistoryWireRun.ts` | Re-export `composeDraftHistoryWireActionsRun` |
 | `wireEvents/handleActionComposeEditorWireRun.ts` | Re-export `composeEditorWireActionsRun` |
 | `wireEvents/handleActionThreadLlmWireRun.ts` | Re-export `threadLlmWireActionsRun` |
-| `wireEvents/handleActionSearchModalWireRun.ts` | Modale recherche + assist NL |
+| `wireEvents/handleActionSearchModalWireRun.ts` | Re-export `searchModalWireActionsRun` |
 | `wireEvents/handleActionAddressBookSidebarWireRun.ts` | Re-export `addressBookSidebarWireActionsRun` |
 | `wireEvents/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `wireEvents/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` (IDs checkbox immédiats via context) |
@@ -383,6 +382,12 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/agentAssistWireActionsRun.ts` | Wire agent, sync, mic, bulk corbeille |
 | `app/mail/accountSetupWireActionsRun.ts` | Wire setup compte / OAuth réglages |
 | `app/mail/modalsWireActionsRun.ts` | Wire modales confirm / text prompt |
+| `app/mail/composeEntryWireActionsRun.ts` | Wire action `compose` (nouveau brouillon / reply) |
+| `app/mail/searchModalWireActionsRun.ts` | Wire modale recherche + assist NL |
+| `app/mail/settingsLlamaBinaryWireActionsRun.ts` | Wire binaire llama-server (detect, winget, chemin) |
+| `app/mail/threadSecurityWireActionsRun.ts` | Wire actions sécurité fil |
+| `app/mail/orgFolderNavWireActionsRun.ts` | Wire navigation org / contacts / FM |
+| `app/mail/newsletterRulesWireActionsRun.ts` | Wire règles newsletter (dispatch → `newsletterRulesWireRun`) |
 | `app/mail/composeEditorWireActionsRun.ts` | Wire éditeur compose (layout, envoi, PJ, rewrite IA) |
 | `app/mail/threadViewUiWireActionsRun.ts` | Wire UI fil (panneau IA, citations, tags, digest) |
 | `app/mail/folderManagerWireActionsRun.ts` | Wire gestionnaire dossiers (`fm-*`) |
@@ -396,12 +401,8 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/threadSecurityActionsRun.ts` | Newsletter rapide, déplacer spam, filtre #security |
 | `app/mail/accountOAuthDesktopConnectRun.ts` | Login OAuth Google / Microsoft (desktop) |
 | `app/mail/accountOAuthFinishRun.ts` | Post-login OAuth nouveau compte |
-| `wireEvents/depsCore.ts` | invoke, toast, state, render, loaders, nav, modales — réexporte `depsContext` |
-| `wireEvents/depsSearchMail.ts` | inbox, recherche, agent, carnet, entrée compose |
-| `wireEvents/depsComposeThread.ts` | compose, fil, LLM compose |
-| `wireEvents/depsSettingsAccount.ts` | réglages, OAuth, prefs IA, setup compte |
-| `wireEvents/depsOrgFolder.ts` | org / gestionnaire dossiers |
-| `wireEvents/handleAction*WireRun.ts` | Sous-handlers : imports ciblés (`depsCore` / `deps*` selon usage) |
+| `wireEvents/depsContext.ts` | Mutateurs UI wire (skip capture compte, carnet edit, cache lignes) |
+| `wireEvents/handleAction*WireRun.ts` | Re-exports `app/mail/*WireActionsRun` uniquement |
 | `threadTagsRender.ts` | Modale / chips tags fil |
 | `actionBriefHtml.ts` | HTML brief d’action IA |
 
@@ -411,8 +412,8 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 
 ## Prochaines extractions (ordre suggéré)
 
-1. Affiner encore les imports wire si de nouveaux handlers grossissent
-2. Extraire handlers wire restants (account setup, compose close, agent, modals) vers `app/mail/*`
-3. Réduire / fusionner barrels `deps*` une fois les handlers migrés
+1. Déplacer les derniers dispatchers wire (`handleActionSettingsApiKeysWireRun`, barrels compose/thread) vers `app/mail/*`
+2. Fusionner `newsletterRulesWireActionsRun` / `newsletterRulesWireRun` si redondant
+3. Poursuivre découpage render si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
