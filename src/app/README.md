@@ -242,6 +242,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsAiModalShellRun.ts` | Ouverture / fermeture modale IA réglages |
 | `app/mail/settingsAiDomWireRun.ts` | Listeners DOM prefs IA (features, modale, llama, arrière-plan) |
 | `app/mail/contactsWireActionsRun.ts` | Actions wire contacts / vCard (depuis `handleActionContactsWireRun`) |
+| `app/mail/searchViewsWireActionsRun.ts` | Vues enregistrées, chips recherche, filtres liste (wire) |
+| `app/mail/listThreadWireActionsRun.ts` | Fil liste, déplacement, brouillons sauvés (wire) |
 | `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
@@ -322,8 +324,8 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `wireEvents/handleActionInboxSearch.ts` | Inbox / recherche — dispatch vers sous-handlers |
 | `wireEvents/handleActionContactsWireRun.ts` | Re-export `contactsWireActionsRun` |
 | `wireEvents/handleActionAgentAssistWireRun.ts` | Agent, mic, sync, corbeille bulk |
-| `wireEvents/handleActionSearchViewsWireRun.ts` | Vues enregistrées, chips recherche, filtres liste |
-| `wireEvents/handleActionListThreadWireRun.ts` | Fil liste, déplacement, brouillons sauvés |
+| `wireEvents/handleActionSearchViewsWireRun.ts` | Re-export `searchViewsWireActionsRun` |
+| `wireEvents/handleActionListThreadWireRun.ts` | Re-export `listThreadWireActionsRun` |
 | `wireEvents/handleActionOrgFolder.ts` | Org / dossiers — dispatch vers sous-handlers |
 | `wireEvents/handleActionOrgFolderNavRun.ts` | Ouverture vues org / contacts / FM |
 | `wireEvents/handleActionFolderManagerRun.ts` | Actions gestionnaire dossiers (`fm-*`) |
@@ -390,7 +392,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 ## Prochaines extractions (ordre suggéré)
 
 1. Affiner encore les imports wire si de nouveaux handlers grossissent
-2. Déplacer `searchViewsWire` / `listThreadWire` vers `app/mail/*` (handlers ~200 lignes)
+2. Déplacer `handleActionThreadLlmWireRun` et autres handlers wire restants vers `app/mail/*`
 3. Poursuivre le découpage render / wire si de nouveaux god-modules apparaissent
 
 `npm run verify:ts` · `npm test`
