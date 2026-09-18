@@ -71,9 +71,13 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/searchViewBulkActionsRun.ts` | Re-export lot recherche / vue |
 | `app/mail/searchViewBulkMarkReadRun.ts` | Marquer lus (lot) |
 | `app/mail/searchViewBulkArchiveRun.ts` | Archiver (lot) |
-| `app/mail/searchFluxAffinerRun.ts` | Affiner le flux (LLM + dossier IMAP) |
+| `app/mail/searchFluxAffinerRun.ts` | Orchestration Affiner le flux |
+| `app/mail/searchFluxAffinerSuggestRun.ts` | LLM + confirmation modale Affiner |
+| `app/mail/searchFluxAffinerApplyRun.ts` | Création dossier IMAP + déplacement lot |
 | `app/lib/tagFamilyForInvoke.ts` | Normalisation famille tag pour invoke Rust |
-| `app/mail/bulkTrashList.ts` | Corbeille lot (liste visible) + `registerBulkTrashListDeps()` |
+| `app/mail/bulkTrashList.ts` | Re-export corbeille lot + registry |
+| `app/mail/bulkTrashListDepsRun.ts` | `registerBulkTrashListDeps` |
+| `app/mail/bulkTrashListRun.ts` | `bulkTrashVisibleThreads` |
 | `app/mail/emptyTrashMailbox.ts` | Vider corbeille dossier + `registerEmptyTrashMailboxDeps()` |
 | `app/mail/appNavActions.ts` | Facades `goBack` / `navigateToInbox` / fil d’Ariane |
 | `app/mail/mailboxManageAction.ts` | CRUD dossier IMAP (modale gérer) + `registerMailboxManageActionDeps()` |
@@ -112,7 +116,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/agentWireActions.ts` | Facades agent assist (prepare reply, telemetry, plan) |
 | `app/mail/agentPrepareReplyRun.ts` | Barrel assistant réponse |
 | `app/mail/agentPrepareReplyStartRun.ts` | `agentPrepareReplyStart` |
-| `app/mail/agentPrepareReplyPipelineRun.ts` | Phases LLM (facts, draft stream, cohérence, plan) |
+| `app/mail/agentPrepareReplyPipelineRun.ts` | Barrel phases LLM assistant réponse |
+| `app/mail/agentPrepareReplyExtractRun.ts` | Facts + skills post-extract + cohérence |
+| `app/mail/agentPrepareReplyDraftRun.ts` | Stream brouillon + refresh plan |
 | `app/mail/agentPrepareReplyContinueRun.ts` | `agentPrepareReplyContinue` |
 | `app/mail/agentAssistSessionHelpers.ts` | Session assist (payload, télémetrie, merge reco) |
 | `app/mail/agentInsertDraftRun.ts` | Insertion brouillon agent dans le composeur |
@@ -124,7 +130,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsWireActionsAccountRun.ts` | Comptes, OAuth, chemins, carnet |
 | `app/mail/settingsWireActionsAiRun.ts` | Prefs IA, moteurs LLM, barres progression |
 | `app/mail/settingsWireActionsMicRun.ts` | Micro / dictée (util audio) |
-| `app/mail/orgFolderWireActions.ts` | Facades org v2, gestionnaire dossiers, contacts |
+| `app/mail/orgFolderWireActions.ts` | Barrel facades org / dossiers / contacts |
+| `app/mail/orgFolderWireFacadeViewsRun.ts` | Navigation vues org + refresh rapport |
+| `app/mail/orgFolderWireFacadeFolderManagerRun.ts` | Délégation gestionnaire dossiers IMAP |
+| `app/mail/orgFolderWireFacadeApplyRun.ts` | Apply org v1/v2, propositions, sync dossier |
 | `app/mail/orgV1WireActionsRun.ts` | Barrel actions wire org v1 |
 | `app/mail/orgV1WireScanRun.ts` | Scan org v1, retag compte |
 | `app/mail/orgV1WireApplyRun.ts` | Appliquer propositions org v1 |
@@ -167,6 +176,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailEmailHtmlSanitize.ts` | DOMPurify + liens/images + `sanitizeEmailHtml()` |
 | `app/mail/idleAiCachePrefetchContext.ts` | `initIdleAiCachePrefetch`, gen / abort |
 | `app/mail/idleAiCachePrefetchScheduleRun.ts` | Planification debounce / idle |
+| `app/mail/idleAiCachePrefetchPickRun.ts` | Sélection fils + miss cache synthèse/traduction |
 | `app/mail/idleAiCachePrefetchPassRun.ts` | Pass synthèse / traduction prefetch |
 | `app/mail/mailHtmlShadowHydrate.ts` | Barrel shadow DOM message HTML |
 | `app/mail/mailHtmlImageLightboxRun.ts` | Lightbox, résolution `cid:` |
@@ -275,7 +285,9 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/settingsNavWireActionsRun.ts` | Wire navigation réglages (onglets, reload comptes) |
 | `app/mail/settingsAiModalShellWireActionsRun.ts` | Wire sous-modale IA (open/close/tabs) |
 | `app/mail/settingsShellWireActionsRun.ts` | Barrel wire shell réglages |
-| `app/mail/threadReplyWireActionsRun.ts` | Wire reply/forward/PJ/liens mail |
+| `app/mail/threadReplyWireActionsRun.ts` | Barrel wire fil (compose + liens) |
+| `app/mail/threadReplyComposeWireRun.ts` | Wire reply / forward |
+| `app/mail/threadReplyMailLinksWireRun.ts` | Wire PJ, contacts, désabonnement |
 | `app/mail/threadNavWireActionsRun.ts` | Wire navigation fil / sidebar |
 | `app/mail/addressBookSidebarWireActionsRun.ts` | Wire carnet d’adresses (sidebar réglages) |
 | `app/mail/contactsWireActionsRun.ts` | Barrel actions wire contacts / vCard |
@@ -294,7 +306,10 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/threadLlmQuickReplyWireActionsRun.ts` | Envoi / insertion quick reply |
 | `app/mail/threadLlmAiUiWireActionsRun.ts` | Synthèse, traduction, digest, Q&A fil |
 | `app/mail/threadLlmDemoWireActionsRun.ts` | Reset / suppression boîte démo playground |
-| `app/mail/settingsApiKeysPersistRun.ts` | Enregistrement / suppression clés API (trousseau) |
+| `app/mail/settingsApiKeysPersistRun.ts` | Re-export clés API (trousseau) |
+| `app/mail/settingsApiKeysPersistHelpersRun.ts` | Garde Tauri + refresh modale moteurs |
+| `app/mail/settingsApiKeysCloudRun.ts` | Clé cloud combinée OpenRouter + dictée |
+| `app/mail/settingsApiKeysIndividualRun.ts` | Clés OpenRouter, dictée, llama-server |
 | `app/mail/settingsPathsRefresh.ts` | Chemins app (`app_paths`) |
 | `app/mail/settingsSemanticEmbeddingCounts.ts` | Comptes embeddings sémantiques |
 | `app/mail/settingsOpenView.ts` | Ouverture vue Paramètres |
