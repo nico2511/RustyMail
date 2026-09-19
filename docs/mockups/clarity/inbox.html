@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clarity — Inbox</title>
+    <link rel="stylesheet" href="clarity.css" />
+  </head>
+  <body>
+    <nav class="mock-nav">
+      <a class="on" href="inbox.html">Inbox</a>
+      <a href="thread.html">Fil</a>
+      <a href="compose.html">Compose</a>
+      <a href="README.md">Doc</a>
+    </nav>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">Rusty<span>Mail</span></div>
+        <button type="button" class="nav-item active">Reçus <span class="count">4</span></button>
+        <button type="button" class="nav-item">Suivis</button>
+        <button type="button" class="nav-item">Envoyés</button>
+        <button type="button" class="nav-item">Brouillons</button>
+      </aside>
+      <header class="topbar">
+        <div class="search">Rechercher ou filtrer…</div>
+        <span class="chip-filter on">Non lus</span>
+        <span class="chip-filter">Cette semaine</span>
+        <button type="button" class="btn-primary">Écrire</button>
+      </header>
+      <main class="main">
+        <div class="page-title">
+          <h1>Reçus</h1>
+          <span class="hint">4 non lus · tri : importance</span>
+        </div>
+        <div class="insight">
+          <div>
+            <strong>À traiter aujourd’hui</strong> — 1 facture (échéance ven.), 1 réponse client attendue.
+          </div>
+          <span class="link">Voir →</span>
+        </div>
+        <div class="list">
+          <article class="row signal urgent">
+            <div class="stripe"></div>
+            <div class="avatar">ML</div>
+            <div>
+              <p class="subject">Renouvellement hébergement<span class="badge">Échéance</span></p>
+              <p class="preview">Confirmer le renouvellement avant vendredi 18h…</p>
+            </div>
+            <time class="time">08:42</time>
+          </article>
+          <article class="row signal">
+            <div class="stripe"></div>
+            <div class="avatar">SC</div>
+            <div>
+              <p class="subject">Re: maquette dashboard Q4</p>
+              <p class="preview">Voici la version avec les contrastes corrigés…</p>
+            </div>
+            <time class="time">Hier</time>
+          </article>
+          <article class="row">
+            <div class="stripe"></div>
+            <div class="avatar">▣</div>
+            <div>
+              <p class="subject">Newsletter produit</p>
+              <p class="preview">Les tendances de la semaine…</p>
+            </div>
+            <time class="time">Lun.</time>
+          </article>
+        </div>
+      </main>
+      <footer class="statusbar">
+        <span>compte@exemple.fr</span>
+        <span>Synchronisé · il y a 1 min</span>
+      </footer>
+    </div>
+  </body>
+</html>

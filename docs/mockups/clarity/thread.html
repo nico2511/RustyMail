@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clarity — Fil</title>
+    <link rel="stylesheet" href="clarity.css" />
+  </head>
+  <body>
+    <nav class="mock-nav">
+      <a href="inbox.html">Inbox</a>
+      <a class="on" href="thread.html">Fil</a>
+      <a href="compose.html">Compose</a>
+    </nav>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">Rusty<span>Mail</span></div>
+        <button type="button" class="nav-item active">Reçus</button>
+        <button type="button" class="nav-item">Suivis</button>
+      </aside>
+      <header class="topbar">
+        <button type="button" class="chip-filter" style="border:0;background:transparent">← Reçus</button>
+        <div class="search" style="max-width:360px;margin:0">Dans ce fil…</div>
+      </header>
+      <main class="main thread-layout">
+        <div class="thread-meta">
+          <h1>Renouvellement hébergement</h1>
+          <p>Marie Lefèvre · sécurité vérifiée · 2 messages</p>
+        </div>
+        <article class="msg">
+          <div class="msg-head">
+            <span class="msg-from">Marie Lefèvre</span>
+            <span class="msg-date">18 sept. 09:12</span>
+          </div>
+          <div class="msg-body">
+            Bonjour, votre contrat arrive à échéance vendredi. Souhaitez-vous renouveler 12 mois au tarif actuel ?
+          </div>
+        </article>
+        <article class="msg">
+          <div class="msg-head">
+            <span class="msg-from">Vous</span>
+            <span class="msg-date">18 sept. 14:03</span>
+          </div>
+          <div class="msg-body">Merci — pouvez-vous confirmer le montant TTC ?</div>
+        </article>
+      </main>
+      <div class="reply-dock">
+        <div class="reply-dock-inner">
+          <input type="text" placeholder="Répondre…" value="" />
+          <button type="button" class="btn-primary">Envoyer</button>
+        </div>
+      </div>
+      <footer class="statusbar"><span>Réponse suggérée disponible</span></footer>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clarity — Compose</title>
+    <link rel="stylesheet" href="clarity.css" />
+  </head>
+  <body>
+    <nav class="mock-nav">
+      <a href="inbox.html">Inbox</a>
+      <a href="thread.html">Fil</a>
+      <a class="on" href="compose.html">Compose</a>
+    </nav>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">Rusty<span>Mail</span></div>
+        <button type="button" class="nav-item">Reçus</button>
+      </aside>
+      <header class="topbar">
+        <span class="hint" style="font-weight:600;color:var(--text)">Nouveau message</span>
+        <div style="flex:1"></div>
+        <button type="button" class="btn-ghost">Brouillon</button>
+        <button type="button" class="btn-primary">Envoyer</button>
+      </header>
+      <main class="main">
+        <div class="compose-card">
+          <div class="field"><label>À</label><input type="text" value="marie@exemple.fr" readonly /></div>
+          <div class="field"><label>Objet</label><input type="text" value="Re: Renouvellement hébergement" readonly /></div>
+          <div class="compose-body">
+            Bonjour Marie,<br /><br />
+            Oui pour 12 mois si le total reste à 129 € TTC.<br /><br />
+            Merci,
+          </div>
+          <div class="compose-actions">
+            <button type="button" class="btn-ghost">Affiner le ton</button>
+            <button type="button" class="btn-primary">Envoyer</button>
+          </div>
+        </div>
+      </main>
+      <footer class="statusbar"><span>Enregistré automatiquement</span></footer>
+    </div>
+  </body>
+</html>
