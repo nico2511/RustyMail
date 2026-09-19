@@ -69,8 +69,18 @@
           if (filter === "urgent") show = !!row.querySelector(".badge-urgent");
           row.classList.toggle("is-filtered-out", !show);
         });
+        updateListEmpty();
       });
     });
+  }
+
+  function updateListEmpty() {
+    var empty = qs("[data-list-empty]");
+    if (!empty) return;
+    var anyVisible = qsa(".list .row").some(function (r) {
+      return !r.classList.contains("is-filtered-out");
+    });
+    empty.classList.toggle("is-visible", !anyVisible);
   }
 
   var readPane = qs("[data-read-pane]");
@@ -156,6 +166,7 @@
     palette.setAttribute("aria-hidden", "false");
     if (paletteInput) {
       paletteInput.value = "";
+      filterPalette("");
       paletteInput.focus();
     }
   }
@@ -180,13 +191,41 @@
     });
     qsa("[data-palette-cmd]", palette).forEach(function (btn) {
       btn.addEventListener("click", function () {
+        if (btn.classList.contains("is-hidden")) return;
         var cmd = btn.getAttribute("data-palette-cmd");
         closePalette();
         if (cmd === "focus" && focusBtn) focusBtn.click();
         if (cmd === "compose") window.location.href = "compose.html";
         if (cmd === "thread" && openThread) window.location.href = openThread.getAttribute("href") || "thread.html";
+        if (cmd === "snooze") {
+          var snoozeToast = qs("[data-snooze-toast]");
+          if (snoozeToast) snoozeToast.classList.add("is-visible");
+        }
+        if (cmd === "batch") {
+          var batchBtn = qs("[data-batch-mode]");
+          if (batchBtn) batchBtn.click();
+        }
       });
     });
+    if (paletteInput) {
+      paletteInput.addEventListener("input", function () {
+        filterPalette(paletteInput.value);
+      });
+    }
+  }
+
+  function filterPalette(query) {
+    var paletteEmpty = qs("[data-palette-empty]");
+    var q = (query || "").trim().toLowerCase();
+    var items = qsa("[data-palette-cmd]");
+    var shown = 0;
+    items.forEach(function (btn) {
+      var text = (btn.textContent + " " + (btn.getAttribute("data-palette-keywords") || "")).toLowerCase();
+      var match = !q || text.indexOf(q) !== -1;
+      btn.classList.toggle("is-hidden", !match);
+      if (match) shown += 1;
+    });
+    if (paletteEmpty) paletteEmpty.classList.toggle("is-visible", shown === 0);
   }
 
   var searchWrap = qs(".search-wrap");
@@ -222,5 +261,69 @@
         toast.classList.remove("is-visible");
       });
     }
+  }
+
+  var snoozeBtn = qs("[data-snooze-trigger]");
+  var snoozeToast = qs("[data-snooze-toast]");
+  if (snoozeBtn && snoozeToast) {
+    snoozeBtn.addEventListener("click", function () {
+      snoozeToast.classList.add("is-visible");
+    });
+  }
+
+  var batchBtn = qs("[data-batch-mode]");
+  var batchCount = qs("[data-batch-count]");
+  function updateBatchCount() {
+    if (!batchCount) return;
+    var n = qsa(".row-check input:checked").length;
+    batchCount.textContent = n + (n > 1 ? " sélectionnés" : " sélectionné");
+  }
+  if (batchBtn) {
+    batchBtn.addEventListener("click", function () {
+      var on = document.body.classList.toggle("batch-mode");
+      batchBtn.classList.toggle("is-on", on);
+      if (!on) {
+        qsa(".row-check input").forEach(function (cb) {
+          cb.checked = false;
+        });
+        updateBatchCount();
+      }
+    });
+  }
+  qsa(".row-check input").forEach(function (cb) {
+    cb.addEventListener("click", function (e) {
+      e.stopPropagation();
+      updateBatchCount();
+    });
+  });
+
+  var attachToggle = qs("[data-attach-toggle]");
+  var dropZone = qs("[data-drop-zone]");
+  if (attachToggle && dropZone) {
+    attachToggle.addEventListener("click", function () {
+      dropZone.classList.toggle("is-visible");
+    });
+    ["dragenter", "dragover"].forEach(function (ev) {
+      dropZone.addEventListener(ev, function (e) {
+        e.preventDefault();
+        dropZone.classList.add("is-dragover");
+      });
+    });
+    dropZone.addEventListener("dragleave", function () {
+      dropZone.classList.remove("is-dragover");
+    });
+    dropZone.addEventListener("drop", function (e) {
+      e.preventDefault();
+      dropZone.classList.remove("is-dragover");
+      dropZone.textContent = "Fichier ajouté (mock) — contrat.pdf";
+    });
+  }
+
+  var scheduleBtn = qs("[data-schedule-trigger]");
+  var scheduleHint = qs("[data-schedule-hint]");
+  if (scheduleBtn && scheduleHint) {
+    scheduleBtn.addEventListener("click", function () {
+      scheduleHint.classList.add("is-visible");
+    });
   }
 })();

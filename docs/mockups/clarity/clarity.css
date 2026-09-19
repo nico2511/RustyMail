@@ -1,4 +1,4 @@
-/* Clarity v6 — intuitif, fonctionnel, mécanique discrète */
+/* Clarity v7 — intuitif, fonctionnel, mécanique discrète */
 :root {
   --sidebar-w: 200px;
   --bg: #f3f4f6;
@@ -1197,4 +1197,197 @@ body.focus-mode .page-head .meta {
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
   background: var(--surface);
+}
+
+/* v7 — sections, sélection, reporter, drop zone, programmation */
+.list-section-label {
+  padding: 8px 12px 6px;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.list-empty {
+  display: none;
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--faint);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  margin-top: 8px;
+}
+
+.list-empty.is-visible {
+  display: block;
+}
+
+.palette-item.is-hidden {
+  display: none;
+}
+
+.palette-empty {
+  display: none;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--faint);
+  text-align: center;
+}
+
+.palette-empty.is-visible {
+  display: block;
+}
+
+.snooze-toast {
+  display: none;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--urgent);
+  background: var(--urgent-ghost);
+  border-radius: var(--radius-sm);
+}
+
+.snooze-toast.is-visible {
+  display: block;
+}
+
+.btn-snooze {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-snooze:hover {
+  border-color: var(--urgent);
+  color: var(--urgent);
+}
+
+body.batch-mode .row {
+  grid-template-columns: 2px 22px 36px minmax(0, 1fr) auto auto;
+}
+
+.row-check {
+  display: none;
+  align-self: center;
+  justify-self: center;
+}
+
+body.batch-mode .row-check {
+  display: flex;
+}
+
+.row-check input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.batch-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+body.batch-mode .batch-bar {
+  display: flex;
+}
+
+.batch-bar button {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-batch {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-batch.is-on {
+  border-color: rgba(15, 118, 110, 0.35);
+  color: var(--primary);
+  background: var(--primary-ghost);
+}
+
+.drop-zone {
+  display: none;
+  margin: 0 14px 10px;
+  padding: 18px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--faint);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.drop-zone.is-visible {
+  display: block;
+}
+
+.drop-zone.is-dragover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-ghost);
+}
+
+.thread-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.thread-files span {
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.schedule-hint {
+  display: none;
+  font-size: 12px;
+  color: var(--primary);
+  margin-left: 8px;
+}
+
+.schedule-hint.is-visible {
+  display: inline;
 }

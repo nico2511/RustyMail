@@ -1,27 +1,27 @@
-# Clarity v6 — intuitif, fonctionnel, discret
+# Clarity v7 — intuitif, fonctionnel, discret
 
-Itération **v6** : v5 + **sync split**, **palette ⌘K**, **mode Focus**, raccourcis visibles.
+Itération **v7** : v6 + **structure liste**, **actions lot**, **reporter**, **compose enrichi**.
 
-## Nouveautés v6
+## Nouveautés v7
 
 | Zone | Mécanique |
 | ---- | --------- |
-| Inbox | **Panneau lecture** synchronisé au clic / **j** · **k** |
-| Inbox | **Palette ⌘K** — fil, compose, Focus |
-| Inbox | Bouton **Focus** — rail, sans brief/filtres, colonne lecture élargie |
-| Inbox | Barre d’état avec **raccourcis** explicites |
-| Fil | Hints **R / E / ⌘K** |
-| Compose | Bandeau **pièce jointe** sobre sous la feuille |
-| v5 | Split, filtres, rail, undo send — conservés |
+| Inbox | **Sections** Aujourd’hui / Hier / Plus tôt |
+| Inbox | **Mode sélection** — cases + barre Archiver / Lu |
+| Inbox | **Reporter demain** (panneau + palette) |
+| Inbox | Palette **filtrée** en tapant · état vide filtre |
+| Compose | **Joindre** + zone **drag-and-drop** · **Programmer** envoi |
+| Fil | Bandeau **pièces jointes** du fil |
+| v6 | Sync split, ⌘K, Focus — conservés |
 
 ## Parcours mockup
 
-`inbox.html` → cliquer lignes · **⌘K** · **Focus** → fil → compose
+`inbox.html` → **Sélection** · filtre **Échéances** · **Reporter** → compose **Joindre**
 
 ## Fichiers
 
 - [`index.html`](index.html) · [`inbox.html`](inbox.html) · [`thread.html`](thread.html) · [`compose.html`](compose.html)
-- [`clarity.css`](clarity.css) · [`mockup.js`](mockup.js) · [`images/clarity-v6-*.png`](images/)
+- [`clarity.css`](clarity.css) · [`mockup.js`](mockup.js) · [`images/clarity-v7-*.png`](images/)
 
 ## Intent (inchangé)
 

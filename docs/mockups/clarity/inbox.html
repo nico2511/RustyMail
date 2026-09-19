@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v6 — Inbox</title>
+    <title>Clarity v7 — Inbox</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -39,9 +39,10 @@
         <div class="page-head">
           <div>
             <h1>Reçus</h1>
-            <span class="meta">4 non lus · tri récent</span>
+            <span class="meta">4 non lus · groupé par date</span>
           </div>
           <div class="page-tools">
+            <button type="button" class="btn-batch" data-batch-mode>Sélection</button>
             <div class="seg" data-split-seg role="group" aria-label="Disposition">
               <button type="button" class="is-on" data-split="split">Split</button>
               <button type="button" data-split="list">Liste</button>
@@ -69,73 +70,92 @@
               <button type="button" class="chip" data-filter="unread">Non lus</button>
               <button type="button" class="chip" data-filter="urgent">Échéances</button>
             </div>
-            <div class="list" data-inbox-list>
-              <article
-                class="row unread is-selected"
-                data-preview-subject="Renouvellement hébergement"
-                data-preview-meta="Marie Lefèvre · aujourd’hui 08:42"
-                data-preview-body="Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?"
-                data-preview-urgent="1"
-                data-thread="thread.html"
-              >
-                <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
-                <div class="stripe"></div>
-                <div class="avatar">ML</div>
-                <div>
-                  <p class="subject">Renouvellement hébergement<span class="badge-urgent">Échéance</span></p>
-                  <p class="preview">Confirmer avant vendredi…</p>
-                </div>
-                <time class="time">08:42</time>
-                <div class="row-actions">
-                  <button type="button">Archiver</button>
-                  <button type="button">Lu</button>
-                </div>
-              </article>
-              <article
-                class="row unread"
-                data-preview-subject="Re: maquette Q4"
-                data-preview-meta="Studio Créa · hier 17:20"
-                data-preview-body="Contraste corrigé en pièce jointe — dis-moi si la version sombre te convient pour la prod."
-                data-preview-urgent="0"
-                data-thread="thread.html"
-              >
-                <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
-                <div class="stripe"></div>
-                <div class="avatar">SC</div>
-                <div>
-                  <p class="subject">Re: maquette Q4</p>
-                  <p class="preview">Contraste corrigé en pièce jointe</p>
-                </div>
-                <time class="time">Hier</time>
-                <div class="row-actions">
-                  <button type="button">Archiver</button>
-                  <button type="button">Lu</button>
-                </div>
-              </article>
-              <article
-                class="row"
-                data-preview-subject="Newsletter"
-                data-preview-meta="Équipe produit · lundi"
-                data-preview-body="Résumé hebdomadaire : 3 merges, 12 issues closes, prochaine release mardi."
-                data-preview-urgent="0"
-                data-thread="thread.html"
-              >
-                <div class="stripe"></div>
-                <div class="avatar">·</div>
-                <div>
-                  <p class="subject">Newsletter</p>
-                  <p class="preview">Résumé hebdomadaire</p>
-                </div>
-                <time class="time">Lun.</time>
-                <div class="row-actions">
-                  <button type="button">Archiver</button>
-                </div>
-              </article>
+            <div class="batch-bar" data-batch-bar>
+              <span data-batch-count>0 sélectionné</span>
+              <button type="button">Archiver</button>
+              <button type="button">Marquer lu</button>
             </div>
+            <div class="list" data-inbox-list>
+              <div class="list-section">
+                <div class="list-section-label">Aujourd’hui</div>
+                <article
+                  class="row unread is-selected"
+                  data-preview-subject="Renouvellement hébergement"
+                  data-preview-meta="Marie Lefèvre · aujourd’hui 08:42"
+                  data-preview-body="Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?"
+                  data-preview-urgent="1"
+                  data-thread="thread.html"
+                >
+                  <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
+                  <label class="row-check"><input type="checkbox" aria-label="Sélectionner" /></label>
+                  <div class="stripe"></div>
+                  <div class="avatar">ML</div>
+                  <div>
+                    <p class="subject">Renouvellement hébergement<span class="badge-urgent">Échéance</span></p>
+                    <p class="preview">Confirmer avant vendredi…</p>
+                  </div>
+                  <time class="time">08:42</time>
+                  <div class="row-actions">
+                    <button type="button">Archiver</button>
+                    <button type="button">Lu</button>
+                  </div>
+                </article>
+              </div>
+              <div class="list-section">
+                <div class="list-section-label">Hier</div>
+                <article
+                  class="row unread"
+                  data-preview-subject="Re: maquette Q4"
+                  data-preview-meta="Studio Créa · hier 17:20"
+                  data-preview-body="Contraste corrigé en pièce jointe — dis-moi si la version sombre te convient pour la prod."
+                  data-preview-urgent="0"
+                  data-thread="thread.html"
+                >
+                  <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
+                  <label class="row-check"><input type="checkbox" aria-label="Sélectionner" /></label>
+                  <div class="stripe"></div>
+                  <div class="avatar">SC</div>
+                  <div>
+                    <p class="subject">Re: maquette Q4</p>
+                    <p class="preview">Contraste corrigé en pièce jointe</p>
+                  </div>
+                  <time class="time">Hier</time>
+                  <div class="row-actions">
+                    <button type="button">Archiver</button>
+                    <button type="button">Lu</button>
+                  </div>
+                </article>
+              </div>
+              <div class="list-section">
+                <div class="list-section-label">Plus tôt</div>
+                <article
+                  class="row"
+                  data-preview-subject="Newsletter"
+                  data-preview-meta="Équipe produit · lundi"
+                  data-preview-body="Résumé hebdomadaire : 3 merges, 12 issues closes, prochaine release mardi."
+                  data-preview-urgent="0"
+                  data-thread="thread.html"
+                >
+                  <label class="row-check"><input type="checkbox" aria-label="Sélectionner" /></label>
+                  <div class="stripe"></div>
+                  <div class="avatar">·</div>
+                  <div>
+                    <p class="subject">Newsletter</p>
+                    <p class="preview">Résumé hebdomadaire</p>
+                  </div>
+                  <time class="time">Lun.</time>
+                  <div class="row-actions">
+                    <button type="button">Archiver</button>
+                  </div>
+                </article>
+              </div>
+            </div>
+            <p class="list-empty" data-list-empty>Aucun message pour ce filtre.</p>
           </div>
           <aside class="read-pane" data-read-pane aria-label="Lecture rapide">
             <p class="read-pane-empty">Sélectionnez un message · <kbd>j</kbd> <kbd>k</kbd></p>
             <div class="read-pane-content">
+              <div class="snooze-toast" data-snooze-toast>Rappel demain 09:00 — message masqué jusqu’à la date</div>
               <div class="read-pane-head">
                 <div>
                   <h2 data-read-title>Renouvellement hébergement</h2>
@@ -150,6 +170,7 @@
                 <a class="btn-primary" data-open-thread href="thread.html" style="text-decoration: none; display: inline-block">Ouvrir le fil</a>
                 <button type="button" class="btn-ghost">Archiver</button>
                 <a class="btn-primary btn-primary--soft" href="compose.html" style="text-decoration: none; display: inline-block">Répondre</a>
+                <button type="button" class="btn-snooze" data-snooze-trigger>Reporter demain</button>
               </div>
             </div>
           </aside>
@@ -157,26 +178,33 @@
       </main>
       <footer class="statusbar">
         <span>Sync · 1 min</span>
-        <span class="kbd-hints" style="margin-left: auto"><kbd>j</kbd><kbd>k</kbd> ligne · <kbd>Entrée</kbd> fil · <kbd>⌘K</kbd> commandes</span>
+        <span class="kbd-hints" style="margin-left: auto"><kbd>j</kbd><kbd>k</kbd> · <kbd>⌘K</kbd> filtrer commandes</span>
       </footer>
     </div>
     <div class="palette-backdrop" data-command-palette aria-hidden="true" role="dialog" aria-label="Palette de commandes">
       <div class="palette" role="document">
         <div class="palette-head">
-          <input type="search" data-palette-input placeholder="Commande ou recherche…" aria-label="Commande" />
+          <input type="search" data-palette-input placeholder="Tapez pour filtrer…" aria-label="Commande" />
           <kbd>esc</kbd>
         </div>
         <div class="palette-list">
-          <button type="button" class="palette-item is-active" data-palette-cmd="thread">
+          <button type="button" class="palette-item is-active" data-palette-cmd="thread" data-palette-keywords="ouvrir fil entrer">
             Ouvrir le fil sélectionné <kbd>↵</kbd>
           </button>
-          <button type="button" class="palette-item" data-palette-cmd="compose">
+          <button type="button" class="palette-item" data-palette-cmd="compose" data-palette-keywords="reponse nouveau message">
             Nouvelle réponse <span>Compose</span>
           </button>
-          <button type="button" class="palette-item" data-palette-cmd="focus">
+          <button type="button" class="palette-item" data-palette-cmd="focus" data-palette-keywords="focus lire chrome">
             Basculer mode Focus <span>Moins de chrome</span>
           </button>
+          <button type="button" class="palette-item" data-palette-cmd="snooze" data-palette-keywords="reporter rappel demain snooze">
+            Reporter demain <span>Échéance sélectionnée</span>
+          </button>
+          <button type="button" class="palette-item" data-palette-cmd="batch" data-palette-keywords="selection multiple bulk">
+            Mode sélection <span>Archiver en lot</span>
+          </button>
         </div>
+        <p class="palette-empty" data-palette-empty>Aucune commande correspondante.</p>
       </div>
     </div>
     <script src="mockup.js"></script>

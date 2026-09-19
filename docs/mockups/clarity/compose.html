@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v6 — Compose</title>
+    <title>Clarity v7 — Compose</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -50,9 +50,15 @@
             <p>Oui pour 12 mois si le total reste à 129 € TTC.</p>
             <p>Merci,</p>
           </div>
+          <div class="drop-zone" data-drop-zone>Déposer des fichiers ici · PDF, images</div>
           <div class="sheet-foot">
-            <span class="hint">⌘↵ envoie · délai 5 s avec annulation</span>
+            <span class="hint">
+              ⌘↵ envoie
+              <span class="schedule-hint" data-schedule-hint>· lundi 09:00 (programmé)</span>
+            </span>
             <div>
+              <button type="button" class="btn-ghost" data-attach-toggle>Joindre</button>
+              <button type="button" class="btn-ghost" data-schedule-trigger>Programmer</button>
               <button type="button" class="btn-ghost">Affiner</button>
               <button type="button" class="btn-primary" data-send-trigger>Envoyer</button>
             </div>
@@ -62,7 +68,7 @@
           </div>
         </div>
       </main>
-      <footer class="statusbar"></footer>
+      <footer class="statusbar"><span>Glisser-déposer après « Joindre »</span></footer>
     </div>
     <script src="mockup.js"></script>
   </body>
