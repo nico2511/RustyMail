@@ -1,37 +1,33 @@
-# Clarity — sleek, doux, utile
+# Clarity v2 — intuitif, fonctionnel, discret
 
-Direction mockup alignée sur : **sleek + fonctionnel**, **UX douce**, **couleurs = hiérarchie** (pas de décoration pastel partout).
+Itération après retour : **sleek utile**, **doux**, couleurs qui **mettent en avant l’important** — comme demandé au départ — avec une **mécanique belle mais discrète** (pas de décor pastel, pas de panneaux permanents bruyants).
 
-## Règles couleur
+## Mécanique discrète (v2)
 
-| Rôle | Token | Usage |
-| ---- | ----- | ----- |
-| Fond app | `--bg` #f4f5f7 | Neutre froid léger — calme, pas crème |
-| Surface | `--surface` #fff | Cartes, lignes mail |
-| Texte principal | `--text` #111827 | Sujets, titres |
-| Texte secondaire | `--muted` #6b7280 | Extraits, meta |
-| **Action / sélection** | `--primary` #0f766e | teal profond — boutons, dossier actif, focus |
-| **Important (non lu)** | `--signal` | barre 3px + fond `--signal-bg` teinté |
-| **Urgent** | `--urgent` #b45309 | chip seul, jamais en fond global |
-| Danger | `--danger` #dc2626 | spam / supprimer — rare |
+| Élément | Comportement mockup |
+| -------- | ------------------- |
+| Navigation | Sidebar 200px, dossier actif = **trait teal 2px** inset (pas fond coloré large) |
+| Recherche | Champ gris neutre ; focus = halo teal très léger |
+| Brief / IA | **Une ligne** + point teal 6px ; lien « Détails » — pas de panneau |
+| Non lu | **Barre 2px** + sujet semi-gras ; pas de fond teinté |
+| Urgent | Chip ambre **petite** sur le sujet |
+| Fil | Messages séparés par hairline ; pas de grosses cartes ombrées |
+| Réponse | Dock fin en bas ; un bouton teal |
+| Compose | Feuille simple ; un seul « Envoyer » teal |
 
-**Principe :** 90 % neutre, 8 % teal (intention utilisateur), 2 % ambre/rouge (sémantique).
+## Couleur (inchangée dans l’esprit)
 
-## Règles UX
-
-- **Sleek** : rayons 10–12px, ombre légère sur cartes uniquement, pas de dégradés décoratifs.
-- **Doux** : espacement généreux (14–16px padding lignes), transitions 150ms, pas de noir pur sur grand fond.
-- **Utile** : omnibox + filtres en une ligne ; actions fil au survol ; barre réponse toujours visible en bas du fil.
-- **IA** : ligne discrète « Suggestion » sous le brief, pas colonne permanente.
+- Neutre `#f3f4f6` / blanc / texte `#111827`
+- **Teal `#0f766e`** : CTA + signal non lu + focus
+- **Ambre** : sémantique « échéance » uniquement
 
 ## Fichiers
 
-- [`inbox.html`](inbox.html) — hiérarchie non lus / urgent / lu
-- [`thread.html`](thread.html) — lecture + réponse
-- [`compose.html`](compose.html) — champs clairs + CTA envoi
-- [`clarity.css`](clarity.css) — tokens
-- [`images/`](images/) — PNG
+- [`index.html`](index.html) — principes
+- [`inbox.html`](inbox.html) · [`thread.html`](thread.html) · [`compose.html`](compose.html)
+- [`clarity.css`](clarity.css) — tokens v2
+- [`images/`](images/) — PNG v2
 
-## vs v0.2.0 pastel
+## Lien intent projet
 
-Plus de sauge/lavande/pêche sur toute la surface ; le teal **guide l’œil** vers ce qui demande une action.
+Même cible que la refonte pastel d’origine (calme, lecture, desktop), **sans** palette sauge/lavande ni colonne IA fixe — **Clarity** = hiérarchie par contrastes et traits, pas par décoration.

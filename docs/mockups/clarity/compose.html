@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity — Compose</title>
+    <title>Clarity v2 — Compose</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -14,31 +14,31 @@
     </nav>
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand">Rusty<span>Mail</span></div>
-        <button type="button" class="nav-item">Reçus</button>
+        <div class="brand"><strong>RustyMail</strong></div>
+        <button type="button" class="nav-item active">Reçus</button>
       </aside>
       <header class="topbar">
-        <span class="hint" style="font-weight:600;color:var(--text)">Nouveau message</span>
-        <div style="flex:1"></div>
-        <button type="button" class="btn-ghost">Brouillon</button>
-        <button type="button" class="btn-primary">Envoyer</button>
+        <span style="font-size:13px;font-weight:600;color:var(--text)">Message</span>
       </header>
       <main class="main">
-        <div class="compose-card">
-          <div class="field"><label>À</label><input type="text" value="marie@exemple.fr" readonly /></div>
-          <div class="field"><label>Objet</label><input type="text" value="Re: Renouvellement hébergement" readonly /></div>
-          <div class="compose-body">
+        <div class="sheet">
+          <div class="row-field"><label>À</label><input type="text" value="marie@exemple.fr" readonly /></div>
+          <div class="row-field"><label>Objet</label><input type="text" value="Re: Renouvellement hébergement" readonly /></div>
+          <div class="body-field">
             Bonjour Marie,<br /><br />
             Oui pour 12 mois si le total reste à 129 € TTC.<br /><br />
             Merci,
           </div>
-          <div class="compose-actions">
-            <button type="button" class="btn-ghost">Affiner le ton</button>
-            <button type="button" class="btn-primary">Envoyer</button>
+          <div class="sheet-foot">
+            <span class="hint">Brouillon enregistré</span>
+            <div>
+              <button type="button" class="btn-ghost">Annuler</button>
+              <button type="button" class="btn-primary">Envoyer</button>
+            </div>
           </div>
         </div>
       </main>
-      <footer class="statusbar"><span>Enregistré automatiquement</span></footer>
+      <footer class="statusbar"></footer>
     </div>
   </body>
 </html>
