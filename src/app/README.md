@@ -546,7 +546,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomContactsListScrollRun.ts` | Scroll infini `#contacts-thread-list` |
 | `app/mail/wireEventsDomDataActionDispatchRun.ts` | Barrel clic `data-action` + change agent/brief |
 | `app/mail/wireEventsDomDataActionClickRun.ts` | Clic `[data-action]` → `handleAction` |
-| `app/mail/wireEventsDomDataActionChangeRun.ts` | Agent skills/mode, mode brief dossier |
+| `app/mail/wireEventsDomDataActionChangeRun.ts` | Barrel listener `change` dispatch |
+| `app/mail/wireEventsDomDataActionAgentChangeRun.ts` | Agent skills / mode assist |
+| `app/mail/wireEventsDomDataActionMailboxBriefChangeRun.ts` | Sélecteur brief dossier |
 | `app/mail/wireEventsDomInboxThreadRun.ts` | Barrel inbox/fil (liste, org, PJ, chrome, modales org) |
 | `app/mail/wireEventsDomInboxThreadChromeRun.ts` | Coques modales stop-prop + boutons ton |
 | `app/mail/wireEventsDomInboxListRun.ts` | Barrel navigation liste + moves |
@@ -650,5 +652,6 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 1. Consolider doc README (doublons table modules) après merge PR #1
 2. ~~Découpage registries / shell~~ — **fait** sur cette branche (`*Run.ts`, plus de `application.ts`)
 3. `@ts-nocheck` DOM wire : typer progressivement `wireEventsDom*`
+4. **Timer `loop-app-slim-e449`** : objectif atteint — à désactiver ; ne plus viser `application.ts` / `deps.ts` (supprimés)
 
 `npm run verify:ts` · `npm test`
