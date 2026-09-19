@@ -159,4 +159,4 @@ Prefs : `general.colorScheme`, `sessionComfort`, `contrastPlus`, `accentLavender
 
 ---
 
-*Dernière mise à jour : Clarity v10 app (apparence + sombre), version **0.2.1**.*
+*Dernière mise à jour : Clarity v10 sur `main`, version **0.2.2** (release Windows : tag `v0.2.2`).*
