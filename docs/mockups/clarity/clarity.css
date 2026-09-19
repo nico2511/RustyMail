@@ -379,7 +379,7 @@ a.btn-primary--soft {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--primary);
+  background: var(--urgent);
   flex-shrink: 0;
 }
 
@@ -414,13 +414,14 @@ a.btn-primary--soft {
 
 .row {
   display: grid;
-  grid-template-columns: 2px 36px minmax(0, 1fr) auto auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
   gap: 8px 12px;
   align-items: center;
-  padding: 12px 12px 12px 0;
+  padding: 12px 12px 12px 14px;
   border-bottom: 1px solid var(--border-subtle);
   transition: background var(--ease);
   position: relative;
+  border-left: 2px solid transparent;
 }
 
 .row-link {
@@ -466,8 +467,7 @@ a.btn-primary--soft {
 }
 
 .row.unread .avatar {
-  box-shadow: inset 0 0 0 2px var(--primary-ghost);
-  color: var(--primary);
+  color: var(--muted);
 }
 
 .row:last-child {
@@ -479,17 +479,21 @@ a.btn-primary--soft {
 }
 
 .row.is-selected {
-  background: var(--primary-ghost);
-  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.18);
+  background: var(--surface-2);
+  box-shadow: none;
+  border-left-color: var(--text);
+}
+
+.row.unread {
+  border-left-color: var(--primary);
+}
+
+.row.unread.is-selected {
+  border-left-color: var(--primary);
 }
 
 .row .stripe {
-  align-self: stretch;
-  background: transparent;
-}
-
-.row.unread .stripe {
-  background: var(--signal);
+  display: none;
 }
 
 .row.unread .subject {
@@ -940,10 +944,17 @@ body.split-off .read-pane {
 }
 
 .chip.is-on {
-  border-color: rgba(15, 118, 110, 0.35);
-  color: var(--primary);
-  background: var(--primary-ghost);
-  font-weight: 600;
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--surface-2);
+  font-weight: 550;
+}
+
+.chip-triage.is-on {
+  border-color: rgba(161, 98, 7, 0.35);
+  color: var(--urgent);
+  background: var(--urgent-ghost);
+  font-weight: 550;
 }
 
 .row.is-filtered-out {
@@ -1346,7 +1357,7 @@ body.focus-mode .page-head .meta {
 }
 
 body.batch-mode .row {
-  grid-template-columns: 2px 22px 36px minmax(0, 1fr) auto auto;
+  grid-template-columns: 22px 36px minmax(0, 1fr) auto auto;
 }
 
 .row-check {
@@ -1362,7 +1373,7 @@ body.batch-mode .row-check {
 .row-check input {
   width: 14px;
   height: 14px;
-  accent-color: var(--primary);
+  accent-color: var(--text);
   cursor: pointer;
 }
 
@@ -1577,11 +1588,6 @@ body.batch-mode .batch-bar {
 }
 
 /* v9 — triage, prochaine action, rappels, checklist envoi */
-.chip-triage.is-on {
-  border-color: rgba(161, 98, 7, 0.45);
-  color: var(--urgent);
-  background: var(--urgent-ghost);
-}
 
 body.triage-view .brief {
   display: none;
@@ -1599,8 +1605,9 @@ body.triage-view .page-head h1::after {
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  border-left: 3px solid var(--primary);
-  background: var(--primary-ghost);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--border);
+  background: var(--surface);
 }
 
 .next-action.is-visible {
@@ -1610,10 +1617,10 @@ body.triage-view .page-head h1::after {
 .next-action-label {
   display: block;
   font-size: 10px;
-  font-weight: 650;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--primary);
+  color: var(--faint);
   margin-bottom: 4px;
 }
 
