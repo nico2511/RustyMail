@@ -18,17 +18,17 @@
   --t-med: 180ms;
   --t-slow: 320ms;
 
-  /* Surfaces — crème chaud, ni blanc pur ni gris ardoise */
-  --deep: #e4e0d9;
-  --base: #ebe7e1;
-  --surface: #f3f0eb;
-  --elevated: #faf8f4;
-  --hover: #e0dbd4;
-  --active: #d4cec6;
-  --surface-elevated: #ffffff;
-  --border: rgba(72, 68, 62, 0.16);
-  --border-weak: rgba(72, 68, 62, 0.1);
-  --border-strong: rgba(72, 68, 62, 0.28);
+  /* Surfaces — crème chaud Clarity v10 Douce ( défaut ) */
+  --deep: #d8d3cb;
+  --base: #ded9d1;
+  --surface: #e8e4dc;
+  --elevated: #f0ece5;
+  --hover: #d6d0c8;
+  --active: #cac4bb;
+  --surface-elevated: #f7f4ef;
+  --border: rgba(68, 64, 58, 0.14);
+  --border-weak: rgba(68, 64, 58, 0.09);
+  --border-strong: rgba(58, 54, 48, 0.28);
 
   /* Accents pastels (sauge, rose poussière, lavande) */
   --sm-primary: #7a9a86;
@@ -60,14 +60,14 @@
 
   --btn-outlined-border: rgba(58, 54, 48, 0.22);
 
-  --text: #3a3d38;
-  --muted: rgba(58, 61, 56, 0.72);
-  --dim: rgba(58, 61, 56, 0.52);
+  --text: #34362f;
+  --muted: rgba(52, 54, 47, 0.76);
+  --dim: rgba(52, 54, 47, 0.5);
   --danger: #a85555;
   --success: #5a9a72;
   --warn: #a89250;
 
-  --scrim: rgba(52, 48, 44, 0.32);
+  --scrim: rgba(48, 44, 40, 0.28);
   --scrim-heavy: rgba(52, 48, 44, 0.44);
   --shadow-panel: 0 8px 28px rgba(58, 52, 44, 0.12);
   --shadow-modal: 0 16px 48px rgba(58, 52, 44, 0.18);

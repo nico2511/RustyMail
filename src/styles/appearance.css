@@ -1,99 +1,27 @@
 /**
- * Clarity v10 — couche mockup uniquement.
- * Composants + layout : ../../../src/styles/tokens.css + styles.css
- * Ici : navigation entre pages mock, réglages couleur pour longues sessions.
+ * Apparence Clarity v10 — thème clair/sombre et modificateurs session.
+ * Spec mock : docs/mockups/clarity/MOCKUP-DIRECTION.md
  */
 
-html,
-body {
-  height: 100%;
-  margin: 0;
+/* Ancien pastel v0.2.0 (opt-out session Douce) */
+body.clarity-pastel-v020 {
+  --deep: #e4e0d9;
+  --base: #ebe7e1;
+  --surface: #f3f0eb;
+  --elevated: #faf8f4;
+  --hover: #e0dbd4;
+  --active: #d4cec6;
+  --surface-elevated: #ffffff;
+  --border: rgba(72, 68, 62, 0.16);
+  --border-weak: rgba(72, 68, 62, 0.1);
+  --border-strong: rgba(72, 68, 62, 0.28);
+  --text: #3a3d38;
+  --muted: rgba(58, 61, 56, 0.72);
+  --dim: rgba(58, 61, 56, 0.52);
+  --scrim: rgba(52, 48, 44, 0.32);
 }
 
-body {
-  min-height: 100vh;
-}
-
-body.has-mock-nav {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-body.has-mock-nav .app-shell {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: calc(100vh - 40px);
-  width: 100%;
-  margin-top: 40px;
-  padding-top: 0;
-  box-sizing: border-box;
-}
-
-/* ——— Nav entre pages mock (hors app) ——— */
-.mock-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 9999;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  padding: 6px 12px;
-  font-size: 12px;
-  background: var(--elevated);
-  border-bottom: 1px solid var(--border-weak);
-  box-shadow: var(--carved-sm);
-}
-
-.mock-nav a {
-  color: var(--muted);
-  text-decoration: none;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-}
-
-.mock-nav a:hover {
-  color: var(--text);
-  background: var(--hover);
-}
-
-.mock-nav a.on {
-  color: var(--text);
-  font-weight: 600;
-  background: var(--accent-dim);
-}
-
-.mock-nav__session {
-  margin-left: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.mock-nav__session-label {
-  font-size: 11px;
-  color: var(--dim);
-  margin-right: 4px;
-}
-
-.mock-nav__session .ghost-button {
-  padding: 4px 10px;
-  font-size: 11px;
-}
-
-.mock-nav__session .ghost-button.is-on {
-  background: var(--accent-dim);
-  border-color: var(--border);
-  color: var(--text);
-}
-
-/* ——— Session longue durée ( défaut Clarity ) ——— */
 body.clarity-session {
-  /* Crème plus basse luminance — moins de fatigue sur écran long */
   --deep: #d8d3cb;
   --base: #ded9d1;
   --surface: #e8e4dc;
@@ -109,7 +37,6 @@ body.clarity-session {
   --scrim: rgba(48, 44, 40, 0.28);
 }
 
-/* Lisibilité renforcée — toujours palette sauge produit, pas de teal Clarity v9 */
 body.clarity-contrast-plus {
   --text: #242620;
   --muted: rgba(36, 38, 32, 0.84);
@@ -125,7 +52,6 @@ body.clarity-contrast-plus {
   --btn-primary-text: #1e2822;
 }
 
-/* Accent doux lavande — variante session (option mock) */
 body.clarity-accent-lavender {
   --accent-lavender: #9a96b4;
   --btn-primary-fill: #c8c4dc;
@@ -140,7 +66,6 @@ body.clarity-session.clarity-contrast-plus {
   --elevated: #ece7df;
 }
 
-/* ——— Thème sombre (nuit chaude, accents sauge produit) ——— */
 body.clarity-dark {
   color-scheme: dark;
   --deep: #141312;
@@ -177,14 +102,6 @@ body.clarity-dark {
   --btn-outlined-border: rgba(231, 226, 217, 0.2);
 }
 
-body.clarity-dark {
-  background:
-    radial-gradient(920px 520px at 12% -8%, rgba(90, 130, 100, 0.12), transparent 58%),
-    radial-gradient(780px 480px at 88% 4%, rgba(120, 110, 150, 0.1), transparent 55%),
-    radial-gradient(640px 400px at 50% 100%, rgba(140, 100, 80, 0.08), transparent 60%),
-    var(--deep);
-}
-
 body.clarity-dark.clarity-contrast-plus {
   --text: #f3efe8;
   --muted: rgba(243, 239, 232, 0.86);
@@ -193,12 +110,49 @@ body.clarity-dark.clarity-contrast-plus {
   --border-strong: rgba(243, 239, 232, 0.32);
 }
 
-.mock-nav__theme {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  margin-left: 8px;
-  padding-left: 10px;
-  border-left: 1px solid var(--border-weak);
+body.appearance-bg-light {
+  background:
+    radial-gradient(920px 520px at 12% -8%, rgba(168, 196, 178, 0.35), transparent 58%),
+    radial-gradient(780px 480px at 88% 4%, rgba(184, 176, 210, 0.28), transparent 55%),
+    radial-gradient(640px 400px at 50% 100%, rgba(212, 168, 138, 0.18), transparent 60%),
+    var(--deep);
+}
+
+body.appearance-bg-dark {
+  background:
+    radial-gradient(920px 520px at 12% -8%, rgba(90, 130, 100, 0.12), transparent 58%),
+    radial-gradient(780px 480px at 88% 4%, rgba(120, 110, 150, 0.1), transparent 55%),
+    radial-gradient(640px 400px at 50% 100%, rgba(140, 100, 80, 0.08), transparent 60%),
+    var(--deep);
+}
+
+/* ——— Dark : durcissement ciblé (styles.css legacy rgba) ——— */
+body.clarity-dark .settings-ctl,
+body.clarity-dark .settings-ctl-select,
+body.clarity-dark textarea.settings-ctl {
+  background: var(--elevated);
+  border-color: var(--border);
+}
+
+body.clarity-dark .thread-row.is-unread {
+  background: var(--hover);
+}
+
+body.clarity-dark .modal-backdrop,
+body.clarity-dark .ai-quick-panel-backdrop {
+  background: var(--scrim);
+}
+
+/*
+ * HTML expéditeur : le shadow DOM conserve le rendu message ;
+ * le conteneur app reste fond clair pour lisibilité des mails externes.
+ */
+body.clarity-dark .message-html {
+  background: #f7f4ef;
+  color: #2a2a28;
+  border: 1px solid var(--border-weak);
+}
+
+body.clarity-dark .message-html-caption {
+  color: var(--muted);
 }

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
+import { applyAppearanceFromPrefs } from "../../appearance";
 import { setLocale } from "../../i18n";
 import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { safeInvoke, tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
@@ -17,6 +18,7 @@ import { bindTauriNativeFileDropAsync } from "./composeTauriNativeFileDrop";
 
 export async function bootInitShellAndRuntime(): Promise<void> {
   setLocale(state.appPrefs.general.motherLanguage ?? "fr");
+  applyAppearanceFromPrefs(state.appPrefs.general);
   render();
   bindKeyboard();
   bindMouseNavigation();

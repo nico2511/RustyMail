@@ -233,18 +233,51 @@ export function renderSettingsAiModal(): string {
 
 function renderSettingsAppearancePanel(): string {
   const ai = state.appPrefs.ai;
+  const g = state.appPrefs.general;
+  const scheme = g.colorScheme ?? "light";
+  const sessionComfort = g.sessionComfort !== false;
+  const contrastPlus = Boolean(g.contrastPlus);
+  const accentLavender = Boolean(g.accentLavender);
+  const darkEffective =
+    scheme === "dark" ||
+    (scheme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const modDisabled = darkEffective ? " disabled" : "";
   return wrapSettingsPage(`
     <div class="settings-card settings-appearance surface-sm">
-      <h2 class="thread-kicker settings-form-kicker" style="margin:0 0 10px">Apparence</h2>
-      ${settingsExplainHtml(
-        "Réglages visuels de l’application (indépendants de la configuration LLM). Pour l’instant : largeur du panneau droit <strong>Détails</strong> / <strong>Brief d’action</strong> (variable CSS <code>--ai-width</code>)."
-      )}
+      <h2 class="thread-kicker settings-form-kicker" style="margin:0 0 10px">${escapeHtml(t("settings.appearance.heading"))}</h2>
+      ${settingsExplainHtml(t("settings.appearance.explain"))}
       <div class="settings-form-row">
-        <label class="compose-field-label" for="prefs-ai-panel-width">Largeur panneau droit (px)</label>
+        <label class="compose-field-label" for="prefs-color-scheme">${escapeHtml(t("settings.appearance.colorScheme"))}</label>
+        <select class="settings-ctl settings-ctl-select" id="prefs-color-scheme" aria-label="${escapeAttr(t("settings.appearance.colorScheme"))}">
+          <option value="light" ${scheme === "light" ? "selected" : ""}>${escapeHtml(t("settings.appearance.schemeLight"))}</option>
+          <option value="dark" ${scheme === "dark" ? "selected" : ""}>${escapeHtml(t("settings.appearance.schemeDark"))}</option>
+          <option value="system" ${scheme === "system" ? "selected" : ""}>${escapeHtml(t("settings.appearance.schemeSystem"))}</option>
+        </select>
+      </div>
+      <div class="settings-form-row">
+        <label class="settings-form-check">
+          <input type="checkbox" id="prefs-session-comfort"${sessionComfort ? " checked" : ""}${modDisabled} />
+          <span class="settings-form-check-text">${escapeHtml(t("settings.appearance.sessionComfort"))}</span>
+        </label>
+      </div>
+      <div class="settings-form-row">
+        <label class="settings-form-check">
+          <input type="checkbox" id="prefs-contrast-plus"${contrastPlus ? " checked" : ""}${modDisabled} />
+          <span class="settings-form-check-text">${escapeHtml(t("settings.appearance.contrastPlus"))}</span>
+        </label>
+      </div>
+      <div class="settings-form-row">
+        <label class="settings-form-check">
+          <input type="checkbox" id="prefs-accent-lavender"${accentLavender ? " checked" : ""}${modDisabled} />
+          <span class="settings-form-check-text">${escapeHtml(t("settings.appearance.accentLavender"))}</span>
+        </label>
+      </div>
+      <div class="settings-form-row">
+        <label class="compose-field-label" for="prefs-ai-panel-width">${escapeHtml(t("settings.appearance.aiPanelWidth"))}</label>
         <input class="settings-ctl" type="number" id="prefs-ai-panel-width" min="260" max="640" step="10" value="${escapeAttr(String(ai.aiPanelWidthPx))}" autocomplete="off" />
       </div>
       <div class="settings-form-footer" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-weak)">
-        <button type="button" class="primary-button" data-action="save-ai-prefs">Enregistrer l’apparence</button>
+        <button type="button" class="primary-button" data-action="save-ai-prefs">${escapeHtml(t("settings.appearance.save"))}</button>
       </div>
     </div>
   `);

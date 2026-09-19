@@ -65,12 +65,29 @@ pub struct GeneralPrefs {
     /// Suggestions de vues + télémétrie activité locale (100 % on-device).
     #[serde(default = "default_activity_suggestions_enabled")]
     pub activity_suggestions_enabled: bool,
+    /// `light`, `dark`, ou `system`.
+    #[serde(default = "default_color_scheme")]
+    pub color_scheme: String,
+    #[serde(default = "default_session_comfort")]
+    pub session_comfort: bool,
+    #[serde(default)]
+    pub contrast_plus: bool,
+    #[serde(default)]
+    pub accent_lavender: bool,
     /// Dossiers verrouillés par compte (vue Dossiers — pas de drag/delete/rename).
     #[serde(default)]
     pub locked_mailboxes_by_account: HashMap<String, Vec<String>>,
 }
 
 fn default_activity_suggestions_enabled() -> bool {
+    true
+}
+
+fn default_color_scheme() -> String {
+    "light".to_string()
+}
+
+fn default_session_comfort() -> bool {
     true
 }
 
@@ -119,6 +136,10 @@ impl Default for GeneralPrefs {
             first_run_dismissed: default_first_run_dismissed(),
             bootstrap_models_completed: false,
             activity_suggestions_enabled: default_activity_suggestions_enabled(),
+            color_scheme: default_color_scheme(),
+            session_comfort: default_session_comfort(),
+            contrast_plus: false,
+            accent_lavender: false,
             locked_mailboxes_by_account: HashMap::new(),
         }
     }

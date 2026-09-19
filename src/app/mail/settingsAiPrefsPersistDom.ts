@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppPrefs } from "../../prefs_defaults";
 import { captureAiPrefsFieldsFromDom } from "../../aiPrefsPersist";
+import { captureAppearanceFieldsFromDom } from "../../appearancePrefs";
+import { applyAppearanceFromPrefs } from "../../appearance";
 import { defaultAppPrefs, normalizeAiPrefsMerged } from "../../prefs_defaults";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
@@ -22,6 +24,7 @@ export async function persistAiPrefsFromDom(opts?: {
   }
   if (!opts?.skipDomCapture) {
     captureAiPrefsFieldsFromDom(state.appPrefs);
+    captureAppearanceFieldsFromDom(state.appPrefs);
   }
   if (state.view === "thread" && state.selectedThread) {
     state.aiOpen = true;
@@ -37,6 +40,7 @@ export async function persistAiPrefsFromDom(opts?: {
     } catch {
       /* ignore reload failures */
     }
+    applyAppearanceFromPrefs(state.appPrefs.general);
     if (!opts?.silent) toast("Réglages IA enregistrés.");
   } catch (e) {
     toast(tauriErrorMessage(e));
