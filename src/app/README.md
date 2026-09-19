@@ -555,9 +555,12 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomOrgConfirmModalsRun.ts` | Checkboxes confirmation modales org |
 | `app/mail/wireEventsDomThreadAttachmentsRun.ts` | PJ fil + hydrate HTML message |
 | `app/mail/wireEventsDomComposeSearchAccountRun.ts` | Barrel compose / recherche / compte (DOM) |
-| `app/mail/wireEventsDomComposeEditorRun.ts` | Orchestration wire composeur |
+| `app/mail/wireEventsDomComposeEditorRun.ts` | Barrel wire composeur (preview, body, champs, toolbar) |
+| `app/mail/wireEventsDomComposeEditorFieldsRun.ts` | Sujet, dropzone PJ, quick reply Enter |
 | `app/mail/wireEventsDomComposePreviewRun.ts` | Preview compose (liens, lightbox) |
-| `app/mail/wireEventsDomComposeBodyRun.ts` | Textarea compose, collage, raccourcis MD |
+| `app/mail/wireEventsDomComposeBodyRun.ts` | Barrel textarea + toolbar markdown |
+| `app/mail/wireEventsDomComposeBodyTextareaRun.ts` | `#compose-body` input, paste image, Ctrl+B/I/K/U |
+| `app/mail/wireEventsDomComposeMarkdownToolbarRun.ts` | Boutons `[data-md]` |
 | `app/mail/wireEventsDomSearchBarRun.ts` | Barres recherche + commit Enter |
 | `app/mail/wireEventsDomAccountFormRun.ts` | Sélecteur compte, préréglage domaine, champs serveur |
 | `app/mail/wireEventsDomThreadQaRun.ts` | Saisie Q&A fil (`#thread-qa-input`) |
