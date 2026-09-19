@@ -555,7 +555,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomInboxListNavRun.ts` | Barrel navigation liste |
 | `app/mail/wireEventsDomInboxListSidebarNavRun.ts` | Toast, clic boîtes `[data-mailbox]` |
 | `app/mail/wireEventsDomInboxListOpenThreadNavRun.ts` | Lignes fil + digest → `openThread` |
-| `app/mail/wireEventsDomInboxListMoveRun.ts` | Trash/archive, déplacement fil, `#move-target-select` |
+| `app/mail/wireEventsDomInboxListMoveRun.ts` | Barrel moves liste |
+| `app/mail/wireEventsDomInboxListTrashArchiveRun.ts` | Boutons trash / archive |
+| `app/mail/wireEventsDomInboxListFolderMoveRun.ts` | Select déplacement fil + `#move-target-select` |
 | `app/mail/wireEventsDomOrgMailboxRun.ts` | Barrel actions org (inline + modales confirm) |
 | `app/mail/wireEventsDomOrgMailboxInlineRun.ts` | Barrel actions org inline |
 | `app/mail/wireEventsDomOrgMailboxDeleteSyncRun.ts` | Supprimer une boîte, sync IMAP |
