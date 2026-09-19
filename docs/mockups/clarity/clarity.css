@@ -1,4 +1,4 @@
-/* Clarity v7 — intuitif, fonctionnel, mécanique discrète */
+/* Clarity v8 — intuitif, fonctionnel, mécanique discrète */
 :root {
   --sidebar-w: 200px;
   --bg: #f3f4f6;
@@ -22,6 +22,15 @@
   --shadow: 0 1px 3px rgba(17, 24, 39, 0.04);
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
   --ease: 150ms ease;
+}
+
+body.contrast-plus {
+  --text: #030712;
+  --muted: #374151;
+  --faint: #4b5563;
+  --border: #cbd5e1;
+  --border-subtle: #e2e8f0;
+  --bg: #eceef2;
 }
 
 * {
@@ -1390,4 +1399,131 @@ body.batch-mode .batch-bar {
 
 .schedule-hint.is-visible {
   display: inline;
+}
+
+.file-chip {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+/* v8 — tri contact, contraste, épingler, activité, ton, navigation fil */
+.btn-contrast {
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-contrast.is-on {
+  border-color: rgba(15, 118, 110, 0.35);
+  color: var(--primary);
+  background: var(--primary-ghost);
+}
+
+.row-pin {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  border: 0;
+  background: var(--surface);
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity var(--ease);
+}
+
+.row:hover .row-pin,
+.row.is-pinned .row-pin {
+  opacity: 1;
+}
+
+.row.is-pinned .row-pin {
+  color: var(--primary);
+}
+
+.activity-feed {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.activity-feed li + li {
+  margin-top: 4px;
+}
+
+.activity-feed strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tone-seg {
+  margin: 0 14px 8px;
+}
+
+.body-field.tone-pro {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.body-field.tone-warm::before {
+  content: "Ton chaleureux suggéré — relire avant envoi.";
+  display: block;
+  font-size: 11px;
+  color: var(--faint);
+  margin-bottom: 10px;
+  font-family: var(--font);
+}
+
+.thread-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.thread-nav-pos {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.thread-nav-btn {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.thread-nav-btn:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.pinned-first .list-section:first-child .list-section-label::after {
+  content: " · épinglés en tête";
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--primary);
 }

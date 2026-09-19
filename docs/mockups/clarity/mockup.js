@@ -106,6 +106,23 @@
       }
     }
     if (openThread) openThread.setAttribute("href", row.getAttribute("data-thread") || "thread.html");
+    updateActivity(row);
+  }
+
+  function updateActivity(row) {
+    var feed = qs("[data-activity-feed]");
+    if (!feed || !row) return;
+    var subject = row.getAttribute("data-preview-subject") || "Message";
+    var sender = row.getAttribute("data-sender") || "Contact";
+    var urgent = row.getAttribute("data-preview-urgent") === "1";
+    feed.innerHTML =
+      "<li><strong>Maintenant</strong> — lecture « " +
+      subject +
+      " »</li>" +
+      "<li>Contact · " +
+      sender +
+      "</li>" +
+      (urgent ? "<li>Priorité auto · échéance détectée</li>" : "<li>Priorité · normale</li>");
   }
 
   function selectRow(row) {
@@ -123,18 +140,111 @@
   }
 
   var list = qs("[data-inbox-list]");
-  if (list) {
+  var dateListHtml = list ? list.innerHTML : "";
+
+  function bindRowPins() {
+    qsa(".row-pin").forEach(function (pin) {
+      pin.addEventListener("click", function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        var row = pin.closest(".row");
+        if (row) row.classList.toggle("is-pinned");
+        pin.textContent = row.classList.contains("is-pinned") ? "★" : "☆";
+      });
+    });
+  }
+
+  function bindInboxRows() {
+    if (!list) return;
     qsa(".row", list).forEach(function (row) {
       row.addEventListener("click", function (e) {
-        if (e.target.closest(".row-actions")) return;
+        if (e.target.closest(".row-actions") || e.target.closest(".row-pin")) return;
         if (document.body.classList.contains("split-off")) return;
         var link = qs(".row-link", row);
         if (link) e.preventDefault();
         selectRow(row);
       });
     });
+    qsa(".row-check input").forEach(function (cb) {
+      cb.addEventListener("click", function (e) {
+        e.stopPropagation();
+        updateBatchCount();
+      });
+    });
+    bindRowPins();
+  }
+
+  function sortInbox(mode) {
+    if (!list) return;
+    var meta = qs("[data-inbox-meta]");
+    if (mode === "date") {
+      list.innerHTML = dateListHtml;
+      if (meta) meta.textContent = "4 non lus · groupé par date";
+      document.body.classList.remove("pinned-first");
+    } else {
+      var rows = [];
+      var wrap = document.createElement("div");
+      wrap.innerHTML = dateListHtml;
+      qsa(".row", wrap).forEach(function (r) {
+        rows.push(r.cloneNode(true));
+      });
+      rows.sort(function (a, b) {
+        var pa = a.classList.contains("is-pinned") ? 0 : 1;
+        var pb = b.classList.contains("is-pinned") ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        return (a.getAttribute("data-sender") || "").localeCompare(b.getAttribute("data-sender") || "");
+      });
+      list.innerHTML = "";
+      var lastSender = null;
+      rows.forEach(function (row) {
+        var sender = row.getAttribute("data-sender") || "Autre";
+        if (sender !== lastSender) {
+          var section = document.createElement("div");
+          section.className = "list-section";
+          var label = document.createElement("div");
+          label.className = "list-section-label";
+          label.textContent = sender;
+          section.appendChild(label);
+          list.appendChild(section);
+          lastSender = sender;
+        }
+        list.lastElementChild.appendChild(row);
+      });
+      if (meta) meta.textContent = "4 non lus · groupé par contact";
+      document.body.classList.toggle("pinned-first", !!qs(".row.is-pinned", list));
+    }
+    bindInboxRows();
+    updateListEmpty();
+    var sel = qs(".row.is-selected", list) || qs(".row", list);
+    if (sel) selectRow(sel);
+  }
+
+  if (list) {
+    bindInboxRows();
     var selected = qs(".row.is-selected", list);
-    if (selected) applyPreview(selected);
+    if (selected) updateActivity(selected);
+  }
+
+  var sortSeg = qs("[data-sort-seg]");
+  if (sortSeg) {
+    qsa("button", sortSeg).forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var mode = btn.getAttribute("data-sort");
+        qsa("button", sortSeg).forEach(function (b) {
+          b.classList.toggle("is-on", b === btn);
+        });
+        sortInbox(mode);
+      });
+    });
+  }
+
+  var contrastBtn = qs("[data-contrast-plus]");
+  if (contrastBtn) {
+    contrastBtn.addEventListener("click", function () {
+      var on = document.body.classList.toggle("contrast-plus");
+      contrastBtn.classList.toggle("is-on", on);
+      contrastBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    });
   }
 
   document.addEventListener("keydown", function (e) {
@@ -204,6 +314,13 @@
         if (cmd === "batch") {
           var batchBtn = qs("[data-batch-mode]");
           if (batchBtn) batchBtn.click();
+        }
+        if (cmd === "contrast" && contrastBtn) contrastBtn.click();
+        if (cmd === "sort-contact" && sortSeg) {
+          qsa("button", sortSeg).forEach(function (b) {
+            b.classList.toggle("is-on", b.getAttribute("data-sort") === "sender");
+          });
+          sortInbox("sender");
         }
       });
     });
@@ -290,12 +407,22 @@
       }
     });
   }
-  qsa(".row-check input").forEach(function (cb) {
-    cb.addEventListener("click", function (e) {
-      e.stopPropagation();
-      updateBatchCount();
+
+  var toneSeg = qs("[data-tone-seg]");
+  var bodyField = qs(".body-field");
+  if (toneSeg && bodyField) {
+    qsa("button", toneSeg).forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tone = btn.getAttribute("data-tone");
+        qsa("button", toneSeg).forEach(function (b) {
+          b.classList.toggle("is-on", b === btn);
+        });
+        bodyField.classList.remove("tone-pro", "tone-warm");
+        if (tone === "pro") bodyField.classList.add("tone-pro");
+        if (tone === "warm") bodyField.classList.add("tone-warm");
+      });
     });
-  });
+  }
 
   var attachToggle = qs("[data-attach-toggle]");
   var dropZone = qs("[data-drop-zone]");

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v7 — Inbox</title>
+    <title>Clarity v8 — Inbox</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -32,6 +32,7 @@
           <input type="search" placeholder="Rechercher ou commande…" />
           <kbd>⌘K</kbd>
         </label>
+        <button type="button" class="btn-contrast" data-contrast-plus aria-pressed="false">Contraste+</button>
         <button type="button" class="btn-focus" data-focus-mode aria-pressed="false">Focus</button>
         <button type="button" class="btn-primary btn-primary--soft">Nouveau</button>
       </header>
@@ -39,9 +40,13 @@
         <div class="page-head">
           <div>
             <h1>Reçus</h1>
-            <span class="meta">4 non lus · groupé par date</span>
+            <span class="meta" data-inbox-meta>4 non lus · groupé par date</span>
           </div>
           <div class="page-tools">
+            <div class="seg" data-sort-seg role="group" aria-label="Regroupement">
+              <button type="button" class="is-on" data-sort="date">Date</button>
+              <button type="button" data-sort="sender">Contact</button>
+            </div>
             <button type="button" class="btn-batch" data-batch-mode>Sélection</button>
             <div class="seg" data-split-seg role="group" aria-label="Disposition">
               <button type="button" class="is-on" data-split="split">Split</button>
@@ -85,8 +90,10 @@
                   data-preview-body="Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?"
                   data-preview-urgent="1"
                   data-thread="thread.html"
+                  data-sender="Marie Lefèvre"
                 >
                   <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
+                  <button type="button" class="row-pin" aria-label="Épingler">☆</button>
                   <label class="row-check"><input type="checkbox" aria-label="Sélectionner" /></label>
                   <div class="stripe"></div>
                   <div class="avatar">ML</div>
@@ -110,8 +117,10 @@
                   data-preview-body="Contraste corrigé en pièce jointe — dis-moi si la version sombre te convient pour la prod."
                   data-preview-urgent="0"
                   data-thread="thread.html"
+                  data-sender="Studio Créa"
                 >
                   <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
+                  <button type="button" class="row-pin" aria-label="Épingler">☆</button>
                   <label class="row-check"><input type="checkbox" aria-label="Sélectionner" /></label>
                   <div class="stripe"></div>
                   <div class="avatar">SC</div>
@@ -135,7 +144,9 @@
                   data-preview-body="Résumé hebdomadaire : 3 merges, 12 issues closes, prochaine release mardi."
                   data-preview-urgent="0"
                   data-thread="thread.html"
+                  data-sender="Équipe produit"
                 >
+                  <button type="button" class="row-pin" aria-label="Épingler">☆</button>
                   <label class="row-check"><input type="checkbox" aria-label="Sélectionner" /></label>
                   <div class="stripe"></div>
                   <div class="avatar">·</div>
@@ -156,6 +167,11 @@
             <p class="read-pane-empty">Sélectionnez un message · <kbd>j</kbd> <kbd>k</kbd></p>
             <div class="read-pane-content">
               <div class="snooze-toast" data-snooze-toast>Rappel demain 09:00 — message masqué jusqu’à la date</div>
+              <ul class="activity-feed" data-activity-feed>
+                <li><strong>Maintenant</strong> — lecture « Renouvellement hébergement »</li>
+                <li>Contact · Marie Lefèvre</li>
+                <li>Priorité auto · échéance détectée</li>
+              </ul>
               <div class="read-pane-head">
                 <div>
                   <h2 data-read-title>Renouvellement hébergement</h2>
@@ -202,6 +218,12 @@
           </button>
           <button type="button" class="palette-item" data-palette-cmd="batch" data-palette-keywords="selection multiple bulk">
             Mode sélection <span>Archiver en lot</span>
+          </button>
+          <button type="button" class="palette-item" data-palette-cmd="sort-contact" data-palette-keywords="tri contact expéditeur grouper">
+            Grouper par contact <span>Vue liste</span>
+          </button>
+          <button type="button" class="palette-item" data-palette-cmd="contrast" data-palette-keywords="contraste accessibilite lisibilite">
+            Contraste+ <span>Lisibilité</span>
           </button>
         </div>
         <p class="palette-empty" data-palette-empty>Aucune commande correspondante.</p>

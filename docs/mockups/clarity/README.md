@@ -1,27 +1,28 @@
-# Clarity v7 — intuitif, fonctionnel, discret
+# Clarity v8 — intuitif, fonctionnel, discret
 
-Itération **v7** : v6 + **structure liste**, **actions lot**, **reporter**, **compose enrichi**.
+Itération **v8** : v7 + **tri contact**, **Contraste+**, **épingler**, **activité**, **ton**, **navigation fil**.
 
-## Nouveautés v7
+## Nouveautés v8
 
 | Zone | Mécanique |
 | ---- | --------- |
-| Inbox | **Sections** Aujourd’hui / Hier / Plus tôt |
-| Inbox | **Mode sélection** — cases + barre Archiver / Lu |
-| Inbox | **Reporter demain** (panneau + palette) |
-| Inbox | Palette **filtrée** en tapant · état vide filtre |
-| Compose | **Joindre** + zone **drag-and-drop** · **Programmer** envoi |
-| Fil | Bandeau **pièces jointes** du fil |
-| v6 | Sync split, ⌘K, Focus — conservés |
+| Inbox | Tri **Date \| Contact** (regroupement expéditeur) |
+| Inbox | **Contraste+** — lisibilité renforcée sans thème sombre |
+| Inbox | **Épingler** (☆) au survol · épinglés en tête en vue Contact |
+| Inbox | Fil **activité** dans le panneau lecture |
+| Inbox | ⌘K : grouper par contact, Contraste+ |
+| Fil | **Préc. / Suiv.** entre messages de la boîte |
+| Compose | **Ton** Neutre · Pro · Chaleureux |
+| v7 | Sections, sélection, reporter, drop — conservés |
 
 ## Parcours mockup
 
-`inbox.html` → **Sélection** · filtre **Échéances** · **Reporter** → compose **Joindre**
+`inbox.html` → **Contact** · épingler une ligne · **Contraste+** → fil navigation → compose **ton**
 
 ## Fichiers
 
 - [`index.html`](index.html) · [`inbox.html`](inbox.html) · [`thread.html`](thread.html) · [`compose.html`](compose.html)
-- [`clarity.css`](clarity.css) · [`mockup.js`](mockup.js) · [`images/clarity-v7-*.png`](images/)
+- [`clarity.css`](clarity.css) · [`mockup.js`](mockup.js) · [`images/clarity-v8-*.png`](images/)
 
 ## Intent (inchangé)
 
