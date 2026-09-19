@@ -193,7 +193,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/bootDeferredPrefsFetchRun.ts` | `get_app_prefs`, statuts clés API |
 | `app/mail/bootDeferredPrefsListenersRun.ts` | Events bootstrap modèles / prefetch LLM |
 | `app/mail/bootDeferredPrefsAfterLoadRun.ts` | Wizard, compte défaut, filtre liste, brief gate |
-| `app/mail/appModuleRegistry.ts` | Orchestrateur `registerAllAppModules()` (~20 lignes) |
+| `app/mail/appModuleRegistry.ts` | Barrel `registerAllAppModules()` |
+| `app/mail/appModuleRegistryRun.ts` | Ordre d’enregistrement des registries au boot |
 | `app/mail/appRenderRegistry.ts` | `registerAppRenderDeps()` (barrel) |
 | `app/mail/appRenderRegistryPagesRun.ts` | Rendu pages Organiser / Dossiers |
 | `app/mail/appRenderRegistryDepsRun.ts` | Barrel `buildAppRenderDeps()` |
@@ -531,7 +532,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `settingsRender.ts` | Paramètres (onglets, modale IA réglages) |
 | `aiPanelRender.ts` | Panneau Détails / brief dossier / agent IA |
 | `orgSampleRowRender.ts` | Ligne échantillon vue Organiser |
-| `app/mail/wireEventsDomOrchestratorRun.ts` | Orchestration DOM (`wireEvents()` ; shell render) |
+| `app/mail/wireEventsDomOrchestratorRun.ts` | Barrel `wireEvents()` |
+| `app/mail/wireEventsDomOrchestratorComposeRun.ts` | Signal AbortController compose + chips / @ autocomplete |
+| `app/mail/wireEventsDomOrchestratorDomainRun.ts` | Enchaîne les `wireEventsDom*Run` par domaine |
 | `app/mail/handleActionRun.ts` | Point d’entrée actions UI (`data-action`) |
 | `app/mail/wireEventsContext.ts` | Refs UI (abort compose, prefs IA immédiats, carnet d’adresses) |
 | `app/mail/wireEventsDepsContext.ts` | Mutateurs contexte wire (capture compte, édition carnet) |
@@ -619,7 +622,7 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 ## Prochaines extractions (ordre suggéré)
 
 1. Consolider doc README (doublons table modules) après merge PR #1
-2. Poursuivre découpage render / registries si de nouveaux god-modules apparaissent
+2. ~~Découpage registries / shell~~ — **fait** sur cette branche (`*Run.ts`, plus de `application.ts`)
 3. `@ts-nocheck` DOM wire : typer progressivement `wireEventsDom*`
 
 `npm run verify:ts` · `npm test`
