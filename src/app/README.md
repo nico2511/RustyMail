@@ -541,7 +541,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDepsContext.ts` | Mutateurs contexte wire (capture compte, édition carnet) |
 | `app/mail/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` |
 | `app/mail/wireEventsDomContactsAgentRun.ts` | Barrel contacts + dispatch `[data-action]` |
-| `app/mail/wireEventsDomContactsListRun.ts` | Recherche / scroll infini liste contacts |
+| `app/mail/wireEventsDomContactsListRun.ts` | Barrel recherche / scroll liste contacts |
+| `app/mail/wireEventsDomContactsListSearchRun.ts` | `#contacts-list-search` debounce 280ms |
+| `app/mail/wireEventsDomContactsListScrollRun.ts` | Scroll infini `#contacts-thread-list` |
 | `app/mail/wireEventsDomDataActionDispatchRun.ts` | Barrel clic `data-action` + change agent/brief |
 | `app/mail/wireEventsDomDataActionClickRun.ts` | Clic `[data-action]` → `handleAction` |
 | `app/mail/wireEventsDomDataActionChangeRun.ts` | Agent skills/mode, mode brief dossier |
@@ -553,7 +555,8 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomOrgMailboxRun.ts` | Barrel actions org (inline + modales confirm) |
 | `app/mail/wireEventsDomOrgMailboxInlineRun.ts` | Sync / supprimer / ignorer boîtes org v1–v2 |
 | `app/mail/wireEventsDomOrgConfirmModalsRun.ts` | Checkboxes confirmation modales org |
-| `app/mail/wireEventsDomThreadAttachmentsRun.ts` | PJ fil + hydrate HTML message |
+| `app/mail/wireEventsDomThreadAttachmentsRun.ts` | Barrel PJ fil + hydrate HTML |
+| `app/mail/wireEventsDomThreadAttachmentButtonsRun.ts` | Boutons download/open PJ |
 | `app/mail/wireEventsDomComposeSearchAccountRun.ts` | Barrel compose / recherche / compte (DOM) |
 | `app/mail/wireEventsDomComposeEditorRun.ts` | Barrel wire composeur (preview, body, champs, toolbar) |
 | `app/mail/wireEventsDomComposeEditorFieldsRun.ts` | Sujet, dropzone PJ, quick reply Enter |
