@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v8 — Fil</title>
+    <title>Clarity v9 — Fil</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -19,6 +19,12 @@
           <span class="brand-rail">RM</span>
         </div>
         <button type="button" class="nav-item active" data-short="R"><span class="nav-label">Reçus</span></button>
+        <details class="sidebar-reminders">
+          <summary>Rappels <span class="count">2</span></summary>
+          <ul>
+            <li>Demain 09:00 · Hébergement</li>
+          </ul>
+        </details>
         <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Réduire le panneau">◀</button>
       </aside>
       <header class="topbar">
@@ -68,6 +74,11 @@
         <summary>Suggestion de réponse (1)</summary>
         <div class="suggest">
           <div class="suggest-label">Insérer dans le dock</div>
+          <div class="quick-replies">
+            <button type="button">Oui · 12 mois</button>
+            <button type="button">Montant TTC ?</button>
+            <button type="button">Rappeler vendredi</button>
+          </div>
           <button type="button">Oui pour 12 mois si le total reste à 129 € TTC</button>
         </div>
       </details>

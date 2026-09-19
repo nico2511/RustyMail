@@ -63,13 +63,7 @@
         qsa(".chip", filters).forEach(function (c) {
           c.classList.toggle("is-on", c === chip);
         });
-        qsa(".list .row").forEach(function (row) {
-          var show = true;
-          if (filter === "unread") show = row.classList.contains("unread");
-          if (filter === "urgent") show = !!row.querySelector(".badge-urgent");
-          row.classList.toggle("is-filtered-out", !show);
-        });
-        updateListEmpty();
+        applyFilter(filter);
       });
     });
   }
@@ -107,6 +101,13 @@
     }
     if (openThread) openThread.setAttribute("href", row.getAttribute("data-thread") || "thread.html");
     updateActivity(row);
+    var nextWrap = qs("[data-next-action-wrap]");
+    var nextText = qs("[data-next-action]");
+    var action = row.getAttribute("data-preview-action") || "";
+    if (nextWrap && nextText) {
+      nextWrap.classList.toggle("is-visible", !!action);
+      nextText.textContent = action;
+    }
   }
 
   function updateActivity(row) {
@@ -142,6 +143,38 @@
   var list = qs("[data-inbox-list]");
   var dateListHtml = list ? list.innerHTML : "";
 
+  function persistListHtml() {
+    if (list) dateListHtml = list.innerHTML;
+  }
+
+  function applyFilter(filter) {
+    qsa(".list .row").forEach(function (row) {
+      var show = true;
+      if (filter === "unread") show = row.classList.contains("unread");
+      if (filter === "urgent") show = !!row.querySelector(".badge-urgent");
+      if (filter === "triage") {
+        show =
+          row.classList.contains("unread") ||
+          row.classList.contains("is-pinned") ||
+          row.getAttribute("data-needs-action") === "1" ||
+          !!row.querySelector(".badge-urgent");
+      }
+      row.classList.toggle("is-filtered-out", !show);
+    });
+    document.body.classList.toggle("triage-view", filter === "triage");
+    updateListEmpty();
+    var meta = qs("[data-inbox-meta]");
+    if (meta && filter === "triage") {
+      var n = visibleRows().length;
+      meta.textContent = n + " à traiter · vue triage";
+    } else if (meta && filter === "all") {
+      var sortOn = qs("[data-sort-seg] button.is-on");
+      var sortMode = sortOn ? sortOn.getAttribute("data-sort") : "date";
+      meta.textContent =
+        sortMode === "sender" ? "4 non lus · groupé par contact" : "4 non lus · groupé par date";
+    }
+  }
+
   function bindRowPins() {
     qsa(".row-pin").forEach(function (pin) {
       pin.addEventListener("click", function (e) {
@@ -150,6 +183,7 @@
         var row = pin.closest(".row");
         if (row) row.classList.toggle("is-pinned");
         pin.textContent = row.classList.contains("is-pinned") ? "★" : "☆";
+        persistListHtml();
       });
     });
   }
@@ -215,6 +249,8 @@
     }
     bindInboxRows();
     updateListEmpty();
+    var activeChip = qs("[data-filter-chips] .chip.is-on");
+    if (activeChip) applyFilter(activeChip.getAttribute("data-filter") || "all");
     var sel = qs(".row.is-selected", list) || qs(".row", list);
     if (sel) selectRow(sel);
   }
@@ -322,6 +358,10 @@
           });
           sortInbox("sender");
         }
+        if (cmd === "triage") {
+          var triageChip = qs('[data-filter="triage"]');
+          if (triageChip) triageChip.click();
+        }
       });
     });
     if (paletteInput) {
@@ -420,9 +460,25 @@
         bodyField.classList.remove("tone-pro", "tone-warm");
         if (tone === "pro") bodyField.classList.add("tone-pro");
         if (tone === "warm") bodyField.classList.add("tone-warm");
+        updateSendChecklist();
       });
     });
   }
+
+  function updateSendChecklist() {
+    var items = qsa("[data-check-item]");
+    if (!items.length) return;
+    items.forEach(function (el) {
+      var key = el.getAttribute("data-check-item");
+      var ok = false;
+      if (key === "to") ok = true;
+      if (key === "tone") ok = !!qs("[data-tone-seg] button.is-on");
+      if (key === "attach") ok = !!qs(".attach-chip");
+      el.classList.toggle("is-ok", ok);
+    });
+  }
+
+  updateSendChecklist();
 
   var attachToggle = qs("[data-attach-toggle]");
   var dropZone = qs("[data-drop-zone]");

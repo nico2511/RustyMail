@@ -1,4 +1,4 @@
-/* Clarity v8 — intuitif, fonctionnel, mécanique discrète */
+/* Clarity v9 — intuitif, fonctionnel, mécanique discrète (base v8) */
 :root {
   --sidebar-w: 200px;
   --bg: #f3f4f6;
@@ -1525,5 +1525,153 @@ body.batch-mode .batch-bar {
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
+  color: var(--primary);
+}
+
+/* v9 — triage, prochaine action, rappels, checklist envoi */
+.chip-triage.is-on {
+  border-color: rgba(161, 98, 7, 0.45);
+  color: var(--urgent);
+  background: var(--urgent-ghost);
+}
+
+body.triage-view .brief {
+  display: none;
+}
+
+body.triage-view .page-head h1::after {
+  content: " · triage";
+  font-weight: 500;
+  color: var(--primary);
+  font-size: 0.85em;
+}
+
+.next-action {
+  display: none;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--primary);
+  background: var(--primary-ghost);
+}
+
+.next-action.is-visible {
+  display: block;
+}
+
+.next-action-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.next-action p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.sidebar-reminders {
+  margin-top: 8px;
+  padding: 8px 6px 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.sidebar-reminders summary {
+  cursor: pointer;
+  color: var(--muted);
+  list-style: none;
+  padding: 6px 4px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-reminders summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-reminders summary .count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--urgent);
+}
+
+.sidebar-reminders ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 4px 8px;
+}
+
+.sidebar-reminders li {
+  padding: 6px 6px;
+  font-size: 11px;
+  color: var(--faint);
+  border-radius: 6px;
+}
+
+.sidebar-reminders li:hover {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+body.sidebar-rail .sidebar-reminders {
+  display: none;
+}
+
+.send-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.send-checklist span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.send-checklist span::before {
+  content: "○";
+  color: var(--faint);
+}
+
+.send-checklist span.is-ok::before {
+  content: "●";
+  color: var(--primary);
+}
+
+.quick-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.quick-replies button {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.quick-replies button:hover {
+  border-color: var(--primary);
   color: var(--primary);
 }

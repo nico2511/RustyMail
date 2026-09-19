@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v8 — Inbox</title>
+    <title>Clarity v9 — Inbox</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -25,6 +25,13 @@
         <button type="button" class="nav-item" data-short="E"><span class="nav-label">Envoyés</span></button>
         <button type="button" class="nav-item" data-short="B"><span class="nav-label">Brouillons</span></button>
         <button type="button" class="nav-item" data-short="C"><span class="nav-label">Corbeille</span></button>
+        <details class="sidebar-reminders" open>
+          <summary>Rappels <span class="count">2</span></summary>
+          <ul>
+            <li>Demain 09:00 · Hébergement</li>
+            <li>Ven. · Échéance contrat</li>
+          </ul>
+        </details>
         <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Réduire le panneau">◀</button>
       </aside>
       <header class="topbar">
@@ -72,6 +79,7 @@
             </details>
             <div class="filters" data-filter-chips>
               <button type="button" class="chip is-on" data-filter="all">Tous</button>
+              <button type="button" class="chip chip-triage" data-filter="triage">Triage</button>
               <button type="button" class="chip" data-filter="unread">Non lus</button>
               <button type="button" class="chip" data-filter="urgent">Échéances</button>
             </div>
@@ -91,6 +99,8 @@
                   data-preview-urgent="1"
                   data-thread="thread.html"
                   data-sender="Marie Lefèvre"
+                  data-needs-action="1"
+                  data-preview-action="Confirmer le renouvellement avant vendredi — répondre ou archiver."
                 >
                   <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
                   <button type="button" class="row-pin" aria-label="Épingler">☆</button>
@@ -118,6 +128,8 @@
                   data-preview-urgent="0"
                   data-thread="thread.html"
                   data-sender="Studio Créa"
+                  data-needs-action="1"
+                  data-preview-action="Valider la maquette Q4 ou demander une révision."
                 >
                   <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
                   <button type="button" class="row-pin" aria-label="Épingler">☆</button>
@@ -172,6 +184,10 @@
                 <li>Contact · Marie Lefèvre</li>
                 <li>Priorité auto · échéance détectée</li>
               </ul>
+              <div class="next-action is-visible" data-next-action-wrap>
+                <span class="next-action-label">Prochaine action</span>
+                <p data-next-action>Confirmer le renouvellement avant vendredi — répondre ou archiver.</p>
+              </div>
               <div class="read-pane-head">
                 <div>
                   <h2 data-read-title>Renouvellement hébergement</h2>
@@ -224,6 +240,9 @@
           </button>
           <button type="button" class="palette-item" data-palette-cmd="contrast" data-palette-keywords="contraste accessibilite lisibilite">
             Contraste+ <span>Lisibilité</span>
+          </button>
+          <button type="button" class="palette-item" data-palette-cmd="triage" data-palette-keywords="triage traiter priorite a faire">
+            Vue triage <span>À traiter seulement</span>
           </button>
         </div>
         <p class="palette-empty" data-palette-empty>Aucune commande correspondante.</p>

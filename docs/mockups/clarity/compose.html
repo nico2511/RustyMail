@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v8 — Compose</title>
+    <title>Clarity v9 — Compose</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -19,6 +19,10 @@
           <span class="brand-rail">RM</span>
         </div>
         <button type="button" class="nav-item active" data-short="R"><span class="nav-label">Reçus</span></button>
+        <details class="sidebar-reminders">
+          <summary>Rappels <span class="count">2</span></summary>
+          <ul><li>Demain 09:00 · Hébergement</li></ul>
+        </details>
         <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Réduire le panneau">◀</button>
       </aside>
       <header class="topbar">
@@ -56,6 +60,11 @@
             <p>Merci,</p>
           </div>
           <div class="drop-zone" data-drop-zone>Déposer des fichiers ici · PDF, images</div>
+          <div class="send-checklist" data-send-checklist>
+            <span data-check-item="to">Destinataire</span>
+            <span data-check-item="tone">Ton choisi</span>
+            <span data-check-item="attach">Pièce jointe</span>
+          </div>
           <div class="sheet-foot">
             <span class="hint">
               ⌘↵ envoie
