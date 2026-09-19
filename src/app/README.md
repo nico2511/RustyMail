@@ -575,7 +575,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomComposeBodyMarkdownShortcutsRun.ts` | Ctrl+B/I/K/U |
 | `app/mail/wireEventsDomComposeMarkdownToolbarRun.ts` | Boutons `[data-md]` |
 | `app/mail/wireEventsDomSearchBarRun.ts` | Barrel `#search-input` / modale |
-| `app/mail/wireEventsDomSearchBarFieldRun.ts` | Focus, draft, Enter / search → commit |
+| `app/mail/wireEventsDomSearchBarFieldRun.ts` | Barrel listeners par champ recherche |
+| `app/mail/wireEventsDomSearchBarDraftFieldRun.ts` | Focus + draft + refresh tags |
+| `app/mail/wireEventsDomSearchBarCommitFieldRun.ts` | Enter / `search` → commit |
 | `app/mail/wireEventsDomAccountFormRun.ts` | Barrel formulaire compte réglages |
 | `app/mail/wireEventsDomAccountSelectRun.ts` | `#account-select` → `switchActiveAccount` |
 | `app/mail/wireEventsDomAccountEmailPresetRun.ts` | Email domain preset + touch champs serveur |
