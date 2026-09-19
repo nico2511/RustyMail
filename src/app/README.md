@@ -553,14 +553,17 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomInboxListNavRun.ts` | Toast, boîtes, ouverture fil, digest |
 | `app/mail/wireEventsDomInboxListMoveRun.ts` | Trash/archive, déplacement fil, `#move-target-select` |
 | `app/mail/wireEventsDomOrgMailboxRun.ts` | Barrel actions org (inline + modales confirm) |
-| `app/mail/wireEventsDomOrgMailboxInlineRun.ts` | Sync / supprimer / ignorer boîtes org v1–v2 |
+| `app/mail/wireEventsDomOrgMailboxInlineRun.ts` | Barrel actions org inline |
+| `app/mail/wireEventsDomOrgMailboxDeleteSyncRun.ts` | Supprimer une boîte, sync IMAP |
+| `app/mail/wireEventsDomOrgMailboxV2IgnoreRun.ts` | Ignorer / réintégrer boîtes org v2 |
 | `app/mail/wireEventsDomOrgConfirmModalsRun.ts` | Checkboxes confirmation modales org |
 | `app/mail/wireEventsDomThreadAttachmentsRun.ts` | Barrel PJ fil + hydrate HTML |
 | `app/mail/wireEventsDomThreadAttachmentButtonsRun.ts` | Boutons download/open PJ |
 | `app/mail/wireEventsDomComposeSearchAccountRun.ts` | Barrel compose / recherche / compte (DOM) |
 | `app/mail/wireEventsDomComposeEditorRun.ts` | Barrel wire composeur (preview, body, champs, toolbar) |
 | `app/mail/wireEventsDomComposeEditorFieldsRun.ts` | Sujet, dropzone PJ, quick reply Enter |
-| `app/mail/wireEventsDomComposePreviewRun.ts` | Preview compose (liens, lightbox) |
+| `app/mail/wireEventsDomComposePreviewRun.ts` | Attache clic preview compose |
+| `app/mail/wireEventsDomComposePreviewClickRun.ts` | Liens mail + lightbox image preview |
 | `app/mail/wireEventsDomComposeBodyRun.ts` | Barrel textarea + toolbar markdown |
 | `app/mail/wireEventsDomComposeBodyTextareaRun.ts` | Barrel `#compose-body` listeners |
 | `app/mail/wireEventsDomComposeBodyInputRun.ts` | Input → preview + autosave révision |
