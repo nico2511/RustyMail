@@ -1,6 +1,6 @@
 # Front-end (`src/`)
 
-Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les modules puis lance **`boot()`** ; le câblage vit dans **`app/mail/*`** (dont `appModuleRegistry.ts`).
+Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les modules puis lance **`boot()`** ; le câblage vit dans **`app/mail/*`** (dont `appModuleRegistry.ts`). Les fichiers **`application.ts`** / **`deps.ts`** n’existent plus sur cette branche.
 
 ## Point d’entrée
 
@@ -562,7 +562,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomComposeEditorFieldsRun.ts` | Sujet, dropzone PJ, quick reply Enter |
 | `app/mail/wireEventsDomComposePreviewRun.ts` | Preview compose (liens, lightbox) |
 | `app/mail/wireEventsDomComposeBodyRun.ts` | Barrel textarea + toolbar markdown |
-| `app/mail/wireEventsDomComposeBodyTextareaRun.ts` | `#compose-body` input, paste image, Ctrl+B/I/K/U |
+| `app/mail/wireEventsDomComposeBodyTextareaRun.ts` | Barrel `#compose-body` listeners |
+| `app/mail/wireEventsDomComposeBodyInputRun.ts` | Input → preview + autosave révision |
+| `app/mail/wireEventsDomComposeBodyPasteRun.ts` | Collage image → markdown inline |
+| `app/mail/wireEventsDomComposeBodyMarkdownShortcutsRun.ts` | Ctrl+B/I/K/U |
 | `app/mail/wireEventsDomComposeMarkdownToolbarRun.ts` | Boutons `[data-md]` |
 | `app/mail/wireEventsDomSearchBarRun.ts` | Barrel `#search-input` / modale |
 | `app/mail/wireEventsDomSearchBarFieldRun.ts` | Focus, draft, Enter / search → commit |
