@@ -1,42 +1,37 @@
-# Clarity v9 — base v8, triage & clarté d’action
+# Clarity v10 — composants produit + session longue durée
 
-> **⚠ Non conforme produit** — CSS et widgets inventés (`clarity.css`). Pour toute UX officielle, suivre [`../RULES.md`](../RULES.md) et les classes réelles (`primary-button`, `thread-row`, etc.). Détail : [`STATUS.md`](STATUS.md).
+Itération **v10** : Clarity reprend les **classes et le markup RustyMail** (`tokens.css`, `styles.css`) au lieu du design parallèle v9 (teal, split, widgets inventés).
 
-Itération **v9** : reprend **toute la v8** (exploration uniquement).
+## Rôle de `clarity.css`
 
-## Nouveautés v9 (vs v8)
+| Couche | Fichier | Rôle |
+| ------ | ------- | ---- |
+| Composants | `../../src/styles/tokens.css` + `styles.css` | Boutons, inbox, fil, compose — identiques à l’app |
+| Session mock | `clarity.css` | Barre nav mock + réglages couleur **longues sessions** |
+| Toggles | `mockup.js` | Douce / Contraste+ / Lavande (localStorage, mock uniquement) |
 
-| Zone | Mécanique |
-| ---- | --------- |
-| Inbox | Filtre **Triage** — non lus, échéances, épinglés, action requise |
-| Inbox | Encart **Prochaine action** dans le panneau lecture |
-| Sidebar | **Rappels** unifiés (reporter + échéances) |
-| Inbox | ⌘K → **Vue triage** |
-| Fil | **Réponses rapides** (puces) au-dessus de la suggestion |
-| Compose | **Checklist** avant envoi (destinataire, ton, PJ) |
-| v8 | Inchangé — tri, contraste, split, Focus, v7… |
+## Modes session (mock)
 
-## Parcours mockup
+- **Douce** (défaut) — crème basse luminance, bordures légères.
+- **Contraste+** — texte et contours renforcés, **sauge produit** (`--sm-primary`), pas de teal Clarity.
+- **Lavande** — variante `--btn-primary-fill` pour explorer un accent reposant.
 
-`inbox.html` → **Triage** → lire **Prochaine action** → fil réponses rapides → compose checklist
+Ces modes sont des **propositions UX** à brancher plus tard dans les préférences app si validées — pas de nouveau composant.
 
-## Fichiers
+## Parcours
 
-- [`index.html`](index.html) · [`inbox.html`](inbox.html) · [`thread.html`](thread.html) · [`compose.html`](compose.html)
-- [`clarity.css`](clarity.css) · [`mockup.js`](mockup.js) · [`images/clarity-v9-*.png`](images/)
+`index.html` → `inbox.html` → `thread.html` → `compose.html`
 
-## Boutons (v9+)
+Barre du haut : basculer les modes session sur chaque page.
 
-- **Taille** : compact (11px, padding réduit).
-- **Couleur** : teal **plein** seulement pour **Envoyer** ; Nouveau / Répondre / Ouvrir = contour ou ghost teal.
-- **Barre** : Focus, Contraste+, Sélection = pills neutres, état actif teal léger.
+## Captures
 
-## Captures courantes
+Régénérer après changement :
 
-À chaque itération, régénérer les visuels :
+- `images/clarity-latest-inbox.png`
+- `images/clarity-latest-thread.png`
+- `images/clarity-latest-compose.png`
 
-- `images/clarity-latest-inbox.png` · `clarity-latest-triage.png` · `clarity-latest-compose.png` · `clarity-latest-thread.png`
+## Historique v2–v9
 
-## Intent (inchangé)
-
-Calme, utile, beau sans bruit — couleur pour **l’important** seulement.
+Exploration non conforme (CSS fictif). Conservée dans git ; **ne pas** prolonger. Voir [`STATUS.md`](STATUS.md).

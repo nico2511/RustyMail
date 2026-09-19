@@ -1,20 +1,18 @@
-# Statut dossier Clarity — non conforme composants produit
+# Statut dossier Clarity
 
-Les fichiers `*.html` + `clarity.css` de ce dossier **ne sont pas** une description fidèle de RustyMail v0.2.0.
+## v10+ (actuel)
 
-Ils contiennent des éléments **non implémentés** ou **styles fictifs**, par exemple :
+Les pages `*.html` importent **`tokens.css` + `styles.css`** et reprennent le markup des renderers produit (`listRender.ts`, `threadViewRender.ts`, `composerRender.ts`).
 
-| Mock Clarity | Équivalent produit (si existe) |
-| ------------ | ------------------------------ |
-| `clarity.css`, teal `#0f766e` | `tokens.css` pastel / `--sm-primary` |
-| `.btn-primary`, `.btn-ghost` | `.primary-button`, `.ghost-button` |
-| Split inbox + read-pane | Liste seule ; ouverture fil plein écran |
-| Palette ⌘K HTML mock | Modale recherche `searchRender.ts` (pas palette commandes générique) |
-| Focus / Contraste+ / Triage chips | Non présents tels quels |
-| Épingler ☆ custom | `toggle-thread-follow` + `icon-pill` étoile |
-| Envoi différé 5 s bandeau | Non présent (split send = PJ, autre modale) |
-| Sidebar rail « RM » | `.sidebar-collapsed` produit |
+`clarity.css` est une **couche fine** :
 
-**Politique actuelle** : voir [`../RULES.md`](../RULES.md). Les prochaines maquettes **valides** doivent réutiliser le markup/classes du repo, pas prolonger `clarity.css`.
+- barre de navigation entre mockups ;
+- classes body `clarity-session`, `clarity-contrast-plus`, `clarity-accent-lavender` pour **couleurs longues sessions** (override de variables `:root`, pas de design parallèle).
 
-Les PNG `clarity-latest-*.png` illustrent l’exploration Clarity uniquement.
+`mockup.js` ne pilote que ces toggles — pas de split inbox, ⌘K, triage, etc.
+
+## v2–v9 (archive)
+
+Itérations avec `clarity.css` teal, widgets et layouts **non présents** dans l’app. Les PNG `clarity-v*-*.png` illustrent cette phase d’exploration uniquement.
+
+Politique globale : [`../RULES.md`](../RULES.md).

@@ -3,93 +3,122 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v9 — Fil</title>
+    <meta name="color-scheme" content="light" />
+    <title>Clarity v10 — Fil (composants produit)</title>
+    <link rel="stylesheet" href="../../src/styles/tokens.css" />
+    <link rel="stylesheet" href="../../src/styles.css" />
     <link rel="stylesheet" href="clarity.css" />
   </head>
-  <body>
-    <nav class="mock-nav">
+  <body class="has-mock-nav clarity-session">
+    <nav class="mock-nav" aria-label="Mockups Clarity">
       <a href="inbox.html">Inbox</a>
       <a class="on" href="thread.html">Fil</a>
       <a href="compose.html">Compose</a>
-    </nav>
-    <div class="shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <span class="brand-full"><strong>RustyMail</strong></span>
-          <span class="brand-rail">RM</span>
-        </div>
-        <button type="button" class="nav-item active" data-short="R"><span class="nav-label">Reçus</span></button>
-        <details class="sidebar-reminders">
-          <summary>Rappels <span class="count">2</span></summary>
-          <ul>
-            <li>Demain 09:00 · Hébergement</li>
-          </ul>
-        </details>
-        <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Réduire le panneau">◀</button>
-      </aside>
-      <header class="topbar">
-        <a class="back" href="inbox.html">← Reçus</a>
-        <label class="search-wrap" style="max-width: 280px; margin: 0">
-          <input type="search" placeholder="Dans le fil" />
-        </label>
-        <div class="topbar-actions">
-          <div class="thread-nav">
-            <a class="thread-nav-btn" href="inbox.html">← Préc.</a>
-            <span class="thread-nav-pos">2 / 4</span>
-            <a class="thread-nav-btn" href="inbox.html">Suiv. →</a>
-          </div>
-          <button type="button" class="btn-ghost">Archiver</button>
-          <a class="btn-primary--soft" href="compose.html" style="text-decoration: none">Répondre</a>
-        </div>
-      </header>
-      <main class="main thread-wrap">
-        <h1>Renouvellement hébergement</h1>
-        <p class="sub">Marie Lefèvre · 2 messages · <span style="color: var(--primary)">action possible</span></p>
-        <div class="thread-files">
-          <span>Pièces jointes du fil</span>
-          <span class="file-chip">contrat-2025.pdf</span>
-          <span class="file-chip">devis-renouvellement.pdf</span>
-        </div>
-        <details class="msg-fold">
-          <summary>Message initial · 18 sept. 09:12</summary>
-          <article class="msg">
-            <div class="msg-top">
-              <span class="msg-from">Marie Lefèvre</span>
-              <span class="msg-date">18 sept. 09:12</span>
-            </div>
-            <div class="msg-text">
-              Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?
-            </div>
-          </article>
-        </details>
-        <article class="msg msg-highlight">
-          <div class="msg-top">
-            <span class="msg-from">Vous</span>
-            <span class="msg-date">18 sept. 14:03</span>
-          </div>
-          <div class="msg-text">Merci — pouvez-vous confirmer le montant TTC ?</div>
-        </article>
-      </main>
-      <details class="suggest-details">
-        <summary>Suggestion de réponse (1)</summary>
-        <div class="suggest">
-          <div class="suggest-label">Insérer dans le dock</div>
-          <div class="quick-replies">
-            <button type="button">Oui · 12 mois</button>
-            <button type="button">Montant TTC ?</button>
-            <button type="button">Rappeler vendredi</button>
-          </div>
-          <button type="button">Oui pour 12 mois si le total reste à 129 € TTC</button>
-        </div>
-      </details>
-      <div class="reply-dock">
-        <form>
-          <input type="text" placeholder="Répondre…" />
-          <button type="button" class="btn-primary">Envoyer</button>
-        </form>
+      <a href="index.html">Principes</a>
+      <div class="mock-nav__session">
+        <span class="mock-nav__session-label">Session</span>
+        <button type="button" class="ghost-button" data-clarity-mode="session" aria-pressed="true">Douce</button>
+        <button type="button" class="ghost-button" data-clarity-mode="contrast" aria-pressed="false">Contraste+</button>
+        <button type="button" class="ghost-button" data-clarity-mode="lavender" aria-pressed="false">Lavande</button>
       </div>
-      <footer class="statusbar">
-        <span class="kbd-hints"><kbd>R</kbd> répondre · <kbd>E</kbd> archiver · <kbd>⌘K</kbd> commandes</span>
+    </nav>
+    <div class="app-shell ai-collapsed">
+      <div class="noise"></div>
+      <aside class="sidebar" aria-label="Mail navigation">
+        <button type="button" class="sidebar-collapse-edge" data-action="toggle-sidebar" aria-label="Masquer les dossiers" title="Réduire le volet">
+          <span class="sidebar-collapse-edge__glyph" aria-hidden="true"></span>
+        </button>
+        <div class="sidebar-header">
+          <div class="sidebar-header-top">
+            <div class="sidebar-account">
+              <span class="avatar large" style="background: rgba(200, 149, 108, 0.16); color: var(--accent)">SC</span>
+              <span><strong>RustyMail</strong><small class="dim" style="display: block">demo@example.org</small></span>
+            </div>
+          </div>
+          <div class="sidebar-actions">
+            <button class="primary-button" data-action="compose" style="padding: 9px 10px; border-radius: var(--radius-btn); width: 100%"><span>Composer</span> <span class="kbd">N</span></button>
+          </div>
+        </div>
+        <nav class="folder-list" aria-label="Folders">
+          <div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">IMAP</span></div>
+          <div class="sidebar-folder-group">
+            <button class="folder-button active" data-mailbox="INBOX"><span class="folder-icon">In</span><span class="folder-name">Boîte de réception</span></button>
+          </div>
+        </nav>
+      </aside>
+      <main class="main">
+        <section class="thread-view thread-reading thread-reading--reading-layout" aria-label="Fil de discussion">
+          <header class="thread-reading-head">
+            <div class="thread-reading-nav secondary-view-nav">
+              <div class="thread-reading-nav__trail">
+                <button type="button" class="thread-back-link" data-action="back">← Boîte de réception</button>
+                <span class="thread-breadcrumb dim">Renouvellement hébergement</span>
+              </div>
+              <div class="thread-reading-nav-actions">
+                <div class="action-bar action-bar--util" role="toolbar" aria-label="Actions utilitaires">
+                  <button type="button" class="icon-pill thread-nav-sync" data-action="sync-inbox" title="Synchroniser (Ctrl+F5)" aria-label="Synchroniser">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 0 1-14.5 4.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M4 4v5h5M4 12a8 8 0 0 1 14.5-4.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M20 20v-5h-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="thread-reading-hero">
+              <h1 class="thread-reading-title">Renouvellement hébergement</h1>
+              <p class="thread-reading-stats dim">1 message · 1 pièce jointe</p>
+              <div class="thread-participants-block">
+                <span class="thread-kicker">Participants</span>
+                <div class="thread-participants-chips">
+                  <button type="button" class="thread-participant-chip label" data-action="contacts-open-detail">Marie Lefèvre</button>
+                </div>
+              </div>
+              <div class="thread-action-bar">
+                <div class="thread-more-actions">
+                  <div class="action-bar action-bar--ops" role="toolbar" aria-label="Actions opérationnelles">
+                    <button type="button" class="icon-pill" data-action="reply" title="Répondre" aria-label="Répondre">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 9V5L3 12l7 7v-4c7 0 10 2 11 6 0-8-3-12-11-12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button type="button" class="icon-pill inbox-seen-toggle inbox-seen-toggle--is-unread" data-action="toggle-thread-seen-cur" title="Marquer comme lu" aria-label="Marquer comme lu">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 7 9 18l-5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button type="button" class="icon-pill danger" data-action="thread-trash-cur" title="Corbeille" aria-label="Corbeille">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 3h6m-8 4h10m-9 0 1 15h6l1-15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+          <div class="thread-messages thread-messages-reading">
+            <article class="message thread-msg thread-msg--root thread-msg--solo thread-msg--head">
+              <div class="message-stack">
+                <header class="message-head-row">
+                  <span class="avatar inbox-thread-avatar" style="background: rgba(111, 122, 111, 0.2); color: var(--sm-primary)">ML</span>
+                  <div class="message-head-main">
+                    <button type="button" class="thread-msg-from thread-participant-link">Marie Lefèvre</button>
+                    <time class="dim" datetime="2026-09-19T08:42:00.000Z">19 sept. 2026, 08:42</time>
+                  </div>
+                </header>
+                <div class="message-body surface-sm">
+                  <div class="message-text">
+                    <p>Bonjour,</p>
+                    <p>Merci de confirmer le renouvellement avant vendredi. La facture est en pièce jointe.</p>
+                    <p>— Marie</p>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+      <footer class="status-bar-wrap">
+        <footer class="status-bar">
+          <span class="status-dot status-dot--idle"></span>
+          <span class="status-bar-app">RustyMail 0.2.0</span>
+          <span class="status-bar-sep" aria-hidden="true">·</span>
+          <span class="dim status-bar-compact">Navigateur · hors Tauri · —</span>
+          <span class="status-bar-spacer" aria-hidden="true"></span>
+          <span class="status-bar-account dim">demo@example.org</span>
+        </footer>
       </footer>
     </div>
     <script src="mockup.js"></script>

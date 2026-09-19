@@ -25,12 +25,14 @@ Si un besoin UX n’est pas couvert par un composant existant, il faut **d’abo
 
 ## Dossier `clarity/`
 
-Les HTML `clarity/*.html` (v2–v9) sont une **exploration historique** avec CSS fictif (`clarity.css`, teal, split inbox, palette ⌘K mock, etc.). **Ils ne respectent pas cette règle** tant qu’ils ne sont pas refondus sur les classes produit.
+**v10+** : mockups sur **composants produit** (`tokens.css`, `styles.css`) + `clarity.css` pour **couleurs session longue durée** (Douce / Contraste+ / Lavande). Pas de widgets inventés.
 
-Toute **nouvelle** itération UX doit soit :
+Les itérations **v2–v9** (teal, split, triage mock…) restent une exploration historique — ne pas les prolonger.
 
-1. **Abandonner** `clarity.css` au profit d’un mockup qui importe `tokens.css` + extraits de `styles.css`, ou  
-2. **Rester** dans la doc (wireframes) sans prétendre décrire le produit.
+Toute **nouvelle** idée UX doit soit :
+
+1. **S’appuyer** sur les classes existantes dans Clarity v10 (ou `inbox-faithful.html`), avec des overrides token documentés, ou  
+2. **Implémenter d’abord** dans l’app, puis mockup.
 
 ## Visuels
 
