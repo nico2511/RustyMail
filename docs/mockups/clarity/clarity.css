@@ -1,4 +1,4 @@
-/* Clarity v5 — intuitif, fonctionnel, mécanique discrète */
+/* Clarity v6 — intuitif, fonctionnel, mécanique discrète */
 :root {
   --sidebar-w: 200px;
   --bg: #f3f4f6;
@@ -1018,4 +1018,183 @@ body.split-off .read-pane {
   font-size: 12px;
   cursor: pointer;
   font-family: inherit;
+}
+
+/* v6 — palette, focus, preview sync, raccourcis */
+.btn-focus {
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-focus.is-on {
+  border-color: rgba(15, 118, 110, 0.35);
+  color: var(--primary);
+  background: var(--primary-ghost);
+}
+
+body.focus-mode {
+  --sidebar-w: 58px;
+}
+
+body.focus-mode .mock-nav {
+  display: none;
+}
+
+body.focus-mode .brief,
+body.focus-mode .filters {
+  display: none;
+}
+
+body.focus-mode .inbox-layout {
+  grid-template-columns: minmax(200px, 34%) minmax(0, 1fr);
+}
+
+body.focus-mode .page-head .meta {
+  display: none;
+}
+
+.palette-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(17, 24, 39, 0.32);
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+}
+
+.palette-backdrop.is-open {
+  display: flex;
+}
+
+.palette {
+  width: min(460px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 50px rgba(17, 24, 39, 0.14);
+  overflow: hidden;
+}
+
+.palette-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.palette-head input {
+  flex: 1;
+  border: 0;
+  padding: 13px 4px;
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+}
+
+.palette-head kbd {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--faint);
+}
+
+.palette-list {
+  padding: 6px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.palette-item:hover,
+.palette-item.is-active {
+  background: var(--primary-ghost);
+}
+
+.palette-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.palette-item kbd {
+  font-size: 10px;
+  color: var(--faint);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.read-pane-badge {
+  flex-shrink: 0;
+}
+
+.read-pane-badge:empty {
+  display: none;
+}
+
+.read-pane-empty {
+  display: none;
+  font-size: 13px;
+  color: var(--faint);
+  text-align: center;
+  padding: 48px 16px;
+}
+
+.read-pane.is-empty .read-pane-content {
+  display: none;
+}
+
+.read-pane.is-empty .read-pane-empty {
+  display: block;
+}
+
+.statusbar .kbd-hints kbd {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  margin: 0 2px;
+  font-family: inherit;
+}
+
+.attach-strip {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+}
+
+.attach-chip {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
 }

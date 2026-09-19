@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v5 — Inbox</title>
+    <title>Clarity v6 — Inbox</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -29,9 +29,10 @@
       </aside>
       <header class="topbar">
         <label class="search-wrap">
-          <input type="search" placeholder="Rechercher…" />
+          <input type="search" placeholder="Rechercher ou commande…" />
           <kbd>⌘K</kbd>
         </label>
+        <button type="button" class="btn-focus" data-focus-mode aria-pressed="false">Focus</button>
         <button type="button" class="btn-primary btn-primary--soft">Nouveau</button>
       </header>
       <main class="main inbox-main">
@@ -68,8 +69,15 @@
               <button type="button" class="chip" data-filter="unread">Non lus</button>
               <button type="button" class="chip" data-filter="urgent">Échéances</button>
             </div>
-            <div class="list">
-              <article class="row unread is-selected" data-row="1">
+            <div class="list" data-inbox-list>
+              <article
+                class="row unread is-selected"
+                data-preview-subject="Renouvellement hébergement"
+                data-preview-meta="Marie Lefèvre · aujourd’hui 08:42"
+                data-preview-body="Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?"
+                data-preview-urgent="1"
+                data-thread="thread.html"
+              >
                 <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
                 <div class="stripe"></div>
                 <div class="avatar">ML</div>
@@ -83,7 +91,14 @@
                   <button type="button">Lu</button>
                 </div>
               </article>
-              <article class="row unread" data-row="2">
+              <article
+                class="row unread"
+                data-preview-subject="Re: maquette Q4"
+                data-preview-meta="Studio Créa · hier 17:20"
+                data-preview-body="Contraste corrigé en pièce jointe — dis-moi si la version sombre te convient pour la prod."
+                data-preview-urgent="0"
+                data-thread="thread.html"
+              >
                 <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
                 <div class="stripe"></div>
                 <div class="avatar">SC</div>
@@ -97,7 +112,14 @@
                   <button type="button">Lu</button>
                 </div>
               </article>
-              <article class="row" data-row="3">
+              <article
+                class="row"
+                data-preview-subject="Newsletter"
+                data-preview-meta="Équipe produit · lundi"
+                data-preview-body="Résumé hebdomadaire : 3 merges, 12 issues closes, prochaine release mardi."
+                data-preview-urgent="0"
+                data-thread="thread.html"
+              >
                 <div class="stripe"></div>
                 <div class="avatar">·</div>
                 <div>
@@ -111,28 +133,51 @@
               </article>
             </div>
           </div>
-          <aside class="read-pane" aria-label="Lecture rapide">
-            <div class="read-pane-head">
-              <div>
-                <h2>Renouvellement hébergement</h2>
-                <p class="read-pane-meta">Marie Lefèvre · aujourd’hui 08:42</p>
+          <aside class="read-pane" data-read-pane aria-label="Lecture rapide">
+            <p class="read-pane-empty">Sélectionnez un message · <kbd>j</kbd> <kbd>k</kbd></p>
+            <div class="read-pane-content">
+              <div class="read-pane-head">
+                <div>
+                  <h2 data-read-title>Renouvellement hébergement</h2>
+                  <p class="read-pane-meta" data-read-meta>Marie Lefèvre · aujourd’hui 08:42</p>
+                </div>
+                <span class="badge-urgent read-pane-badge" data-read-urgent>Échéance</span>
               </div>
-              <span class="badge-urgent">Échéance</span>
-            </div>
-            <div class="read-pane-body">
-              Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?
-            </div>
-            <div class="read-pane-actions">
-              <a class="btn-primary" href="thread.html" style="text-decoration: none; display: inline-block">Ouvrir le fil</a>
-              <button type="button" class="btn-ghost">Archiver</button>
-              <button type="button" class="btn-primary btn-primary--soft">Répondre</button>
+              <div class="read-pane-body" data-read-body>
+                Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?
+              </div>
+              <div class="read-pane-actions">
+                <a class="btn-primary" data-open-thread href="thread.html" style="text-decoration: none; display: inline-block">Ouvrir le fil</a>
+                <button type="button" class="btn-ghost">Archiver</button>
+                <a class="btn-primary btn-primary--soft" href="compose.html" style="text-decoration: none; display: inline-block">Répondre</a>
+              </div>
             </div>
           </aside>
         </div>
       </main>
       <footer class="statusbar">
-        <span>Sync · 1 min</span><span style="margin-left: auto">Split : lire sans quitter la liste</span>
+        <span>Sync · 1 min</span>
+        <span class="kbd-hints" style="margin-left: auto"><kbd>j</kbd><kbd>k</kbd> ligne · <kbd>Entrée</kbd> fil · <kbd>⌘K</kbd> commandes</span>
       </footer>
+    </div>
+    <div class="palette-backdrop" data-command-palette aria-hidden="true" role="dialog" aria-label="Palette de commandes">
+      <div class="palette" role="document">
+        <div class="palette-head">
+          <input type="search" data-palette-input placeholder="Commande ou recherche…" aria-label="Commande" />
+          <kbd>esc</kbd>
+        </div>
+        <div class="palette-list">
+          <button type="button" class="palette-item is-active" data-palette-cmd="thread">
+            Ouvrir le fil sélectionné <kbd>↵</kbd>
+          </button>
+          <button type="button" class="palette-item" data-palette-cmd="compose">
+            Nouvelle réponse <span>Compose</span>
+          </button>
+          <button type="button" class="palette-item" data-palette-cmd="focus">
+            Basculer mode Focus <span>Moins de chrome</span>
+          </button>
+        </div>
+      </div>
     </div>
     <script src="mockup.js"></script>
   </body>
