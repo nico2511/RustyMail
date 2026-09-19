@@ -12,7 +12,7 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/dom.ts` | Élément racine `#app` |
 | `app/types/` | Types TypeScript |
 
-## Modules extraits (dégraissage en cours)
+## Modules extraits (v0.2.0 — dégraissage bouclé sur `main`)
 
 | Dossier | Contenu |
 | ------- | ------- |
