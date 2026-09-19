@@ -144,7 +144,7 @@ npm run tauri:dev    # ergonomie réelle desktop
 
 **Règle (non négociable)** : toute UX mockée ou livrée doit utiliser **uniquement les composants existants** — voir [`docs/mockups/RULES.md`](mockups/RULES.md) et [`docs/mockups/APP-COMPONENT-INVENTORY.md`](mockups/APP-COMPONENT-INVENTORY.md).
 
-Le dossier `docs/mockups/clarity/` est une exploration **non alignée** produit (CSS parallèle) — voir [`clarity/STATUS.md`](mockups/clarity/STATUS.md). Ne pas confondre avec la refonte pastel v0.2.0.
+**Direction mockups UX : [Clarity v10](mockups/clarity/)** — composants produit + couche session longue durée (`clarity.css`). Entrée : [`docs/mockups/README.md`](mockups/README.md), détail : [`clarity/MOCKUP-DIRECTION.md`](mockups/clarity/MOCKUP-DIRECTION.md). Les itérations Clarity v2–v9 restent une archive (non prolonger).
 
 ---
 

@@ -1,6 +1,8 @@
 # Statut dossier Clarity
 
-## v10+ (actuel)
+**Direction repo : v10.** Les mockups UX officiels vivent ici (`inbox`, `fil`, `compose` + captures `clarity-latest-*.png`).
+
+## v10 (actuel — à prolonger)
 
 Les pages `*.html` importent **`tokens.css` + `styles.css`** et reprennent le markup des renderers produit (`listRender.ts`, `threadViewRender.ts`, `composerRender.ts`).
 

@@ -1,6 +1,8 @@
-# Clarity v10 — composants produit + session longue durée
+# Clarity v10 — direction mockups UX (officielle)
 
-Itération **v10** : Clarity reprend les **classes et le markup RustyMail** (`tokens.css`, `styles.css`) au lieu du design parallèle v9 (teal, split, widgets inventés).
+Itération **v10** : base unique pour les maquettes UX du repo — **classes et markup RustyMail** (`tokens.css`, `styles.css`), plus une couche **session longue durée**.
+
+Voir aussi [`MOCKUP-DIRECTION.md`](MOCKUP-DIRECTION.md) et [`../README.md`](../README.md).
 
 ## Rôle de `clarity.css`
 

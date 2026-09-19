@@ -23,16 +23,19 @@ Si un besoin UX n’est pas couvert par un composant existant, il faut **d’abo
 | Shell | `appShellRenderMarkupRun.ts`, `docs/UX-NOTE.md` |
 | Inventaire détaillé | [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md) |
 
-## Dossier `clarity/`
+## Dossier `clarity/` — **v10 = direction officielle**
 
-**v10+** : mockups sur **composants produit** (`tokens.css`, `styles.css`) + `clarity.css` pour **couleurs session longue durée** (Douce / Contraste+ / Lavande). Pas de widgets inventés.
+Les mockups UX du repo **partent de Clarity v10** ([`README.md`](clarity/README.md), [`MOCKUP-DIRECTION.md`](clarity/MOCKUP-DIRECTION.md)).
 
-Les itérations **v2–v9** (teal, split, triage mock…) restent une exploration historique — ne pas les prolonger.
+- **Composants** : `tokens.css`, `styles.css`, markup des renderers.
+- **Session** : `clarity.css` (Douce / Contraste+ / Lavande) — propositions palette longue durée.
+
+Les itérations **v2–v9** (teal, split, triage mock…) restent une **archive** — ne pas les prolonger.
 
 Toute **nouvelle** idée UX doit soit :
 
-1. **S’appuyer** sur les classes existantes dans Clarity v10 (ou `inbox-faithful.html`), avec des overrides token documentés, ou  
-2. **Implémenter d’abord** dans l’app, puis mockup.
+1. **Itérer Clarity v10** (classes existantes + overrides token documentés dans `clarity/MOCKUP-DIRECTION.md`), ou  
+2. **Implémenter d’abord** dans l’app, puis mettre à jour les HTML Clarity.
 
 ## Visuels
 
