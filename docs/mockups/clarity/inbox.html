@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v2 — Inbox</title>
+    <title>Clarity v3 — Inbox</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -22,13 +22,16 @@
         <button type="button" class="nav-item">Corbeille</button>
       </aside>
       <header class="topbar">
-        <div class="search" tabindex="0">Rechercher…</div>
-        <button type="button" class="btn-primary">Nouveau</button>
+        <label class="search-wrap">
+          <input type="search" placeholder="Rechercher…" />
+          <kbd>⌘K</kbd>
+        </label>
+        <button type="button" class="btn-primary btn-primary--soft">Nouveau</button>
       </header>
       <main class="main">
         <div class="page-head">
           <h1>Reçus</h1>
-          <span class="meta">4 non lus</span>
+          <span class="meta">4 non lus · tri récent</span>
         </div>
         <div class="brief">
           <span class="dot" aria-hidden="true"></span>
@@ -37,6 +40,7 @@
         </div>
         <div class="list">
           <article class="row unread">
+            <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
             <div class="stripe"></div>
             <div class="avatar">ML</div>
             <div>
@@ -44,8 +48,13 @@
               <p class="preview">Confirmer avant vendredi…</p>
             </div>
             <time class="time">08:42</time>
+            <div class="row-actions">
+              <button type="button">Archiver</button>
+              <button type="button">Lu</button>
+            </div>
           </article>
           <article class="row unread">
+            <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
             <div class="stripe"></div>
             <div class="avatar">SC</div>
             <div>
@@ -53,6 +62,10 @@
               <p class="preview">Contraste corrigé en pièce jointe</p>
             </div>
             <time class="time">Hier</time>
+            <div class="row-actions">
+              <button type="button">Archiver</button>
+              <button type="button">Lu</button>
+            </div>
           </article>
           <article class="row">
             <div class="stripe"></div>
@@ -62,10 +75,13 @@
               <p class="preview">Résumé hebdomadaire</p>
             </div>
             <time class="time">Lun.</time>
+            <div class="row-actions">
+              <button type="button">Archiver</button>
+            </div>
           </article>
         </div>
       </main>
-      <footer class="statusbar"><span>Sync · 1 min</span></footer>
+      <footer class="statusbar"><span>Sync · 1 min</span><span style="margin-left:auto">Survol : actions rapides</span></footer>
     </div>
   </body>
 </html>

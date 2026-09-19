@@ -1,33 +1,28 @@
-# Clarity v2 — intuitif, fonctionnel, discret
+# Clarity v3 — intuitif, fonctionnel, discret
 
-Itération après retour : **sleek utile**, **doux**, couleurs qui **mettent en avant l’important** — comme demandé au départ — avec une **mécanique belle mais discrète** (pas de décor pastel, pas de panneaux permanents bruyants).
+Itération **v3** : même palette et layout v2, **mécaniques** affinées (apparaissent au survol / au bon moment).
 
-## Mécanique discrète (v2)
+## Nouveautés v3
 
-| Élément | Comportement mockup |
-| -------- | ------------------- |
-| Navigation | Sidebar 200px, dossier actif = **trait teal 2px** inset (pas fond coloré large) |
-| Recherche | Champ gris neutre ; focus = halo teal très léger |
-| Brief / IA | **Une ligne** + point teal 6px ; lien « Détails » — pas de panneau |
-| Non lu | **Barre 2px** + sujet semi-gras ; pas de fond teinté |
-| Urgent | Chip ambre **petite** sur le sujet |
-| Fil | Messages séparés par hairline ; pas de grosses cartes ombrées |
-| Réponse | Dock fin en bas ; un bouton teal |
-| Compose | Feuille simple ; un seul « Envoyer » teal |
+| Zone | Mécanique discrète |
+| ---- | ------------------- |
+| Inbox | Ligne cliquable ; **Archiver / Lu** visibles au **survol** seulement |
+| Inbox | « Nouveau » en **contour** teal ; « Envoyer » reste plein |
+| Inbox | Recherche + rappel **⌘K** dans le champ |
+| Fil | **Suggestion** en pill pointillée (insertion réponse) au-dessus du dock |
+| Fil / Compose | Fil d’Ariane **← Reçus** / **← Fil** |
+| Non lu | Barre 2px + **anneau** avatar léger (pas de fond coloré) |
 
-## Couleur (inchangée dans l’esprit)
+## Parcours mockup
 
-- Neutre `#f3f4f6` / blanc / texte `#111827`
-- **Teal `#0f766e`** : CTA + signal non lu + focus
-- **Ambre** : sémantique « échéance » uniquement
+`inbox.html` → (clic 1re ligne) → `thread.html` → suggestion → `compose.html`
 
 ## Fichiers
 
-- [`index.html`](index.html) — principes
-- [`inbox.html`](inbox.html) · [`thread.html`](thread.html) · [`compose.html`](compose.html)
-- [`clarity.css`](clarity.css) — tokens v2
-- [`images/`](images/) — PNG v2
+- [`index.html`](index.html) · [`inbox.html`](inbox.html) · [`thread.html`](thread.html) · [`compose.html`](compose.html)
+- [`clarity.css`](clarity.css) · [`images/clarity-v3-*.png`](images/)
 
-## Lien intent projet
+## Intent (inchangé)
 
-Même cible que la refonte pastel d’origine (calme, lecture, desktop), **sans** palette sauge/lavande ni colonne IA fixe — **Clarity** = hiérarchie par contrastes et traits, pas par décoration.
+Calme, utile, beau sans bruit — couleur pour **l’important** seulement.
+

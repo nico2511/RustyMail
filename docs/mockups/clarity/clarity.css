@@ -1,4 +1,4 @@
-/* Clarity v2 — intuitif, fonctionnel, mécanique discrète */
+/* Clarity v3 — intuitif, fonctionnel, mécanique discrète */
 :root {
   --bg: #f3f4f6;
   --surface: #ffffff;
@@ -115,26 +115,50 @@ body {
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.search {
+.search kbd {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--faint);
+  font-family: inherit;
+}
+
+.search-wrap {
   flex: 1;
   max-width: 440px;
-  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
   background: var(--bg);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  font-size: 13px;
-  color: var(--faint);
   transition: border-color var(--ease), box-shadow var(--ease);
 }
 
-.search:hover {
+.search-wrap:hover {
   border-color: var(--border);
 }
 
-.search:focus-within {
+.search-wrap:focus-within {
   border-color: var(--border);
   box-shadow: 0 0 0 2px var(--primary-ghost);
+}
+
+.search-wrap input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 9px 0;
+  font-size: 13px;
   outline: none;
+  color: var(--text);
+}
+
+.search-wrap input::placeholder {
+  color: var(--faint);
 }
 
 .btn-primary {
@@ -223,14 +247,71 @@ body {
   overflow: hidden;
 }
 
+.btn-primary--soft {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+
+.btn-primary--soft:hover {
+  background: var(--primary-ghost);
+  border-color: transparent;
+}
+
 .row {
   display: grid;
-  grid-template-columns: 2px 36px minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: 2px 36px minmax(0, 1fr) auto auto;
+  gap: 8px 12px;
   align-items: center;
-  padding: 12px 14px 12px 0;
+  padding: 12px 12px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
   transition: background var(--ease);
+  position: relative;
+}
+
+.row-link {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.row > *:not(.row-link) {
+  position: relative;
+  z-index: 1;
+}
+
+.row-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--ease);
+  pointer-events: none;
+}
+
+.row:hover .row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.row-actions button {
+  border: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.row-actions button:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.row.unread .avatar {
+  box-shadow: inset 0 0 0 2px var(--primary-ghost);
+  color: var(--primary);
 }
 
 .row:last-child {
@@ -415,6 +496,37 @@ body {
   background: transparent;
   font-size: 13px;
   outline: none;
+}
+
+.suggest {
+  max-width: 640px;
+  margin: 0 22px 6px;
+  padding-left: 10px;
+}
+
+.suggest button {
+  border: 1px dashed var(--border);
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color var(--ease), color var(--ease);
+}
+
+.suggest button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  border-style: solid;
+}
+
+.suggest-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+  margin-bottom: 6px;
 }
 
 .back {

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v2 — Compose</title>
+    <title>Clarity v3 — Compose</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -18,7 +18,8 @@
         <button type="button" class="nav-item active">Reçus</button>
       </aside>
       <header class="topbar">
-        <span style="font-size:13px;font-weight:600;color:var(--text)">Message</span>
+        <a class="back" href="thread.html">← Fil</a>
+        <span style="font-size:13px;font-weight:600;color:var(--text);margin-left:8px">Réponse</span>
       </header>
       <main class="main">
         <div class="sheet">
@@ -30,9 +31,9 @@
             Merci,
           </div>
           <div class="sheet-foot">
-            <span class="hint">Brouillon enregistré</span>
+            <span class="hint">⌘↵ envoyer · enregistré</span>
             <div>
-              <button type="button" class="btn-ghost">Annuler</button>
+              <button type="button" class="btn-ghost">Affiner</button>
               <button type="button" class="btn-primary">Envoyer</button>
             </div>
           </div>
