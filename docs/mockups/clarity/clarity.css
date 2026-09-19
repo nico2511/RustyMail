@@ -417,11 +417,14 @@ a.btn-primary--soft {
   grid-template-columns: 36px minmax(0, 1fr) auto auto;
   gap: 8px 12px;
   align-items: center;
-  padding: 12px 12px 12px 14px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border-subtle);
   transition: background var(--ease);
   position: relative;
-  border-left: 2px solid transparent;
+}
+
+.row .stripe {
+  display: none !important;
 }
 
 .row-link {
@@ -480,24 +483,23 @@ a.btn-primary--soft {
 
 .row.is-selected {
   background: var(--surface-2);
-  box-shadow: none;
-  border-left-color: var(--text);
-}
-
-.row.unread {
-  border-left-color: var(--primary);
-}
-
-.row.unread.is-selected {
-  border-left-color: var(--primary);
-}
-
-.row .stripe {
-  display: none;
+  box-shadow: inset 3px 0 0 var(--border);
 }
 
 .row.unread .subject {
   font-weight: 600;
+}
+
+.row.unread .subject::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--text);
+  vertical-align: 0.15em;
+  opacity: 0.35;
 }
 
 .badge-urgent {
@@ -1487,21 +1489,24 @@ body.batch-mode .batch-bar {
 }
 
 /* v8 — tri contact, épingler, activité, ton, navigation fil */
+.row-pin {
   position: absolute;
-  right: 10px;
+  right: 72px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
   border: 0;
-  background: var(--surface);
+  background: transparent;
   color: var(--faint);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
-  padding: 2px 4px;
+  padding: 2px;
   border-radius: 4px;
   opacity: 0;
   transition: opacity var(--ease);
+  width: auto;
+  height: auto;
 }
 
 .row:hover .row-pin,
