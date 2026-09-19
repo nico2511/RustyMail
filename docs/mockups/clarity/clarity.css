@@ -1,6 +1,6 @@
 /**
  * Clarity v10 — couche mockup uniquement.
- * Composants + layout : ../../src/styles/tokens.css + styles.css
+ * Composants + layout : ../../../src/styles/tokens.css + styles.css
  * Ici : navigation entre pages mock, réglages couleur pour longues sessions.
  */
 
@@ -12,6 +12,22 @@ body {
 
 body {
   min-height: 100vh;
+}
+
+body.has-mock-nav {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+body.has-mock-nav .app-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: calc(100vh - 40px);
+  width: 100%;
+  margin-top: 40px;
+  padding-top: 0;
+  box-sizing: border-box;
 }
 
 /* ——— Nav entre pages mock (hors app) ——— */
@@ -73,13 +89,6 @@ body {
   background: var(--accent-dim);
   border-color: var(--border);
   color: var(--text);
-}
-
-/* Décaler le shell sous la barre mock */
-body.has-mock-nav .app-shell {
-  padding-top: 40px;
-  min-height: calc(100vh - 40px);
-  box-sizing: border-box;
 }
 
 /* ——— Session longue durée ( défaut Clarity ) ——— */

@@ -6,7 +6,7 @@ Itération **v10** : Clarity reprend les **classes et le markup RustyMail** (`to
 
 | Couche | Fichier | Rôle |
 | ------ | ------- | ---- |
-| Composants | `../../src/styles/tokens.css` + `styles.css` | Boutons, inbox, fil, compose — identiques à l’app |
+| Composants | `../../../src/styles/tokens.css` + `styles.css` (depuis `clarity/*.html`) | Boutons, inbox, fil, compose — identiques à l’app |
 | Session mock | `clarity.css` | Barre nav mock + réglages couleur **longues sessions** |
 | Toggles | `mockup.js` | Douce / Contraste+ / Lavande (localStorage, mock uniquement) |
 
