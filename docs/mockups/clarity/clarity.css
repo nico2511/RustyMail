@@ -22,6 +22,12 @@
   --shadow: 0 1px 3px rgba(17, 24, 39, 0.04);
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
   --ease: 150ms ease;
+  /* Boutons compacts — teal plein = CTA unique (Envoyer) */
+  --btn-py: 4px;
+  --btn-px: 9px;
+  --btn-fs: 11px;
+  --btn-fw: 500;
+  --btn-radius: 6px;
 }
 
 body.contrast-plus {
@@ -235,16 +241,32 @@ body.sidebar-rail .nav-item.active::before {
   color: var(--faint);
 }
 
+.btn-primary,
+.btn-ghost,
+.btn-primary--soft,
+a.btn-primary,
+a.btn-ghost,
+a.btn-primary--soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--btn-py) var(--btn-px);
+  border-radius: var(--btn-radius);
+  font-size: var(--btn-fs);
+  font-weight: var(--btn-fw);
+  line-height: 1.25;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+
 .btn-primary {
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  border: 0;
+  border: 1px solid transparent;
   background: var(--primary);
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--ease);
 }
 
 .btn-primary:hover {
@@ -252,12 +274,38 @@ body.sidebar-rail .nav-item.active::before {
 }
 
 .btn-ghost {
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font-size: 13px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
   color: var(--muted);
+}
+
+.btn-ghost:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btn-ghost--accent {
+  color: var(--primary);
+  border-color: rgba(15, 118, 110, 0.2);
+}
+
+.btn-ghost--accent:hover {
+  background: var(--primary-ghost);
+  border-color: rgba(15, 118, 110, 0.28);
+  color: var(--primary-hover);
+}
+
+.btn-primary--soft {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid rgba(15, 118, 110, 0.22);
+}
+
+.btn-primary--soft:hover {
+  background: var(--primary-ghost);
+  border-color: rgba(15, 118, 110, 0.32);
+  color: var(--primary-hover);
 }
 
 .main {
@@ -357,15 +405,11 @@ body.sidebar-rail .nav-item.active::before {
   overflow: hidden;
 }
 
-.btn-primary--soft {
-  background: transparent;
-  color: var(--primary);
-  border: 1px solid var(--border);
-}
-
-.btn-primary--soft:hover {
-  background: var(--primary-ghost);
-  border-color: transparent;
+.read-pane-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .row {
@@ -404,19 +448,21 @@ body.sidebar-rail .nav-item.active::before {
 }
 
 .row-actions button {
-  border: 0;
-  background: var(--surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  color: var(--muted);
+  background: transparent;
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--faint);
   cursor: pointer;
+  font-family: inherit;
 }
 
 .row-actions button:hover {
-  color: var(--text);
+  color: var(--muted);
   border-color: var(--border);
+  background: var(--surface-2);
 }
 
 .row.unread .avatar {
@@ -621,14 +667,16 @@ body.sidebar-rail .nav-item.active::before {
 }
 
 .suggest button {
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--border-subtle);
   background: transparent;
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 11px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
   transition: border-color var(--ease), color var(--ease);
+  font-family: inherit;
 }
 
 .suggest button:hover {
@@ -720,8 +768,9 @@ body.sidebar-rail .nav-item.active::before {
 .seg button {
   border: 0;
   background: transparent;
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
@@ -730,7 +779,7 @@ body.sidebar-rail .nav-item.active::before {
 .seg button.is-on {
   background: var(--surface-2);
   color: var(--text);
-  font-weight: 600;
+  font-weight: 550;
   box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 
@@ -792,8 +841,9 @@ body.density-compact .brief summary {
 .compose-tabs button {
   border: 0;
   background: transparent;
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
@@ -803,7 +853,7 @@ body.density-compact .brief summary {
 
 .compose-tabs button.is-on {
   color: var(--primary);
-  font-weight: 600;
+  font-weight: 550;
   border-bottom-color: var(--primary);
 }
 
@@ -875,10 +925,11 @@ body.split-off .read-pane {
 
 .chip {
   border: 1px solid var(--border-subtle);
-  background: var(--surface);
+  background: transparent;
   border-radius: 999px;
-  padding: 4px 11px;
-  font-size: 11px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
@@ -939,12 +990,6 @@ body.split-off .read-pane {
   line-height: 1.55;
   color: var(--muted);
   margin-bottom: 16px;
-}
-
-.read-pane-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .topbar-actions {
@@ -1030,19 +1075,34 @@ body.split-off .read-pane {
 }
 
 /* v6 — palette, focus, preview sync, raccourcis */
-.btn-focus {
-  padding: 7px 11px;
-  border-radius: var(--radius-sm);
+.btn-focus,
+.btn-contrast,
+.btn-batch {
+  padding: 3px 8px;
+  border-radius: var(--btn-radius);
   border: 1px solid var(--border-subtle);
-  background: var(--surface);
-  font-size: 12px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
+  line-height: 1.25;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
 }
 
-.btn-focus.is-on {
-  border-color: rgba(15, 118, 110, 0.35);
+.btn-focus:hover,
+.btn-contrast:hover,
+.btn-batch:hover {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.btn-focus.is-on,
+.btn-contrast.is-on,
+.btn-batch.is-on {
+  border-color: rgba(15, 118, 110, 0.25);
   color: var(--primary);
   background: var(--primary-ghost);
 }
@@ -1132,9 +1192,10 @@ body.focus-mode .page-head .meta {
   border: 0;
   background: transparent;
   text-align: left;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text);
   cursor: pointer;
   font-family: inherit;
@@ -1268,18 +1329,20 @@ body.focus-mode .page-head .meta {
 
 .btn-snooze {
   border: 1px solid var(--border-subtle);
-  background: var(--surface);
+  background: transparent;
   color: var(--muted);
-  font-size: 12px;
-  padding: 7px 11px;
-  border-radius: var(--radius-sm);
+  font-size: var(--btn-fs);
+  font-weight: var(--btn-fw);
+  padding: var(--btn-py) var(--btn-px);
+  border-radius: var(--btn-radius);
   cursor: pointer;
   font-family: inherit;
 }
 
 .btn-snooze:hover {
-  border-color: var(--urgent);
+  border-color: rgba(161, 98, 7, 0.35);
   color: var(--urgent);
+  background: var(--urgent-ghost);
 }
 
 body.batch-mode .row {
@@ -1324,25 +1387,27 @@ body.batch-mode .batch-bar {
   border: 0;
   background: transparent;
   color: var(--primary);
-  font-weight: 600;
-  font-size: 12px;
+  font-weight: 500;
+  font-size: 11px;
   cursor: pointer;
   font-family: inherit;
+  padding: 0 4px;
 }
 
 .btn-batch {
-  padding: 4px 10px;
-  border-radius: 8px;
+  padding: 3px 8px;
+  border-radius: var(--btn-radius);
   border: 1px solid var(--border-subtle);
-  background: var(--surface);
+  background: transparent;
   font-size: 11px;
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
 }
 
 .btn-batch.is-on {
-  border-color: rgba(15, 118, 110, 0.35);
+  border-color: rgba(15, 118, 110, 0.25);
   color: var(--primary);
   background: var(--primary-ghost);
 }
@@ -1410,25 +1475,7 @@ body.batch-mode .batch-bar {
   color: var(--muted);
 }
 
-/* v8 — tri contact, contraste, épingler, activité, ton, navigation fil */
-.btn-contrast {
-  padding: 7px 11px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: var(--surface);
-  font-size: 12px;
-  color: var(--muted);
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.btn-contrast.is-on {
-  border-color: rgba(15, 118, 110, 0.35);
-  color: var(--primary);
-  background: var(--primary-ghost);
-}
-
-.row-pin {
+/* v8 — tri contact, épingler, activité, ton, navigation fil */
   position: absolute;
   right: 10px;
   top: 50%;
@@ -1506,13 +1553,14 @@ body.batch-mode .batch-bar {
 }
 
 .thread-nav-btn {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--muted);
   text-decoration: none;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 3px 7px;
+  border-radius: var(--btn-radius);
   border: 1px solid var(--border-subtle);
-  background: var(--surface);
+  background: transparent;
 }
 
 .thread-nav-btn:hover {
@@ -1662,16 +1710,18 @@ body.sidebar-rail .sidebar-reminders {
 
 .quick-replies button {
   border: 1px solid var(--border-subtle);
-  background: var(--surface);
+  background: transparent;
   border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 11px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
 }
 
 .quick-replies button:hover {
-  border-color: var(--primary);
+  border-color: rgba(15, 118, 110, 0.28);
   color: var(--primary);
+  background: var(--primary-ghost);
 }
