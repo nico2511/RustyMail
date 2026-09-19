@@ -1,4 +1,4 @@
-/* Clarity v3 — intuitif, fonctionnel, mécanique discrète */
+/* Clarity v4 — intuitif, fonctionnel, mécanique discrète */
 :root {
   --bg: #f3f4f6;
   --surface: #ffffff;
@@ -194,9 +194,17 @@ body {
 
 .page-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  gap: 12px;
+}
+
+.page-head > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .page-head h1 {
@@ -210,18 +218,39 @@ body {
   color: var(--faint);
 }
 
-/* Brief : une ligne, discret */
+/* Brief : une ligne, repliable */
 .brief {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
   margin-bottom: 12px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   font-size: 12px;
   color: var(--muted);
+}
+
+.brief summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.brief summary::-webkit-details-marker {
+  display: none;
+}
+
+.brief summary::after {
+  content: "▸";
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--faint);
+  transition: transform var(--ease);
+}
+
+.brief[open] summary::after {
+  transform: rotate(90deg);
 }
 
 .brief .dot {
@@ -232,12 +261,19 @@ body {
   flex-shrink: 0;
 }
 
-.brief a {
-  margin-left: auto;
+.brief .brief-body {
+  padding: 0 12px 10px 28px;
+  line-height: 1.55;
+}
+
+.brief .brief-body a {
   color: var(--primary);
   font-weight: 600;
   text-decoration: none;
-  font-size: 12px;
+}
+
+.page-head .seg {
+  margin-left: 12px;
 }
 
 .list {
@@ -320,6 +356,11 @@ body {
 
 .row:hover {
   background: var(--surface-2);
+}
+
+.row.is-selected {
+  background: var(--primary-ghost);
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.18);
 }
 
 .row .stripe {
@@ -589,4 +630,125 @@ body {
 .sheet-foot .hint {
   font-size: 11px;
   color: var(--faint);
+}
+
+/* v4 — densité, suggestion repliable, aperçu compose */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.seg button {
+  border: 0;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.seg button.is-on {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+
+body.density-compact .row {
+  padding: 7px 8px 7px 0;
+  gap: 4px 10px;
+}
+
+body.density-compact .row .preview {
+  display: none;
+}
+
+body.density-compact .page-head h1 {
+  font-size: 16px;
+}
+
+body.density-compact .brief summary {
+  padding: 7px 10px;
+}
+
+.suggest-details {
+  max-width: 640px;
+  margin: 0 22px 6px;
+}
+
+.suggest-details summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--faint);
+  padding: 4px 0;
+}
+
+.suggest-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.suggest-details summary::before {
+  content: "▸ ";
+  font-size: 10px;
+}
+
+.suggest-details[open] summary::before {
+  content: "▾ ";
+}
+
+.suggest-details .suggest {
+  margin: 6px 0 0;
+  padding-left: 10px;
+}
+
+.compose-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.compose-tabs button {
+  border: 0;
+  background: transparent;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.compose-tabs button.is-on {
+  color: var(--primary);
+  font-weight: 600;
+  border-bottom-color: var(--primary);
+}
+
+.preview-pane {
+  display: none;
+  min-height: 180px;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.preview-pane p {
+  margin: 0 0 0.75em;
+}
+
+.sheet.show-preview .body-field {
+  display: none;
+}
+
+.sheet.show-preview .preview-pane {
+  display: block;
 }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v3 — Fil</title>
+    <title>Clarity v4 — Fil</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -19,13 +19,13 @@
       </aside>
       <header class="topbar">
         <a class="back" href="inbox.html">← Reçus</a>
-        <label class="search-wrap" style="max-width:280px;margin:0">
+        <label class="search-wrap" style="max-width: 280px; margin: 0">
           <input type="search" placeholder="Dans le fil" />
         </label>
       </header>
       <main class="main thread-wrap">
         <h1>Renouvellement hébergement</h1>
-        <p class="sub">Marie Lefèvre · 2 messages · <span style="color:var(--primary)">action possible</span></p>
+        <p class="sub">Marie Lefèvre · 2 messages · <span style="color: var(--primary)">action possible</span></p>
         <article class="msg">
           <div class="msg-top">
             <span class="msg-from">Marie Lefèvre</span>
@@ -43,10 +43,13 @@
           <div class="msg-text">Merci — pouvez-vous confirmer le montant TTC ?</div>
         </article>
       </main>
-      <div class="suggest" style="position:fixed;left:200px;right:0;bottom:88px">
-        <div class="suggest-label">Suggestion</div>
-        <button type="button">Oui pour 12 mois si le total reste à 129 € TTC — insérer</button>
-      </div>
+      <details class="suggest-details">
+        <summary>Suggestion de réponse (1)</summary>
+        <div class="suggest">
+          <div class="suggest-label">Insérer dans le dock</div>
+          <button type="button">Oui pour 12 mois si le total reste à 129 € TTC</button>
+        </div>
+      </details>
       <div class="reply-dock">
         <form>
           <input type="text" placeholder="Répondre…" />

@@ -1,28 +1,27 @@
-# Clarity v3 — intuitif, fonctionnel, discret
+# Clarity v4 — intuitif, fonctionnel, discret
 
-Itération **v3** : même palette et layout v2, **mécaniques** affinées (apparaissent au survol / au bon moment).
+Itération **v4** : palette et mécaniques v3, plus **densité**, **repliables** et **aperçu** avant envoi.
 
-## Nouveautés v3
+## Nouveautés v4
 
-| Zone | Mécanique discrète |
-| ---- | ------------------- |
-| Inbox | Ligne cliquable ; **Archiver / Lu** visibles au **survol** seulement |
-| Inbox | « Nouveau » en **contour** teal ; « Envoyer » reste plein |
-| Inbox | Recherche + rappel **⌘K** dans le champ |
-| Fil | **Suggestion** en pill pointillée (insertion réponse) au-dessus du dock |
-| Fil / Compose | Fil d’Ariane **← Reçus** / **← Fil** |
-| Non lu | Barre 2px + **anneau** avatar léger (pas de fond coloré) |
+| Zone | Mécanique |
+| ---- | --------- |
+| Inbox | Brief **repliable** (`details`) — une ligne par défaut |
+| Inbox | **Confort / Compact** — masque l’extrait en compact |
+| Inbox | Ligne **is-selected** — mock focus clavier (↑↓ · Entrée) |
+| Fil | Suggestion **fermée** par défaut (`details`) |
+| Compose | Onglets **Rédaction \| Aperçu** sur la feuille |
+| v3 | Survol Archiver/Lu, ⌘K, fil d’Ariane, stripe non lu — conservés |
 
 ## Parcours mockup
 
-`inbox.html` → (clic 1re ligne) → `thread.html` → suggestion → `compose.html`
+`inbox.html` → (clic 1re ligne) → `thread.html` → `compose.html` (basculer Aperçu)
 
 ## Fichiers
 
 - [`index.html`](index.html) · [`inbox.html`](inbox.html) · [`thread.html`](thread.html) · [`compose.html`](compose.html)
-- [`clarity.css`](clarity.css) · [`images/clarity-v3-*.png`](images/)
+- [`clarity.css`](clarity.css) · [`mockup.js`](mockup.js) · [`images/clarity-v4-*.png`](images/)
 
 ## Intent (inchangé)
 
 Calme, utile, beau sans bruit — couleur pour **l’important** seulement.
-

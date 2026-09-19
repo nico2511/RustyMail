@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v3 — Inbox</title>
+    <title>Clarity v4 — Inbox</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -30,16 +30,27 @@
       </header>
       <main class="main">
         <div class="page-head">
-          <h1>Reçus</h1>
-          <span class="meta">4 non lus · tri récent</span>
+          <div>
+            <h1>Reçus</h1>
+            <span class="meta">4 non lus · tri récent</span>
+          </div>
+          <div class="seg" data-density-seg role="group" aria-label="Densité liste">
+            <button type="button" class="is-on" data-density="comfort">Confort</button>
+            <button type="button" data-density="compact">Compact</button>
+          </div>
         </div>
-        <div class="brief">
-          <span class="dot" aria-hidden="true"></span>
-          <span>2 éléments meritent attention aujourd’hui</span>
-          <a href="#">Détails</a>
-        </div>
+        <details class="brief">
+          <summary>
+            <span class="dot" aria-hidden="true"></span>
+            <span>2 éléments meritent attention aujourd’hui</span>
+          </summary>
+          <div class="brief-body">
+            Renouvellement hébergement (échéance vendredi) · Re: maquette Q4 (réponse en attente).
+            <a href="thread.html">Ouvrir le plus urgent →</a>
+          </div>
+        </details>
         <div class="list">
-          <article class="row unread">
+          <article class="row unread is-selected">
             <a class="row-link" href="thread.html" aria-label="Ouvrir le fil"></a>
             <div class="stripe"></div>
             <div class="avatar">ML</div>
@@ -81,7 +92,10 @@
           </article>
         </div>
       </main>
-      <footer class="statusbar"><span>Sync · 1 min</span><span style="margin-left:auto">Survol : actions rapides</span></footer>
+      <footer class="statusbar">
+        <span>Sync · 1 min</span><span style="margin-left: auto">↑↓ focus · Entrée ouvrir</span>
+      </footer>
     </div>
+    <script src="mockup.js"></script>
   </body>
 </html>
