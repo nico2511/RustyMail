@@ -552,7 +552,9 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomInboxThreadRun.ts` | Barrel inbox/fil (liste, org, PJ, chrome, modales org) |
 | `app/mail/wireEventsDomInboxThreadChromeRun.ts` | Coques modales stop-prop + boutons ton |
 | `app/mail/wireEventsDomInboxListRun.ts` | Barrel navigation liste + moves |
-| `app/mail/wireEventsDomInboxListNavRun.ts` | Toast, boîtes, ouverture fil, digest |
+| `app/mail/wireEventsDomInboxListNavRun.ts` | Barrel navigation liste |
+| `app/mail/wireEventsDomInboxListSidebarNavRun.ts` | Toast, clic boîtes `[data-mailbox]` |
+| `app/mail/wireEventsDomInboxListOpenThreadNavRun.ts` | Lignes fil + digest → `openThread` |
 | `app/mail/wireEventsDomInboxListMoveRun.ts` | Trash/archive, déplacement fil, `#move-target-select` |
 | `app/mail/wireEventsDomOrgMailboxRun.ts` | Barrel actions org (inline + modales confirm) |
 | `app/mail/wireEventsDomOrgMailboxInlineRun.ts` | Barrel actions org inline |

@@ -6,7 +6,7 @@ import { registerAppSearchWireDeps } from "./appSearchWireRegistry";
 import { registerAppShellWireContext } from "./appShellRender";
 import { registerAppThreadWireDeps } from "./appThreadWireRegistry";
 
-/** Startup module wiring order (formerly `application.ts` body). */
+/** Startup module wiring order (formerly `application.ts` body; `deps.ts` removed). */
 export function registerAllAppModules(): void {
   registerAppShellWireContext(getAddressBookRowsCache);
   registerAppRenderDeps();
