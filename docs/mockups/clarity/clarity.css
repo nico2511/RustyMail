@@ -1,0 +1,141 @@
+/**
+ * Clarity v10 — couche mockup uniquement.
+ * Composants + layout : ../../../src/styles/tokens.css + styles.css
+ * Ici : navigation entre pages mock, réglages couleur pour longues sessions.
+ */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+body.has-mock-nav {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+body.has-mock-nav .app-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: calc(100vh - 40px);
+  width: 100%;
+  margin-top: 40px;
+  padding-top: 0;
+  box-sizing: border-box;
+}
+
+/* ——— Nav entre pages mock (hors app) ——— */
+.mock-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--elevated);
+  border-bottom: 1px solid var(--border-weak);
+  box-shadow: var(--carved-sm);
+}
+
+.mock-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.mock-nav a:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.mock-nav a.on {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--accent-dim);
+}
+
+.mock-nav__session {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.mock-nav__session-label {
+  font-size: 11px;
+  color: var(--dim);
+  margin-right: 4px;
+}
+
+.mock-nav__session .ghost-button {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.mock-nav__session .ghost-button.is-on {
+  background: var(--accent-dim);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* ——— Session longue durée ( défaut Clarity ) ——— */
+body.clarity-session {
+  /* Crème plus basse luminance — moins de fatigue sur écran long */
+  --deep: #d8d3cb;
+  --base: #ded9d1;
+  --surface: #e8e4dc;
+  --elevated: #f0ece5;
+  --surface-elevated: #f7f4ef;
+  --hover: #d6d0c8;
+  --active: #cac4bb;
+  --text: #34362f;
+  --muted: rgba(52, 54, 47, 0.76);
+  --dim: rgba(52, 54, 47, 0.5);
+  --border: rgba(68, 64, 58, 0.14);
+  --border-weak: rgba(68, 64, 58, 0.09);
+  --scrim: rgba(48, 44, 40, 0.28);
+}
+
+/* Lisibilité renforcée — toujours palette sauge produit, pas de teal Clarity v9 */
+body.clarity-contrast-plus {
+  --text: #242620;
+  --muted: rgba(36, 38, 32, 0.84);
+  --dim: rgba(36, 38, 32, 0.58);
+  --border: rgba(58, 54, 48, 0.24);
+  --border-strong: rgba(58, 54, 48, 0.34);
+  --sm-primary: #5f856c;
+  --accent: var(--sm-primary);
+  --accent-hover: #4f735a;
+  --accent-dim: rgba(95, 133, 108, 0.26);
+  --btn-primary-fill: #a8c4b4;
+  --btn-primary-fill-hover: #b8d0c2;
+  --btn-primary-text: #1e2822;
+}
+
+/* Accent doux lavande — variante session (option mock) */
+body.clarity-accent-lavender {
+  --accent-lavender: #9a96b4;
+  --btn-primary-fill: #c8c4dc;
+  --btn-primary-fill-hover: #d4d0e6;
+  --accent-dim: rgba(154, 150, 180, 0.22);
+}
+
+body.clarity-session.clarity-contrast-plus {
+  --deep: #d2cdc4;
+  --base: #dad4cb;
+  --surface: #e4dfd6;
+  --elevated: #ece7df;
+}

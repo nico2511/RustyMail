@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Clarity v10 — Compose (composants produit)</title>
+    <link rel="stylesheet" href="../../../src/styles/tokens.css" />
+    <link rel="stylesheet" href="../../../src/styles.css" />
+    <link rel="stylesheet" href="clarity.css" />
+  </head>
+  <body class="has-mock-nav clarity-session">
+    <nav class="mock-nav" aria-label="Mockups Clarity">
+      <a href="inbox.html">Inbox</a>
+      <a href="thread.html">Fil</a>
+      <a class="on" href="compose.html">Compose</a>
+      <a href="index.html">Principes</a>
+      <div class="mock-nav__session">
+        <span class="mock-nav__session-label">Session</span>
+        <button type="button" class="ghost-button" data-clarity-mode="session" aria-pressed="true">Douce</button>
+        <button type="button" class="ghost-button" data-clarity-mode="contrast" aria-pressed="false">Contraste+</button>
+        <button type="button" class="ghost-button" data-clarity-mode="lavender" aria-pressed="false">Lavande</button>
+      </div>
+    </nav>
+    <div class="app-shell ai-collapsed compose-fullscreen-active">
+      <div class="noise"></div>
+      <section class="compose-view composer-mail-shell composer-fullscreen-shell" aria-label="Composer">
+        <header class="compose-fs-header">
+          <div class="compose-fs-hintbar">
+            <p class="compose-fs-layout-hint dim" aria-hidden="true">Markdown · <span class="kbd">M</span> basculer la vue du compositeur</p>
+          </div>
+          <div class="compose-fs-header-row">
+            <button type="button" class="icon-button compose-fs-close" data-action="close-compose" aria-label="Fermer le composer">×</button>
+            <div class="compose-fs-title-block">
+              <span class="compose-fs-kicker">Composer</span>
+              <span class="compose-fs-subtitle dim">Nouveau message</span>
+            </div>
+            <nav class="compose-fs-tabs" role="tablist" aria-label="Mode d’affichage du composer">
+              <button type="button" role="tab" aria-selected="true" class="compose-fs-tab is-active" data-compose-layout="split">Split</button>
+              <button type="button" role="tab" aria-selected="false" class="compose-fs-tab" data-compose-layout="write">Écrire</button>
+              <button type="button" role="tab" aria-selected="false" class="compose-fs-tab" data-compose-layout="preview">Aperçu</button>
+            </nav>
+            <button type="button" class="primary-button compose-fs-send compose-send" data-action="send">Envoyer</button>
+          </div>
+        </header>
+        <div class="compose-workspace">
+          <div class="compose-meta-card surface-sm">
+            <div class="field-row compose-to-row">
+              <label for="compose-to" class="compose-field-label">À</label>
+              <div class="compose-to-cell">
+                <input id="compose-to" class="compose-subject-input" placeholder="destinataire@example.org" value="marie.lefevre@example.org" />
+                <span class="compose-recipient-extra"><button type="button" class="compose-link" data-action="toggle-compose-cc-bcc">Cc · Cci</button></span>
+              </div>
+            </div>
+            <div class="field-row compose-subject-row">
+              <label for="compose-subject" class="compose-field-label">Objet</label>
+              <input id="compose-subject" class="compose-subject-input" placeholder="Objet du message" value="Re: Renouvellement hébergement" />
+            </div>
+            <div class="field-row compose-files-row">
+              <label class="compose-field-label">Fichiers</label>
+              <div class="attachments-row attachments-row--unified">
+                <div class="attachments-actions">
+                  <button class="ghost-button composer-accent-outline" type="button" data-action="pick-attachments">Ajouter…</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="compose-editor-sheet">
+            <div class="composer-body composer-body--split">
+              <textarea id="compose-body" placeholder="Rédiger en Markdown…">Bonjour Marie,
+
+Je confirme le renouvellement pour la date indiquée.
+
+Cordialement,</textarea>
+              <div class="preview"><p>Bonjour Marie,</p><p>Je confirme le renouvellement pour la date indiquée.</p><p>Cordialement,</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <footer class="status-bar-wrap">
+        <footer class="status-bar">
+          <span class="status-dot status-dot--idle"></span>
+          <span class="status-bar-app">RustyMail 0.2.0</span>
+          <span class="status-bar-spacer" aria-hidden="true"></span>
+          <span class="status-bar-account dim">demo@example.org</span>
+        </footer>
+      </footer>
+    </div>
+    <script src="mockup.js"></script>
+  </body>
+</html>

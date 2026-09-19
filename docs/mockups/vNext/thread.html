@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fil — RustyMail Focus mockup</title>
+    <link rel="stylesheet" href="mockup.css" />
+  </head>
+  <body>
+    <nav class="mock-nav">
+      <a href="index.html">Hub</a>
+      <a href="inbox.html">Inbox</a>
+      <a class="active" href="thread.html">Fil</a>
+      <a href="compose.html">Compose</a>
+    </nav>
+    <div class="shell shell--no-panel">
+      <aside class="rail">
+        <div class="rail__logo">R</div>
+        <button type="button" class="rail__btn active">✉</button>
+        <button type="button" class="rail__btn">⌕</button>
+        <button type="button" class="rail__btn">👤</button>
+        <button type="button" class="rail__btn">⚙</button>
+      </aside>
+      <header class="topbar">
+        <div class="omnibox" style="max-width: 420px">← Reçus</div>
+      </header>
+      <main class="main">
+        <div class="thread-head">
+          <h1>Renouvellement hébergement</h1>
+          <p>Marie Lefèvre · 3 messages · sécurité OK</p>
+        </div>
+        <div class="timeline">
+          <article class="msg-card">
+            <div class="msg-card__rail"></div>
+            <div class="msg-card__body">
+              <span class="msg-card__date">18 sept. 09:12</span>
+              <div class="msg-card__from">Marie Lefèvre</div>
+              <p class="msg-card__text">
+                Bonjour, votre contrat arrive à échéance vendredi. Souhaitez-vous renouveler sur 12 mois
+                au tarif actuel ?
+              </p>
+            </div>
+          </article>
+          <article class="msg-card">
+            <div class="msg-card__rail" style="background: var(--ink-faint)"></div>
+            <div class="msg-card__body">
+              <span class="msg-card__date">18 sept. 14:03</span>
+              <div class="msg-card__from">Vous</div>
+              <p class="msg-card__text">Merci — pouvez-vous confirmer le montant TTC avant validation ?</p>
+            </div>
+          </article>
+        </div>
+        <div class="reply-bar">
+          <button type="button" class="primary">Répondre</button>
+          <button type="button">Transférer</button>
+          <button type="button">Archiver</button>
+        </div>
+      </main>
+      <footer class="status"><span>Lecture zen</span></footer>
+    </div>
+    <button type="button" class="fab-assist">✦ Résumer le fil</button>
+  </body>
+</html>
