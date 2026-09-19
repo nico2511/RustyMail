@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inbox — RustyMail Focus mockup</title>
+    <link rel="stylesheet" href="mockup.css" />
+  </head>
+  <body>
+    <nav class="mock-nav">
+      <a href="index.html">Hub</a>
+      <a class="active" href="inbox.html">Inbox</a>
+      <a href="thread.html">Fil</a>
+      <a href="compose.html">Compose</a>
+    </nav>
+    <div class="shell">
+      <aside class="rail">
+        <div class="rail__logo">R</div>
+        <button type="button" class="rail__btn active">✉</button>
+        <button type="button" class="rail__btn">⌕</button>
+        <button type="button" class="rail__btn">👤</button>
+        <button type="button" class="rail__btn">⚙</button>
+      </aside>
+      <aside class="panel">
+        <h2>Dossiers</h2>
+        <div class="folder active"><span>📥</span> Reçus <span class="folder__badge">12</span></div>
+        <div class="folder"><span>★</span> Suivis <span class="folder__badge">3</span></div>
+        <div class="folder"><span>📤</span> Envoyés</div>
+        <div class="folder"><span>📝</span> Brouillons</div>
+        <div class="folder"><span>🗑</span> Corbeille</div>
+      </aside>
+      <header class="topbar">
+        <div class="omnibox">Rechercher dans Reçus… <kbd>⌘K</kbd></div>
+      </header>
+      <main class="main">
+        <div class="inbox-header">
+          <h1>Reçus</h1>
+          <span class="density">Confortable · 12 non lus</span>
+        </div>
+        <div class="brief-strip">
+          <strong>Brief</strong> — 2 décisions possibles, 1 facture, 3 newsletters ignorables.
+          <span style="margin-left: auto; color: var(--sage); font-weight: 600">Voir le résumé →</span>
+        </div>
+        <div class="thread-list">
+          <article class="thread-row unread">
+            <div class="avatar">ML</div>
+            <div>
+              <p class="thread-row__subject">Renouvellement hébergement — action avant vendredi</p>
+              <p class="thread-row__preview">Bonjour, votre contrat arrive à échéance le…</p>
+            </div>
+            <div class="thread-row__meta">08:42</div>
+          </article>
+          <article class="thread-row unread">
+            <div class="avatar">SC</div>
+            <div>
+              <p class="thread-row__subject">Re: maquette dashboard Q4</p>
+              <p class="thread-row__preview">J’ai joint une version avec les contrastes…</p>
+            </div>
+            <div class="thread-row__meta">Hier</div>
+          </article>
+          <article class="thread-row">
+            <div class="avatar">▣</div>
+            <div>
+              <p class="thread-row__subject">Newsletter — veille produit</p>
+              <p class="thread-row__preview">Cette semaine : IA on-device, privacy…</p>
+            </div>
+            <div class="thread-row__meta">Lun.</div>
+          </article>
+        </div>
+      </main>
+      <footer class="status"><span>compte@exemple.fr</span><span>Sync OK · il y a 2 min</span></footer>
+    </div>
+    <button type="button" class="fab-assist">✦ Assist</button>
+  </body>
+</html>

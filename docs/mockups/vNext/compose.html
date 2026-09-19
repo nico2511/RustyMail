@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Compose — RustyMail Focus mockup</title>
+    <link rel="stylesheet" href="mockup.css" />
+  </head>
+  <body>
+    <nav class="mock-nav">
+      <a href="index.html">Hub</a>
+      <a href="inbox.html">Inbox</a>
+      <a href="thread.html">Fil</a>
+      <a class="active" href="compose.html">Compose</a>
+    </nav>
+    <div class="shell shell--compose">
+      <aside class="rail">
+        <div class="rail__logo">R</div>
+        <button type="button" class="rail__btn active">✉</button>
+        <button type="button" class="rail__btn">⌕</button>
+        <button type="button" class="rail__btn">👤</button>
+        <button type="button" class="rail__btn">⚙</button>
+      </aside>
+      <header class="topbar">
+        <div class="omnibox" style="max-width: 280px; margin: 0">Nouveau message</div>
+        <button type="button" style="margin-left: auto; padding: 8px 14px; border-radius: 10px; border: 0; background: var(--sage); color: #fff; font-weight: 600">Envoyer</button>
+      </header>
+      <main class="main" style="padding-top: 12px">
+        <div class="compose-grid">
+          <section class="compose-pane">
+            <div class="compose-pane__head">Éditeur</div>
+            <div class="compose-fields">
+              <div><strong>À</strong> marie@exemple.fr</div>
+              <div><strong>Objet</strong> Re: Renouvellement hébergement</div>
+            </div>
+            <div class="compose-editor">
+              Bonjour Marie,<br /><br />
+              Oui pour 12 mois si le montant reste à **129 € TTC**.<br /><br />
+              Merci,
+            </div>
+          </section>
+          <section class="compose-pane">
+            <div class="compose-pane__head">Aperçu</div>
+            <div class="compose-preview">
+              <p style="margin-top: 0"><strong>Bonjour Marie,</strong></p>
+              <p>Oui pour 12 mois si le montant reste à <strong>129 € TTC</strong>.</p>
+              <p>Merci,</p>
+            </div>
+          </section>
+        </div>
+      </main>
+      <footer class="status"><span>Brouillon enregistré</span></footer>
+    </div>
+    <button type="button" class="fab-assist">✦ Affiner le ton</button>
+  </body>
+</html>
