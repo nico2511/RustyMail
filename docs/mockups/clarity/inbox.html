@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Clarity v10 — Inbox (composants produit)</title>
+    <link rel="stylesheet" href="../../../src/styles/tokens.css" />
+    <link rel="stylesheet" href="../../../src/styles.css" />
+    <link rel="stylesheet" href="clarity.css" />
+  </head>
+  <body class="has-mock-nav clarity-session">
+    <nav class="mock-nav" aria-label="Mockups Clarity">
+      <a class="on" href="inbox.html">Inbox</a>
+      <a href="thread.html">Fil</a>
+      <a href="compose.html">Compose</a>
+      <a href="index.html">Principes</a>
+      <div class="mock-nav__theme">
+        <span class="mock-nav__session-label">Thème</span>
+        <button type="button" class="ghost-button" data-clarity-scheme="light" aria-pressed="true">Clair</button>
+        <button type="button" class="ghost-button" data-clarity-scheme="dark" aria-pressed="false">Sombre</button>
+        <button type="button" class="ghost-button" data-clarity-scheme="system" aria-pressed="false">Système</button>
+      </div>
+      <div class="mock-nav__session">
+        <span class="mock-nav__session-label">Session</span>
+        <button type="button" class="ghost-button" data-clarity-mode="session" aria-pressed="true">Douce</button>
+        <button type="button" class="ghost-button" data-clarity-mode="contrast" aria-pressed="false">Contraste+</button>
+        <button type="button" class="ghost-button" data-clarity-mode="lavender" aria-pressed="false">Lavande</button>
+      </div>
+    </nav>
+    <div class="app-shell ai-collapsed">
+      <div class="noise"></div>
+
+      <aside class="sidebar" aria-label="Mail navigation">
+        <button
+          type="button"
+          class="sidebar-collapse-edge"
+          data-action="toggle-sidebar"
+          aria-label="Masquer les dossiers"
+          title="Réduire le volet"
+        >
+          <span class="sidebar-collapse-edge__glyph" aria-hidden="true"></span>
+        </button>
+        <div class="sidebar-header">
+          <div class="sidebar-header-top">
+            <div class="sidebar-account">
+              <span class="avatar large" style="background: rgba(200, 149, 108, 0.16); color: var(--accent)">SC</span>
+              <span
+                ><strong>RustyMail</strong><small class="dim" style="display: block">demo@example.org</small></span
+              >
+            </div>
+          </div>
+          <div class="sidebar-actions">
+            <button class="primary-button" data-action="compose" style="padding: 9px 10px; border-radius: var(--radius-btn); width: 100%">
+              <span>Composer</span> <span class="kbd">N</span>
+            </button>
+            <select id="account-select" class="account-select" style="width: 100%">
+              <option selected>Compte démo</option>
+            </select>
+          </div>
+        </div>
+        <nav class="folder-list" aria-label="Folders">
+          <div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">IMAP</span></div>
+          <div class="sidebar-folder-group">
+            <button class="folder-button active" data-mailbox="INBOX">
+              <span class="folder-icon">In</span>
+              <span class="folder-name">Boîte de réception</span>
+              <span class="folder-count unread">3</span>
+            </button>
+            <button class="folder-button" data-mailbox="Sent">
+              <span class="folder-icon">↑</span>
+              <span class="folder-name">Envoyés</span>
+            </button>
+            <button class="folder-button" data-mailbox="Archive">
+              <span class="folder-icon">Ar</span>
+              <span class="folder-name">Archives</span>
+            </button>
+            <button class="folder-button" data-mailbox="Trash">
+              <span class="folder-icon">Co</span>
+              <span class="folder-name">Corbeille</span>
+            </button>
+          </div>
+          <button type="button" class="folder-button" data-action="open-folder-manager-view" title="Gérer l’arbre des dossiers personnels">
+            <span class="folder-icon">Ar</span>
+            <span class="folder-name">Dossiers</span>
+            <span class="folder-count">2</span>
+          </button>
+        </nav>
+        <div class="sidebar-footer">
+          <button type="button" class="folder-button" data-action="open-organization-v2-view">
+            <span class="folder-icon">O2</span><span class="folder-name">Organiser V2</span>
+          </button>
+          <button type="button" class="folder-button" data-action="settings">
+            <span class="folder-icon">ST</span><span class="folder-name">Paramètres</span><span class="folder-count">1</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section class="thread-view inbox-index" aria-label="Inbox">
+          <header class="inbox-appbar">
+            <div class="inbox-appbar-top">
+              <div class="inbox-appbar-intro">
+                <div class="inbox-mailbox-title-row">
+                  <h1 class="inbox-mailbox-title">Boîte de réception</h1>
+                </div>
+                <p class="inbox-mailbox-sub">3 sur 3 conversations</p>
+              </div>
+              <div class="inbox-appbar-actions">
+                <button type="button" class="ghost-button status-bar-digest-trigger inbox-toolbar-btn" data-action="toggle-mailbox-digest-panel" title="Ouvrir le brief d’action IA du dossier">Brief</button>
+                <button type="button" class="ghost-button inbox-toolbar-btn" data-action="open-mailbox-manage" title="Gérer les dossiers">Dossiers</button>
+                <button type="button" class="ghost-button inbox-toolbar-btn" data-action="sync-inbox" title="Synchroniser la boîte IMAP (Ctrl+F5)">Sync</button>
+              </div>
+            </div>
+
+            <div class="inbox-search-stack search-bar-stack">
+              <label class="inbox-search surface-sm">
+                <svg class="inbox-search-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="search-input" type="search" value="" placeholder="Rechercher… Entrée · @contact · #local:dossier (Tab) · #compte" aria-label="Rechercher : Entrée pour valider · #local:nom ou #local:&quot;Perso/Archives&quot;" autocomplete="off" />
+                <span class="kbd">/</span>
+              </label>
+            </div>
+
+            <div class="inbox-chips" role="toolbar" aria-label="Filtres de la boîte">
+              <button type="button" class="inbox-chip inbox-chip-active" data-action="list-filter-all">Tout <span class="inbox-chip-badge">12</span></button>
+              <button type="button" class="inbox-chip" data-action="list-filter-unread">Non lus <span class="inbox-chip-badge">3</span></button>
+              <button type="button" class="inbox-chip" data-action="list-filter-starred" title="Fils marqués « Suivre » (étoile) — tous dossiers">Suivis <span class="inbox-chip-badge">1</span></button>
+              <button type="button" class="inbox-chip" data-action="list-filter-focused" title="Masquer les fils classés expéditeur automatique">Priorité <span class="inbox-chip-badge">8</span></button>
+              <button type="button" class="inbox-chip" data-action="list-filter-auto" title="Uniquement les fils expéditeur automatique">Auto <span class="inbox-chip-badge">4</span></button>
+            </div>
+          </header>
+
+          <div class="inbox-panel surface">
+            <div class="inbox-thread-list" role="list">
+              <div class="thread-row inbox-thread-row thread-row--unread" data-thread-id="t1" role="listitem">
+                <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="t1">
+                  <span class="avatar inbox-thread-avatar" style="background: rgba(111, 122, 111, 0.2); color: var(--sm-primary)">ML</span>
+                  <span class="inbox-thread-stack">
+                    <span class="inbox-thread-line1">
+                      <span class="inbox-thread-from">Marie Lefèvre</span>
+                      <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="2026-09-19T08:42:00.000Z" title="19 sept. 2026, 08:42">08:42</time>
+                    </span>
+                    <span class="inbox-thread-subject">
+                      <span class="inbox-unread-dot" aria-hidden="true"></span>
+                      <strong>Renouvellement hébergement</strong>
+                      <span class="inbox-thread-attach-hint dim" role="img" aria-label="1 pièce jointe"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M9 12.5 13.8 7.7a3.1 3.1 0 1 1 4.4 4.4L11 19.3a5.1 5.1 0 1 1-7.2-7.2l7.2-7.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </span>
+                    <p class="thread-preview inbox-thread-preview">Bonjour, merci de confirmer avant vendredi…</p>
+                  </span>
+                </button>
+                <div class="inbox-thread-date-col" title="19 sept. 2026, 08:42">
+                  <time class="inbox-thread-date-label dim" datetime="2026-09-19T08:42:00.000Z">08:42</time>
+                </div>
+                <div class="inbox-thread-folder-col" title="Boîte de réception — INBOX">
+                  <select class="inbox-thread-folder-move" data-action="move-thread-select" data-thread-id="t1" data-source-mailbox="INBOX" title="Déplacer vers un autre dossier" aria-label="Déplacer ce fil vers un autre dossier"><option value="" selected>Boîte de réception</option><option value="Archive">Archives — Archive</option><option value="Trash">Corbeille — Trash</option></select>
+                </div>
+                <div class="thread-row-actions inbox-thread-actions row-actions">
+                  <button type="button" class="icon-pill inbox-thread-follow-toggle" data-action="toggle-thread-follow" data-thread-id="t1" title="Suivre ce fil" aria-label="Suivre ce fil" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="m12 3.5 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.9l6-.9L12 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/></svg></button>
+                  <span class="action-sep" aria-hidden="true"></span>
+                  <button type="button" class="icon-pill inbox-seen-toggle inbox-seen-toggle--is-unread" data-action="toggle-thread-seen" data-thread-id="t1" title="Marquer comme lu" aria-label="Marquer comme lu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 7 9 18l-5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <span class="action-sep" aria-hidden="true"></span>
+                  <button type="button" class="icon-pill danger" data-mv="trash" data-thread-id="t1" title="Corbeille" aria-label="Corbeille"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h6m-8 4h10m-9 0 1 15h6l1-15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v7M14 11v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                  <button type="button" class="icon-pill" data-mv="archive" data-thread-id="t1" title="Archiver" aria-label="Archiver"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M4 7h16v14H4V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M3 7l1-3h16l1 3H3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 11h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                </div>
+              </div>
+
+              <div class="thread-row inbox-thread-row" data-thread-id="t2" role="listitem">
+                <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="t2">
+                  <span class="avatar inbox-thread-avatar" style="background: rgba(111, 122, 111, 0.2); color: var(--sm-primary)">PD</span>
+                  <span class="inbox-thread-stack">
+                    <span class="inbox-thread-line1">
+                      <span class="inbox-thread-from">Paul Durand</span>
+                      <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="2026-09-18T16:20:00.000Z" title="18 sept. 2026, 16:20">Hier</time>
+                    </span>
+                    <span class="inbox-thread-subject">
+                      <strong>Compte-rendu réunion produit</strong>
+                      <span class="inbox-thread-count-hint dim" role="img" aria-label="Conversation, 4 messages" title="Conversation, 4 messages"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M5 6h11a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H10l-4 3v-3H5a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 10h6M9 13h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="inbox-thread-count-badge">4</span></span>
+                    </span>
+                    <p class="thread-preview inbox-thread-preview">Voici les décisions et les prochaines étapes…</p>
+                  </span>
+                </button>
+                <div class="inbox-thread-date-col" title="18 sept. 2026, 16:20">
+                  <time class="inbox-thread-date-label dim" datetime="2026-09-18T16:20:00.000Z">Hier</time>
+                </div>
+                <div class="inbox-thread-folder-col" title="Boîte de réception — INBOX">
+                  <select class="inbox-thread-folder-move" data-action="move-thread-select" data-thread-id="t2" data-source-mailbox="INBOX" title="Déplacer vers un autre dossier" aria-label="Déplacer ce fil vers un autre dossier"><option value="" selected>Boîte de réception</option><option value="Archive">Archives — Archive</option></select>
+                </div>
+                <div class="thread-row-actions inbox-thread-actions row-actions">
+                  <button type="button" class="icon-pill inbox-thread-follow-toggle inbox-thread-follow-toggle--on" data-action="toggle-thread-follow" data-thread-id="t2" title="Retirer du suivi" aria-label="Retirer du suivi" aria-pressed="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="m12 3.5 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.9l6-.9L12 3.5Z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
+                  <span class="action-sep" aria-hidden="true"></span>
+                  <button type="button" class="icon-pill inbox-seen-toggle" data-action="toggle-thread-seen" data-thread-id="t2" title="Marquer comme non lu" aria-label="Marquer comme non lu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M4 6h16v12H4V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+                  <span class="action-sep" aria-hidden="true"></span>
+                  <button type="button" class="icon-pill danger" data-mv="trash" data-thread-id="t2" title="Corbeille" aria-label="Corbeille"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h6m-8 4h10m-9 0 1 15h6l1-15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v7M14 11v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                  <button type="button" class="icon-pill" data-mv="archive" data-thread-id="t2" title="Archiver" aria-label="Archiver"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M4 7h16v14H4V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M3 7l1-3h16l1 3H3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 11h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                </div>
+              </div>
+
+              <div class="thread-row inbox-thread-row thread-row--unread" data-thread-id="t3" role="listitem">
+                <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="t3">
+                  <span class="avatar inbox-thread-avatar" style="background: rgba(111, 122, 111, 0.2); color: var(--sm-primary)">NL</span>
+                  <span class="inbox-thread-stack">
+                    <span class="inbox-thread-line1">
+                      <span class="inbox-thread-from">Newsletter Dev</span>
+                      <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="2026-09-17T09:00:00.000Z" title="17 sept. 2026, 09:00">17 sept.</time>
+                    </span>
+                    <span class="inbox-thread-subject">
+                      <span class="inbox-unread-dot" aria-hidden="true"></span>
+                      <strong>Rust weekly #412</strong>
+                    </span>
+                    <p class="thread-preview inbox-thread-preview dim">Cette semaine : async, tooling, crates…</p>
+                  </span>
+                </button>
+                <div class="inbox-thread-date-col" title="17 sept. 2026, 09:00">
+                  <time class="inbox-thread-date-label dim" datetime="2026-09-17T09:00:00.000Z">17 sept.</time>
+                </div>
+                <div class="inbox-thread-folder-col" title="Boîte de réception — INBOX">
+                  <span class="inbox-thread-folder-label">Boîte de réception</span>
+                </div>
+                <div class="thread-row-actions inbox-thread-actions row-actions">
+                  <button type="button" class="icon-pill inbox-thread-follow-toggle" data-action="toggle-thread-follow" data-thread-id="t3" title="Suivre ce fil" aria-label="Suivre ce fil" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="m12 3.5 2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.9l6-.9L12 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/></svg></button>
+                  <span class="action-sep" aria-hidden="true"></span>
+                  <button type="button" class="icon-pill inbox-seen-toggle inbox-seen-toggle--is-unread" data-action="toggle-thread-seen" data-thread-id="t3" title="Marquer comme lu" aria-label="Marquer comme lu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 7 9 18l-5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <span class="action-sep" aria-hidden="true"></span>
+                  <button type="button" class="icon-pill danger" data-mv="trash" data-thread-id="t3" title="Corbeille" aria-label="Corbeille"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h6m-8 4h10m-9 0 1 15h6l1-15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v7M14 11v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                  <button type="button" class="icon-pill" data-mv="archive" data-thread-id="t3" title="Archiver" aria-label="Archiver"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M4 7h16v14H4V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M3 7l1-3h16l1 3H3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 11h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                </div>
+              </div>
+            </div>
+            <div class="inbox-panel-footer">
+              <div class="inbox-panel-footer__row">
+                <div class="inbox-panel-footer__lead"></div>
+                <div class="inbox-panel-footer__center">
+                  <span class="inbox-end-hint dim">Mode navigateur — lancez Tauri pour la sync</span>
+                </div>
+                <div class="inbox-panel-footer__trail">
+                  <span class="inbox-end-hint dim" title="Pagination locale">Fin de liste (3)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="status-bar-wrap">
+        <footer class="status-bar">
+          <span class="status-dot status-dot--idle" title="Noyau mail indisponible ou navigateur"></span>
+          <span class="status-bar-app">RustyMail 0.2.0</span>
+          <span class="status-bar-sep" aria-hidden="true">·</span>
+          <span class="dim status-bar-compact">Navigateur · hors Tauri · —</span>
+          <span class="status-bar-spacer" aria-hidden="true"></span>
+          <span class="status-bar-account dim" title="demo@example.org">demo@example.org</span>
+        </footer>
+      </footer>
+    </div>
+    <script src="mockup.js"></script>
+  </body>
+</html>

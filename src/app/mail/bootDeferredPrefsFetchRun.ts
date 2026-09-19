@@ -7,6 +7,7 @@ import { withTimeout } from "../lib/tauriCommand";
 import { state } from "../state";
 import { syncMailboxDigestPanelWithFeaturePref } from "./mailboxDigest";
 import { setLocale } from "../../i18n";
+import { applyAppearanceFromPrefs } from "../../appearance";
 
 export async function fetchAndApplyAppPrefsFromBackend(): Promise<void> {
   state.appPrefs = await withTimeout(invoke<AppPrefs>("get_app_prefs", {}), BOOT_INVOKE_TIMEOUT_MS);
@@ -24,6 +25,7 @@ export async function fetchAndApplyAppPrefsFromBackend(): Promise<void> {
   });
   syncMailboxDigestPanelWithFeaturePref();
   setLocale(state.appPrefs.general.motherLanguage ?? "fr");
+  applyAppearanceFromPrefs(state.appPrefs.general);
 }
 
 export async function loadBootApiKeyStatuses(): Promise<void> {

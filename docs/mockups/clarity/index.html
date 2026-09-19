@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Clarity v10 — direction mockups UX</title>
+    <link rel="stylesheet" href="../../../src/styles/tokens.css" />
+    <link rel="stylesheet" href="../../../src/styles.css" />
+    <link rel="stylesheet" href="clarity.css" />
+  </head>
+  <body class="has-mock-nav clarity-session" style="padding: 56px 24px 24px; max-width: 640px; margin: 0 auto">
+    <nav class="mock-nav" aria-label="Mockups Clarity">
+      <a href="inbox.html">Inbox</a>
+      <a href="thread.html">Fil</a>
+      <a href="compose.html">Compose</a>
+      <a class="on" href="index.html">Principes</a>
+      <div class="mock-nav__theme">
+        <span class="mock-nav__session-label">Thème</span>
+        <button type="button" class="ghost-button" data-clarity-scheme="light" aria-pressed="true">Clair</button>
+        <button type="button" class="ghost-button" data-clarity-scheme="dark" aria-pressed="false">Sombre</button>
+        <button type="button" class="ghost-button" data-clarity-scheme="system" aria-pressed="false">Système</button>
+      </div>
+      <div class="mock-nav__session">
+        <span class="mock-nav__session-label">Session</span>
+        <button type="button" class="ghost-button" data-clarity-mode="session" aria-pressed="true">Douce</button>
+        <button type="button" class="ghost-button" data-clarity-mode="contrast" aria-pressed="false">Contraste+</button>
+        <button type="button" class="ghost-button" data-clarity-mode="lavender" aria-pressed="false">Lavande</button>
+      </div>
+    </nav>
+
+    <p class="surface-sm" style="padding: 14px 16px; border-radius: var(--radius-md); font-size: 13px; color: var(--muted); line-height: 1.55; border: 1px solid var(--border-weak)">
+      <strong style="color: var(--text)">Clarity v10</strong> — même markup et classes que l’app (<code>primary-button</code>, <code>thread-row</code>, <code>inbox-chip</code>…).
+      <code>clarity.css</code> ne fait qu’ajouter la barre mock + <strong>couleurs session longue durée</strong> (crème basse luminance, contraste+, accent lavande optionnel).
+      Pas de teal v9, pas de split inbox inventé.
+    </p>
+
+    <h1 style="font-size: 22px; margin-top: 32px">Clarity v10</h1>
+    <p style="color: var(--muted); line-height: 1.6; margin-top: 0">
+      <strong>Direction officielle</strong> des mockups UX dans ce repo — composants produit + palette session longue durée.
+    </p>
+    <ul style="color: var(--muted); line-height: 1.85; font-size: 14px; padding-left: 1.2em">
+      <li><strong>Composants produit</strong> — source <code>listRender.ts</code>, <code>threadViewRender.ts</code>, <code>composerRender.ts</code>.</li>
+      <li><strong>Session douce</strong> — surfaces crème moins agressives pour travailler des heures.</li>
+      <li><strong>Contraste+</strong> — texte et bordures renforcés, palette sauge inchangée.</li>
+      <li><strong>Lavande</strong> — variante bouton primaire (mock) sans nouveau widget.</li>
+    </ul>
+    <p style="margin-top: 24px">
+      <a href="inbox.html" style="color: var(--sm-primary); font-weight: 600">Ouvrir l’inbox v10 →</a>
+    </p>
+    <p class="dim" style="font-size: 12px; margin-top: 32px">Règles globales : <a href="../RULES.md">RULES.md</a></p>
+    <script src="mockup.js"></script>
+  </body>
+</html>

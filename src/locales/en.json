@@ -69,6 +69,19 @@
       "filterFocused": "Focused (excluding auto senders)",
       "filterAuto": "Auto (newsletters / auto senders)"
     },
+    "appearance": {
+      "heading": "Appearance",
+      "explain": "Clarity v10 light (Soft session by default), warm dark mode, or follow the system. Contrast+ and lavender apply in light mode only.",
+      "colorScheme": "Theme",
+      "schemeLight": "Light",
+      "schemeDark": "Dark",
+      "schemeSystem": "System",
+      "sessionComfort": "Soft session (low-glare cream)",
+      "contrastPlus": "Contrast+",
+      "accentLavender": "Lavender accent (buttons)",
+      "aiPanelWidth": "Right panel width (px)",
+      "save": "Save appearance"
+    },
     "ai": {
       "tabsAria": "AI settings",
       "tabFeatures": "Features",

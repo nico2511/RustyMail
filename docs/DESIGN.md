@@ -81,9 +81,14 @@ Legacy **Slate Monolith** dark palette was replaced by this light pastel system;
 | Composer | `.compose-*`, `.composer-*` |
 | Attachment logic | `pickAttachments`, `bindComposerDropzone`, `persistDraft` — `main.ts` |
 
+## Theme & appearance (Clarity v10)
+
+- **Light default:** Douce cream tokens in `src/styles/tokens.css`.
+- **Modifiers:** `src/styles/appearance.css` — Contrast+, lavender accent, warm **dark** (`clarity-dark`), system preference via **Settings → Appearance**.
+- **Email HTML:** `.message-html` keeps a light canvas in dark app theme so third-party mail stays readable.
+
 ## Possible evolutions
 
-- Optional **dark** theme via `prefers-color-scheme` or explicit toggle (tokens are centralized for this)
 - Three-column layout refinements (AI rail + editor + wide panel)
 - Rich editor with unified undo beyond Markdown toolbar
 

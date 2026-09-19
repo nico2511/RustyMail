@@ -69,6 +69,19 @@
       "filterFocused": "Priorité (hors expéditeurs auto)",
       "filterAuto": "Auto (newsletters / expéditeurs auto)"
     },
+    "appearance": {
+      "heading": "Apparence",
+      "explain": "Thème clair Clarity v10 (Douce par défaut), mode sombre chaleureux, ou suivi du système. Contraste+ et lavande s’appliquent en clair uniquement.",
+      "colorScheme": "Thème",
+      "schemeLight": "Clair",
+      "schemeDark": "Sombre",
+      "schemeSystem": "Système",
+      "sessionComfort": "Session douce (crème basse luminance)",
+      "contrastPlus": "Contraste+",
+      "accentLavender": "Accent lavande (boutons)",
+      "aiPanelWidth": "Largeur panneau droit (px)",
+      "save": "Enregistrer l’apparence"
+    },
     "ai": {
       "tabsAria": "Paramètres IA",
       "tabFeatures": "Fonctionnalités",

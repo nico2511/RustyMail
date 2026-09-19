@@ -1,0 +1,158 @@
+/**
+ * Apparence Clarity v10 — thème clair/sombre et modificateurs session.
+ * Spec mock : docs/mockups/clarity/MOCKUP-DIRECTION.md
+ */
+
+/* Ancien pastel v0.2.0 (opt-out session Douce) */
+body.clarity-pastel-v020 {
+  --deep: #e4e0d9;
+  --base: #ebe7e1;
+  --surface: #f3f0eb;
+  --elevated: #faf8f4;
+  --hover: #e0dbd4;
+  --active: #d4cec6;
+  --surface-elevated: #ffffff;
+  --border: rgba(72, 68, 62, 0.16);
+  --border-weak: rgba(72, 68, 62, 0.1);
+  --border-strong: rgba(72, 68, 62, 0.28);
+  --text: #3a3d38;
+  --muted: rgba(58, 61, 56, 0.72);
+  --dim: rgba(58, 61, 56, 0.52);
+  --scrim: rgba(52, 48, 44, 0.32);
+}
+
+body.clarity-session {
+  --deep: #d8d3cb;
+  --base: #ded9d1;
+  --surface: #e8e4dc;
+  --elevated: #f0ece5;
+  --surface-elevated: #f7f4ef;
+  --hover: #d6d0c8;
+  --active: #cac4bb;
+  --text: #34362f;
+  --muted: rgba(52, 54, 47, 0.76);
+  --dim: rgba(52, 54, 47, 0.5);
+  --border: rgba(68, 64, 58, 0.14);
+  --border-weak: rgba(68, 64, 58, 0.09);
+  --scrim: rgba(48, 44, 40, 0.28);
+}
+
+body.clarity-contrast-plus {
+  --text: #242620;
+  --muted: rgba(36, 38, 32, 0.84);
+  --dim: rgba(36, 38, 32, 0.58);
+  --border: rgba(58, 54, 48, 0.24);
+  --border-strong: rgba(58, 54, 48, 0.34);
+  --sm-primary: #5f856c;
+  --accent: var(--sm-primary);
+  --accent-hover: #4f735a;
+  --accent-dim: rgba(95, 133, 108, 0.26);
+  --btn-primary-fill: #a8c4b4;
+  --btn-primary-fill-hover: #b8d0c2;
+  --btn-primary-text: #1e2822;
+}
+
+body.clarity-accent-lavender {
+  --accent-lavender: #9a96b4;
+  --btn-primary-fill: #c8c4dc;
+  --btn-primary-fill-hover: #d4d0e6;
+  --accent-dim: rgba(154, 150, 180, 0.22);
+}
+
+body.clarity-session.clarity-contrast-plus {
+  --deep: #d2cdc4;
+  --base: #dad4cb;
+  --surface: #e4dfd6;
+  --elevated: #ece7df;
+}
+
+body.clarity-dark {
+  color-scheme: dark;
+  --deep: #141312;
+  --base: #1a1917;
+  --surface: #242220;
+  --elevated: #2c2a27;
+  --surface-elevated: #33312e;
+  --hover: #32302c;
+  --active: #3d3a36;
+  --text: #e7e2d9;
+  --muted: rgba(231, 226, 217, 0.72);
+  --dim: rgba(231, 226, 217, 0.48);
+  --border: rgba(231, 226, 217, 0.14);
+  --border-weak: rgba(231, 226, 217, 0.08);
+  --border-strong: rgba(231, 226, 217, 0.22);
+  --scrim: rgba(8, 7, 6, 0.55);
+  --scrim-heavy: rgba(8, 7, 6, 0.72);
+  --shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.48);
+  --carved: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 10px rgba(0, 0, 0, 0.25);
+  --carved-sm: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 4px rgba(0, 0, 0, 0.2);
+  --sm-primary: #8aab96;
+  --sm-secondary: #9a9892;
+  --accent: var(--sm-primary);
+  --accent-hover: #9abca8;
+  --accent-dim: rgba(138, 171, 150, 0.2);
+  --btn-primary-fill: #5f7568;
+  --btn-primary-fill-hover: #6d8576;
+  --btn-primary-text: #eef2ef;
+  --btn-primary-border: rgba(238, 242, 239, 0.12);
+  --btn-secondary-bg: #33312e;
+  --btn-secondary-bg-hover: #3d3a36;
+  --btn-secondary-border: rgba(231, 226, 217, 0.16);
+  --btn-outlined-border: rgba(231, 226, 217, 0.2);
+}
+
+body.clarity-dark.clarity-contrast-plus {
+  --text: #f3efe8;
+  --muted: rgba(243, 239, 232, 0.86);
+  --dim: rgba(243, 239, 232, 0.58);
+  --border: rgba(243, 239, 232, 0.22);
+  --border-strong: rgba(243, 239, 232, 0.32);
+}
+
+body.appearance-bg-light {
+  background:
+    radial-gradient(920px 520px at 12% -8%, rgba(168, 196, 178, 0.35), transparent 58%),
+    radial-gradient(780px 480px at 88% 4%, rgba(184, 176, 210, 0.28), transparent 55%),
+    radial-gradient(640px 400px at 50% 100%, rgba(212, 168, 138, 0.18), transparent 60%),
+    var(--deep);
+}
+
+body.appearance-bg-dark {
+  background:
+    radial-gradient(920px 520px at 12% -8%, rgba(90, 130, 100, 0.12), transparent 58%),
+    radial-gradient(780px 480px at 88% 4%, rgba(120, 110, 150, 0.1), transparent 55%),
+    radial-gradient(640px 400px at 50% 100%, rgba(140, 100, 80, 0.08), transparent 60%),
+    var(--deep);
+}
+
+/* ——— Dark : durcissement ciblé (styles.css legacy rgba) ——— */
+body.clarity-dark .settings-ctl,
+body.clarity-dark .settings-ctl-select,
+body.clarity-dark textarea.settings-ctl {
+  background: var(--elevated);
+  border-color: var(--border);
+}
+
+body.clarity-dark .thread-row.is-unread {
+  background: var(--hover);
+}
+
+body.clarity-dark .modal-backdrop,
+body.clarity-dark .ai-quick-panel-backdrop {
+  background: var(--scrim);
+}
+
+/*
+ * HTML expéditeur : le shadow DOM conserve le rendu message ;
+ * le conteneur app reste fond clair pour lisibilité des mails externes.
+ */
+body.clarity-dark .message-html {
+  background: #f7f4ef;
+  color: #2a2a28;
+  border: 1px solid var(--border-weak);
+}
+
+body.clarity-dark .message-html-caption {
+  color: var(--muted);
+}

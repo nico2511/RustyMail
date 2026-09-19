@@ -41,6 +41,14 @@ export type AppPrefsGeneral = {
   autoArchiveRules?: AutoArchiveRule[];
   /** Suggestions de vues basées sur l'activité locale (on-device). */
   activitySuggestionsEnabled?: boolean;
+  /** Thème interface : clair, sombre, ou suivre le système. */
+  colorScheme?: "light" | "dark" | "system";
+  /** Palette Douce (crème basse luminance) en mode clair. */
+  sessionComfort?: boolean;
+  /** Lisibilité renforcée (clair uniquement). */
+  contrastPlus?: boolean;
+  /** Variante bouton primaire lavande (clair uniquement). */
+  accentLavender?: boolean;
 };
 
 export type AppPrefsAi = {
@@ -141,6 +149,10 @@ export function defaultAppPrefs(): AppPrefs {
       autoArchiveEnabled: false,
       autoArchiveRules: [],
       activitySuggestionsEnabled: true,
+      colorScheme: "light",
+      sessionComfort: true,
+      contrastPlus: false,
+      accentLavender: false,
     },
     ai: {
       dictationEnabled: false,

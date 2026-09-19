@@ -140,4 +140,23 @@ npm run tauri:dev    # ergonomie réelle desktop
 
 ---
 
-*Dernière mise à jour : merge PR #1 → `main`, version **0.2.0**.*
+## Apparence Clarity v10 (app)
+
+- **Clair par défaut** : tokens [`src/styles/tokens.css`](../src/styles/tokens.css) = palette **Douce** (crème basse luminance).
+- **Modificateurs clair** : [`src/styles/appearance.css`](../src/styles/appearance.css) — Contraste+, accent lavande, opt-out session (`clarity-pastel-v020`).
+- **Sombre** : `body.clarity-dark` — nuit chaude, sauge atténuée ; réglage **Paramètres → Apparence** (clair / sombre / système).
+- **HTML expéditeur** : conteneur `.message-html` reste fond clair en thème sombre (lisibilité des mails externes).
+
+Prefs : `general.colorScheme`, `sessionComfort`, `contrastPlus`, `accentLavender` (`app_prefs.json`).
+
+---
+
+## Mockups & explorations
+
+**Règle (non négociable)** : toute UX mockée ou livrée doit utiliser **uniquement les composants existants** — voir [`docs/mockups/RULES.md`](mockups/RULES.md) et [`docs/mockups/APP-COMPONENT-INVENTORY.md`](mockups/APP-COMPONENT-INVENTORY.md).
+
+**Direction mockups UX : [Clarity v10](mockups/clarity/)** — composants produit + couche session longue durée (`clarity.css`). Entrée : [`docs/mockups/README.md`](mockups/README.md), détail : [`clarity/MOCKUP-DIRECTION.md`](mockups/clarity/MOCKUP-DIRECTION.md). Les itérations Clarity v2–v9 restent une archive (non prolonger).
+
+---
+
+*Dernière mise à jour : Clarity v10 app (apparence + sombre), version **0.2.1**.*
