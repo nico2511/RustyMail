@@ -300,8 +300,7 @@ pub async fn org_apply_proposal_with(
     };
 
     let archive_dest_hint = if matches!(action, OrgSuggestedAction::Archive) {
-        org_resolve_archive_path(path, ids.first().map(|(t, _)| t.as_str()).unwrap_or(""))
-            .ok()
+        org_resolve_archive_path(path, ids.first().map(|(t, _)| t.as_str()).unwrap_or("")).ok()
     } else {
         None
     };

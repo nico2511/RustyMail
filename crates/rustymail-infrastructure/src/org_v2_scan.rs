@@ -20,7 +20,8 @@ const V2_KINDS: &[OrgProposalKind] = &[
     OrgProposalKind::LlmCluster,
 ];
 
-const V2_FOCUS_NOTE: &str = "Inbox ancienne, désinscriptions, transactionnels, doublons cross-folder, \
+const V2_FOCUS_NOTE: &str =
+    "Inbox ancienne, désinscriptions, transactionnels, doublons cross-folder, \
     règles mots-clés, dossiers vides. Les propositions IA n’apparaissent que si le LLM est activé.";
 
 fn kind_allowed(kind: OrgProposalKind) -> bool {

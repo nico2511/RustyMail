@@ -181,9 +181,7 @@ pub use saved_searches::{
     delete_saved_search, get_saved_search, list_saved_searches, mark_saved_search_seen,
     migrate_saved_searches, upsert_saved_search,
 };
-pub use search_history::{
-    clear_search_history, list_search_history, record_search_history,
-};
+pub use search_history::{clear_search_history, list_search_history, record_search_history};
 pub use semantic_search::{
     count_threads_matching_query, embedding_plain_for_message, init_semantic_model_dir,
     reindex_semantic_account, reindex_semantic_mailbox, reindex_semantic_missing,
@@ -1374,10 +1372,7 @@ fn migrate_messages_fts(connection: &Connection) -> Result<(), rusqlite::Error> 
         "ALTER TABLE threads ADD COLUMN priority_score REAL NOT NULL DEFAULT 0",
         [],
     );
-    let _ = connection.execute(
-        "ALTER TABLE threads ADD COLUMN mail_type TEXT",
-        [],
-    );
+    let _ = connection.execute("ALTER TABLE threads ADD COLUMN mail_type TEXT", []);
     Ok(())
 }
 
