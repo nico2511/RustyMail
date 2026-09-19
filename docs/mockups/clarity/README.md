@@ -29,6 +29,12 @@ Itération **v9** : reprend **toute la v8** (Date/Contact, Contraste+, épingler
 - **Couleur** : teal **plein** seulement pour **Envoyer** ; Nouveau / Répondre / Ouvrir = contour ou ghost teal.
 - **Barre** : Focus, Contraste+, Sélection = pills neutres, état actif teal léger.
 
+## Captures courantes
+
+À chaque itération, régénérer les visuels :
+
+- `images/clarity-latest-inbox.png` · `clarity-latest-triage.png` · `clarity-latest-compose.png` · `clarity-latest-thread.png`
+
 ## Intent (inchangé)
 
 Calme, utile, beau sans bruit — couleur pour **l’important** seulement.
