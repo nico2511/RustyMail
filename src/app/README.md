@@ -186,7 +186,8 @@ Découpage progressif du monolithe historique. **`src/main.ts`** enregistre les 
 | `app/mail/mailAttachmentActions.ts` | Téléchargement / ouverture PJ (confirm risque) |
 | `app/mail/appShellRender.ts` | Barrel rendu DOM shell |
 | `app/mail/appShellRenderRefs.ts` | Refs wire (compose, carnet, prefs IA immédiates) |
-| `app/mail/appShellRenderContext.ts` | `registerAppShellWireContext` + `registerRender` |
+| `app/mail/appShellRenderContext.ts` | Barrel `registerAppShellWireContext` |
+| `app/mail/appShellRenderContextRun.ts` | `registerWireEventsContext` + `registerRender(renderAppShell)` |
 | `app/mail/appShellRenderRun.ts` | `renderAppShell` (orchestration) |
 | `app/mail/appShellRenderMarkupRun.ts` | Classes CSS shell, largeur panneau IA, HTML inner |
 | `app/mail/loadBootDeferredPrefs.ts` | Orchestration prefs différées au boot |
@@ -542,7 +543,8 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomContactsAgentRun.ts` | Barrel contacts + dispatch `[data-action]` |
 | `app/mail/wireEventsDomContactsListRun.ts` | Recherche / scroll infini liste contacts |
 | `app/mail/wireEventsDomDataActionDispatchRun.ts` | Clic `data-action`, agent assist, brief dossier |
-| `app/mail/wireEventsDomInboxThreadRun.ts` | Barrel inbox/fil (liste, org, PJ, ton) |
+| `app/mail/wireEventsDomInboxThreadRun.ts` | Barrel inbox/fil (liste, org, PJ, chrome, modales org) |
+| `app/mail/wireEventsDomInboxThreadChromeRun.ts` | Coques modales stop-prop + boutons ton |
 | `app/mail/wireEventsDomInboxListRun.ts` | Navigation liste, moves, sélecteur déplacement |
 | `app/mail/wireEventsDomOrgMailboxRun.ts` | Actions org inline + checkboxes modales confirm |
 | `app/mail/wireEventsDomThreadAttachmentsRun.ts` | PJ fil + hydrate HTML message |
