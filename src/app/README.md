@@ -570,7 +570,10 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomAccountSelectRun.ts` | `#account-select` → `switchActiveAccount` |
 | `app/mail/wireEventsDomAccountEmailPresetRun.ts` | Email domain preset + touch champs serveur |
 | `app/mail/wireEventsDomThreadQaRun.ts` | Saisie Q&A fil (`#thread-qa-input`) |
-| `app/mail/appShellRenderChromeRun.ts` | Capture formulaire compte, scroll/focus post-render shell |
+| `app/mail/appShellRenderChromeRun.ts` | Barrel capture / scroll / focus post-render |
+| `app/mail/appShellRenderAccountsCaptureRun.ts` | Snapshot identité formulaire comptes avant render |
+| `app/mail/appShellRenderScrollRestoreRun.ts` | Scroll sidebar, org, modale IA |
+| `app/mail/appShellRenderFocusRun.ts` | Focus prompt texte + modale recherche |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
 | `app/mail/composeWireActionsRun.ts` | Barrel fermeture compose wire, révision, grammaire |
 | `app/mail/composeWireCloseRun.ts` | Fermer compose sans sauver / sauver et fermer |
