@@ -34,4 +34,9 @@ Toute **nouvelle** itération UX doit soit :
 
 ## Visuels
 
-Chaque changement de mockup ou de doc UX livrable doit inclure une **capture à jour** (`clarity-latest-*.png` ou capture app Tauri / `npm run dev`).
+Chaque changement de mockup ou de doc UX livrable doit inclure une **capture à jour** (`docs/mockups/images/mockups-faithful-inbox.png`, `clarity-latest-*.png` ou capture app Tauri / `npm run dev`).
+
+## Mockup inbox conforme
+
+- Fichier : [`inbox-faithful.html`](inbox-faithful.html) — shell + sidebar + `listRender` (statique).
+- Styles : `../../src/styles/tokens.css` + `../../src/styles.css` uniquement.
