@@ -542,10 +542,14 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomSettingsAiRun.ts` | Délègue à `settingsAiDomWireRun` |
 | `app/mail/wireEventsDomContactsAgentRun.ts` | Barrel contacts + dispatch `[data-action]` |
 | `app/mail/wireEventsDomContactsListRun.ts` | Recherche / scroll infini liste contacts |
-| `app/mail/wireEventsDomDataActionDispatchRun.ts` | Clic `data-action`, agent assist, brief dossier |
+| `app/mail/wireEventsDomDataActionDispatchRun.ts` | Barrel clic `data-action` + change agent/brief |
+| `app/mail/wireEventsDomDataActionClickRun.ts` | Clic `[data-action]` → `handleAction` |
+| `app/mail/wireEventsDomDataActionChangeRun.ts` | Agent skills/mode, mode brief dossier |
 | `app/mail/wireEventsDomInboxThreadRun.ts` | Barrel inbox/fil (liste, org, PJ, chrome, modales org) |
 | `app/mail/wireEventsDomInboxThreadChromeRun.ts` | Coques modales stop-prop + boutons ton |
-| `app/mail/wireEventsDomInboxListRun.ts` | Navigation liste, moves, sélecteur déplacement |
+| `app/mail/wireEventsDomInboxListRun.ts` | Barrel navigation liste + moves |
+| `app/mail/wireEventsDomInboxListNavRun.ts` | Toast, boîtes, ouverture fil, digest |
+| `app/mail/wireEventsDomInboxListMoveRun.ts` | Trash/archive, déplacement fil, `#move-target-select` |
 | `app/mail/wireEventsDomOrgMailboxRun.ts` | Barrel actions org (inline + modales confirm) |
 | `app/mail/wireEventsDomOrgMailboxInlineRun.ts` | Sync / supprimer / ignorer boîtes org v1–v2 |
 | `app/mail/wireEventsDomOrgConfirmModalsRun.ts` | Checkboxes confirmation modales org |
