@@ -658,6 +658,6 @@ Outils : `tools/extract-source.mjs` (source par défaut `app/mail/appModuleRegis
 1. Consolider doc README (doublons table modules) après merge PR #1
 2. ~~Découpage registries / shell~~ — **fait** sur cette branche (`*Run.ts`, plus de `application.ts`)
 3. `@ts-nocheck` DOM wire : typer progressivement `wireEventsDom*`
-4. **Timer `loop-app-slim-e449`** : objectif atteint — à désactiver ; ne plus viser `application.ts` / `deps.ts` (supprimés)
+4. ~~**Timer `loop-app-slim-e449`**~~ — **désactivé** (objectif dégraissage atteint ; `application.ts` / `deps.ts` supprimés)
 
 `npm run verify:ts` · `npm test`
