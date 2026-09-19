@@ -1,6 +1,8 @@
 # Clarity v9 — base v8, triage & clarté d’action
 
-Itération **v9** : reprend **toute la v8** (Date/Contact, Contraste+, épingler, activité, ton, navigation) et ajoute le **flux « à traiter »**.
+> **⚠ Non conforme produit** — CSS et widgets inventés (`clarity.css`). Pour toute UX officielle, suivre [`../RULES.md`](../RULES.md) et les classes réelles (`primary-button`, `thread-row`, etc.). Détail : [`STATUS.md`](STATUS.md).
+
+Itération **v9** : reprend **toute la v8** (exploration uniquement).
 
 ## Nouveautés v9 (vs v8)
 

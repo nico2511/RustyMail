@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>RustyMail — composants produit (référence mockups)</title>
+    <link rel="stylesheet" href="../../src/styles/tokens.css" />
+    <link rel="stylesheet" href="../../src/styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        max-width: 720px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 8px;
+      }
+      p.lead {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 0 0 20px;
+      }
+      section {
+        margin-bottom: 24px;
+        padding: 16px;
+        background: var(--surface);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-weak);
+      }
+      section h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--dim);
+        margin: 0 0 12px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .sample-list {
+        padding: 0;
+        border: 1px solid var(--border-weak);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Composants existants — source de vérité mockups</h1>
+    <p class="lead">
+      Uniquement classes du repo (<code>src/styles.css</code>). Pas de <code>clarity.css</code> ni de widgets inventés.
+    </p>
+
+    <section>
+      <h2>Boutons</h2>
+      <div class="row">
+        <button type="button" class="primary-button" style="padding: 8px 14px">Composer</button>
+        <button type="button" class="ghost-button" style="padding: 6px 12px">Synchroniser</button>
+        <button type="button" class="ghost-button inbox-toolbar-btn" style="padding: 6px 12px">Archiver</button>
+        <button type="button" class="compose-send primary-button" style="padding: 8px 16px">Envoyer</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Ligne inbox (extrait markup)</h2>
+      <div class="sample-list" role="list">
+        <div class="thread-row inbox-thread-row thread-row--unread" role="listitem">
+          <button type="button" class="thread-row-main inbox-thread-row-main">
+            <span class="avatar inbox-thread-avatar" style="background: rgba(111, 122, 111, 0.2); color: var(--sm-primary)">ML</span>
+            <span class="inbox-thread-stack">
+              <span class="inbox-thread-line1"><span class="inbox-thread-from">Marie Lefèvre</span></span>
+              <span class="inbox-thread-subject"><strong>Renouvellement hébergement</strong></span>
+              <p class="thread-preview inbox-thread-preview dim">Confirmer avant vendredi…</p>
+            </span>
+          </button>
+          <div class="inbox-thread-date-col"><time class="dim">08:42</time></div>
+          <div class="thread-row-actions inbox-thread-actions row-actions">
+            <button type="button" class="icon-pill inbox-thread-follow-toggle" title="Suivre">★</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p class="lead">Doc : <code>docs/mockups/RULES.md</code> · <code>APP-COMPONENT-INVENTORY.md</code></p>
+  </body>
+</html>

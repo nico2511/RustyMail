@@ -140,4 +140,12 @@ npm run tauri:dev    # ergonomie réelle desktop
 
 ---
 
+## Mockups & explorations
+
+**Règle (non négociable)** : toute UX mockée ou livrée doit utiliser **uniquement les composants existants** — voir [`docs/mockups/RULES.md`](mockups/RULES.md) et [`docs/mockups/APP-COMPONENT-INVENTORY.md`](mockups/APP-COMPONENT-INVENTORY.md).
+
+Le dossier `docs/mockups/clarity/` est une exploration **non alignée** produit (CSS parallèle) — voir [`clarity/STATUS.md`](mockups/clarity/STATUS.md). Ne pas confondre avec la refonte pastel v0.2.0.
+
+---
+
 *Dernière mise à jour : merge PR #1 → `main`, version **0.2.0**.*
