@@ -561,8 +561,11 @@ Pont **`registerRenderDeps()`** dans `renderDeps.ts` : callbacks câblés via **
 | `app/mail/wireEventsDomComposeBodyRun.ts` | Barrel textarea + toolbar markdown |
 | `app/mail/wireEventsDomComposeBodyTextareaRun.ts` | `#compose-body` input, paste image, Ctrl+B/I/K/U |
 | `app/mail/wireEventsDomComposeMarkdownToolbarRun.ts` | Boutons `[data-md]` |
-| `app/mail/wireEventsDomSearchBarRun.ts` | Barres recherche + commit Enter |
-| `app/mail/wireEventsDomAccountFormRun.ts` | Sélecteur compte, préréglage domaine, champs serveur |
+| `app/mail/wireEventsDomSearchBarRun.ts` | Barrel `#search-input` / modale |
+| `app/mail/wireEventsDomSearchBarFieldRun.ts` | Focus, draft, Enter / search → commit |
+| `app/mail/wireEventsDomAccountFormRun.ts` | Barrel formulaire compte réglages |
+| `app/mail/wireEventsDomAccountSelectRun.ts` | `#account-select` → `switchActiveAccount` |
+| `app/mail/wireEventsDomAccountEmailPresetRun.ts` | Email domain preset + touch champs serveur |
 | `app/mail/wireEventsDomThreadQaRun.ts` | Saisie Q&A fil (`#thread-qa-input`) |
 | `app/mail/appShellRenderChromeRun.ts` | Capture formulaire compte, scroll/focus post-render shell |
 | `app/mail/composeViewWireActions.ts` | Entrée vue compose (`enterComposeView`, session, preview layout) |
