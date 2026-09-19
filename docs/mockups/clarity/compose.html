@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v4 — Compose</title>
+    <title>Clarity v5 — Compose</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -14,14 +14,22 @@
     </nav>
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand"><strong>RustyMail</strong></div>
-        <button type="button" class="nav-item active">Reçus</button>
+        <div class="brand">
+          <span class="brand-full"><strong>RustyMail</strong></span>
+          <span class="brand-rail">RM</span>
+        </div>
+        <button type="button" class="nav-item active" data-short="R"><span class="nav-label">Reçus</span></button>
+        <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Réduire le panneau">◀</button>
       </aside>
       <header class="topbar">
         <a class="back" href="thread.html">← Fil</a>
         <span style="font-size: 13px; font-weight: 600; color: var(--text); margin-left: 8px">Réponse</span>
       </header>
       <main class="main">
+        <div class="send-toast" data-send-toast role="status">
+          <span><strong>Envoi dans 5 s</strong> — vous pouvez encore annuler</span>
+          <button type="button" class="undo" data-send-undo>Annuler l’envoi</button>
+        </div>
         <div class="sheet" data-compose-sheet>
           <div class="compose-tabs" data-compose-tabs role="tablist">
             <button type="button" class="is-on" data-tab="edit" role="tab">Rédaction</button>
@@ -43,10 +51,10 @@
             <p>Merci,</p>
           </div>
           <div class="sheet-foot">
-            <span class="hint">⌘↵ envoyer · onglet Aperçu avant envoi</span>
+            <span class="hint">⌘↵ envoie · délai 5 s avec annulation</span>
             <div>
               <button type="button" class="btn-ghost">Affiner</button>
-              <button type="button" class="btn-primary">Envoyer</button>
+              <button type="button" class="btn-primary" data-send-trigger>Envoyer</button>
             </div>
           </div>
         </div>

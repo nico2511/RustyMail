@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clarity v4 — Fil</title>
+    <title>Clarity v5 — Fil</title>
     <link rel="stylesheet" href="clarity.css" />
   </head>
   <body>
@@ -14,28 +14,39 @@
     </nav>
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand"><strong>RustyMail</strong></div>
-        <button type="button" class="nav-item active">Reçus</button>
+        <div class="brand">
+          <span class="brand-full"><strong>RustyMail</strong></span>
+          <span class="brand-rail">RM</span>
+        </div>
+        <button type="button" class="nav-item active" data-short="R"><span class="nav-label">Reçus</span></button>
+        <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Réduire le panneau">◀</button>
       </aside>
       <header class="topbar">
         <a class="back" href="inbox.html">← Reçus</a>
         <label class="search-wrap" style="max-width: 280px; margin: 0">
           <input type="search" placeholder="Dans le fil" />
         </label>
+        <div class="topbar-actions">
+          <button type="button" class="btn-ghost">Archiver</button>
+          <a class="btn-primary btn-primary--soft" href="compose.html" style="text-decoration: none">Répondre</a>
+        </div>
       </header>
       <main class="main thread-wrap">
         <h1>Renouvellement hébergement</h1>
         <p class="sub">Marie Lefèvre · 2 messages · <span style="color: var(--primary)">action possible</span></p>
-        <article class="msg">
-          <div class="msg-top">
-            <span class="msg-from">Marie Lefèvre</span>
-            <span class="msg-date">18 sept. 09:12</span>
-          </div>
-          <div class="msg-text">
-            Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?
-          </div>
-        </article>
-        <article class="msg">
+        <details class="msg-fold">
+          <summary>Message initial · 18 sept. 09:12</summary>
+          <article class="msg">
+            <div class="msg-top">
+              <span class="msg-from">Marie Lefèvre</span>
+              <span class="msg-date">18 sept. 09:12</span>
+            </div>
+            <div class="msg-text">
+              Bonjour, votre contrat arrive à échéance vendredi. Renouvellement 12 mois au tarif actuel ?
+            </div>
+          </article>
+        </details>
+        <article class="msg msg-highlight">
           <div class="msg-top">
             <span class="msg-from">Vous</span>
             <span class="msg-date">18 sept. 14:03</span>
@@ -56,7 +67,8 @@
           <button type="button" class="btn-primary">Envoyer</button>
         </form>
       </div>
-      <footer class="statusbar"><span>Entrée envoie · Échap retour liste</span></footer>
+      <footer class="statusbar"><span>Entrée envoie · historique replié par défaut</span></footer>
     </div>
+    <script src="mockup.js"></script>
   </body>
 </html>
