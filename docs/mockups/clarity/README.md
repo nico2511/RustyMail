@@ -1,6 +1,8 @@
-# Clarity v10 — direction mockups UX (officielle)
+# Clarity v10 — archive
 
-Itération **v10** : base unique pour les maquettes UX du repo — **classes et markup RustyMail** (`tokens.css`, `styles.css`), plus une couche **session longue durée**.
+**Ne plus prolonger.** La direction UX est [`../productivity/`](../productivity/). Ce dossier reste comme historique du shell pastel et des modes session.
+
+Itération **v10** (ancienne base) : classes et markup RustyMail (`tokens.css`, `styles.css`), plus une couche **session longue durée**.
 
 Voir aussi [`MOCKUP-DIRECTION.md`](MOCKUP-DIRECTION.md) et [`../README.md`](../README.md).
 

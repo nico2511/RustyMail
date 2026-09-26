@@ -1,6 +1,8 @@
 # Design & UI
 
-Source of truth for the front end (`src/styles.css`, `src/main.ts`): tokens, Composer / Inbox screens, and known pitfalls. **Implementation wins** over aspirational mockups.
+Source of truth for the **shipped** front end (`src/styles.css`, `src/main.ts`): tokens, Composer / Inbox screens, and known pitfalls. **Implementation wins** over aspirational mockups for what the app does today.
+
+The **next** interface direction is not this pastel system and not Clarity. It is the productivity mockups: [`docs/mockups/productivity/`](mockups/productivity/README.md). Implement that direction; do not extend Clarity.
 
 ## Principles
 

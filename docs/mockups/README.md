@@ -1,28 +1,26 @@
 # Mockups UX — RustyMail
 
-## Direction officielle : **Clarity v10**
+## Direction officielle : productivité
 
-Les maquettes UX suivent **`docs/mockups/clarity/`** (v10) :
+Les maquettes à suivre sont dans **[`productivity/`](productivity/)** :
 
-- Composants et classes **identiques à l’app** (`../../../src/styles/tokens.css`, `styles.css`, markup des `*Render.ts`).
-- **`clarity.css`** : uniquement la barre de navigation entre pages mock + **palette session longue durée** (Douce / Contraste+ / Lavande).
+- [`index.html`](productivity/index.html) → [`inbox.html`](productivity/inbox.html) → [`thread.html`](productivity/thread.html) → [`compose.html`](productivity/compose.html)
+- Langage visuel **neuf** (rail charbon, surface blanche, accent cuivre). Pas les tokens pastel, pas Clarity.
+- Le prochain travail d’interface **implémente cette direction**, il ne prolonge pas Clarity.
 
-**Parcours** : [`clarity/index.html`](clarity/index.html) → `inbox.html` → `thread.html` → `compose.html`.
+Détail : [`productivity/README.md`](productivity/README.md). Captures : `productivity/images/`.
 
-Captures de référence : `clarity/images/clarity-latest-*.png`.
+## Clarity — archive, ne pas continuer
 
-## Règles & inventaire
-
-- [`RULES.md`](RULES.md) — pas de widgets inventés ; composants produit d’abord.
-- [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md) — classes autorisées.
-- [`clarity/STATUS.md`](clarity/STATUS.md) — v10 vs archive v2–v9.
+[`clarity/`](clarity/) (v2–v10, y compris la couche session Douce / Contraste+ / Lavande) est **clos**. Ne pas l’itérer, ne pas s’en servir comme base visuelle.
 
 ## Autres fichiers
 
 | Fichier | Rôle |
 | ------- | ---- |
-| [`inbox-faithful.html`](inbox-faithful.html) | Inbox statique sans couche session (même base que Clarity v10). |
-| [`faithful-components-demo.html`](faithful-components-demo.html) | Planche composants isolée. |
-| `clarity/` v2–v9 (git history) | Exploration historique — **ne pas prolonger**. |
+| [`RULES.md`](RULES.md) | Périmètre des maquettes. La règle « classes de l’app uniquement » vaut pour l’historique fidèle, pas pour `productivity/`. |
+| [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md) | Inventaire du shell actuel — référence de ce qui existe, pas la cible visuelle. |
+| [`inbox-faithful.html`](inbox-faithful.html), [`faithful-components-demo.html`](faithful-components-demo.html) | Gel du shell livré. Pas la direction suivante. |
+| `alternatives/`, `vNext/` | Explorations anciennes. |
 
-Produit livré : refonte pastel **v0.2.0** sur `main` — voir [`../UX-NOTE.md`](../UX-NOTE.md).
+L’app sur `main` a encore le shell pastel. Ces maquettes disent quoi construire ensuite, elles ne décrivent pas le CSS déjà livré.

@@ -1,8 +1,16 @@
 # Règles mockups UX — RustyMail
 
-## Règle absolue
+## Direction en cours
 
-**Toute UX proposée ou mockée doit reposer exclusivement sur les composants et classes déjà présents dans l’application.**
+Les maquettes **[`productivity/`](productivity/)** sont la direction UX officielle. Elles sont **volontairement indépendantes** des classes de l’app, de `tokens.css` et de Clarity : validation visuelle d’abord, implémentation dans `src/` ensuite.
+
+Le prochain travail d’interface implémente **cette** direction. Clarity (v2–v10) est une archive — ne pas la prolonger.
+
+La règle « composants existants uniquement » ci-dessous reste vraie pour les fichiers historiques (`clarity/`, `inbox-faithful.html`). Elle **ne s’applique pas** à `productivity/`.
+
+## Règle historique (fichiers fidèles)
+
+**Les maquettes fidèles au shell livré reposent sur les composants et classes déjà présents dans l’application.**
 
 - **Aucune hallucination** : pas de widgets, palettes, modes ou layouts inventés qui n’existent pas dans le code produit.
 - **Source de vérité** : rendu HTML (`src/app/ui/render/*`), styles (`src/styles.css`, `src/styles/tokens.css`), actions `data-action` câblées dans `wireEventsDom*`.
@@ -23,23 +31,13 @@ Si un besoin UX n’est pas couvert par un composant existant, il faut **d’abo
 | Shell | `appShellRenderMarkupRun.ts`, `docs/UX-NOTE.md` |
 | Inventaire détaillé | [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md) |
 
-## Dossier `clarity/` — **v10 = direction officielle**
+## Dossier `clarity/` — archive
 
-Les mockups UX du repo **partent de Clarity v10** ([`README.md`](clarity/README.md), [`MOCKUP-DIRECTION.md`](clarity/MOCKUP-DIRECTION.md)).
-
-- **Composants** : `tokens.css`, `styles.css`, markup des renderers.
-- **Session** : `clarity.css` (Douce / Contraste+ / Lavande) — propositions palette longue durée.
-
-Les itérations **v2–v9** (teal, split, triage mock…) restent une **archive** — ne pas les prolonger.
-
-Toute **nouvelle** idée UX doit soit :
-
-1. **Itérer Clarity v10** (classes existantes + overrides token documentés dans `clarity/MOCKUP-DIRECTION.md`), ou  
-2. **Implémenter d’abord** dans l’app, puis mettre à jour les HTML Clarity.
+Clarity v2–v10 n’est **plus** la direction. Ne pas itérer ces pages. Voir [`productivity/README.md`](productivity/README.md).
 
 ## Visuels
 
-Chaque changement de mockup ou de doc UX livrable doit inclure une **capture à jour** (`docs/mockups/images/mockups-faithful-inbox.png`, `clarity-latest-*.png` ou capture app Tauri / `npm run dev`).
+Chaque changement des maquettes productivité doit inclure une capture à jour dans `productivity/images/` (`inbox.png`, `thread.png`, `compose.png`).
 
 ## Mockup inbox conforme
 

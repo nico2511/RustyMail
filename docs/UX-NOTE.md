@@ -153,10 +153,12 @@ Prefs : `general.colorScheme`, `sessionComfort`, `contrastPlus`, `accentLavender
 
 ## Mockups & explorations
 
-**Règle (non négociable)** : toute UX mockée ou livrée doit utiliser **uniquement les composants existants** — voir [`docs/mockups/RULES.md`](mockups/RULES.md) et [`docs/mockups/APP-COMPONENT-INVENTORY.md`](mockups/APP-COMPONENT-INVENTORY.md).
+Le shell décrit plus haut est **ce qui est livré** (pastel, Clarity v10). Ce n’est **pas** la direction suivante.
 
-**Direction mockups UX : [Clarity v10](mockups/clarity/)** — composants produit + couche session longue durée (`clarity.css`). Entrée : [`docs/mockups/README.md`](mockups/README.md), détail : [`clarity/MOCKUP-DIRECTION.md`](mockups/clarity/MOCKUP-DIRECTION.md). Les itérations Clarity v2–v9 restent une archive (non prolonger).
+**Direction UX à implémenter : [`docs/mockups/productivity/`](mockups/productivity/)** — réception, fil, rédaction. Clarity (v2–v10) est archivée, à ne pas continuer. Entrée : [`docs/mockups/README.md`](mockups/README.md).
+
+L’inventaire des composants actuels reste dans [`APP-COMPONENT-INVENTORY.md`](mockups/APP-COMPONENT-INVENTORY.md). Il décrit l’app d’aujourd’hui, pas les maquettes productivité.
 
 ---
 
-*Dernière mise à jour : Clarity v10 sur `main`, version **0.2.2** (release Windows : tag `v0.2.2`).*
+*Dernière mise à jour : direction mockups productivité. L’app livrée reste la 0.2.2 (shell pastel / Clarity v10) jusqu’à l’implémentation de cette direction.*
