@@ -135,6 +135,18 @@ pub fn validate_proposal_id(proposal_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Identifiant de lot Organize (UUID) réutilisé entre les chunks d’un même apply V2.
+pub fn validate_org_batch_id(batch_id: &str) -> Result<(), String> {
+    let t = batch_id.trim();
+    if t.is_empty() || t.len() > 80 {
+        return Err("batchId: identifiant invalide.".into());
+    }
+    if !t.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+        return Err("batchId: caractères interdits.".into());
+    }
+    Ok(())
+}
+
 /// Liste optionnelle de fils / dossiers pour un apply partiel.
 pub fn validate_org_thread_ids(thread_ids: Option<&[String]>) -> Result<(), String> {
     let Some(ids) = thread_ids else {

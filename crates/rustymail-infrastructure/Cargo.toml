@@ -18,7 +18,8 @@ keyring-core = "1.0.0"
 async-imap = { version = "0.11.2", default-features = false, features = ["runtime-tokio"] }
 async-native-tls = { version = "0.5.0", default-features = false, features = ["runtime-tokio"] }
 tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros", "fs", "sync", "time"] }
-socket2 = "0.5"
+# Feature `all` : débloque `Socket::set_reuse_port` (SO_REUSEPORT loopback OAuth). Flag vide, pas de deps extra.
+socket2 = { version = "0.5", features = ["all"] }
 futures = "0.3.31"
 mailparse = "0.15.0"
 serde = { workspace = true }

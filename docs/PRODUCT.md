@@ -12,7 +12,7 @@ RustyMail (formerly planned as “RustMaily”) is a **readability-first, local-
 ## Non-goals
 
 - Replacing webmail for every power-user workflow on day one
-- Embedding llama.cpp inside the desktop binary (generative AI uses **HTTP** to llama-server or OpenRouter)
+- Embedding llama.cpp inside the desktop binary (generative AI uses **HTTP** to llama-server, Ollama, or OpenRouter)
 - Shipping a RustyMail OAuth **backend** or bundling a runtime `.env` in installers
 - Treating Google Desktop `client_secret` as a confidential server secret (Google documents it as non-confidential for installed apps; still required for token exchange with PKCE)
 ## Core experience

@@ -64,7 +64,7 @@ Optional product capabilities:
 
 ### `rustymail-llm`
 
-HTTP client for `/v1/chat/completions` (OpenRouter, llama-server, other OpenAI-compatible endpoints). Privacy redaction before third-party exfiltration.
+HTTP client for `/v1/chat/completions` (OpenRouter, llama-server, Ollama). Privacy redaction before third-party exfiltration. GBNF is llama-server only.
 
 ### `rustymail-semantic`
 

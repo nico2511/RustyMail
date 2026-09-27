@@ -62,7 +62,10 @@ Front-end reads via **`invokeAiCacheGet`** (`ipc_bridge.ts`) with dedup and time
 | `set_app_prefs` | W file | AI URL validation |
 | LLM commands | W cache / Net | `llm_gate`; JSON validators; untrusted mail wrapper |
 | `ai_cache_get` | R | Validated keys only |
-| Org center apply | Net+W | Trash/delete mailbox backend acks |
+| Org center apply | Net+W | Trash/delete mailbox backend acks ; optional `batchId` (hex UUID) shared across V2 chunks |
+| Org v2 scan | Net (LLM) | Heuristics are prompt context. Response is a validated orientation or a status message; proposals shown are LLM actions only |
+| Updater plugin | Net | Capabilities `updater:default` (check, download, install). Downloads happen in Rust, not the WebView. No install without a user click. |
+| Process restart | Sys | `process:allow-restart` only — `process:allow-exit` is not granted |
 | Demo account reset/remove | W | Scoped to `playground@demo.rustymail.app` |
 
 ## Command families (status)
@@ -85,7 +88,7 @@ Front-end reads via **`invokeAiCacheGet`** (`ipc_bridge.ts`) with dedup and time
 | Aspect | Behavior |
 | ------ | -------- |
 | `generate_json` | JSON extraction + deserialize; optional GBNF merge |
-| GBNF grammar | Sent to **llama-server** only; ignored on OpenRouter |
+| GBNF grammar | Sent to **llama-server** only; ignored on OpenRouter and Ollama |
 | Business validation | Callers + `ai_llm_contracts` — see [LLM_CONTRACTS.md](LLM_CONTRACTS.md) |
 
 ## Local CI regression targets

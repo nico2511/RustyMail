@@ -23,6 +23,10 @@ Before publishing an installable bundle (MSI/NSIS):
 
 8. Run `cargo audit` (CI [`.github/workflows/cargo-audit.yml`](../.github/workflows/cargo-audit.yml)); fix or document exceptions.
 
+### Updater
+
+8b. The minisign **private** key exists only as the GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY` (optional password secret). It is not in the repo, the installer, or release notes. The matching **public** key is the `plugins.updater.pubkey` string in `tauri.conf.json`. Until that placeholder is replaced, clients cannot verify updates. See [RELEASE.md](RELEASE.md).
+
 ### Local data
 
 9. After upgrade: confirm `rustymail.sqlite3` opens (SQLCipher migration) and `*.pre-sqlcipher.bak` exists if a plaintext DB was migrated.
@@ -66,8 +70,8 @@ Module `crates/rustymail-llm/src/privacy.rs` redacts when `LlmEngine::exfiltrate
 - Emails, phones, IBAN, cards, Bearer/JWT tokens, `message_id=` prefixes
 
 **Always redacted:** OpenRouter  
-**Redacted:** non-loopback OpenAI-compatible URLs  
-**Not redacted:** llama-server on loopback (`127.0.0.1`, `localhost`, `[::1]`)
+**Redacted:** non-loopback OpenAI-compatible URLs (llama-server or Ollama)  
+**Not redacted:** llama-server or Ollama on loopback (`127.0.0.1`, `localhost`, `[::1]`)
 
 ### AI cache
 

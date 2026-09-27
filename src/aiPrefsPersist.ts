@@ -23,6 +23,10 @@ export function syncLlmEnginePrefsToDom(ai: AppPrefsAi): void {
   set("prefs-openrouter-enabled", ai.openrouterEnabled);
   set("prefs-llama-server-enabled", ai.llamaServerEnabled);
   set("prefs-ai-cloud-fallback", ai.aiCloudLlmFallback);
+  const olUrl = document.querySelector<HTMLInputElement>("#prefs-ollama-base-url");
+  if (olUrl) olUrl.value = ai.ollamaBaseUrl;
+  const olModel = document.querySelector<HTMLInputElement>("#prefs-ollama-model");
+  if (olModel) olModel.value = ai.ollamaModel;
 }
 
 function captureAiFeatureTogglesInto(ai: AppPrefs["ai"]): void {
@@ -127,6 +131,14 @@ export function captureAiPrefsFieldsFromDom(target: AppPrefs): void {
     );
     target.ai.llamaServerBinaryPath =
       document.querySelector<HTMLInputElement>("#prefs-llama-server-binary-path")?.value?.trim() ?? "";
+  }
+
+  const olUrl = document.querySelector<HTMLInputElement>("#prefs-ollama-base-url");
+  if (olUrl) {
+    target.ai.ollamaBaseUrl = olUrl.value.trim() || dAi.ollamaBaseUrl;
+    target.ai.ollamaModel =
+      document.querySelector<HTMLInputElement>("#prefs-ollama-model")?.value?.trim() ?? "";
+    target.ai.ollamaEnabled = target.ai.chatBackend === "ollama";
   }
 
   const localRepo = document.querySelector<HTMLInputElement>("#prefs-local-llm-repo");

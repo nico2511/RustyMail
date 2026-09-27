@@ -8,11 +8,12 @@ use rustymail_domain::{
 use rustymail_infrastructure::{
     ai_feature_enabled, enrich_org_report_llm_refs, ignore_mailbox, load_accounts, load_app_prefs,
     move_thread_unarchive, open_sqlite_migrated_public, org_apply_proposal_with,
-    org_llm_proposals_for_account, org_preview_proposal, org_resolve_archive_path,
-    org_retag_account, org_retag_threads, org_scan_account, org_undo_last_batch,
-    org_v2_scan_account, post_move_heuristic_refresh, prepare_org_proposal_for_apply,
-    preview_auto_archive_candidates, record_proposal_decision, resolve_apply_action,
-    run_auto_archive_rules, unignore_mailbox, validate_org_apply_thread_ids, AiFeature,
+    org_llm_orientation_for_account, org_llm_proposals_for_account, org_preview_proposal,
+    org_resolve_archive_path, org_retag_account, org_retag_threads, org_scan_account,
+    org_undo_last_batch, org_v2_scan_account, org_v2_with_llm_outcome, post_move_heuristic_refresh,
+    prepare_org_proposal_for_apply, preview_auto_archive_candidates, record_proposal_decision,
+    resolve_apply_action, run_auto_archive_rules, unignore_mailbox, validate_org_apply_thread_ids,
+    AiFeature,
 };
 use tauri::State;
 
@@ -46,6 +47,9 @@ pub struct OrgApplyPayload {
     /// Carte affichée côté UI (obligatoire pour `llm-*`, recommandé pour toutes les cartes).
     #[serde(default)]
     pub proposal_snapshot: Option<OrgProposal>,
+    /// Même identifiant pour tous les chunks d’un apply V2 (undo d’un seul lot).
+    #[serde(default)]
+    pub batch_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -67,6 +71,8 @@ pub struct OrgRetagThreadsPayload {
 #[serde(rename_all = "camelCase")]
 pub struct OrgArchivePathPayload {
     pub thread_id: String,
+    #[serde(default)]
+    pub account_id: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -154,10 +160,11 @@ fn org_scan_account_compute(
             match build_llm_engine(&prefs, paths) {
                 Ok(mut engine) => {
                     let lang = prefs.general.mother_language.as_str();
+                    let heuristics = report.proposals.clone();
                     match org_llm_proposals_for_account(
                         &paths.db_path,
                         account_id,
-                        report.proposals.len(),
+                        &heuristics,
                         &mut engine,
                         lang,
                     ) {
@@ -279,6 +286,9 @@ pub async fn org_apply_proposal_cmd(
     if effective_action == OrgSuggestedAction::DeleteMailbox {
         ipc_guard::validate_delete_mailbox_ack(payload.delete_mailbox_ack.as_deref())?;
     }
+    if let Some(ref batch_id) = payload.batch_id {
+        ipc_guard::validate_org_batch_id(batch_id)?;
+    }
 
     let db = paths.db_path.clone();
     let thread_ids = payload.thread_ids.clone();
@@ -288,6 +298,7 @@ pub async fn org_apply_proposal_cmd(
         proposal,
         thread_ids,
         payload.action_override.as_deref(),
+        payload.batch_id.as_deref(),
     )
     .await?;
 
@@ -358,11 +369,98 @@ pub async fn org_resolve_archive_path_cmd(
     payload: OrgArchivePathPayload,
 ) -> Result<String, String> {
     ipc_guard::validate_thread_id(&payload.thread_id)?;
+    if !payload.account_id.trim().is_empty() {
+        ipc_guard::validate_account_id(&payload.account_id)?;
+    }
     let db = paths.db_path.clone();
     let thread_id = payload.thread_id.clone();
-    tauri::async_runtime::spawn_blocking(move || org_resolve_archive_path(&db, &thread_id))
-        .await
-        .map_err(|e| format!("org archive path join: {e}"))?
+    let account_id = payload.account_id.trim().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        org_resolve_archive_path(&db, &account_id, &thread_id)
+    })
+    .await
+    .map_err(|e| format!("org archive path join: {e}"))?
+}
+
+const ORG_V2_LLM_DISABLED: &str = "Organiser a besoin du LLM pour une orientation. Activez « Propositions Organiser » dans Paramètres → IA. Aucune orientation n’a été inventée.";
+
+fn org_v2_llm_unavailable(err: &str) -> String {
+    format!(
+        "Orientation indisponible : {err}. Aucune orientation de remplacement n’a été produite."
+    )
+}
+
+/// Scan v2 : heuristiques en contexte, sortie utilisateur = orientation LLM validée.
+fn org_v2_scan_account_compute(
+    paths: &AppPaths,
+    account_id: &str,
+) -> Result<OrgV2ScanReport, String> {
+    let heuristic = org_v2_scan_account(&paths.db_path, account_id)?;
+    let heuristics = heuristic.proposals.clone();
+    let mut llm_status = OrgScanLlmStatus {
+        requested: true,
+        ..OrgScanLlmStatus::default()
+    };
+    let prefs = load_app_prefs(&paths.prefs_path);
+    if !ai_feature_enabled(&prefs.ai, AiFeature::OrgProposals) {
+        llm_status.message = Some(ORG_V2_LLM_DISABLED.into());
+        return org_v2_with_llm_outcome(
+            &paths.db_path,
+            account_id,
+            heuristic,
+            None,
+            Vec::new(),
+            llm_status,
+        );
+    }
+    llm_status.enabled = true;
+    let lang = prefs.general.mother_language.clone();
+    match build_llm_engine(&prefs, paths) {
+        Ok(mut engine) => {
+            match org_llm_orientation_for_account(
+                &paths.db_path,
+                account_id,
+                &heuristics,
+                &mut engine,
+                lang.as_str(),
+            ) {
+                Ok((orientation, actions)) => {
+                    llm_status.succeeded = true;
+                    llm_status.proposal_count = actions.len();
+                    org_v2_with_llm_outcome(
+                        &paths.db_path,
+                        account_id,
+                        heuristic,
+                        Some(orientation),
+                        actions,
+                        llm_status,
+                    )
+                }
+                Err(e) => {
+                    llm_status.message = Some(org_v2_llm_unavailable(&e));
+                    org_v2_with_llm_outcome(
+                        &paths.db_path,
+                        account_id,
+                        heuristic,
+                        None,
+                        Vec::new(),
+                        llm_status,
+                    )
+                }
+            }
+        }
+        Err(e) => {
+            llm_status.message = Some(org_v2_llm_unavailable(&e));
+            org_v2_with_llm_outcome(
+                &paths.db_path,
+                account_id,
+                heuristic,
+                None,
+                Vec::new(),
+                llm_status,
+            )
+        }
+    }
 }
 
 #[tauri::command]
@@ -371,28 +469,12 @@ pub async fn org_v2_scan_account_cmd(
     payload: OrgV2ScanPayload,
 ) -> Result<OrgV2ScanReport, String> {
     ipc_guard::validate_account_id(&payload.account_id)?;
-    let db = paths.db_path.clone();
+    let _include_llm = payload.include_llm;
+    let paths = std::clone::Clone::clone(&*paths);
     let account_id = payload.account_id.trim().to_string();
-    let include_llm = payload.include_llm;
-    let paths_clone = std::clone::Clone::clone(&*paths);
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut report = org_v2_scan_account(&db, &account_id)?;
-        if include_llm {
-            // Enrichir avec LLM si gate OK, puis re-filtrer via kinds V2 (LlmCluster inclus).
-            if let Ok(full) = org_scan_account_compute(&paths_clone, &account_id, true) {
-                for p in full.proposals {
-                    if matches!(p.kind, rustymail_domain::OrgProposalKind::LlmCluster)
-                        && !report.proposals.iter().any(|x| x.id == p.id)
-                    {
-                        report.proposals.push(p);
-                    }
-                }
-            }
-        }
-        Ok(report)
-    })
-    .await
-    .map_err(|e| format!("org v2 scan join: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || org_v2_scan_account_compute(&paths, &account_id))
+        .await
+        .map_err(|e| format!("org v2 scan join: {e}"))?
 }
 
 #[tauri::command]

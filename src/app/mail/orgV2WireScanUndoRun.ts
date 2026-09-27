@@ -1,7 +1,7 @@
 import type { OrgApplyProgress } from "../../organizationView";
 import { orgUndoLast } from "../../organizationView";
 import type { OrgV2ScanReport } from "../../organizationViewV2";
-import { orgV2ScanAccount } from "../../organizationViewV2";
+import { orgV2ScanAccount, orgV2ScanStatusLine } from "../../organizationViewV2";
 import { currentAccount } from "../core/accountContext";
 import { render } from "../dispatch";
 import { state } from "../state";
@@ -16,12 +16,11 @@ export function tryHandleOrgV2ScanUndoWire(action: string): boolean {
       state.organizationV2.scanning = true;
       state.organizationV2.applyMessage = "Analyse…";
       render();
-      const includeLlm = Boolean(state.appPrefs.ai.featureOrgProposalsEnabled);
-      void orgV2ScanAccount(acc.id, includeLlm)
+      void orgV2ScanAccount(acc.id, true)
         .then((report: OrgV2ScanReport) => {
           state.organizationV2.report = report;
           state.organizationV2.scanning = false;
-          state.organizationV2.applyMessage = `${report.proposals.length} action(s).`;
+          state.organizationV2.applyMessage = orgV2ScanStatusLine(report);
           render();
         })
         .catch((e: unknown) => {

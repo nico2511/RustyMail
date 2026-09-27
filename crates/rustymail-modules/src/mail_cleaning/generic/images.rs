@@ -35,7 +35,7 @@ pub fn is_tracking_or_hidden_img(el: ElementRef<'_>) -> bool {
     let tiny = pixel_dimensions_only(el);
     let tracker_host = known_tracker_host(&s);
 
-    if tiny && tracker_host {
+    if tracker_host && (tiny || tracker_pixel_dimensions(el)) {
         return true;
     }
     if tiny && presentation_role(el) {
@@ -98,9 +98,18 @@ fn presentation_role(el: ElementRef<'_>) -> bool {
 }
 
 fn pixel_dimensions_only(el: ElementRef<'_>) -> bool {
+    dims_at_most(el, 1)
+}
+
+/// Pixels de tracking un peu plus grands que 1×1 (2×2, 3×3) — seulement avec un hôte tracker.
+fn tracker_pixel_dimensions(el: ElementRef<'_>) -> bool {
+    dims_at_most(el, 3)
+}
+
+fn dims_at_most(el: ElementRef<'_>, max: u32) -> bool {
     let w = el.attr("width").and_then(parse_dim);
     let h = el.attr("height").and_then(parse_dim);
-    matches!((w, h), (Some(w), Some(h)) if w <= 1 && h <= 1) || dims_from_style_tiny(el)
+    matches!((w, h), (Some(w), Some(h)) if w <= max && h <= max) || dims_from_style_at_most(el, max)
 }
 
 fn parse_dim(raw: &str) -> Option<u32> {
@@ -108,7 +117,7 @@ fn parse_dim(raw: &str) -> Option<u32> {
     t.parse().ok()
 }
 
-fn dims_from_style_tiny(el: ElementRef<'_>) -> bool {
+fn dims_from_style_at_most(el: ElementRef<'_>, max: u32) -> bool {
     let Some(style) = el.attr("style") else {
         return false;
     };
@@ -123,7 +132,7 @@ fn dims_from_style_tiny(el: ElementRef<'_>) -> bool {
             h = parse_css_len(rest);
         }
     }
-    matches!((w, h), (Some(0..=1), Some(0..=1)))
+    matches!((w, h), (Some(w), Some(h)) if w <= max && h <= max)
 }
 
 fn parse_css_len(raw: &str) -> Option<u32> {
@@ -153,6 +162,22 @@ mod tests {
         let img = doc.select(&Selector::parse("img").unwrap()).next().unwrap();
         assert!(is_outlook_noise_img(img));
         assert!(is_tracking_or_hidden_img(img));
+    }
+
+    #[test]
+    fn removes_2x2_tracker_host_pixel() {
+        let html = r#"<img src="https://track.example/open.gif" width="2" height="2" alt=""/>"#;
+        let doc = Html::parse_fragment(html);
+        let img = doc.select(&Selector::parse("img").unwrap()).next().unwrap();
+        assert!(is_tracking_or_hidden_img(img));
+    }
+
+    #[test]
+    fn keeps_2x2_without_tracker_host() {
+        let html = r#"<img src="https://cdn.example/spacer.png" width="2" height="2" alt=""/>"#;
+        let doc = Html::parse_fragment(html);
+        let img = doc.select(&Selector::parse("img").unwrap()).next().unwrap();
+        assert!(!is_tracking_or_hidden_img(img));
     }
 
     #[test]

@@ -25,6 +25,11 @@ src-tauri/app-icon.png
 .env
 .env.local
 
+# Clé privée updater Tauri (minisign). La clé publique vit dans tauri.conf.json.
+*.key
+src-tauri/*.key
+src-tauri/*.key.pub
+
 # Debug / local logs
 *.log
 debug-*.log

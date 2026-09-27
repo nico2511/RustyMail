@@ -18,13 +18,39 @@ export type OrgV2MemorySummary = {
   ignoredMailboxes: string[];
 };
 
+export type OrgOrientation = {
+  diagnosis: string;
+  recommendations: string[];
+};
+
+export type OrgScanLlmStatus = {
+  requested?: boolean;
+  enabled?: boolean;
+  succeeded?: boolean;
+  proposalCount?: number;
+  message?: string | null;
+};
+
 export type OrgV2ScanReport = {
   proposals: OrgProposal[];
   stats: { threadCount: number; mailboxCount: number };
   mailboxStructure: OrgScanReport["mailboxStructure"];
   memory: OrgV2MemorySummary;
   focusNote: string;
+  orientation?: OrgOrientation | null;
+  llmStatus?: OrgScanLlmStatus | null;
 };
+
+/** Ligne d’état après un scan : orientation réelle, ou message sans diagnostic inventé. */
+export function orgV2ScanStatusLine(report: OrgV2ScanReport): string {
+  if (report.orientation?.diagnosis?.trim()) {
+    const n = report.proposals.length;
+    return n > 0
+      ? `${n} action(s) proposée(s) par l’orientation.`
+      : "Orientation prête, aucune action groupée.";
+  }
+  return report.llmStatus?.message?.trim() || "Orientation indisponible. Aucun diagnostic n’a été inventé.";
+}
 
 export type OrganizationV2ViewState = {
   scanning: boolean;
@@ -257,28 +283,56 @@ export function renderOrganizationV2View(
           </ul>
         </div>`;
 
-  const memoryBanner = report
-    ? `<p class="org-v2-memory dim" role="status">
+  const orientation = report?.orientation ?? null;
+  const llmMessage = report?.llmStatus?.message?.trim() ?? "";
+  const memoryBanner =
+    report && orientation
+      ? `<p class="org-v2-memory dim" role="status">
         ${report.memory.suppressedCount > 0 ? `${report.memory.suppressedCount} proposition(s) masquée(s) par la mémoire. ` : ""}
         ${report.focusNote}
       </p>${ignoredListHtml}`
-    : "";
+      : ignoredListHtml;
 
-  const cards = report?.proposals ?? [];
+  const orientationHtml = orientation
+    ? `<section class="org-orientation" aria-label="Orientation">
+        <h2 class="thread-kicker">Orientation</h2>
+        <p class="org-orientation__diagnosis">${escapeHtml(orientation.diagnosis)}</p>
+        ${
+          orientation.recommendations.length > 0
+            ? `<ul class="org-orientation__recs">${orientation.recommendations
+                .map((rec) => `<li>${escapeHtml(rec)}</li>`)
+                .join("")}</ul>`
+            : ""
+        }
+      </section>`
+    : llmMessage
+      ? `<p class="org-orientation-status" role="status">${escapeHtml(llmMessage)}</p>`
+      : "";
+
+  const cards = orientation ? (report?.proposals ?? []) : [];
   const cardsHtml =
     cards.length === 0
-      ? `<p class="dim org-empty">Aucune action en attente. Les cartes déjà traitées ou reportées ne réapparaissent pas.</p>`
+      ? orientation
+        ? `<p class="dim org-empty">Aucune action groupée dans cette orientation.</p>`
+        : report
+          ? ""
+          : `<p class="dim org-empty">Aucune action en attente.</p>`
       : cards
           .map((p) => {
             const threadSamples = dedupeThreadRefs(p.threadRefs);
             const mailboxSamples = p.threadRefs.filter((r) => isMailboxRef(r)).slice(0, 12);
             const rowSamples = [...threadSamples, ...mailboxSamples].slice(0, 12);
             const samplesHtml = rowSamples.map((r) => renderThreadSample(r, p)).join("");
-            const mailboxes = [...new Set(p.threadRefs.map((r) => r.mailbox?.trim()).filter(Boolean))] as string[];
+            const mailboxesAll = [...new Set(p.threadRefs.map((r) => r.mailbox?.trim()).filter(Boolean))] as string[];
+            const mailboxes = mailboxesAll.slice(0, 8);
+            const moreMailboxes = mailboxesAll.length - mailboxes.length;
             const mailboxChipsHtml =
               mailboxes.length > 0
-                ? `<div class="org-mailbox-chips">${mailboxes.map((mb) => mailboxChip(mb)).join("")}</div>`
+                ? `<div class="org-mailbox-chips">${mailboxes.map((mb) => mailboxChip(mb)).join("")}${
+                    moreMailboxes > 0 ? `<span class="dim">+ ${moreMailboxes} dossier(s)</span>` : ""
+                  }</div>`
                 : "";
+            const hiddenSamples = Math.max(0, (p.totalCount ?? 0) - rowSamples.length);
             const advisoryOnly = !isProposalApplicable(p);
             const countLabel =
               mailboxSamples.length > 0 || (p.threadRefs[0] && isMailboxRef(p.threadRefs[0]))
@@ -305,6 +359,11 @@ export function renderOrganizationV2View(
                   : advisoryOnly
                     ? `<p class="dim">Conseil structurel — pas d’application automatique.</p>`
                     : ""
+              }
+              ${
+                !advisoryOnly && hiddenSamples > 0
+                  ? `<p class="dim org-sample-hint">${hiddenSamples} autre(s) inclus dans l’action, non listés ici.</p>`
+                  : ""
               }
               <div class="org-card__actions org-card__actions--multi org-card__actions--v2">
                 ${
@@ -369,7 +428,7 @@ export function renderOrganizationV2View(
         <div class="inbox-appbar-intro">
           ${navRenderTrailHtml("Organiser V2", escapeHtml, escapeAttr, { navClass: "secondary-view-nav" })}
           <h1 class="organization-title inbox-mailbox-title">${iconSvg("archive")}<span>Organiser</span></h1>
-          <p class="dim organization-lead">Nettoyage actionable : inbox ancienne, désinscriptions, doublons, transactionnels. Annulation possible après apply.</p>
+          <p class="dim organization-lead">L’analyse demande une orientation au LLM : diagnostic, recommandations, actions. Sans modèle joignable, aucun conseil n’est inventé.</p>
         </div>
       </div>
       <div class="organization-toolbar">
@@ -379,7 +438,7 @@ export function renderOrganizationV2View(
         <button type="button" class="ghost-button" data-action="org-v2-undo" ${state.applying || state.scanning ? "disabled" : ""}>
           Annuler le dernier lot
         </button>
-        ${report ? `<span class="dim"> ${report.proposals.length} action(s) · ${report.stats.threadCount} fils</span>` : ""}
+        ${report ? `<span class="dim"> ${orientation ? `${report.proposals.length} action(s)` : "pas d’orientation"} · ${report.stats.threadCount} fils</span>` : ""}
       </div>
       ${
         state.applyMessage
@@ -393,7 +452,8 @@ export function renderOrganizationV2View(
       ${memoryBanner}
     </header>
     <div class="inbox-panel surface organization-panel organization-v2-panel">
-      ${report ? `<div class="org-cards org-cards--v2">${cardsHtml}</div>` : `<p class="dim org-hint">Lancez une analyse pour voir la file d’actions.</p>`}
+      ${orientationHtml}
+      ${report ? `<div class="org-cards org-cards--v2">${cardsHtml}</div>` : `<p class="dim org-hint">Lancez une analyse pour obtenir une orientation.</p>`}
       ${trashModal}
       ${deleteMailboxModal}
       <p class="org-v2-affiner-note dim">Pour structurer un flux par critères, utilisez les <strong>vues enregistrées</strong>. Le bouton <strong>Affiner</strong> (LLM) apparaît sous une recherche ou vue ouverte — nécessite « Propositions Organiser (LLM) » dans Paramètres → IA.</p>

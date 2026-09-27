@@ -37,7 +37,7 @@ RustyMail is a **local-first desktop mail client**: **IMAP** sync, **SMTP** send
 | Folder management | Create, rename, delete, subscribe on IMAP |
 | Pagination | SQL `LIMIT`/`OFFSET` thread list + “Load more” |
 | Trash | Move to Trash + empty trash |
-| **Organization center** | Sidebar “Organize”: heuristic scan, batch cards (stale inbox, unsubscribe candidates, cross-folder duplicates, tags…), hierarchical archive `Archive/YYYY/MM-month`, LLM proposals when enabled |
+| **Organization center** | Sidebar “Organiser V2”: heuristics prepare context only. The view shows an LLM orientation (diagnosis, recommendations, proposed actions) validated in Rust. If the model is unreachable, a status message is shown and no orientation is invented. Tag normalization stays on Organiser v1. Archive `Archive/YYYY/MM-month`. Mail core does not require the LLM |
 
 ---
 
@@ -58,7 +58,7 @@ RustyMail is a **local-first desktop mail client**: **IMAP** sync, **SMTP** send
 Opening a message produces a `CleanedMessageView`:
 
 - **Text:** signature stripping, quote folding, entity/tag extraction
-- **HTML:** provider pipelines — generic, **Amazon**, **Deblock**
+- **HTML:** provider pipelines — generic, **Amazon**, **Deblock**, **GitHub** digests
 - **Security:** heuristic `mail_security` (SPF/DKIM/DMARC, attachments, punycode, composite score); optional LLM augment merges without removing hard signals — see [IPC_SECURITY.md](IPC_SECURITY.md)
 
 ---
@@ -104,7 +104,7 @@ Opening a message produces a `CleanedMessageView`:
 
 ## Generative AI (HTTP)
 
-No in-process llama.cpp. Calls via HTTP to OpenRouter and/or llama-server.
+No in-process llama.cpp. Calls via HTTP to OpenRouter, llama-server, and/or Ollama.
 
 Commands include: translate, rewrite, grammar, quick replies, Q&A, inbox digest, security augment, NL search, org proposals.
 
@@ -124,9 +124,10 @@ Commands include: translate, rewrite, grammar, quick replies, Q&A, inbox digest,
 
 ## Known limits
 
-- HTML trust: DOMPurify + guards, not a full “text-only by default” policy
+- HTML trust: DOMPurify + guards (scripts, remote media, CSS `url()`), not a full “text-only by default” policy
+- Desktop updates: Windows NSIS via `tauri-plugin-updater` once a minisign key pair is configured (see [RELEASE.md](RELEASE.md))
 - IMAP IDLE watches **INBOX** continuously; Sent/Drafts/Trash + the UI-focused folder sync on a secondary cadence
-- Generative AI requires external server or OpenRouter
+- Generative AI requires OpenRouter, llama-server, or Ollama (HTTP)
 - Some tag/summary paths stay **deterministic** until an LLM is reachable
 - UI locale packs: `fr` and `en`; not every string may be translated yet
 

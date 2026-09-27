@@ -35,17 +35,31 @@ export function contextPresetIndex(n: number): number {
   return best;
 }
 
-export function applyEngineConnectionMode(ai: AppPrefsAi, mode: "local" | "cloud" | "hybrid"): void {
+export type EngineConnectionMode = "local" | "cloud" | "hybrid" | "ollama";
+
+export function applyEngineConnectionMode(ai: AppPrefsAi, mode: EngineConnectionMode): void {
+  if (mode === "ollama") {
+    ai.chatBackend = "ollama";
+    ai.ollamaEnabled = true;
+    if (!ai.ollamaBaseUrl.trim()) {
+      ai.ollamaBaseUrl = "http://127.0.0.1:11434/v1";
+    }
+    return;
+  }
+  ai.ollamaEnabled = false;
   if (mode === "local") {
+    ai.chatBackend = "llama-server";
     ai.openrouterEnabled = false;
     ai.llamaServerEnabled = true;
     ai.aiCloudLlmFallback = false;
     ai.localLlmEnabled = true;
   } else if (mode === "cloud") {
+    ai.chatBackend = "openrouter";
     ai.openrouterEnabled = true;
     ai.llamaServerEnabled = false;
     ai.aiCloudLlmFallback = false;
   } else {
+    ai.chatBackend = "auto";
     ai.openrouterEnabled = true;
     ai.llamaServerEnabled = true;
     ai.aiCloudLlmFallback = true;
@@ -96,6 +110,12 @@ export type SettingsAiLlmRuntimeStatus = {
   llamaServerSpawnEnabled: boolean;
   llamaServerBinaryPath: string;
   llamaServerNCtx?: number | null;
+  chatBackend?: string;
+  ollamaEnabled?: boolean;
+  ollamaBaseUrl?: string;
+  ollamaModel?: string;
+  ollamaReachable?: boolean | null;
+  ollamaStatusMessage?: string | null;
 };
 
 export interface SettingsAiPanelDeps {
@@ -118,7 +138,7 @@ export interface SettingsAiPanelDeps {
   llmCachedGgufFilenames: string[];
   bootstrapModelsCompleted: boolean;
   /** Onglet visible dans Paramètres → Moteurs (indépendant des cases cochées). */
-  engineSettingsTab: "local" | "cloud" | "hybrid";
+  engineSettingsTab: EngineConnectionMode;
 }
 
 const SETTINGS_AI_MODAL_IDS: readonly SettingsAiModalId[] = [
@@ -164,7 +184,12 @@ export function settingsAiModalTitle(modalId: SettingsAiModalId): string {
 const SETTINGS_AI_AUTOSAVE_HINT =
   '<p class="dim settings-ai-autosave-hint">Les changements sont enregistrés automatiquement.</p>';
 
-export function engineConnectionMode(ai: AppPrefsAi): "local" | "cloud" | "hybrid" {
+export function engineConnectionMode(ai: AppPrefsAi): EngineConnectionMode {
+  const backend = (ai.chatBackend || "auto").trim();
+  if (backend === "ollama") return "ollama";
+  if (backend === "openrouter") return "cloud";
+  if (backend === "llama-server") return "local";
+  if (ai.ollamaEnabled && !ai.openrouterEnabled && !ai.llamaServerEnabled) return "ollama";
   if (ai.openrouterEnabled && ai.llamaServerEnabled && ai.aiCloudLlmFallback) return "hybrid";
   if (ai.openrouterEnabled && !ai.llamaServerEnabled) return "cloud";
   if (ai.llamaServerEnabled && !ai.openrouterEnabled) return "local";
@@ -172,9 +197,9 @@ export function engineConnectionMode(ai: AppPrefsAi): "local" | "cloud" | "hybri
   return "local";
 }
 
-function renderEngineModePicker(engineSettingsTab: "local" | "cloud" | "hybrid"): string {
+function renderEngineModePicker(engineSettingsTab: EngineConnectionMode): string {
   const mode = engineSettingsTab;
-  const btn = (id: "local" | "cloud" | "hybrid", label: string, hint: string) => {
+  const btn = (id: EngineConnectionMode, label: string, hint: string) => {
     const active = mode === id ? " settings-engine-mode-btn--active" : "";
     return `<button type="button" class="settings-engine-mode-btn${active}" data-action="ai-engine-mode" data-engine-mode="${id}" title="${hint}">
       <span class="settings-engine-mode-btn__label">${label}</span>
@@ -185,6 +210,7 @@ function renderEngineModePicker(engineSettingsTab: "local" | "cloud" | "hybrid")
       ${btn("local", "Sur mon PC", "llama-server + modèle local")}
       ${btn("cloud", "Cloud", "OpenRouter (pas de gros fichier local)")}
       ${btn("hybrid", "Hybride", "PC en priorité, repli cloud si le local échoue")}
+      ${btn("ollama", "Ollama", "Ollama local, API compatible OpenAI")}
     </div>
     <p class="settings-explain settings-explain--lead dim" style="margin-top:8px">
       Comment l’app appelle le modèle de texte. Dictée et recherche sémantique : onglets dédiés.
@@ -668,10 +694,49 @@ function renderEnginesLocalModelSection(deps: SettingsAiPanelDeps): string {
     </div>`;
 }
 
+function renderEnginesOllamaSection(deps: SettingsAiPanelDeps): string {
+  const { ai, escapeAttr } = deps;
+  return `
+    <div class="settings-ai-subsection">
+      <h4 class="settings-ai-subsection__title">Ollama</h4>
+      <p class="settings-explain settings-explain--lead dim">
+        Même client HTTP que llama-server (<code>/v1/chat/completions</code>). Ollama ne reçoit pas de grammaire GBNF : le JSON (orientation Organiser comprise) est validé dans Rust.
+      </p>
+      <div class="settings-form-row">
+        <label class="compose-field-label" for="prefs-ollama-base-url">URL API</label>
+        <input class="settings-ctl" type="url" id="prefs-ollama-base-url" value="${escapeAttr(ai.ollamaBaseUrl)}" placeholder="http://127.0.0.1:11434/v1" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="settings-form-row" style="margin-top:8px">
+        <label class="compose-field-label" for="prefs-ollama-model">Modèle</label>
+        <input class="settings-ctl" type="text" id="prefs-ollama-model" value="${escapeAttr(ai.ollamaModel)}" placeholder="llama3.2" autocomplete="off" spellcheck="false" />
+      </div>
+      <p class="settings-form-field-hint dim">Nom tel que <code>ollama list</code>. Si le statut dit injoignable, lancez <code>ollama serve</code>.</p>
+    </div>`;
+}
+
+function ollamaStatusLine(ls: SettingsAiLlmRuntimeStatus, escapeHtml: (s: string) => string): string {
+  if (ls.chatBackend !== "ollama" && !ls.ollamaEnabled) return "";
+  const reach =
+    ls.ollamaReachable === true ? "joignable" : ls.ollamaReachable === false ? "injoignable" : "non testé";
+  const detail = ls.ollamaStatusMessage?.trim()
+    ? ` · ${escapeHtml(ls.ollamaStatusMessage.trim())}`
+    : "";
+  const model = ls.ollamaModel?.trim()
+    ? ` · modèle <code>${escapeHtml(ls.ollamaModel.trim())}</code>`
+    : "";
+  return `<li>Ollama : <strong>${reach}</strong>${model}${detail}</li>`;
+}
+
 function renderEnginesBody(deps: SettingsAiPanelDeps): string {
   const { ai, escapeHtml, isTauri, engineSettingsTab, llmRuntimeStatus: ls } = deps;
   const showCloud = engineSettingsTab === "cloud" || engineSettingsTab === "hybrid";
   const showLocal = engineSettingsTab === "local" || engineSettingsTab === "hybrid";
+  const ollamaSection =
+    engineSettingsTab === "ollama"
+      ? `
+    <hr class="settings-section-divider" />
+    ${renderEnginesOllamaSection(deps)}`
+      : "";
   const cloudSections = showCloud
     ? `
     <hr class="settings-section-divider" />
@@ -691,6 +756,7 @@ function renderEnginesBody(deps: SettingsAiPanelDeps): string {
     ${cloudSections}
     ${hybridSection}
     ${localSections}
+    ${ollamaSection}
     ${SETTINGS_AI_AUTOSAVE_HINT}
     ${
       !isTauri
@@ -701,8 +767,9 @@ function renderEnginesBody(deps: SettingsAiPanelDeps): string {
             <ul style="margin:8px 0 0;padding-left:1.15em">
               <li>OpenRouter : <strong>${ls.openrouterEnabled ? "activé" : "désactivé"}</strong>${ls.openrouterEnabled ? ` · modèle <code>${escapeHtml(ls.openrouterModel)}</code>` : ""}${ls.openrouterApiKeySet ? "" : ' · <span class="dim">clé manquante</span>'}</li>
               <li>llama-server : <strong>${ls.llamaServerEnabled ? "activé" : "désactivé"}</strong>${ls.llamaServerEnabled ? ` · <code style="word-break:break-all">${escapeHtml(ls.llamaServerBaseUrl)}</code>` : ""}</li>
+              ${ollamaStatusLine(ls, escapeHtml)}
               <li>Fichier modèle : <strong>${ls.modelFilePresent ? "présent" : "absent"}</strong>${ls.expectedPathDisplay ? ` · <code style="word-break:break-all;font-size:12px">${escapeHtml(ls.expectedPathDisplay)}</code>` : ""}</li>
-              <li>Fonctions IA : <strong>${ls.llmGateOpen ? "disponibles" : "indisponibles"}</strong></li>
+              <li>Fonctions IA : <strong>${ls.llmGateOpen ? "disponibles" : "indisponibles"}</strong>${!ls.llmGateOpen && ls.llmGateHint ? ` — ${escapeHtml(ls.llmGateHint)}` : ""}</li>
             </ul>
           </div>`
           : `<p class="settings-explain settings-explain--lead dim" style="margin-top:12px">Statut inconnu — utilisez <strong>Configurer recommandé</strong>.</p>`
@@ -775,12 +842,13 @@ export function renderSettingsAiHub(deps: SettingsAiPanelDeps): string {
     : "Modèle absent";
   const llmMeta =
     ls?.llmGateOpen ? "Moteur prêt"
-    : ai.openrouterEnabled || ai.llamaServerEnabled ? "Configuration incomplète"
-    : "Non configuré";
+    : ai.chatBackend === "ollama" || ai.ollamaEnabled || ai.openrouterEnabled || ai.llamaServerEnabled
+      ? "Configuration incomplète"
+      : "Non configuré";
   return `
     <div class="settings-ai-hub">
       <p class="settings-explain settings-explain--lead">
-        <strong>Fonctionnalités</strong> (ce que l’IA fait) et <strong>moteurs</strong> (comment elle tourne : PC, cloud, hybride) sont séparés. Ouvrez une ligne pour régler une catégorie.
+        <strong>Fonctionnalités</strong> (ce que l’IA fait) et <strong>moteurs</strong> (PC, cloud, hybride ou Ollama) sont séparés. Ouvrez une ligne pour régler une catégorie.
       </p>
       <h3 class="thread-kicker settings-form-kicker settings-ai-block-heading">Moteurs</h3>
       ${hubRow("engines", "Moteurs &amp; connexion", llmMeta)}

@@ -9,11 +9,11 @@ use rustymail_infrastructure::{
     dictation_api_key_present, dictation_api_key_set, ensure_local_llm_gguf_download,
     list_cached_gguf_filenames, llama_server_api_key_clear, llama_server_api_key_present,
     llama_server_api_key_set, llm_gguf_download_cancel_clear, llm_gguf_download_cancel_request,
-    llm_singleton, load_app_prefs, log_attachment_audited, openrouter_api_key_clear,
-    openrouter_api_key_present, openrouter_api_key_set, peek_attachment_identity,
-    persist_allow_invalid_tls_from_ui_checkbox, prefs_path_from_db_dir, save_app_prefs_validated,
-    transcribe_and_maybe_translate, AppPrefs, DraftRevisionListItem, ImapSyncResult,
-    NewsletterRule, SavedDraftListItem, SavedDraftOpenResult, SemanticReindexStats,
+    llm_singleton, load_app_prefs, log_attachment_audited, normalized_chat_backend,
+    openrouter_api_key_clear, openrouter_api_key_present, openrouter_api_key_set,
+    peek_attachment_identity, persist_allow_invalid_tls_from_ui_checkbox, prefs_path_from_db_dir,
+    save_app_prefs_validated, transcribe_and_maybe_translate, AppPrefs, DraftRevisionListItem,
+    ImapSyncResult, NewsletterRule, SavedDraftListItem, SavedDraftOpenResult, SemanticReindexStats,
     SyncMailboxesOutcome, PREFIX_RISK_CONFIRM,
 };
 mod activity_commands;
@@ -1353,6 +1353,10 @@ fn llm_status_refresh_hardware(
 }
 
 fn probe_llama_n_ctx_for_status(prefs: &AppPrefs) -> Option<u32> {
+    let backend = normalized_chat_backend(&prefs.ai.chat_backend);
+    if backend == "ollama" || backend == "openrouter" {
+        return None;
+    }
     if !prefs.ai.llama_server_enabled || prefs.ai.llama_server_base_url.trim().is_empty() {
         return None;
     }
@@ -2131,6 +2135,8 @@ pub fn run() {
     .try_init();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let data_dir = app
                 .path()

@@ -416,6 +416,14 @@ pub struct LlmStatusPayload {
     pub llama_server_binary_path: String,
     /// `n_ctx` lu depuis llama-server (`/props`) si le serveur répond.
     pub llama_server_n_ctx: Option<u32>,
+    /// `auto`, `openrouter`, `llama-server` ou `ollama`.
+    pub chat_backend: String,
+    pub ollama_enabled: bool,
+    pub ollama_base_url: String,
+    pub ollama_model: String,
+    /// `None` si Ollama n’est pas le moteur effectif (pas de sonde).
+    pub ollama_reachable: Option<bool>,
+    pub ollama_status_message: Option<String>,
 }
 
 fn tier_label(tier: HardwareModelTier) -> &'static str {
@@ -462,7 +470,22 @@ pub fn build_llm_status(
         && !prefs.ai.llama_server_base_url.trim().is_empty()
         && llama_srv_gpu_ok
         && (!prefs.ai.llama_server_model.trim().is_empty() || llama_spawn_ready);
-    let gate = openrouter_gate || llama_server_gate;
+    let chat_backend = crate::normalized_chat_backend(&prefs.ai.chat_backend);
+    let ollama_url_nonempty = !prefs.ai.ollama_base_url.trim().is_empty();
+    let ollama_model_nonempty = !prefs.ai.ollama_model.trim().is_empty();
+    let ollama_config_ok = ollama_url_nonempty && ollama_model_nonempty;
+    let ollama_selected = chat_backend == "ollama"
+        || (chat_backend == "auto"
+            && prefs.ai.ollama_enabled
+            && ollama_config_ok
+            && !openrouter_gate
+            && !llama_server_gate);
+    let gate = match chat_backend {
+        "ollama" => ollama_config_ok,
+        "openrouter" => openrouter_gate,
+        "llama-server" => llama_server_gate,
+        _ => openrouter_gate || llama_server_gate || (prefs.ai.ollama_enabled && ollama_config_ok),
+    };
     let llm_gate_hint = if gate {
         None
     } else {
@@ -478,11 +501,28 @@ pub fn build_llm_status(
                 prefs.ai.llama_server_spawn_enabled,
                 !prefs.ai.llama_server_binary_path.trim().is_empty(),
                 model_file_present,
+                chat_backend,
+                prefs.ai.ollama_enabled,
+                ollama_url_nonempty,
+                ollama_model_nonempty,
             )
             .err()
             .unwrap_or("Aucun moteur IA disponible.")
             .to_string(),
         )
+    };
+    let (ollama_reachable, ollama_status_message) = if ollama_selected && ollama_url_nonempty {
+        match rustymail_llm::probe_openai_models(prefs.ai.ollama_base_url.trim()) {
+            Ok(()) => (Some(true), Some("Ollama joignable.".to_string())),
+            Err(e) => (Some(false), Some(e)),
+        }
+    } else if chat_backend == "ollama" {
+        (
+            Some(false),
+            Some("Ollama : renseignez l’URL (souvent http://127.0.0.1:11434/v1).".to_string()),
+        )
+    } else {
+        (None, None)
     };
 
     LlmStatusPayload {
@@ -514,6 +554,12 @@ pub fn build_llm_status(
         llama_server_spawn_enabled: prefs.ai.llama_server_spawn_enabled,
         llama_server_binary_path: prefs.ai.llama_server_binary_path.clone(),
         llama_server_n_ctx: None,
+        chat_backend: chat_backend.to_string(),
+        ollama_enabled: prefs.ai.ollama_enabled,
+        ollama_base_url: prefs.ai.ollama_base_url.clone(),
+        ollama_model: prefs.ai.ollama_model.clone(),
+        ollama_reachable,
+        ollama_status_message,
     }
 }
 

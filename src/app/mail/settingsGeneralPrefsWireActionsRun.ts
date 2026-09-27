@@ -4,6 +4,11 @@ import { toast } from "../lib/toast";
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { persistGeneralPrefsFromDom } from "./settingsGeneralPrefsPersistRun";
 import { persistDefaultAccountId, switchActiveAccount } from "./settingsWireActions";
+import {
+  checkForDesktopUpdate,
+  installDesktopUpdate,
+  relaunchDesktopApp,
+} from "./desktopUpdate";
 
 export async function tryHandleSettingsGeneralPrefsWire(action: string, _element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -37,6 +42,15 @@ export async function tryHandleSettingsGeneralPrefsWire(action: string, _element
     }
     case "save-general-prefs":
       void persistGeneralPrefsFromDom();
+      return true;
+    case "desktop-update-check":
+      void checkForDesktopUpdate();
+      return true;
+    case "desktop-update-install":
+      void installDesktopUpdate();
+      return true;
+    case "desktop-update-relaunch":
+      void relaunchDesktopApp().catch((error) => toast(tauriErrorMessage(error)));
       return true;
     default:
       return false;

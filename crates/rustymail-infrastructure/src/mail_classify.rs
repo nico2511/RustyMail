@@ -212,12 +212,7 @@ mod tests {
             local_part: "*".into(),
         }];
         assert_eq!(
-            classify_mail_type(
-                "billing@notify.sendgrid.net",
-                "Votre facture",
-                true,
-                &rules
-            ),
+            classify_mail_type("billing@notify.sendgrid.net", "Votre facture", true, &rules),
             MailType::Transactional
         );
     }
@@ -291,9 +286,7 @@ mod tests {
     #[test]
     fn priority_score_wraps_compose() {
         let s = priority_score_for_thread(true, true, 40.0, 0.5);
-        assert!(
-            (s.score - ThreadPriorityScore::compose(true, true, 40.0, 0.5).score).abs() < 0.01
-        );
+        assert!((s.score - ThreadPriorityScore::compose(true, true, 40.0, 0.5).score).abs() < 0.01);
         assert!(s.total() >= 25.0 + 30.0);
     }
 

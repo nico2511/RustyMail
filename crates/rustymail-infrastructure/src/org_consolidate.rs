@@ -43,7 +43,7 @@ pub fn scan_duplicate_threads(
     for row in rows.flatten() {
         let root = row.4.clone();
         let ts = row.5.as_deref().map(|s| s.to_string()).unwrap_or_default();
-        let ts_key = ts.parse::<i64>().unwrap_or(0);
+        let ts_key = received_at_epoch(&ts);
         by_root
             .entry(root)
             .or_default()
@@ -82,11 +82,12 @@ pub fn scan_duplicate_threads(
         return Ok(Vec::new());
     }
     let total = duplicate_refs.len();
-    let sample: Vec<_> = duplicate_refs
-        .into_iter()
-        .take(20)
-        .map(|r| enrich_thread_ref(conn, account_id, r))
-        .collect();
+    let mut iter = duplicate_refs.into_iter();
+    let mut kept = Vec::with_capacity(total);
+    for r in iter.by_ref().take(20) {
+        kept.push(enrich_thread_ref(conn, account_id, r));
+    }
+    kept.extend(iter);
     Ok(vec![OrgProposal {
         id: "duplicate-cross-mailbox".to_string(),
         kind: OrgProposalKind::DuplicateThreadCrossMailbox,
@@ -95,8 +96,8 @@ pub fn scan_duplicate_threads(
         rationale:
             "Même conversation présente dans plusieurs dossiers — archiver les copies redondantes."
                 .to_string(),
-        thread_ids: sample.iter().map(|r| r.thread_id.clone()).collect(),
-        thread_refs: sample,
+        thread_ids: kept.iter().map(|r| r.thread_id.clone()).collect(),
+        thread_refs: kept,
         suggested_action: OrgSuggestedAction::Archive,
         target_mailbox: None,
         confidence: 0.9,
@@ -108,6 +109,21 @@ pub fn scan_duplicate_threads(
         explain_signals: vec!["duplicate_thread".into(), "cross_mailbox".into()],
         unsubscribe_links: Vec::new(),
     }])
+}
+
+/// `received_at` est du RFC3339, pas un entier. `0` si la date est illisible.
+fn received_at_epoch(ts: &str) -> i64 {
+    let t = ts.trim();
+    if t.is_empty() {
+        return 0;
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(t) {
+        return dt.timestamp();
+    }
+    if let Ok(dt) = t.parse::<chrono::DateTime<chrono::Utc>>() {
+        return dt.timestamp();
+    }
+    0
 }
 
 fn pick_canonical(
@@ -135,4 +151,40 @@ fn canonical_score(m: &(String, String, String, i64, i64)) -> i32 {
         s -= 10;
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn member(
+        id: &str,
+        mailbox: &str,
+        followed: i64,
+        ts: &str,
+    ) -> (String, String, String, i64, i64) {
+        (
+            id.into(),
+            mailbox.into(),
+            "sujet".into(),
+            followed,
+            received_at_epoch(ts),
+        )
+    }
+
+    #[test]
+    fn rfc3339_dates_are_ordered() {
+        assert!(
+            received_at_epoch("2026-06-01T00:00:00Z") > received_at_epoch("2024-01-01T00:00:00Z")
+        );
+        assert_eq!(received_at_epoch("pas-une-date"), 0);
+        assert_eq!(received_at_epoch(""), 0);
+    }
+
+    #[test]
+    fn newer_copy_wins_when_scores_tie() {
+        let older = member("old", "INBOX", 0, "2024-01-01T00:00:00Z");
+        let newer = member("new", "INBOX", 0, "2026-06-01T00:00:00Z");
+        assert_eq!(pick_canonical(&[older, newer]).0, "new");
+    }
 }

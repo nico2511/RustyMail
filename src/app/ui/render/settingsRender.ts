@@ -15,6 +15,7 @@ import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { formatNewsletterRuleInput } from "../../lib/newsletterRuleFormat";
 import { settingsExplainHtml } from "../../lib/settingsExplainHtml";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
+import { desktopUpdatePhase } from "../../mail/desktopUpdate";
 import { state } from "../../state";
 import type { AddressBookRow, ShortcutRow } from "../../types";
 import {
@@ -143,11 +144,66 @@ function renderSettingsGeneralPanel(): string {
         </div>
       </section>
 
+      <hr class="settings-section-divider" />
+
+      <section class="settings-general-section" aria-labelledby="settings-general-update-heading">
+        <h3 id="settings-general-update-heading" class="thread-kicker settings-form-kicker">Mises à jour</h3>
+        ${settingsExplainHtml(
+          "Windows : vérification discrète au démarrage. Rien n’est téléchargé tant que vous ne le demandez pas. L’installation ferme RustyMail puis le relance."
+        )}
+        ${renderDesktopUpdateControls()}
+      </section>
+
       <div class="settings-form-footer settings-general-footer">
         <button type="button" class="primary-button" data-action="save-general-prefs">${escapeHtml(t("common.save"))}</button>
       </div>
     </div>
   `);
+}
+
+function renderDesktopUpdateControls(): string {
+  if (!isTauriRuntime()) {
+    return `<p class="dim">Les mises à jour automatiques concernent l’application Windows installée.</p>`;
+  }
+  const phase = desktopUpdatePhase();
+  const status = (() => {
+    switch (phase.kind) {
+      case "checking":
+        return "Vérification…";
+      case "uptodate":
+        return "Cette version est à jour.";
+      case "available":
+        return `Version ${phase.version} disponible.`;
+      case "downloading":
+        return phase.label;
+      case "ready":
+        return `Version ${phase.version} installée. Redémarrez pour l’ouvrir.`;
+      case "error":
+        return phase.message;
+      default:
+        return "Aucune vérification pour l’instant.";
+    }
+  })();
+  const notes =
+    phase.kind === "available" && phase.notes
+      ? `<p class="dim" style="white-space:pre-wrap">${escapeHtml(phase.notes)}</p>`
+      : "";
+  const installBtn =
+    phase.kind === "available"
+      ? `<button type="button" class="primary-button" data-action="desktop-update-install">Télécharger et installer</button>`
+      : "";
+  const relaunchBtn =
+    phase.kind === "ready"
+      ? `<button type="button" class="primary-button" data-action="desktop-update-relaunch">Redémarrer</button>`
+      : "";
+  const busy = phase.kind === "checking" || phase.kind === "downloading";
+  return `<p class="org-apply-msg" role="status">${escapeHtml(status)}</p>
+    ${notes}
+    <div class="settings-card__actions">
+      <button type="button" class="ghost-button" data-action="desktop-update-check" ${busy ? "disabled" : ""}>Vérifier les mises à jour</button>
+      ${installBtn}
+      ${relaunchBtn}
+    </div>`;
 }
 
 function renderSettingsAddressBookPanel(): string {
@@ -509,7 +565,7 @@ function renderSettingsDeveloperPanel(): string {
         <li><strong>Données</strong> — SQLite + WAL (<code>rusqlite</code>), JSON prefs, trousseau OS</li>
         <li><strong>Mail</strong> — IMAP (<code>async-imap</code>), SMTP (<code>lettre</code>), pièces jointes</li>
         <li><strong>Recherche</strong> — lexical + mode hybrid / sémantique (<code>rustymail-semantic</code>, ONNX MiniLM)</li>
-        <li><strong>IA</strong> — OpenRouter ou serveur compatible OpenAI, llama-server, dictée Whisper</li>
+        <li><strong>IA</strong> — OpenRouter, llama-server ou Ollama, dictée Whisper</li>
       </ul>
       <p class="dim" style="margin:12px 0 0;font-size:12px;line-height:1.5">Détails : <code>README.md</code> et <code>docs/</code>.</p>
     </article>

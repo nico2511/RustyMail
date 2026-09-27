@@ -74,8 +74,8 @@ pub use address_contacts::{
 };
 pub use ai_features::{ai_feature_enabled, AiFeature};
 pub use app_prefs::{
-    load_app_prefs, prefs_path_from_db_dir, save_app_prefs, sync_draft_language_from_mother,
-    AiPrefs, AppPrefs, GeneralPrefs, APP_PREFS_FILE,
+    load_app_prefs, normalized_chat_backend, prefs_path_from_db_dir, save_app_prefs,
+    sync_draft_language_from_mother, AiPrefs, AppPrefs, GeneralPrefs, APP_PREFS_FILE,
 };
 pub use attachment_policy::{
     attachment_needs_explicit_ack, log_attachment_audited, PREFIX_RISK_CONFIRM,
@@ -175,15 +175,16 @@ pub use org_post_move::{
     post_move_heuristic_refresh, spawn_post_move_background_sync, PostMoveRefreshOutcome,
 };
 pub use org_retag::{org_retag_account, org_retag_threads};
-pub use org_scan::{enrich_org_report_llm_refs, org_llm_proposals_for_account, org_scan_account};
-pub use org_v2_scan::org_v2_scan_account;
+pub use org_scan::{
+    enrich_org_report_llm_refs, format_org_heuristic_context, org_llm_orientation_for_account,
+    org_llm_proposals_for_account, org_scan_account,
+};
+pub use org_v2_scan::{org_v2_scan_account, org_v2_with_llm_outcome};
 pub use saved_searches::{
     delete_saved_search, get_saved_search, list_saved_searches, mark_saved_search_seen,
     migrate_saved_searches, upsert_saved_search,
 };
-pub use search_history::{
-    clear_search_history, list_search_history, record_search_history,
-};
+pub use search_history::{clear_search_history, list_search_history, record_search_history};
 pub use semantic_search::{
     count_threads_matching_query, embedding_plain_for_message, init_semantic_model_dir,
     reindex_semantic_account, reindex_semantic_mailbox, reindex_semantic_missing,
@@ -1374,10 +1375,7 @@ fn migrate_messages_fts(connection: &Connection) -> Result<(), rusqlite::Error> 
         "ALTER TABLE threads ADD COLUMN priority_score REAL NOT NULL DEFAULT 0",
         [],
     );
-    let _ = connection.execute(
-        "ALTER TABLE threads ADD COLUMN mail_type TEXT",
-        [],
-    );
+    let _ = connection.execute("ALTER TABLE threads ADD COLUMN mail_type TEXT", []);
     Ok(())
 }
 

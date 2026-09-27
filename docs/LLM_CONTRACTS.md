@@ -1,13 +1,13 @@
 # LLM JSON contracts
 
-Single business flow per feature: prompt → generation → JSON → **Rust validation** → domain. **GBNF** is an accelerator on llama-server only; OpenRouter has no grammar constraint.
+Single business flow per feature: prompt → generation → JSON → **Rust validation** → domain. **GBNF** is an accelerator on llama-server only; OpenRouter and Ollama have no grammar constraint.
 
 ## Layers
 
 | Layer | Location | Role |
 | ----- | -------- | ---- |
 | Prompt | `ai_*` modules | Describes expected format (camelCase); wraps mail in `untrusted_mail_content_block` |
-| GBNF | `ai_llm_contracts::gbnf_*` | Optional `grammar` for llama-server (`effective_grammar` in `rustymail-llm`) |
+| GBNF | `ai_llm_contracts::gbnf_*` | Optional `grammar` for llama-server only (`grammar_for_kind` drops it for OpenRouter and Ollama) |
 | Parse | `ai_llm_util::parse_model_json` | Extract + `serde_json` → DTO |
 | Validation | `ai_llm_contracts::validate_*` | **Source of truth:** bounds, cardinalities, reject absurd cases (same for local and cloud) |
 | Normalization | `ai_*` | Fine truncations, UX fallback (e.g. existing summary in `summary_from_raw`) |
@@ -26,6 +26,7 @@ Single business flow per feature: prompt → generation → JSON → **Rust vali
 | `TRANSLATION_PLAIN_JSON_GBNF` | `{ translatedText, preservedEntityIds[], detectedSourceLang }` |
 | `QA_THREAD_JSON_GBNF` | `{ answer, evidenceMessageIds[] }` |
 | `SECURITY_FINDINGS_GBNF` (`mail_security`) | `{ findings[{ code, severity, messageFr }] }` — max 3 findings enforced post-parse |
+| `ORG_ORIENTATION_JSON_GBNF` | `{ diagnosis, recommendations[], actions[{ title, rationale, threadIds[], searchKeywords[], suggestedAction, targetMailbox }] }` — `validate_org_orientation_shape` |
 
 ## Untrusted mail in prompts
 

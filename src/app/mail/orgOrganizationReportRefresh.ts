@@ -1,5 +1,5 @@
 import { orgScanAccount } from "../../organizationView";
-import { orgV2ScanAccount } from "../../organizationViewV2";
+import { orgV2ScanAccount, orgV2ScanStatusLine } from "../../organizationViewV2";
 import { render } from "../dispatch";
 import { currentAccount } from "../core/accountContext";
 import { tauriErrorMessage } from "../lib/tauriCommand";
@@ -32,9 +32,9 @@ export async function refreshOrganizationV2Report(): Promise<void> {
   state.organizationV2.applyMessage = "Mise à jour…";
   render();
   try {
-    const report = await orgV2ScanAccount(acc.id);
+    const report = await orgV2ScanAccount(acc.id, true);
     state.organizationV2.report = report;
-    state.organizationV2.applyMessage = `${report.proposals.length} action(s) en file.`;
+    state.organizationV2.applyMessage = orgV2ScanStatusLine(report);
   } catch (e) {
     toast(tauriErrorMessage(e));
   } finally {

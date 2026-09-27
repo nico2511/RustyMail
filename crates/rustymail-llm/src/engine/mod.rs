@@ -1,7 +1,9 @@
-//! Moteur d’inférence : client HTTP chat/completions (OpenRouter, llama-server, …) ou stub sans `reqwest`.
+//! Moteur d’inférence : client HTTP chat/completions (OpenRouter, llama-server, Ollama) ou stub sans `reqwest`.
 
 #[cfg(feature = "http")]
 mod http_chat;
+#[cfg(feature = "http")]
+pub use http_chat::probe_openai_models;
 #[cfg(not(feature = "http"))]
 mod stub;
 
@@ -30,6 +32,14 @@ impl LlmEngine {
     pub fn open_router(api_key: String, base_url: String, model: String) -> Result<Self, LlmError> {
         Ok(LlmEngine::Http(http_chat::HttpChatEngine::new_open_router(
             api_key, base_url, model,
+        )?))
+    }
+
+    /// Ollama (`/v1/chat/completions`). Pas de clé, pas de grammaire GBNF.
+    #[cfg(feature = "http")]
+    pub fn ollama(base_url: String, model: String) -> Result<Self, LlmError> {
+        Ok(LlmEngine::Http(http_chat::HttpChatEngine::new_ollama(
+            base_url, model,
         )?))
     }
 
@@ -63,6 +73,11 @@ impl LlmEngine {
         Err(LlmError::NotAvailable)
     }
 
+    #[cfg(not(feature = "http"))]
+    pub fn ollama(_base_url: String, _model: String) -> Result<Self, LlmError> {
+        Err(LlmError::NotAvailable)
+    }
+
     pub fn generate(
         &mut self,
         system: &str,
@@ -72,7 +87,7 @@ impl LlmEngine {
         self.generate_with_schema(system, user, p, "")
     }
 
-    /// Comme [`generate`](Self::generate) avec grammaire GBNF optionnelle (llama-server).
+    /// Comme [`generate`](Self::generate) avec grammaire GBNF optionnelle (llama-server seulement).
     pub fn generate_with_schema(
         &mut self,
         system: &str,

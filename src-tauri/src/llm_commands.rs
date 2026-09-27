@@ -7,12 +7,12 @@ use rustymail_domain::{
 };
 use rustymail_infrastructure::{
     ai_feature_enabled, llama_server_api_key_get, llm_gguf_cached, load_app_prefs,
-    openrouter_api_key_get, openrouter_api_key_present, sqlite_list_threads_page_scoped,
-    sqlite_open_thread_by_id, AiFeature, AppPrefs,
+    normalized_chat_backend, openrouter_api_key_get, openrouter_api_key_present,
+    sqlite_list_threads_page_scoped, sqlite_open_thread_by_id, AiFeature, AppPrefs,
 };
 use rustymail_llm::{
     hardware::{detect_profile, llama_server_gpu_gate_ok},
-    redact_user_content_if_needed, LlmEngine,
+    probe_openai_models, redact_user_content_if_needed, LlmEngine,
 };
 use rustymail_modules::{
     ai_action_brief::{
@@ -48,6 +48,10 @@ pub(crate) fn ensure_llm_gate_args(prefs: &AppPrefs, paths: &AppPaths) -> Result
         prefs.ai.llama_server_spawn_enabled,
         !prefs.ai.llama_server_binary_path.trim().is_empty(),
         gguf_cached,
+        normalized_chat_backend(&prefs.ai.chat_backend),
+        prefs.ai.ollama_enabled,
+        !prefs.ai.ollama_base_url.trim().is_empty(),
+        !prefs.ai.ollama_model.trim().is_empty(),
     )
     .map_err(|e| e.to_string())
 }
@@ -69,8 +73,10 @@ pub(crate) fn llm_gate_feature(
     llm_gate(prefs, paths)
 }
 
-/// **OpenRouter** en priorité si activé et prêt, sinon **llama-server** (HTTP).
-/// Avec `ai_cloud_llm_fallback` et les deux moteurs prêts : tente d’abord **llama-server**, puis OpenRouter en cas d’échec de construction du client local.
+/// Moteur effectif selon `chat_backend`.
+///
+/// `ollama` / `openrouter` / `llama-server` sont exclusifs. `auto` garde la priorité historique
+/// (OpenRouter, sinon llama-server, sinon Ollama si activé). Le repli cloud ne s’applique qu’en `auto`.
 pub fn build_llm_engine(prefs: &AppPrefs, paths: &crate::AppPaths) -> Result<LlmEngine, String> {
     let openrouter_ok = prefs.ai.openrouter_enabled
         && openrouter_api_key_present()
@@ -125,6 +131,44 @@ pub fn build_llm_engine(prefs: &AppPrefs, paths: &crate::AppPaths) -> Result<Llm
         Ok(engine)
     };
 
+    let build_ollama = || -> Result<LlmEngine, String> {
+        let base = prefs.ai.ollama_base_url.trim();
+        let model = prefs.ai.ollama_model.trim();
+        if base.is_empty() {
+            return Err("Ollama : URL vide. Indiquez souvent http://127.0.0.1:11434/v1.".into());
+        }
+        if model.is_empty() {
+            return Err("Ollama : nom de modèle vide (voir `ollama list`).".into());
+        }
+        probe_openai_models(base)?;
+        let mut engine =
+            LlmEngine::ollama(base.to_string(), model.to_string()).map_err(|e| e.to_string())?;
+        if prefs.ai.local_llm_context_size >= 1024 {
+            engine.set_n_ctx_probe(prefs.ai.local_llm_context_size);
+        }
+        Ok(engine)
+    };
+
+    let backend = normalized_chat_backend(&prefs.ai.chat_backend);
+    if backend == "ollama" {
+        return build_ollama();
+    }
+    if backend == "openrouter" {
+        if openrouter_ok {
+            return build_openrouter();
+        }
+        return Err("OpenRouter sélectionné : activez-le avec une clé API et un modèle.".into());
+    }
+    if backend == "llama-server" {
+        if llama_ok {
+            return build_llama();
+        }
+        return Err(
+            "llama-server sélectionné : URL, modèle (ou lancement auto) et profil matériel requis."
+                .into(),
+        );
+    }
+
     if prefs.ai.ai_cloud_llm_fallback && llama_ok && openrouter_ok {
         return match build_llama() {
             Ok(e) => Ok(e),
@@ -138,6 +182,12 @@ pub fn build_llm_engine(prefs: &AppPrefs, paths: &crate::AppPaths) -> Result<Llm
     }
     if llama_ok {
         return build_llama();
+    }
+    if prefs.ai.ollama_enabled
+        && !prefs.ai.ollama_base_url.trim().is_empty()
+        && !prefs.ai.ollama_model.trim().is_empty()
+    {
+        return build_ollama();
     }
     Err("Aucun moteur IA utilisable.".into())
 }
@@ -273,26 +323,53 @@ fn sanitize_cache_seg(s: &str) -> String {
 }
 
 /// Segment stable pour versionner le cache SQLite (modèle effectif + backend).
+fn ollama_cache_segment(prefs: &AppPrefs) -> String {
+    format!(
+        "ol:{}@{}",
+        sanitize_cache_seg(prefs.ai.ollama_model.trim()),
+        sanitize_cache_seg(prefs.ai.ollama_base_url.trim())
+    )
+}
+
+fn llama_cache_segment(prefs: &AppPrefs) -> String {
+    let m = if prefs.ai.llama_server_model.trim().is_empty() {
+        "auto".to_string()
+    } else {
+        sanitize_cache_seg(prefs.ai.llama_server_model.trim())
+    };
+    format!(
+        "ll:{}@{}",
+        m,
+        sanitize_cache_seg(prefs.ai.llama_server_base_url.trim())
+    )
+}
+
 pub fn ai_cache_model_segment(prefs: &AppPrefs) -> String {
     let ai = &prefs.ai;
-    if ai.openrouter_enabled
+    let openrouter_ok = ai.openrouter_enabled
         && openrouter_api_key_present()
-        && !ai.openrouter_model.trim().is_empty()
-    {
-        format!("or:{}", sanitize_cache_seg(ai.openrouter_model.trim()))
-    } else if ai.llama_server_enabled {
-        let m = if ai.llama_server_model.trim().is_empty() {
-            "auto".to_string()
-        } else {
-            sanitize_cache_seg(ai.llama_server_model.trim())
-        };
-        format!(
-            "ll:{}@{}",
-            m,
-            sanitize_cache_seg(ai.llama_server_base_url.trim())
-        )
-    } else {
-        "none".into()
+        && !ai.openrouter_model.trim().is_empty();
+    let ollama_ok = ai.ollama_enabled
+        && !ai.ollama_base_url.trim().is_empty()
+        && !ai.ollama_model.trim().is_empty();
+    match normalized_chat_backend(&ai.chat_backend) {
+        "ollama" => ollama_cache_segment(prefs),
+        "openrouter" if openrouter_ok => {
+            format!("or:{}", sanitize_cache_seg(ai.openrouter_model.trim()))
+        }
+        "llama-server" if ai.llama_server_enabled => llama_cache_segment(prefs),
+        "openrouter" | "llama-server" => "none".into(),
+        _ => {
+            if openrouter_ok {
+                format!("or:{}", sanitize_cache_seg(ai.openrouter_model.trim()))
+            } else if ai.llama_server_enabled {
+                llama_cache_segment(prefs)
+            } else if ollama_ok {
+                ollama_cache_segment(prefs)
+            } else {
+                "none".into()
+            }
+        }
     }
 }
 

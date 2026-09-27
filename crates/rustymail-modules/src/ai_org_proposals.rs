@@ -1,15 +1,23 @@
-//! Propositions LLM pour le centre d'organisation (métadonnées agrégées).
+//! Orientation LLM du centre d'organisation.
+//! Les heuristiques alimentent le contexte ; la sortie validée est le diagnostic,
+//! les recommandations et les actions proposées.
 
-use crate::ai_llm_util::{gen_params_json_for_prompt, parse_model_json};
-use rustymail_domain::{
-    OrgProposal, OrgProposalKind, OrgProposalSource, OrgSuggestedAction, OrgThreadRef,
-};
-use rustymail_llm::LlmEngine;
-use serde::Deserialize;
 use std::collections::HashSet;
 
+use crate::ai_llm_contracts::{
+    untrusted_mail_content_block, validate_org_orientation_shape, OrgOrientationActionShape,
+    ORG_ORIENTATION_JSON_GBNF,
+};
+use crate::ai_llm_util::{gen_params_json_for_prompt, parse_model_json};
+use rustymail_domain::{
+    OrgOrientation, OrgProposal, OrgProposalKind, OrgProposalSource, OrgSuggestedAction,
+    OrgThreadRef,
+};
+use rustymail_llm::{LlmEngine, LlmError};
+use serde::Deserialize;
+
 #[derive(Debug, Deserialize)]
-struct LlmOrgProposalRow {
+struct LlmOrgActionRow {
     title: String,
     rationale: String,
     #[serde(default, rename = "threadIds")]
@@ -23,19 +31,28 @@ struct LlmOrgProposalRow {
 }
 
 #[derive(Debug, Deserialize)]
-struct LlmOrgResponse {
+struct LlmOrgOrientationResponse {
+    diagnosis: String,
     #[serde(default)]
-    proposals: Vec<LlmOrgProposalRow>,
+    recommendations: Vec<String>,
+    #[serde(default)]
+    actions: Vec<LlmOrgActionRow>,
 }
 
 /// Réserve tokens pour la sortie JSON lors du rognage du catalogue (`n_ctx` − réserve − marge).
 const ORG_LLM_OUTPUT_RESERVE: u32 = 2048;
 const ORG_LLM_PROMPT_SLACK: u32 = 384;
 
+#[derive(Debug, Clone)]
+pub struct ParsedOrgOrientation {
+    pub orientation: OrgOrientation,
+    pub actions: Vec<OrgProposal>,
+}
+
 fn trim_catalog_to_n_ctx(
     engine: &LlmEngine,
     account_label: &str,
-    heuristic_proposal_count: usize,
+    heuristic_context: &str,
     thread_catalog: &str,
     system: &str,
 ) -> String {
@@ -44,12 +61,7 @@ fn trim_catalog_to_n_ctx(
     let mut lines: Vec<&str> = thread_catalog.lines().filter(|l| !l.is_empty()).collect();
     loop {
         let catalog = lines.join("\n");
-        let user = format!(
-            "Compte : {account_label}\n\
-             {heuristic_proposal_count} proposition(s) heuristique(s) déjà détectées.\n\
-             Catalogue de fils (threadId;mailbox;expéditeur;sujet) — une ligne par fil :\n\
-             {catalog}\n"
-        );
+        let user = orientation_user_prompt(account_label, heuristic_context, &catalog);
         let used = (engine.token_count(system) + engine.token_count(&user)) as u32;
         if used <= budget || lines.len() <= 8 {
             return catalog;
@@ -58,49 +70,67 @@ fn trim_catalog_to_n_ctx(
     }
 }
 
-pub fn org_proposals_with_llm(
-    engine: &mut LlmEngine,
-    account_label: &str,
-    thread_catalog: &str,
-    heuristic_proposal_count: usize,
-    valid_thread_ids: &HashSet<String>,
-    output_language: &str,
-) -> Result<Vec<OrgProposal>, String> {
-    let system = crate::prompts::system_prompt_for_language("org_proposals", output_language);
-    let catalog = trim_catalog_to_n_ctx(
-        engine,
-        account_label,
-        heuristic_proposal_count,
-        thread_catalog,
-        system.as_str(),
-    );
-    let user = format!(
+fn orientation_user_prompt(account_label: &str, heuristic_context: &str, catalog: &str) -> String {
+    let heuristics = untrusted_mail_content_block("org-heuristics", heuristic_context);
+    let threads = untrusted_mail_content_block("org-catalog", catalog);
+    format!(
         "Account: {account_label}\n\
-         {heuristic_proposal_count} heuristic proposal(s) already detected.\n\
+         Heuristic candidates are context only. Write the orientation from them; do not echo the list as the diagnosis.\n\
+         {heuristics}\n\
          Thread catalog (threadId;mailbox;sender;subject) — one line per thread:\n\
-         {catalog}\n"
-    );
-    let p = gen_params_json_for_prompt(engine, system.as_str(), &user, 512, 2048);
-    let raw = engine
-        .generate(system.as_str(), &user, &p)
-        .map_err(|e| e.to_string())?;
-    let parsed: LlmOrgResponse =
-        parse_model_json(&raw).map_err(|e: rustymail_llm::LlmError| e.to_string())?;
-    let mut out = Vec::new();
-    for (i, row) in parsed.proposals.into_iter().enumerate().take(8) {
-        let action = match row.suggested_action.to_ascii_lowercase().as_str() {
-            "move" => OrgSuggestedAction::Move,
-            "trash" => OrgSuggestedAction::Trash,
-            "markread" | "mark_read" => OrgSuggestedAction::MarkRead,
-            _ => OrgSuggestedAction::Archive,
-        };
+         {threads}\n"
+    )
+}
+
+fn map_suggested_action(raw: &str) -> OrgSuggestedAction {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "move" => OrgSuggestedAction::Move,
+        "trash" => OrgSuggestedAction::Trash,
+        "markread" | "mark_read" => OrgSuggestedAction::MarkRead,
+        _ => OrgSuggestedAction::Archive,
+    }
+}
+
+/// Parse et valide le JSON d’orientation. Les ids hors catalogue sont retirés.
+/// Un diagnostic absent ou hors contrat est une erreur : aucun texte de repli n’est fabriqué.
+pub fn parse_org_orientation_json(
+    raw: &str,
+    valid_thread_ids: &HashSet<String>,
+) -> Result<ParsedOrgOrientation, LlmError> {
+    let parsed: LlmOrgOrientationResponse = parse_model_json(raw)?;
+    let diagnosis = parsed.diagnosis.trim().to_string();
+    let recommendations: Vec<String> = parsed
+        .recommendations
+        .iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    {
+        let shapes: Vec<OrgOrientationActionShape<'_>> = parsed
+            .actions
+            .iter()
+            .map(|row| OrgOrientationActionShape {
+                title: row.title.trim(),
+                rationale: row.rationale.trim(),
+                thread_ids: &row.thread_ids,
+                search_keywords: &row.search_keywords,
+                suggested_action: row.suggested_action.trim(),
+                target_mailbox: row.target_mailbox.as_deref(),
+            })
+            .collect();
+        validate_org_orientation_shape(&diagnosis, &recommendations, &shapes)?;
+    }
+
+    let mut actions = Vec::new();
+    for (i, row) in parsed.actions.into_iter().enumerate().take(5) {
         let refs: Vec<OrgThreadRef> = row
             .thread_ids
             .iter()
-            .filter(|tid| valid_thread_ids.contains(tid.as_str()))
+            .map(|tid| tid.trim())
+            .filter(|tid| valid_thread_ids.contains(*tid))
             .take(20)
             .map(|tid| OrgThreadRef {
-                thread_id: tid.clone(),
+                thread_id: tid.to_string(),
                 ..Default::default()
             })
             .collect();
@@ -108,28 +138,116 @@ pub fn org_proposals_with_llm(
             .search_keywords
             .into_iter()
             .map(|k| k.trim().to_string())
-            .filter(|k| k.len() >= 2)
-            .take(8)
+            .filter(|k| k.chars().count() >= 2)
+            .take(6)
             .collect();
-        out.push(OrgProposal {
+        if refs.is_empty() && keywords.is_empty() {
+            continue;
+        }
+        let target = row
+            .target_mailbox
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        actions.push(OrgProposal {
             id: format!("llm-{i}"),
             kind: OrgProposalKind::LlmCluster,
             section: "range".to_string(),
-            title: row.title,
-            rationale: row.rationale,
+            title: row.title.trim().to_string(),
+            rationale: row.rationale.trim().to_string(),
             thread_ids: refs.iter().map(|r| r.thread_id.clone()).collect(),
             thread_refs: refs,
-            suggested_action: action,
-            target_mailbox: row.target_mailbox,
+            suggested_action: map_suggested_action(&row.suggested_action),
+            target_mailbox: target,
             confidence: 0.65,
             source: OrgProposalSource::Llm,
             total_count: 0,
             applicable: true,
             llm_search_keywords: keywords,
             explain_rule_id: None,
-            explain_signals: Vec::new(),
+            explain_signals: vec!["Orientation LLM".into()],
             unsubscribe_links: Vec::new(),
         });
     }
-    Ok(out)
+
+    Ok(ParsedOrgOrientation {
+        orientation: OrgOrientation {
+            diagnosis,
+            recommendations,
+        },
+        actions,
+    })
+}
+
+pub fn org_orientation_with_llm(
+    engine: &mut LlmEngine,
+    account_label: &str,
+    thread_catalog: &str,
+    heuristic_context: &str,
+    valid_thread_ids: &HashSet<String>,
+    output_language: &str,
+) -> Result<ParsedOrgOrientation, String> {
+    let system = crate::prompts::system_prompt_for_language("org_proposals", output_language);
+    let catalog = trim_catalog_to_n_ctx(
+        engine,
+        account_label,
+        heuristic_context,
+        thread_catalog,
+        system.as_str(),
+    );
+    let user = orientation_user_prompt(account_label, heuristic_context, &catalog);
+    let p = gen_params_json_for_prompt(engine, system.as_str(), &user, 512, 2048);
+    let raw = engine
+        .generate_with_schema(system.as_str(), &user, &p, ORG_ORIENTATION_JSON_GBNF)
+        .map_err(|e| e.to_string())?;
+    parse_org_orientation_json(&raw, valid_thread_ids).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ids(values: &[&str]) -> HashSet<String> {
+        values.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn orientation_keeps_catalog_ids_and_drops_unknown() {
+        let raw = r#"{"diagnosis":"L’inbox est encombrée de newsletters déjà lues.","recommendations":["Archiver le lot lu de plus de 30 jours.","Laisser les fils non lus en inbox."],"actions":[{"title":"Archiver les lues","rationale":"Plus d’activité récente sur ces fils.","threadIds":["t-ok","t-nope"],"searchKeywords":[],"suggestedAction":"archive","targetMailbox":null}]}"#;
+        let parsed = parse_org_orientation_json(raw, &ids(&["t-ok"])).expect("parse");
+        assert!(parsed.orientation.diagnosis.contains("newsletters"));
+        assert_eq!(parsed.orientation.recommendations.len(), 2);
+        assert_eq!(parsed.actions.len(), 1);
+        assert_eq!(parsed.actions[0].thread_ids, vec!["t-ok".to_string()]);
+        assert_eq!(parsed.actions[0].source, OrgProposalSource::Llm);
+        assert_eq!(
+            parsed.actions[0].suggested_action,
+            OrgSuggestedAction::Archive
+        );
+    }
+
+    #[test]
+    fn orientation_rejects_missing_diagnosis_without_fallback_text() {
+        let raw = r#"{"recommendations":["Ranger plus tard."],"actions":[]}"#;
+        let err = parse_org_orientation_json(raw, &ids(&[])).expect_err("missing diagnosis");
+        let msg = err.to_string();
+        assert!(!msg.to_lowercase().contains("boîte est en ordre"));
+        assert!(!msg.contains("Orientation prête"));
+    }
+
+    #[test]
+    fn orientation_rejects_unknown_action_instead_of_defaulting() {
+        let raw = r#"{"diagnosis":"Plusieurs factures sont encore dans l’inbox.","recommendations":["Les regrouper avant archivage."],"actions":[{"title":"Purger","rationale":"Action non prévue par le contrat.","threadIds":["t-ok"],"searchKeywords":[],"suggestedAction":"destroy","targetMailbox":null}]}"#;
+        assert!(parse_org_orientation_json(raw, &ids(&["t-ok"])).is_err());
+    }
+
+    #[test]
+    fn action_without_known_ids_can_keep_keywords() {
+        let raw = r#"{"diagnosis":"Des notifications marchandes reviennent chaque semaine.","recommendations":["Chercher les reçus avant de les archiver."],"actions":[{"title":"Reçus marchands","rationale":"Les ids précis ne sont pas dans l’échantillon.","threadIds":["missing"],"searchKeywords":["receipt","order"],"suggestedAction":"archive","targetMailbox":null}]}"#;
+        let parsed = parse_org_orientation_json(raw, &ids(&["other"])).expect("keywords");
+        assert!(parsed.actions[0].thread_ids.is_empty());
+        assert_eq!(
+            parsed.actions[0].llm_search_keywords,
+            vec!["receipt".to_string(), "order".to_string()]
+        );
+    }
 }

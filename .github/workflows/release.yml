@@ -44,7 +44,27 @@ jobs:
           RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.RUSTYMAIL_GOOGLE_OAUTH_CLIENT_ID }}
           RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.RUSTYMAIL_GOOGLE_OAUTH_CLIENT_SECRET }}
           RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID: ${{ secrets.RUSTYMAIL_MICROSOFT_OAUTH_CLIENT_ID }}
-        run: npm run tauri:build -- --bundles nsis
+          # Clé privée minisign de l’updater. Absente → installeur NSIS quand même, sans .sig / latest.json.
+          # Ne jamais committer cette clé. Voir docs/RELEASE.md.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            Write-Host "::warning::TAURI_SIGNING_PRIVATE_KEY absent — installeur NSIS sans artefacts updater (.sig / latest.json)."
+            npm run tauri:build -- --bundles nsis
+          } else {
+            npm run tauri:build -- --bundles nsis --config src-tauri/tauri.updater.release.json
+          }
+
+      - name: Write updater latest.json
+        shell: pwsh
+        run: |
+          $nsis = @('target/release/bundle/nsis', 'src-tauri/target/release/bundle/nsis') |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+          if (-not $nsis) { throw "dossier NSIS introuvable" }
+          node scripts/write-updater-latest-json.mjs $nsis "$env:GITHUB_REPOSITORY"
 
       - name: List build outputs
         shell: pwsh

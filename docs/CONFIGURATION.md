@@ -35,6 +35,7 @@ See [AI_AND_MODELS.md](AI_AND_MODELS.md) for full detail. Summary:
 - **Local LLM:** HF repo/revision/GGUF filename, context size, GPU preference
 - **OpenRouter:** enabled flag, base URL, model id — **API key in keyring only**
 - **llama-server:** base URL (default `http://127.0.0.1:8080/v1`), spawn options, binary path
+- **Ollama:** `chatBackend` `ollama`, base URL (default `http://127.0.0.1:11434/v1`), model name — no API key, no GBNF
 - **Feature toggles:** per-feature gates (`featureThreadSummaryEnabled`, `featureSecurityLlmEnabled`, etc.)
 - **Background tasks:** auto semantic index, LLM prefetch, idle cache prefetch
 

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "LLM HTTP (OpenRouter, llama-server) + profil matériel pour recommandations GGUF"
+description = "LLM HTTP (OpenRouter, llama-server, Ollama) + profil matériel pour recommandations GGUF"
 
 [features]
 default = ["http"]

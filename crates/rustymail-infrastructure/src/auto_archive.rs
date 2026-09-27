@@ -77,7 +77,12 @@ pub fn preview_auto_archive_candidates(
     }
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
     let mut candidates: Vec<(String, String)> = Vec::new();
-    for rule in prefs.general.auto_archive_rules.iter().filter(|r| r.enabled) {
+    for rule in prefs
+        .general
+        .auto_archive_rules
+        .iter()
+        .filter(|r| r.enabled)
+    {
         for c in select_rule_candidates(&conn, account_id, rule)? {
             if !candidates.iter().any(|(id, _)| id == &c.0) {
                 candidates.push(c);
@@ -206,7 +211,8 @@ fn select_rule_candidates(
                 }
             } else if !last_at.is_empty() {
                 // Fallback date SQL `YYYY-MM-DD…`
-                if let Ok(naive) = chrono::NaiveDate::parse_from_str(&last_at[..last_at.len().min(10)], "%Y-%m-%d")
+                if let Ok(naive) =
+                    chrono::NaiveDate::parse_from_str(&last_at[..last_at.len().min(10)], "%Y-%m-%d")
                 {
                     let days = (now.date_naive() - naive).num_days();
                     if days < age_days {
@@ -301,8 +307,8 @@ fn estimate_candidate_stats(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustymail_domain::AutoArchiveRule;
     use rusqlite::Connection;
+    use rustymail_domain::AutoArchiveRule;
 
     #[test]
     fn select_rule_matches_age_and_read() {

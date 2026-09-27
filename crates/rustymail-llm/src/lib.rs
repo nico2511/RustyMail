@@ -1,4 +1,4 @@
-//! Inférence LLM via **HTTP** (`/v1/chat/completions`) : OpenRouter, llama-server, etc.
+//! Inférence LLM via **HTTP** (`/v1/chat/completions`) : OpenRouter, llama-server, Ollama.
 //! Recommandations de poids GGUF selon la RAM : [`hardware`].
 
 mod engine;
@@ -7,6 +7,15 @@ pub mod hardware;
 mod privacy;
 
 pub use engine::LlmEngine;
+
+#[cfg(feature = "http")]
+pub use engine::probe_openai_models;
+
+/// Sonde `GET /v1/models`. Sans le client HTTP compilé, la sonde est indisponible.
+#[cfg(not(feature = "http"))]
+pub fn probe_openai_models(_base_url: &str) -> Result<(), String> {
+    Err("Sonde Ollama indisponible : client HTTP non compilé.".into())
+}
 pub use error::LlmError;
 pub use hardware::{
     llama_server_gpu_gate_ok, Accelerator, HardwareModelProfile, HardwareModelTier,

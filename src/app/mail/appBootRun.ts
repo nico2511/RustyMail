@@ -5,6 +5,7 @@ import { bootLoadAccountsAndImapPush } from "./appBootAccountsRun";
 import { bootDeferredLlmStatusAndPrefetch } from "./appBootLlmDeferRun";
 import { bootLoadInitialMailData } from "./appBootMailDataRun";
 import { bootInitShellAndRuntime } from "./appBootRuntimeRun";
+import { quietStartupUpdateCheck } from "./desktopUpdate";
 
 export async function boot(): Promise<void> {
   try {
@@ -12,6 +13,7 @@ export async function boot(): Promise<void> {
     await bootLoadAccountsAndImapPush();
     await bootLoadInitialMailData();
     await bootDeferredLlmStatusAndPrefetch();
+    quietStartupUpdateCheck();
   } catch (error) {
     const msg = `boot failed: ${tauriErrorMessage(error)}`;
     render();

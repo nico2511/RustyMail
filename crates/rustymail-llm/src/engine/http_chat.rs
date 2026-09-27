@@ -1,5 +1,5 @@
 //! Client HTTP `POST …/chat/completions` (API [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat)) —
-//! utilisé pour OpenRouter (headers additionnels) et pour **llama-server** (souvent sans clé, loopback).
+//! utilisé pour OpenRouter, **llama-server** et **Ollama** (`/v1`, souvent `http://127.0.0.1:11434/v1`).
 
 use crate::{LlmError, LlmGenParams};
 use serde::de::DeserializeOwned;
@@ -27,7 +27,7 @@ struct ChatCompletionRequest<'a> {
     temperature: f32,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_p: Option<f32>,
-    /// Grammaire GBNF (llama-server / llama.cpp) — ignorée par OpenRouter.
+    /// Grammaire GBNF (llama-server / llama.cpp) — ignorée par OpenRouter et Ollama.
     #[serde(skip_serializing_if = "Option::is_none")]
     grammar: Option<&'a str>,
 }
@@ -87,8 +87,21 @@ fn extract_jsonish_text(raw: &str) -> &str {
 pub enum HttpChatBackendKind {
     /// OpenRouter : clé obligatoire + `HTTP-Referer` / `X-Title`.
     OpenRouter,
-    /// llama-server, vLLM, etc. : clé optionnelle, pas d’en-têtes fournisseur.
+    /// llama-server, vLLM, etc. : clé optionnelle, pas d’en-têtes fournisseur. GBNF envoyée.
     OpenAiCompatible,
+    /// Ollama (`/v1/chat/completions`). Pas de grammaire GBNF : le JSON est validé ensuite en Rust.
+    Ollama,
+}
+
+fn grammar_for_kind<'a>(
+    kind: HttpChatBackendKind,
+    p: &'a LlmGenParams,
+    schema_gbnf: &'a str,
+) -> Option<&'a str> {
+    match kind {
+        HttpChatBackendKind::OpenAiCompatible => effective_grammar(p, schema_gbnf),
+        HttpChatBackendKind::OpenRouter | HttpChatBackendKind::Ollama => None,
+    }
 }
 
 #[derive(Debug)]
@@ -205,6 +218,26 @@ impl HttpChatEngine {
         })
     }
 
+    /// Ollama : même chemin HTTP qu’un serveur compatible OpenAI, sans Bearer ni GBNF.
+    pub fn new_ollama(base_url: String, model: String) -> Result<Self, LlmError> {
+        let model = model.trim().to_string();
+        if model.is_empty() {
+            return Err(LlmError::Msg(
+                "Ollama : nom de modèle vide (voir `ollama list`).".into(),
+            ));
+        }
+        let base_norm = Self::normalize_base(base_url)?;
+        let client = build_blocking_client(base_url_looks_loopback(&base_norm))?;
+        Ok(Self {
+            client,
+            api_key: String::new(),
+            base_url: base_norm,
+            model,
+            kind: HttpChatBackendKind::Ollama,
+            n_ctx_probe: None,
+        })
+    }
+
     pub fn set_n_ctx_probe(&mut self, n_ctx: u32) {
         if n_ctx >= 1024 {
             self.n_ctx_probe = Some(n_ctx);
@@ -231,6 +264,7 @@ impl HttpChatEngine {
                     req.header("Authorization", format!("Bearer {}", self.api_key))
                 }
             }
+            HttpChatBackendKind::Ollama => req,
         }
     }
 
@@ -241,10 +275,7 @@ impl HttpChatEngine {
         p: &LlmGenParams,
         schema_gbnf: &str,
     ) -> Result<String, LlmError> {
-        let grammar = match self.kind {
-            HttpChatBackendKind::OpenAiCompatible => effective_grammar(p, schema_gbnf),
-            HttpChatBackendKind::OpenRouter => None,
-        };
+        let grammar = grammar_for_kind(self.kind, p, schema_gbnf);
         let body = ChatCompletionRequest {
             model: self.model.as_str(),
             messages: vec![
@@ -349,10 +380,7 @@ impl HttpChatEngine {
         schema_gbnf: &str,
         mut on_chunk: impl FnMut(&str) -> ControlFlow<Result<(), E>>,
     ) -> Result<String, LlmError> {
-        let grammar = match self.kind {
-            HttpChatBackendKind::OpenAiCompatible => effective_grammar(p, schema_gbnf),
-            HttpChatBackendKind::OpenRouter => None,
-        };
+        let grammar = grammar_for_kind(self.kind, p, schema_gbnf);
         let mut body = json!({
             "model": self.model,
             "messages": [
@@ -468,14 +496,43 @@ impl HttpChatEngine {
     pub fn exfiltrates_to_third_party(&self) -> bool {
         match self.kind {
             HttpChatBackendKind::OpenRouter => true,
-            HttpChatBackendKind::OpenAiCompatible => !base_url_looks_loopback(&self.base_url),
+            HttpChatBackendKind::OpenAiCompatible | HttpChatBackendKind::Ollama => {
+                !base_url_looks_loopback(&self.base_url)
+            }
         }
+    }
+}
+
+/// `GET {base}/models` (API OpenAI). Timeout court : sert à dire si Ollama répond.
+pub fn probe_openai_models(base_url: &str) -> Result<(), String> {
+    let base = base_url.trim().trim_end_matches('/');
+    if base.is_empty() {
+        return Err("Ollama : URL vide.".into());
+    }
+    let url = format!("{base}/models");
+    let loopback = base_url_looks_loopback(base);
+    let mut builder = reqwest::blocking::Client::builder().timeout(Duration::from_secs(2));
+    if loopback {
+        builder = builder.no_proxy();
+    }
+    let client = builder
+        .build()
+        .map_err(|e| format!("Ollama : client HTTP ({e})."))?;
+    match client.get(&url).send() {
+        Ok(resp) if resp.status().is_success() => Ok(()),
+        Ok(resp) => Err(format!(
+            "Ollama injoignable à {base} (HTTP {}). Vérifiez l’URL, souvent http://127.0.0.1:11434/v1.",
+            resp.status()
+        )),
+        Err(e) => Err(format!(
+            "Ollama injoignable à {base}. Lancez `ollama serve` ou corrigez l’URL. Détail : {e}"
+        )),
     }
 }
 
 #[cfg(test)]
 mod grammar_tests {
-    use super::effective_grammar;
+    use super::{effective_grammar, grammar_for_kind, probe_openai_models, HttpChatBackendKind};
     use crate::LlmGenParams;
 
     #[test]
@@ -491,5 +548,48 @@ mod grammar_tests {
     fn effective_grammar_falls_back_to_schema() {
         let p = LlmGenParams::default();
         assert_eq!(effective_grammar(&p, "from-schema"), Some("from-schema"));
+    }
+
+    #[test]
+    fn ollama_does_not_send_gbnf() {
+        let p = LlmGenParams::default();
+        assert_eq!(
+            grammar_for_kind(HttpChatBackendKind::Ollama, &p, "root ::= \"{\" "),
+            None
+        );
+        assert_eq!(
+            grammar_for_kind(HttpChatBackendKind::OpenRouter, &p, "root"),
+            None
+        );
+        assert!(grammar_for_kind(HttpChatBackendKind::OpenAiCompatible, &p, "root").is_some());
+    }
+
+    #[test]
+    fn probe_models_accepts_local_http_mock() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        std::thread::spawn(move || {
+            let (mut sock, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 1024];
+            let _ = sock.read(&mut buf);
+            let body = br#"{"object":"list","data":[]}"#;
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = sock.write_all(resp.as_bytes());
+            let _ = sock.write_all(body);
+        });
+        let base = format!("http://127.0.0.1:{port}/v1");
+        probe_openai_models(&base).expect("probe ok");
+    }
+
+    #[test]
+    fn probe_models_reports_ollama_when_nothing_listens() {
+        let err = probe_openai_models("http://127.0.0.1:1/v1").expect_err("refused");
+        assert!(err.contains("Ollama injoignable"));
+        assert!(err.contains("11434") || err.contains("127.0.0.1:1"));
     }
 }

@@ -48,5 +48,16 @@
         "displayLanguageSelector": false
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "REMPLACER_PAR_LA_CLE_PUBLIQUE_MINISIGN",
+      "endpoints": [
+        "https://github.com/nico2511/RustyMail/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
