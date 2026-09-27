@@ -1,28 +1,27 @@
 # Mockups UX — RustyMail
 
-## Direction officielle : **Clarity v10**
+## Direction officielle : productivité
 
-Les maquettes UX suivent **`docs/mockups/clarity/`** (v10) :
+Les maquettes à suivre sont dans **[`productivity/`](productivity/)** :
 
-- Composants et classes **identiques à l’app** (`../../../src/styles/tokens.css`, `styles.css`, markup des `*Render.ts`).
-- **`clarity.css`** : uniquement la barre de navigation entre pages mock + **palette session longue durée** (Douce / Contraste+ / Lavande).
+- [`index.html`](productivity/index.html) → [`inbox.html`](productivity/inbox.html) → [`thread.html`](productivity/thread.html) → [`compose.html`](productivity/compose.html)
+- Rail charbon repliable, surface blanche, accent cuivre. Literata pour lire le courrier, IBM Plex Sans pour les menus.
+- Réception multi-compte : Perso **ardoise**, Atelier **olive**, Facturation **prune**. Le nom du compte reste écrit. Le cuivre n’est pas une couleur de compte.
+- Le prochain travail d’interface **implémente cette direction**. Il ne prolonge pas Clarity.
 
-**Parcours** : [`clarity/index.html`](clarity/index.html) → `inbox.html` → `thread.html` → `compose.html`.
+Détail : [`productivity/README.md`](productivity/README.md). Principes : [`../UX-NOTE.md`](../UX-NOTE.md) et [`../DESIGN.md`](../DESIGN.md). Captures : `productivity/images/`.
 
-Captures de référence : `clarity/images/clarity-latest-*.png`.
+Le CSS dans `src/` est encore le shell pastel Clarity v10. Ces maquettes disent quoi construire ensuite. Elles ne décrivent pas le CSS déjà livré, et cette PR ne le modifie pas.
 
-## Règles & inventaire
+## Clarity — archive, ne pas continuer
 
-- [`RULES.md`](RULES.md) — pas de widgets inventés ; composants produit d’abord.
-- [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md) — classes autorisées.
-- [`clarity/STATUS.md`](clarity/STATUS.md) — v10 vs archive v2–v9.
+[`clarity/`](clarity/) (v2–v10, y compris Douce / Contraste+ / Lavande) est **clos**. Ne pas l’itérer, ne pas s’en servir comme base visuelle.
 
 ## Autres fichiers
 
 | Fichier | Rôle |
 | ------- | ---- |
-| [`inbox-faithful.html`](inbox-faithful.html) | Inbox statique sans couche session (même base que Clarity v10). |
-| [`faithful-components-demo.html`](faithful-components-demo.html) | Planche composants isolée. |
-| `clarity/` v2–v9 (git history) | Exploration historique — **ne pas prolonger**. |
-
-Produit livré : refonte pastel **v0.2.0** sur `main` — voir [`../UX-NOTE.md`](../UX-NOTE.md).
+| [`RULES.md`](RULES.md) | Nouvelles maquettes = `productivity/`. La règle « classes de l’app » ne vaut que pour l’historique fidèle. |
+| [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md) | Inventaire du shell **livré**. Pas la cible. |
+| [`inbox-faithful.html`](inbox-faithful.html), [`faithful-components-demo.html`](faithful-components-demo.html) | Gel du shell livré. |
+| `alternatives/`, `vNext/` | Explorations anciennes (crème, sauge, autres palettes). Closes. |

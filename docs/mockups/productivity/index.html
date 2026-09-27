@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RustyMail — Maquettes productivité</title>
+  <link rel="stylesheet" href="productivity.css">
+</head>
+<body data-page="hub">
+  <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0" aria-hidden="true">
+    <symbol id="i-min" viewBox="0 0 16 16"><path d="M3 12h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-max" viewBox="0 0 16 16"><path d="M3.5 3.5h9v9h-9Z" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4 4 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  </svg>
+  <div class="app app-hub">
+    <header class="chrome">
+      <a class="brand" href="index.html">RustyMail</a>
+      <span class="chrome-title">Maquettes</span>
+      <div class="win">
+        <button type="button" tabindex="-1" aria-label="Réduire"><svg class="ico"><use href="#i-min"/></svg></button>
+        <button type="button" tabindex="-1" aria-label="Agrandir"><svg class="ico"><use href="#i-max"/></svg></button>
+        <button type="button" tabindex="-1" class="close" aria-label="Fermer"><svg class="ico"><use href="#i-close"/></svg></button>
+      </div>
+    </header>
+    <main class="hub">
+      <div class="hub-inner">
+        <p class="kicker">Prochaine interface</p>
+        <h1>Lire, trier, répondre.</h1>
+        <p class="lede">Trois écrans pour valider le client mail tel qu’on s’en sert : une liste que l’on parcourt vite, un fil que l’on lit comme une discussion, une rédaction qui prend presque toute la largeur. Literata sert à lire le courrier ; IBM Plex Sans sert aux menus et au chrome. Cette direction remplace Clarity. Le prochain travail d’interface l’implémente — il ne prolonge pas Clarity.</p>
+        <ol class="hub-list">
+          <li>
+            <a href="inbox.html">
+              <span class="num">01</span>
+              <strong>Réception</strong>
+              <span>Trois comptes, liste unifiée ou filtrée. L’avatar ouvre la modale. <kbd>[</kbd> replie les dossiers.</span>
+              <em>Ouvrir</em>
+            </a>
+          </li>
+          <li>
+            <a href="thread.html">
+              <span class="num">02</span>
+              <strong>Fil</strong>
+              <span>Chaque message se plie. Un clic sur le nom ouvre la modale contact.</span>
+              <em>Ouvrir</em>
+            </a>
+          </li>
+          <li>
+            <a href="compose.html">
+              <span class="num">03</span>
+              <strong>Rédaction</strong>
+              <span>Rail replié dès l’ouverture : presque toute la largeur pour écrire. <kbd>[</kbd> le rouvre.</span>
+              <em>Ouvrir</em>
+            </a>
+          </li>
+        </ol>
+        <section class="principles" aria-label="Principes">
+          <h2>Ce que ces écrans tiennent</h2>
+          <p><strong>Écrire large.</strong> Le rail dossiers se replie sur une barre d’icônes. En rédaction, il est replié par défaut. Touche <kbd>[</kbd> ou bouton Réduire.</p>
+          <p><strong>Infos à la demande.</strong> Compte, sync, raccourcis, sécurité et tags sont dans une modale — pas dans le rail. <a href="inbox.html?profil=1">Ouvrir le compte</a>.</p>
+          <p><strong>Fil scannable.</strong> Chaque message se plie. Chevron, un seul développé à la fois, trait cuivre sur le non-lu. <a href="thread.html?contact=1">Fiche contact</a>.</p>
+          <p><strong>Deux polices.</strong> Literata pour l’objet, le corps et les aperçus. IBM Plex Sans pour le rail, les boutons, les filtres et les modales.</p>
+          <p><strong>Premier plan.</strong> Sujet, expéditeur, corps, Répondre, Envoyer, Nouveau, non-lus. Le reste est plus gris, ou derrière un chevron, un onglet, une modale, un survol.</p>
+          <p><strong>Pas de costume.</strong> Rail charbon, surface blanche, cuivre rare. Ni crème-sauge, ni teal.</p>
+        </section>
+      </div>
+    </main>
+    <footer class="status">
+      <span>Fichiers statiques — ouvrir ce dossier dans un navigateur</span>
+      <nav class="walk" aria-label="Parcours des maquettes">
+        <a href="index.html" data-nav="hub">Sommaire</a>
+        <a href="inbox.html" data-nav="inbox">Réception</a>
+        <a href="thread.html" data-nav="thread">Fil</a>
+        <a href="compose.html" data-nav="compose">Rédaction</a>
+      </nav>
+    </footer>
+  </div>
+  <script src="mockup.js"></script>
+</body>
+</html>

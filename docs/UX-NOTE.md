@@ -1,162 +1,68 @@
-# Note UX — RustyMail v0.2.0 (refonte pastel)
+# Note UX — direction productivité
 
-Document de référence pour la **structure visuelle**, l’**ergonomie** et l’**architecture front** livrée avec la refonte pastel (PR #1 → `main`, tag **`v0.2.0`**).
+Guidance officielle pour la **prochaine** interface de RustyMail. Les écrans de référence sont les maquettes [`docs/mockups/productivity/`](mockups/productivity/README.md). Ouvrir `index.html` dans ce dossier, sans build.
 
-## Branches de sauvegarde
+**Le code `src/` ne suit pas encore cette note.** Le ship actuel reste le shell **pastel Clarity v10** (`src/styles/tokens.css`, `src/styles.css`, `src/styles/appearance.css` : crème, sauge, lavande, thème sombre). Il le reste jusqu’à une **PR d’implémentation séparée**. Ne pas étendre ce costume. Ne pas traiter Clarity (v2–v10) comme la direction.
 
-| Branche | Rôle |
-| -------- | ----- |
-| `cursor/pastel-ux-refonte-e449` | Branche de travail historique de la refonte (conservée sur le remote). |
-| `stamp/v0.2.0-pastel-ux` | **Snapshot** au commit final de la refonte (identique au tip de la branche ci-dessus au moment du merge). |
-| `main` @ tag `v0.2.0` | Ligne produit courante après merge + bump de version. |
+## Principes
 
-Pour retrouver l’état exact de la refonte avant évolutions sur `main`, checkout `stamp/v0.2.0-pastel-ux` ou le tag `v0.2.0`.
+- **Lire, trier, répondre.** Densité calme : une liste, un fil en discussion, une rédaction large.
+- **Deux polices.** Literata pour l’objet, le corps et les aperçus. IBM Plex Sans pour le rail, les boutons, les filtres et les modales.
+- **Cuivre rare.** Non-lu, Répondre, Envoyer, Nouveau message, focus. Pas la couleur d’un compte.
+- **Premier plan / retrait.** Sujet, expéditeur, corps du message ouvert et actions principales restent visibles. Métadonnées, tags, DKIM, sync, compte, contact, aide, réécriture, raccourcis et compteurs secondaires passent en retrait — plus petits, plus gris, ou derrière un chevron, un onglet, une modale, un survol — et restent disponibles.
+- **Multicompte.** Vue unifiée ou une boîte à la fois. Le nom du compte est toujours écrit. Teinte en plus : Perso ardoise, Atelier olive, Facturation prune.
+- **Pas de costume.** Ni crème, ni sauge, ni lavande, ni teal Clarity.
 
----
+## Shell
 
-## Intentions produit
-
-- **Calme visuel** : palette crème / sauge / lavande, pas de contraste agressif type « dark dev tool ».
-- **Lecture mail d’abord** : colonne centrale dominante, panneau IA repliable, sidebar dossiers repliable.
-- **Desktop-first (Tauri)** : grille fixe plein écran, scroll interne par panneau, barre d’état 28 px.
-- **Progressive disclosure** : compose plein écran, modales pour actions rares, panneau IA et overlay quick panel séparés.
-
----
-
-## Design system (tokens)
-
-Source : `src/styles/tokens.css` + fond `body` dans `src/styles.css`.
-
-| Domaine | Choix |
-| -------- | ----- |
-| Surfaces | `--deep`, `--base`, `--surface`, `--elevated` (crème chaud) |
-| Accents | sauge `--sm-primary`, lavande `--accent-lavender`, pêche `--accent-peach` |
-| Typo | stack system-ui locale (pas de Google Fonts) |
-| Rayons | `--radius-btn` 8px, cartes 10–14px |
-| Motion | `--t-fast` 120ms, `--ease-out` |
-| Focus | `outline` accent 1px + offset 2px (`:focus-visible`) |
-
-Le fond global combine ** trois radial-gradients** pastels + bruit SVG léger (`.noise`, non interactif).
-
----
-
-## Grille shell (`app-shell`)
-
-Rendu : `app/mail/appShellRenderRun.ts` + markup `appShellRenderMarkupRun.ts`.
+Fenêtre desktop (barre 40 px, barre d’état 28 px).
 
 ```
-┌─────────────┬──────────────────────────┬──────────────┐
-│  Sidebar    │  Main (liste / fil / …)   │  Panneau IA  │
-│  dossiers   │                           │  (largeur    │
-│             │                           │   --ai-width)│
-├─────────────┴──────────────────────────┴──────────────┤
-│  Status bar (28px)                                     │
-└────────────────────────────────────────────────────────┘
+┌──────────┬─────────────────────────────────────┐
+│ Rail     │  Liste, fil ou rédaction            │
+│ charbon  │  surface blanche                    │
+│ 232 px   │                          [Aide]     │
+│ ou 56 px │                                     │
+├──────────┴─────────────────────────────────────┤
+│  Sync (point) · parcours                        │
+└─────────────────────────────────────────────────┘
 ```
 
-- **Colonnes** : `clamp(252px, 22vw, 320px) | 1fr | var(--ai-width)` ; IA repliable → `--ai-width: 0` (`.ai-collapsed`).
-- **Sidebar repliable** : `.sidebar-collapsed` — colonne 0, bouton ☰ dans `.main`.
-- **Compose** : `.compose-fullscreen-active` — une colonne compositeur, footer status masqué visuellement.
-- **Modales** : empilées dans le markup shell (move, tags, image, prompt, recherche, réglages IA, etc.).
+- **Rail repliable.** Bouton Réduire, ou `[` / `\`. En rédaction il est replié dès l’ouverture.
+- **Compte hors du rail.** L’avatar, Paramètres ou le point de sync ouvrent une modale (identité, comptes IMAP, sync, déconnexion). `inbox.html?profil=1`.
+- **Aide et réécriture.** Onglet de bord, fermé par défaut. Pas un panneau ouvert au centre.
+- **Contact.** Clic sur un nom ou une adresse : modale (écrire, carnet), pas une page. `thread.html?contact=1`.
 
-État global : `state.view`, `state.sidebarCollapsed`, prefs IA (`aiPanelWidthPx`), layout compose.
+## Cartographie
 
----
+| Écran | Dans les maquettes | Hors maquette (le produit existe déjà) |
+| ----- | ------------------ | -------------------------------------- |
+| Réception | `inbox.html` — unifiée ou filtrée, pastilles de compte, non-lus | — |
+| Fil | `thread.html` — chaque message pliable, citation repliée, HTML nettoyé en badges, pièce jointe | — |
+| Rédaction | `compose.html` — markdown, aperçu, historique, pièces jointes, envoyer | — |
+| Compte | Modale (avatar) | Page réglages complète, OAuth |
+| Contact | Modale depuis un nom | Page carnet |
+| Dossiers | Rail + arborescence repliée | Gestionnaire de dossiers dédié |
+| Recherche | Champ dans la réception | Résultats sémantiques / hybrides dessinés à part |
+| Aide | Onglet fermé | Réglages des modèles |
+| Organiser | — | Centre d’organisation (voir `ORGANISER_V2.md`) |
 
-## Cartographie des vues (`state.view`)
+Les maquettes habillent des mécaniques déjà là (IMAP, fils, dossiers, recherche, markdown, pièces jointes, aide optionnelle). Elles n’ajoutent pas de produit.
 
-| Vue | Zone principale | Notes UX |
-| ----- | ---------------- | -------- |
-| `inbox` / liste | `.main` + sidebar | Barre recherche, filtres, digest dossier optionnel |
-| `thread` | Lecture fil | Meta auto / zen, PJ, sécurité mail, QA fil |
-| `compose` | Plein écran | Preview markdown, chips destinataires, panneau IA latéral masqué |
-| `settings` | Formulaires onglets | Comptes, IA, activité — capture identité avant re-render |
-| `contacts` | Liste + fiche | Recherche debounce, scroll infini |
-| `organization` / v2 | Organiser boîtes | Modales confirm avec checkbox |
-| `folder-manager` | Arborescence | DnD dossiers |
+## Parcours
 
-Navigation : pile `navigation.ts` + fil d’Ariane (`navBreadcrumbSegments`).
+Sommaire → réception → fil → rédaction.
 
----
+- `inbox.html?compte=tous` — liste mélangée, pastille par ligne.
+- `?compte=perso` · `?compte=atelier` · `?compte=facturation` — une boîte, teinte dans le titre et le rail.
+- Fil de Camille Moreau → **Répondre** → rédaction, rail replié.
 
-## Ergonomie clavier & souris
+Détail et captures : [`docs/mockups/productivity/README.md`](mockups/productivity/README.md). Règles : [`docs/mockups/RULES.md`](mockups/RULES.md).
 
-- **Raccourcis shell** : `appShellKeyboard*Run.ts` (accords, Escape, raccourcis « plain » hors champs éditables).
-- **Compose** : Ctrl/Cmd+B/I/K/U sur `#compose-body` ; Enter sur quick reply.
-- **Recherche** : Enter commit (sauf autocomplete `#` / `@` ouverts).
-- **Clic `data-action`** : dispatch central `handleActionRun` + branchements DOM `wireEventsDom*`.
-- **Scroll conservé** : snapshot sidebar / org / modale IA avant `innerHTML` shell (`appShellRenderScrollRestoreRun.ts`).
+## Archive
 
----
-
-## Tons rédaction (`state.tone`)
-
-Boutons `[data-tone]` (wire inbox/thread chrome) : influencent le style des brouillons / assist (voir `composeTone`, hints micro).
+Clarity v2–v10, Focus Paper (`vNext/`) et les alternatives couleur sont closes. L’inventaire [`APP-COMPONENT-INVENTORY.md`](mockups/APP-COMPONENT-INVENTORY.md) décrit le shell **livré**, pas la cible.
 
 ---
 
-## Structure code ↔ UX
-
-Le dégraissage front (**plus de `application.ts` / `deps.ts`**) aligne la **structure du code** sur les **domaines UX** :
-
-| Domaine UX | Câblage |
-| ----------- | -------- |
-| Boot | `main.ts` → `appModuleRegistryRun` |
-| Rendu | `render()` → `appShellRenderRun` + `renderDeps` par page |
-| Registries | compose / search / thread / account-org / render fragments |
-| DOM events | `wireEventsDomOrchestrator*` → modules par écran |
-
-Doc modules : `src/app/README.md`.
-
----
-
-## Mode navigateur vs Tauri
-
-- **Vite** (`npm run dev`) : pas de persistance IMAP ; message « Mode navigateur » normal.
-- **Tauri** : comptes, sync, OAuth, autosave brouillons, file drop native.
-
-Ne pas juger l’ergonomie « prod » uniquement en preview web sans compte.
-
----
-
-## Pistes post-v0.2.0 (UX / structure)
-
-1. **Typage** des `wireEventsDom*` (`@ts-nocheck` → types ciblés).
-2. **Responsive** : breakpoints partiels dans `styles.css` — revue tablette si cible élargie.
-3. **Accessibilité** : audit contrastes pastels (WCAG), labels ARIA modales, annonces live region status.
-4. **Cohérence** : unifier libellés FR, états vide (empty states), feedback chargement liste/fil.
-5. **Design tokens** : documenter variantes « danger / warn » déjà en tokens pour fil #security.
-6. **Tests visuels** : captures golden sur inbox / fil / compose pour éviter régressions pastel.
-
----
-
-## Vérification locale
-
-```bash
-npm run verify:ts && npm test
-npm run dev          # aperçu UX navigateur :5173
-npm run tauri:dev    # ergonomie réelle desktop
-```
-
----
-
-## Apparence Clarity v10 (app)
-
-- **Clair par défaut** : tokens [`src/styles/tokens.css`](../src/styles/tokens.css) = palette **Douce** (crème basse luminance).
-- **Modificateurs clair** : [`src/styles/appearance.css`](../src/styles/appearance.css) — Contraste+, accent lavande, opt-out session (`clarity-pastel-v020`).
-- **Sombre** : `body.clarity-dark` — nuit chaude, sauge atténuée ; réglage **Paramètres → Apparence** (clair / sombre / système).
-- **HTML expéditeur** : conteneur `.message-html` reste fond clair en thème sombre (lisibilité des mails externes).
-
-Prefs : `general.colorScheme`, `sessionComfort`, `contrastPlus`, `accentLavender` (`app_prefs.json`).
-
----
-
-## Mockups & explorations
-
-**Règle (non négociable)** : toute UX mockée ou livrée doit utiliser **uniquement les composants existants** — voir [`docs/mockups/RULES.md`](mockups/RULES.md) et [`docs/mockups/APP-COMPONENT-INVENTORY.md`](mockups/APP-COMPONENT-INVENTORY.md).
-
-**Direction mockups UX : [Clarity v10](mockups/clarity/)** — composants produit + couche session longue durée (`clarity.css`). Entrée : [`docs/mockups/README.md`](mockups/README.md), détail : [`clarity/MOCKUP-DIRECTION.md`](mockups/clarity/MOCKUP-DIRECTION.md). Les itérations Clarity v2–v9 restent une archive (non prolonger).
-
----
-
-*Dernière mise à jour : Clarity v10 sur `main`, version **0.2.2** (release Windows : tag `v0.2.2`).*
+*Ship actuel : shell pastel Clarity v10 dans `src/`. Cette note décrit ce qu’une PR d’interface ultérieure doit implémenter.*

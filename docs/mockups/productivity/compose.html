@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RustyMail — Réponse</title>
+  <link rel="stylesheet" href="productivity.css">
+</head>
+<body data-page="compose">
+  <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0" aria-hidden="true">
+    <symbol id="i-pen" viewBox="0 0 16 16"><path d="M11.2 2.3 13.7 4.8 6 12.5H3.5V10Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.6 3.9 12.1 6.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 16 16"><path d="M2 8.2h12V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 8.2 8 3l6 5.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.2h5.2L12.5 5.5V13.8H4Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.2 2.2V5.5h3.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 16 16"><path d="M2.4 8.1 13.6 2.7 9.3 13.4 7.6 8.8Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 16 16"><path d="M2 3.2h12v2.4H2Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.2 5.6v7.2h9.6V5.6M6.4 8.4h3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2.6 14.2 13.4H1.8Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.4v3.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 11.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3.2 4.4h9.6M6.2 4.4V3h3.6v1.4M4.6 4.4l.6 9h5.6l.6-9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-people" viewBox="0 0 16 16"><circle cx="6" cy="5.2" r="1.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.6 13v-.8A2.6 2.6 0 0 1 5.2 9.6h1.6A2.6 2.6 0 0 1 9.4 12.2V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="5.4" r="1.4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 9.8h.6A2.3 2.3 0 0 1 13.1 12v1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.2h4l1.3 1.6H14V13H2Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 16 16"><path d="M2.4 6.2 8 3.6l5.6 2.6L8 8.8Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.4 9.2 8 11.6l4.6-2.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M6 4.5v.01M10.5 8v.01M7.5 11.5v.01" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 16 16"><path d="M10.6 6.4v5a2.6 2.6 0 0 1-5.2 0V4.7a1.7 1.7 0 0 1 3.4 0V11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 16 16"><rect x="6" y="2.2" width="4" height="6.4" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.4 7.4a3.6 3.6 0 0 0 7.2 0M8 11v2.2M6.2 13.2h3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 16 16"><path d="M10 3.4 5.4 8 10 12.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-min" viewBox="0 0 16 16"><path d="M3 12h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-max" viewBox="0 0 16 16"><path d="M3.5 3.5h9v9h-9Z" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4 4 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <div class="app is-rail-collapsed">
+    <header class="chrome">
+      <a class="brand" href="index.html">RustyMail</a>
+      <span class="chrome-title">Rédaction</span>
+      <div class="win">
+        <button type="button" tabindex="-1" aria-label="Réduire"><svg class="ico"><use href="#i-min"/></svg></button>
+        <button type="button" tabindex="-1" aria-label="Agrandir"><svg class="ico"><use href="#i-max"/></svg></button>
+        <button type="button" tabindex="-1" class="close" aria-label="Fermer"><svg class="ico"><use href="#i-close"/></svg></button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="rail" aria-label="Dossiers">
+        <div class="rail-top">
+          <button type="button" class="avatar-btn" id="profile-open" data-open-profile aria-haspopup="dialog" aria-controls="profile" aria-expanded="false" title="Compte — Nicolas">
+            <span class="mono" id="account-mark">N</span>
+            <span class="sr" id="account-name">Nicolas</span>
+          </button>
+          <a class="btn btn-primary btn-compose" href="compose.html?nouveau=1">
+            <svg class="ico"><use href="#i-pen"/></svg>
+            <span>Nouveau message</span>
+            <kbd class="kbd">N</kbd>
+          </a>
+        </div>
+        <nav class="rail-nav" aria-label="Boîtes">
+          <p class="section">Sur cet appareil</p>
+          <button type="button" class="folder" title="Brouillons sauvegardés"><svg class="ico"><use href="#i-file"/></svg><span class="label">Sauvés</span><span class="count">2</span></button>
+          <button type="button" class="folder" title="Carnet d’adresses"><svg class="ico"><use href="#i-people"/></svg><span class="label">Carnet</span></button>
+          <p class="section">Comptes</p>
+          <a class="folder is-account" href="inbox.html?compte=tous" title="Vue unifiée"><svg class="ico"><use href="#i-layers"/></svg><span class="label">Tous les comptes</span><span class="count">6</span></a>
+          <a class="folder is-account" href="inbox.html?compte=perso" data-compte="perso" title="nicolas@exemple.fr"><span class="mono">N</span><span class="label">Perso</span><span class="count">1</span></a>
+          <a class="folder is-account" href="inbox.html?compte=atelier" data-compte="atelier" title="atelier@exemple.fr"><span class="mono">A</span><span class="label">Atelier</span><span class="count">3</span></a>
+          <a class="folder is-account" href="inbox.html?compte=facturation" data-compte="facturation" title="facturation@exemple.fr"><span class="mono">F</span><span class="label">Facturation</span><span class="count">2</span></a>
+          <p class="section">Boîtes</p>
+          <a class="folder is-current" href="inbox.html"><svg class="ico"><use href="#i-inbox"/></svg><span class="label">Boîte de réception</span><span class="count">6</span></a>
+          <button type="button" class="folder" title="Brouillons"><svg class="ico"><use href="#i-file"/></svg><span class="label">Brouillons</span><span class="count">1</span></button>
+          <button type="button" class="folder" title="Envoyés"><svg class="ico"><use href="#i-send"/></svg><span class="label">Envoyés</span></button>
+          <button type="button" class="folder" title="Archive"><svg class="ico"><use href="#i-archive"/></svg><span class="label">Archive</span></button>
+          <button type="button" class="folder" title="Indésirables"><svg class="ico"><use href="#i-alert"/></svg><span class="label">Indésirables</span><span class="count">4</span></button>
+          <button type="button" class="folder" title="Corbeille"><svg class="ico"><use href="#i-trash"/></svg><span class="label">Corbeille</span></button>
+          <details class="tree">
+            <summary class="folder"><svg class="ico"><use href="#i-folder"/></svg><span class="label">Dossiers</span><span class="count">2</span></summary>
+            <div class="tree-kids">
+              <button type="button" class="folder"><svg class="ico"><use href="#i-folder"/></svg><span class="label">Clients</span></button>
+              <button type="button" class="folder"><svg class="ico"><use href="#i-folder"/></svg><span class="label">Factures</span></button>
+            </div>
+          </details>
+        </nav>
+        <div class="rail-foot">
+          <button type="button" class="folder" title="Organiser la boîte"><svg class="ico"><use href="#i-layers"/></svg><span class="label">Organiser</span></button>
+          <button type="button" class="folder" data-open-profile title="Paramètres du compte"><svg class="ico"><use href="#i-sliders"/></svg><span class="label">Paramètres</span></button>
+          <button type="button" class="rail-collapse" id="rail-toggle" aria-expanded="false" aria-label="Afficher les dossiers" title="Afficher les dossiers ([)">
+            <svg class="ico"><use href="#i-chevron"/></svg>
+            <span class="label">Dossiers</span>
+            <kbd class="kbd rail-kbd">[</kbd>
+          </button>
+        </div>
+      </aside>
+
+      <main class="compose">
+        <div class="compose-top">
+          <a class="btn btn-quiet" id="close-compose" href="thread.html">Fermer</a>
+          <h1 id="compose-title">Réponse</h1>
+          <div class="tabs" role="tablist" aria-label="Vue du message">
+            <button type="button" role="tab" data-compose-tab="write" aria-selected="true">Écrire</button>
+            <button type="button" role="tab" data-compose-tab="preview" aria-selected="false">Aperçu</button>
+            <button type="button" role="tab" data-compose-tab="history" aria-selected="false">Historique</button>
+          </div>
+          <span class="autosave" id="autosave">Brouillon local · à l’instant</span>
+        </div>
+
+        <div class="compose-scroll">
+          <div class="sheet" data-compose-pane="write">
+            <div class="field">
+              <label for="to">À</label>
+              <div class="chips">
+                <span class="chip" id="to-chip">Camille Moreau<button type="button" aria-label="Retirer Camille Moreau">×</button></span>
+                <input id="to" type="email" placeholder="Ajouter un destinataire" autocomplete="off">
+              </div>
+              <button type="button" class="linkish" id="cc-toggle" aria-expanded="false" aria-controls="cc-row">Cc / Cci</button>
+            </div>
+            <div class="field" id="cc-row" data-cc>
+              <label for="cc">Cc</label>
+              <input id="cc" type="email" value="elbaz@etude-elbaz.fr" autocomplete="off">
+            </div>
+            <div class="field" data-cc>
+              <label for="bcc">Cci</label>
+              <input id="bcc" type="email" placeholder="Copie cachée" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="subject">Objet</label>
+              <input id="subject" class="subject-input" type="text" value="Re: Contrat d’atelier — relecture de l’article 4">
+            </div>
+            <label class="sr" for="body">Message en markdown</label>
+            <textarea id="body" class="body" lang="fr" spellcheck="true">Camille,
+
+J’ai relu l’article 4. Deux points :
+
+1. La date de livraison du 12 juin reste tenable si le chêne part lundi.
+2. La clause de réserve de propriété doit citer le lot 18-C.
+
+L’échéancier me convient. Je joins la version annotée.
+
+Nicolas</textarea>
+            <ul class="files" id="files">
+              <li class="filechip">
+                <svg class="ico" aria-hidden="true"><use href="#i-clip"/></svg>
+                <span>article-4-annoté.pdf</span>
+                <span class="meta">240 Ko</span>
+                <button type="button" class="icon-btn" data-remove-file aria-label="Retirer article-4-annoté.pdf">×</button>
+              </li>
+            </ul>
+          </div>
+
+          <div class="sheet preview-pane prose" id="preview" data-compose-pane="preview" hidden></div>
+
+          <div class="sheet" data-compose-pane="history" hidden>
+            <ul class="history" id="history-list">
+              <li>
+                <span class="ago">À l’instant</span>
+                <span>Version actuelle</span>
+              </li>
+              <li>
+                <time datetime="2026-09-26T14:26">14:26</time>
+                <span>Avant la liste des points</span>
+                <button type="button" class="btn btn-quiet" data-restore="rev-1426">Restaurer</button>
+              </li>
+            </ul>
+            <pre id="rev-1426" class="sr">Camille,
+
+J’ai relu l’article 4. Je reviens vers toi dans la journée.
+
+Nicolas</pre>
+          </div>
+        </div>
+
+        <footer class="compose-foot">
+          <label class="btn btn-quiet pick">
+            <svg class="ico" aria-hidden="true"><use href="#i-clip"/></svg>
+            Joindre
+            <input id="pick-files" type="file" multiple>
+          </label>
+          <button type="button" class="btn btn-quiet" title="Dictée locale, Whisper">
+            <svg class="ico" aria-hidden="true"><use href="#i-mic"/></svg>
+            Dicter
+          </button>
+          <button type="button" class="btn btn-quiet">Correction</button>
+          <button type="button" class="btn btn-primary">
+            <svg class="ico" aria-hidden="true"><use href="#i-send"/></svg>
+            Envoyer
+          </button>
+        </footer>
+
+        <button type="button" class="edge-tab" data-panel-toggle aria-controls="rewrite" aria-expanded="false">Réécriture</button>
+      </main>
+
+      <aside class="panel" id="rewrite" hidden>
+        <div class="panel-head">
+          <h2>Réécriture</h2>
+          <button type="button" class="btn btn-quiet" data-panel-toggle aria-controls="rewrite">Fermer</button>
+        </div>
+        <p class="note">S’applique au passage sélectionné, ou au message entier si rien n’est sélectionné.</p>
+        <h3>Ton</h3>
+        <div class="tones">
+          <button type="button" class="btn">Formel</button>
+          <button type="button" class="btn">Décontracté</button>
+          <button type="button" class="btn">Concis</button>
+        </div>
+        <h3>Orthographe</h3>
+        <p>La correction relit le brouillon sans l’envoyer.</p>
+      </aside>
+    </div>
+
+    <footer class="status">
+      <button type="button" class="sync" data-open-profile title="Brouillon local · à l’instant">
+        <i aria-hidden="true"></i>
+        <span class="sr">Brouillon conservé sur cet appareil.</span>
+      </button>
+      <span class="status-hint"><kbd>[</kbd> dossiers</span>
+      <nav class="walk" aria-label="Parcours des maquettes">
+        <a href="index.html" data-nav="hub">Sommaire</a>
+        <a href="inbox.html" data-nav="inbox">Réception</a>
+        <a href="thread.html" data-nav="thread">Fil</a>
+        <a href="compose.html" data-nav="compose">Rédaction</a>
+      </nav>
+    </footer>
+  </div>
+  <div class="modal" id="profile" hidden>
+    <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer le compte"></button>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <div class="modal-head">
+        <h2 id="profile-title">Compte</h2>
+        <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
+      </div>
+      <div class="identity">
+        <span class="mono mono-lg" id="profile-mark">N</span>
+        <div>
+          <strong id="profile-name">Nicolas</strong>
+          <span id="profile-mail">nicolas@exemple.fr</span>
+        </div>
+      </div>
+      <h3>Comptes IMAP</h3>
+      <div class="acct-list" role="listbox" id="account-menu" aria-label="Comptes">
+        <button type="button" role="option" data-compte="tous" aria-selected="true">Tous les comptes<small>Vue unifiée · 6 non lus</small></button>
+        <button type="button" role="option" data-compte="perso">Perso<small>nicolas@exemple.fr · synchronisé il y a 2 min</small></button>
+        <button type="button" role="option" data-compte="atelier">Atelier<small>atelier@exemple.fr · synchronisé il y a 4 min</small></button>
+        <button type="button" role="option" data-compte="facturation">Facturation<small>facturation@exemple.fr · synchronisé il y a 6 min</small></button>
+      </div>
+      <button type="button" class="btn btn-quiet add-account" id="add-account">Ajouter un compte</button>
+      <p class="note" id="add-account-note" hidden>Le compte IMAP rejoint cette liste. La vue unifiée l’affiche tout de suite.</p>
+      <h3>Raccourcis</h3>
+      <ul class="shortcut-list">
+        <li><kbd>[</kbd> Replier ou ouvrir les dossiers</li>
+        <li><kbd>\</kbd> Même bascule</li>
+        <li><kbd>N</kbd> Nouveau message</li>
+        <li><kbd>/</kbd> Recherche</li>
+        <li><kbd>R</kbd> Répondre</li>
+        <li><kbd>Échap</kbd> Fermer</li>
+      </ul>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="logout">Déconnexion</button>
+      </div>
+    </div>
+  </div>
+  <script src="mockup.js"></script>
+</body>
+</html>

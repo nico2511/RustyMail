@@ -1,6 +1,8 @@
 # Inventaire composants UX existants (RustyMail v0.2.0)
 
-Liste **factuelle** extraite du code — à utiliser pour mockups et refontes sans inventer de UI.
+Liste **factuelle** du shell **livré** (pastel Clarity v10). Elle sert à lire le code actuel.
+
+Ce n’est **pas** la direction. Les nouvelles maquettes sont dans [`productivity/`](productivity/). Voir [`RULES.md`](RULES.md).
 
 ## Boutons & contrôles
 

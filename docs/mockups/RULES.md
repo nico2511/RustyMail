@@ -1,47 +1,34 @@
 # Règles mockups UX — RustyMail
 
-## Règle absolue
+## Direction officielle
 
-**Toute UX proposée ou mockée doit reposer exclusivement sur les composants et classes déjà présents dans l’application.**
+Les maquettes **[`productivity/`](productivity/)** sont la direction UX. Charcoal, blanc, cuivre, Literata pour la lecture, IBM Plex Sans pour le chrome. Elles ne reprennent pas les classes de l’app, ni `tokens.css`, ni Clarity.
 
-- **Aucune hallucination** : pas de widgets, palettes, modes ou layouts inventés qui n’existent pas dans le code produit.
-- **Source de vérité** : rendu HTML (`src/app/ui/render/*`), styles (`src/styles.css`, `src/styles/tokens.css`), actions `data-action` câblées dans `wireEventsDom*`.
-- **Tokens** : palette **pastel v0.2.0** (`--sm-primary`, `--btn-primary-fill`, etc.) — pas de design parallèle non branché.
+Toute **nouvelle** proposition d’interface s’itère dans `productivity/` (HTML statique, captures dans `productivity/images/`). L’implémentation dans `src/` viendra dans une PR séparée. D’ici là, le CSS livré reste le shell pastel Clarity v10 — ce n’est pas la cible.
 
-Si un besoin UX n’est pas couvert par un composant existant, il faut **d’abord** l’implémenter dans l’app (ou ouvrir une issue explicite), **ensuite** le mockup/documenter — jamais l’inverse.
+Clarity (v2–v10) est une **archive**. Ne pas la prolonger, ne pas s’en servir comme base.
 
-## Fichiers de référence
+## Ce qui ne s’applique plus comme direction
 
-| Besoin | Où regarder |
-| ------ | ------------- |
-| Boutons | `.primary-button`, `.ghost-button`, `.icon-pill`, `.icon-button` — `src/styles.css` |
-| Liste inbox | `.thread-row`, `.inbox-thread-row`, `listRender.ts` |
-| Sidebar | `sidebarRender.ts`, `.sidebar` |
-| Brief / digest | `actionBriefHtml.ts`, `mailboxDigest`, classes `inbox-brief-*` |
-| Recherche | `searchRender.ts`, modale `#search-modal` |
-| Compose | `composerRender.ts`, `.composer-mail-shell`, `[data-tone]` |
-| Shell | `appShellRenderMarkupRun.ts`, `docs/UX-NOTE.md` |
-| Inventaire détaillé | [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md) |
+L’ancienne règle « maquettes = composants et tokens déjà dans l’app » (palette pastel v0.2.0, classes `.primary-button` / `.thread-row`, pas de design parallèle) **ne guide plus** les nouvelles maquettes.
 
-## Dossier `clarity/` — **v10 = direction officielle**
+Elle reste vraie seulement pour les fichiers historiques qui gèlent le shell livré :
 
-Les mockups UX du repo **partent de Clarity v10** ([`README.md`](clarity/README.md), [`MOCKUP-DIRECTION.md`](clarity/MOCKUP-DIRECTION.md)).
+- [`inbox-faithful.html`](inbox-faithful.html), [`faithful-components-demo.html`](faithful-components-demo.html)
+- le dossier [`clarity/`](clarity/)
 
-- **Composants** : `tokens.css`, `styles.css`, markup des renderers.
-- **Session** : `clarity.css` (Douce / Contraste+ / Lavande) — propositions palette longue durée.
+Là, pas de widget inventé : le rendu vient de `src/app/ui/render/*` et les styles de `src/styles.css` + `src/styles/tokens.css`. Cet inventaire est dans [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md). Il décrit l’app d’aujourd’hui, pas `productivity/`.
 
-Les itérations **v2–v9** (teal, split, triage mock…) restent une **archive** — ne pas les prolonger.
+## Dossier `clarity/` — archive
 
-Toute **nouvelle** idée UX doit soit :
-
-1. **Itérer Clarity v10** (classes existantes + overrides token documentés dans `clarity/MOCKUP-DIRECTION.md`), ou  
-2. **Implémenter d’abord** dans l’app, puis mettre à jour les HTML Clarity.
+Ne pas itérer ces pages. Voir [`productivity/README.md`](productivity/README.md) et [`../UX-NOTE.md`](../UX-NOTE.md).
 
 ## Visuels
 
-Chaque changement de mockup ou de doc UX livrable doit inclure une **capture à jour** (`docs/mockups/images/mockups-faithful-inbox.png`, `clarity-latest-*.png` ou capture app Tauri / `npm run dev`).
+Chaque changement visible de `productivity/` met à jour les captures dans `productivity/images/` (`inbox.png`, `inbox-facturation.png`, `thread.png`, `compose.png`, `profile-modal.png`, `contact-modal.png`).
 
-## Mockup inbox conforme
+## Mockup fidèle (historique)
 
-- Fichier : [`inbox-faithful.html`](inbox-faithful.html) — shell + sidebar + `listRender` (statique).
+- Fichier : [`inbox-faithful.html`](inbox-faithful.html).
 - Styles : `../../src/styles/tokens.css` + `../../src/styles.css` uniquement.
+- Pas la direction suivante.

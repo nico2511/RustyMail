@@ -24,6 +24,7 @@ RustyMail (formerly planned as “RustMaily”) is a **readability-first, local-
 | Organization | Tags, facets, archive layouts, organization center with batch actions |
 | Search | Lexical, semantic (MiniLM), hybrid, optional natural-language query via LLM |
 | Accounts | Multi-account IMAP/SMTP; OAuth Google/Microsoft via PKCE + loopback when clients are embedded or set in env |
+| Interface | **Next** visual direction: productivity mockups ([DESIGN.md](DESIGN.md), [mockups/productivity/](mockups/productivity/README.md)) — charcoal rail, white surface, copper accent, Literata + IBM Plex Sans, multi-account hues. The **shipped** UI in `src/` remains the Clarity v10 pastel shell until a separate implementation PR |
 
 ## Version history (summary)
 

@@ -1,6 +1,8 @@
-# Direction mockups — Clarity v10
+# Direction mockups — Clarity v10 (archive)
 
-**Décision** : toute itération UX documentée dans le repo part de **Clarity v10**, pas de l’exploration v2–v9 (teal, split, triage fictif).
+**Dépassé.** Toute nouvelle itération UX part de [`../productivity/`](../productivity/), pas de Clarity.
+
+Décision historique : les itérations documentées ici partaient de Clarity v10, pas de l’exploration v2–v9 (teal, split, triage fictif).
 
 Miroir app (livré) : [`../../../src/styles/appearance.css`](../../../src/styles/appearance.css) + defaults [`tokens.css`](../../../src/styles/tokens.css).
 

@@ -1,4 +1,6 @@
-# Alternatives couleur & UX — après retour « Focus Paper »
+# Alternatives couleur & UX — après retour « Focus Paper » (archive)
+
+**Clos.** Ce n’est pas la direction. Les maquettes officielles sont dans [`../productivity/`](../productivity/).
 
 La proposition **Focus Paper** (sauge + crème) est **écartée**. Ci-dessous : **3 directions visuelles opposées**, chacune avec une **inbox mockup** HTML (même structure rail + liste, **palettes différentes**).
 

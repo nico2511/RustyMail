@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RustyMail — Boîte de réception</title>
+  <link rel="stylesheet" href="productivity.css">
+</head>
+<body data-page="inbox">
+  <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0" aria-hidden="true">
+    <symbol id="i-pen" viewBox="0 0 16 16"><path d="M11.2 2.3 13.7 4.8 6 12.5H3.5V10Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.6 3.9 12.1 6.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 16 16"><path d="M2 8.2h12V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 8.2 8 3l6 5.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.2h5.2L12.5 5.5V13.8H4Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.2 2.2V5.5h3.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 16 16"><path d="M2.4 8.1 13.6 2.7 9.3 13.4 7.6 8.8Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 16 16"><path d="M2 3.2h12v2.4H2Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.2 5.6v7.2h9.6V5.6M6.4 8.4h3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2.6 14.2 13.4H1.8Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.4v3.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 11.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3.2 4.4h9.6M6.2 4.4V3h3.6v1.4M4.6 4.4l.6 9h5.6l.6-9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 16 16"><path d="M4 2.2h8v11.2L8 10.6 4 13.4Z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-people" viewBox="0 0 16 16"><circle cx="6" cy="5.2" r="1.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.6 13v-.8A2.6 2.6 0 0 1 5.2 9.6h1.6A2.6 2.6 0 0 1 9.4 12.2V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="5.4" r="1.4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 9.8h.6A2.3 2.3 0 0 1 13.1 12v1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.2h4l1.3 1.6H14V13H2Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 16 16"><path d="M2.4 6.2 8 3.6l5.6 2.6L8 8.8Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.4 9.2 8 11.6l4.6-2.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M6 4.5v.01M10.5 8v.01M7.5 11.5v.01" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.4 10.4 13.6 13.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 16 16"><path d="M10.6 6.4v5a2.6 2.6 0 0 1-5.2 0V4.7a1.7 1.7 0 0 1 3.4 0V11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.2 8.2 6.4 11.4 12.8 4.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 16 16"><path d="M10 3.4 5.4 8 10 12.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-min" viewBox="0 0 16 16"><path d="M3 12h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-max" viewBox="0 0 16 16"><path d="M3.5 3.5h9v9h-9Z" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4 4 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <div class="app">
+    <header class="chrome">
+      <a class="brand" href="index.html">RustyMail</a>
+      <span class="chrome-title">Boîte de réception</span>
+      <div class="win">
+        <button type="button" tabindex="-1" aria-label="Réduire"><svg class="ico"><use href="#i-min"/></svg></button>
+        <button type="button" tabindex="-1" aria-label="Agrandir"><svg class="ico"><use href="#i-max"/></svg></button>
+        <button type="button" tabindex="-1" class="close" aria-label="Fermer"><svg class="ico"><use href="#i-close"/></svg></button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="rail" aria-label="Dossiers">
+        <div class="rail-top">
+          <button type="button" class="avatar-btn" id="profile-open" data-open-profile aria-haspopup="dialog" aria-controls="profile" aria-expanded="false" title="Compte — Nicolas">
+            <span class="mono" id="account-mark">N</span>
+            <span class="sr" id="account-name">Nicolas</span>
+          </button>
+          <a class="btn btn-primary btn-compose" href="compose.html?nouveau=1">
+            <svg class="ico"><use href="#i-pen"/></svg>
+            <span>Nouveau message</span>
+            <kbd class="kbd">N</kbd>
+          </a>
+        </div>
+        <nav class="rail-nav" aria-label="Boîtes">
+          <p class="section">Sur cet appareil</p>
+          <button type="button" class="folder" title="Brouillons sauvegardés">
+            <svg class="ico"><use href="#i-file"/></svg>
+            <span class="label">Sauvés</span>
+            <span class="count">2</span>
+          </button>
+          <button type="button" class="folder" title="Carnet d’adresses">
+            <svg class="ico"><use href="#i-people"/></svg>
+            <span class="label">Carnet</span>
+          </button>
+          <p class="section">Comptes</p>
+          <button type="button" class="folder is-account is-scope" data-compte="tous" title="Vue unifiée">
+            <svg class="ico"><use href="#i-layers"/></svg>
+            <span class="label">Tous les comptes</span>
+            <span class="count" data-compte-count="tous">6</span>
+          </button>
+          <button type="button" class="folder is-account" data-compte="perso" title="nicolas@exemple.fr">
+            <span class="mono">N</span>
+            <span class="label">Perso</span>
+            <span class="count" data-compte-count="perso">1</span>
+          </button>
+          <button type="button" class="folder is-account" data-compte="atelier" title="atelier@exemple.fr">
+            <span class="mono">A</span>
+            <span class="label">Atelier</span>
+            <span class="count" data-compte-count="atelier">3</span>
+          </button>
+          <button type="button" class="folder is-account" data-compte="facturation" title="facturation@exemple.fr">
+            <span class="mono">F</span>
+            <span class="label">Facturation</span>
+            <span class="count" data-compte-count="facturation">2</span>
+          </button>
+          <p class="section" id="boxes-label">Boîtes</p>
+          <a class="folder is-current" href="inbox.html" aria-current="page">
+            <svg class="ico"><use href="#i-inbox"/></svg>
+            <span class="label">Boîte de réception</span>
+            <span class="count" data-count="inbox">6</span>
+          </a>
+          <button type="button" class="folder" title="Brouillons">
+            <svg class="ico"><use href="#i-file"/></svg>
+            <span class="label">Brouillons</span>
+            <span class="count">1</span>
+          </button>
+          <button type="button" class="folder" title="Envoyés">
+            <svg class="ico"><use href="#i-send"/></svg>
+            <span class="label">Envoyés</span>
+          </button>
+          <button type="button" class="folder" title="Archive">
+            <svg class="ico"><use href="#i-archive"/></svg>
+            <span class="label">Archive</span>
+          </button>
+          <button type="button" class="folder" title="Indésirables">
+            <svg class="ico"><use href="#i-alert"/></svg>
+            <span class="label">Indésirables</span>
+            <span class="count">4</span>
+          </button>
+          <button type="button" class="folder" title="Corbeille">
+            <svg class="ico"><use href="#i-trash"/></svg>
+            <span class="label">Corbeille</span>
+          </button>
+          <details class="tree">
+            <summary class="folder">
+              <svg class="ico"><use href="#i-folder"/></svg>
+              <span class="label">Dossiers</span>
+              <span class="count">2</span>
+            </summary>
+            <div class="tree-kids">
+              <button type="button" class="folder"><svg class="ico"><use href="#i-folder"/></svg><span class="label">Clients</span></button>
+              <button type="button" class="folder"><svg class="ico"><use href="#i-folder"/></svg><span class="label">Factures</span></button>
+            </div>
+          </details>
+        </nav>
+        <div class="rail-foot">
+          <button type="button" class="folder" title="Organiser la boîte">
+            <svg class="ico"><use href="#i-layers"/></svg>
+            <span class="label">Organiser</span>
+          </button>
+          <button type="button" class="folder" data-open-profile title="Paramètres du compte">
+            <svg class="ico"><use href="#i-sliders"/></svg>
+            <span class="label">Paramètres</span>
+          </button>
+          <button type="button" class="rail-collapse" id="rail-toggle" aria-expanded="true" aria-label="Masquer les dossiers" title="Masquer les dossiers ([)">
+            <svg class="ico"><use href="#i-chevron"/></svg>
+            <span class="label">Réduire</span>
+            <kbd class="kbd rail-kbd">[</kbd>
+          </button>
+        </div>
+      </aside>
+
+      <main class="list">
+        <header class="list-head">
+          <div class="list-title">
+            <div class="scope-wrap">
+              <button type="button" class="scope-btn" id="scope-btn" aria-expanded="false" aria-controls="scope-menu" aria-haspopup="menu">
+                <span>
+                  <span class="scope-kicker">Boîte de réception</span>
+                  <span class="scope-name" id="box-title">Tous les comptes</span>
+                </span>
+                <svg class="ico" aria-hidden="true"><use href="#i-chevron"/></svg>
+              </button>
+              <div class="pop" id="scope-menu" hidden role="menu">
+                <button type="button" role="menuitemradio" data-compte="tous" aria-checked="true">Tous les comptes<small>6 non lus</small></button>
+                <button type="button" role="menuitemradio" data-compte="perso">Perso<small>nicolas@exemple.fr</small></button>
+                <button type="button" role="menuitemradio" data-compte="atelier">Atelier<small>atelier@exemple.fr</small></button>
+                <button type="button" role="menuitemradio" data-compte="facturation">Facturation<small>facturation@exemple.fr</small></button>
+              </div>
+            </div>
+            <p id="unread-count">6 non lus</p>
+          </div>
+          <p class="scope-mail" id="scope-mail">Perso, Atelier, Facturation</p>
+          <div class="search">
+            <div class="search-field">
+              <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
+              <label class="sr" for="q">Rechercher</label>
+              <input id="q" type="search" placeholder="Rechercher un expéditeur, un sujet, un dossier…" autocomplete="off">
+              <kbd>/</kbd>
+            </div>
+            <div class="search-hint">
+              <p>Recherche lexicale, sémantique ou hybride.</p>
+              <p><code>@camille</code><code>#local:Clients</code><code>chêne facture</code></p>
+            </div>
+          </div>
+          <div class="filters" role="group" aria-label="Filtrer la liste">
+            <button type="button" data-filter="all" aria-pressed="true">Tous</button>
+            <button type="button" data-filter="unread" aria-pressed="false">Non lus</button>
+            <button type="button" data-filter="follow" aria-pressed="false">Suivis</button>
+          </div>
+        </header>
+        <div class="rows" role="list">
+          <p class="filter-empty" id="filter-empty" hidden>Aucun message dans ce filtre.</p>
+
+          <article class="row is-unread is-follow is-selected" role="listitem" data-compte="atelier">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <svg class="flag" aria-hidden="true"><use href="#i-bookmark"/></svg>
+                  <button type="button" class="from" data-who="camille">Camille Moreau</button>
+                  <span class="sr">suivi, non lu, 3 messages</span>
+                  <span class="nmsg" title="3 messages">3</span>
+                <span class="acct">Atelier</span></span>
+                <span class="line2">
+                  <span class="subj">Contrat d’atelier</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Parfait. Je joins l’échéancier du notaire — dis-moi si les montants conviennent.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-09-26T14:22">14:22</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme lu" aria-label="Marquer comme lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row is-unread" role="listitem" data-compte="facturation">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <button type="button" class="from" data-who="elbaz">Maître Julien Elbaz</button>
+                  <span class="sr">non lu, 2 messages</span>
+                  <span class="nmsg" title="2 messages">2</span>
+                <span class="acct">Facturation</span></span>
+                <span class="line2">
+                  <span class="subj">Projet d’acte</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">J’ai annoté les servitudes. On en parle avant jeudi si tu as une heure.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-09-26T11:05">11:05</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme lu" aria-label="Marquer comme lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row is-unread" role="listitem" data-compte="atelier">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1"><button type="button" class="from" data-who="sillon">Transport Sillon</button><span class="sr">non lu</span><span class="acct">Atelier</span></span>
+                <span class="line2">
+                  <span class="subj">Avis de passage</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Colis 2/3 en instance au dépôt de Gerland. À retirer sous cinq jours.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-09-26T08:10">08:10</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme lu" aria-label="Marquer comme lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row is-unread" role="listitem" data-compte="facturation">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <button type="button" class="from" data-who="rhone">Banque Rhône</button>
+                  <span class="sr">non lu, pièce jointe</span>
+                  <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
+                <span class="acct">Facturation</span></span>
+                <span class="line2">
+                  <span class="subj">Relevé d’avril</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Votre relevé est disponible. Solde au 30 avril : 18 420,16 €.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-09-25">Hier</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme lu" aria-label="Marquer comme lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row is-unread is-follow" role="listitem" data-compte="atelier">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <svg class="flag" aria-hidden="true"><use href="#i-bookmark"/></svg>
+                  <button type="button" class="from" data-who="hugo">Hugo Martin</button>
+                  <span class="sr">suivi, non lu</span>
+                <span class="acct">Atelier</span></span>
+                <span class="line2">
+                  <span class="subj">Livraison du chêne</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Le camion passe mardi entre 8 h et 10 h. Prévoir quelqu’un à l’atelier.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-09-25">Hier</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme lu" aria-label="Marquer comme lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row is-unread" role="listitem" data-compte="perso">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <button type="button" class="from" data-who="revue">La Revue du bois</button>
+                  <span class="sr">non lu, infolettre</span>
+                  <span class="quiet-tag">Infolettre</span>
+                <span class="acct">Perso</span></span>
+                <span class="line2">
+                  <span class="subj">Édition de mai</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Séchoir, finitions à l’huile, et un portrait d’atelier en Savoie.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-09-22">mar.</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme lu" aria-label="Marquer comme lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row" role="listitem" data-compte="atelier">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <button type="button" class="from" data-who="ines">Inès Navarro</button>
+                  <span class="nmsg" title="4 messages">4</span>
+                <span class="acct">Atelier</span></span>
+                <span class="line2">
+                  <span class="subj">Planning de juin</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">La pose chez Bellevue glisse au 18. Je t’envoie le plan à jour.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-09-22">mar.</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme non lu" aria-label="Marquer comme non lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row" role="listitem" data-compte="facturation">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <button type="button" class="from" data-who="lea">Léa Charpentier</button>
+                  <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
+                <span class="acct">Facturation</span></span>
+                <span class="line2">
+                  <span class="subj">Facture 2026-041 réglée</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Virement reçu, merci. On confirme la commande de quincaillerie.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-05-12">12 mai</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme non lu" aria-label="Marquer comme non lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row" role="listitem" data-compte="atelier">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <button type="button" class="from" data-who="seve">Imprimerie Sève</button>
+                  <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
+                <span class="acct">Atelier</span></span>
+                <span class="line2">
+                  <span class="subj">BAT couverture</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Le bon à tirer est en pièce jointe. Réponse souhaitée avant mercredi.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-05-09">9 mai</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme non lu" aria-label="Marquer comme non lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row" role="listitem" data-compte="atelier">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1"><button type="button" class="from" data-who="paul">Paul Hedin</button><span class="acct">Atelier</span></span>
+                <span class="line2">
+                  <span class="subj">Devis quincaillerie</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Remise de 8 % sur le lot charnières si la commande part avant fin mai.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-05-07">7 mai</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme non lu" aria-label="Marquer comme non lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row" role="listitem" data-compte="perso">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1"><button type="button" class="from" data-who="bellevue">SCI Bellevue</button><span class="acct">Perso</span></span>
+                <span class="line2">
+                  <span class="subj">Appel de charges</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Deuxième trimestre : merci de valider le montant avant le 20.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-05-05">5 mai</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme non lu" aria-label="Marquer comme non lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <article class="row" role="listitem" data-compte="atelier">
+            <a href="thread.html">
+              <span class="pip" aria-hidden="true"></span>
+              <span class="copy">
+                <span class="line1">
+                  <button type="button" class="from" data-who="marie">Marie Duval</button>
+                  <span class="nmsg" title="2 messages">2</span>
+                <span class="acct">Atelier</span></span>
+                <span class="line2">
+                  <span class="subj">Échantillons d’huile</span>
+                  <span class="sep" aria-hidden="true">—</span>
+                  <span class="prev">Le ton chêne clair nous convient. On part là-dessus pour la série.</span>
+                </span>
+              </span>
+              <time class="when" datetime="2026-04-28">28 avr.</time>
+            </a>
+            <div class="row-actions">
+              <button type="button" class="icon-btn" title="Archiver" aria-label="Archiver"><svg class="ico"><use href="#i-archive"/></svg></button>
+              <button type="button" class="icon-btn" data-read title="Marquer comme non lu" aria-label="Marquer comme non lu"><svg class="ico"><use href="#i-check"/></svg></button>
+              <button type="button" class="icon-btn danger" title="Corbeille" aria-label="Mettre à la corbeille"><svg class="ico"><use href="#i-trash"/></svg></button>
+            </div>
+          </article>
+
+          <button type="button" class="more">Charger la suite</button>
+        </div>
+      </main>
+    </div>
+
+    <footer class="status">
+      <button type="button" class="sync" data-open-profile title="3 comptes · synchronisés">
+        <i aria-hidden="true"></i>
+        <span class="sr">3 comptes synchronisés. Ouvrir le compte.</span>
+      </button>
+      <span class="status-hint"><kbd>[</kbd> dossiers</span>
+      <nav class="walk" aria-label="Parcours des maquettes">
+        <a href="index.html" data-nav="hub">Sommaire</a>
+        <a href="inbox.html" data-nav="inbox">Réception</a>
+        <a href="thread.html" data-nav="thread">Fil</a>
+        <a href="compose.html" data-nav="compose">Rédaction</a>
+      </nav>
+    </footer>
+  </div>
+  <div class="modal" id="profile" hidden>
+    <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer le compte"></button>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <div class="modal-head">
+        <h2 id="profile-title">Compte</h2>
+        <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
+      </div>
+      <div class="identity">
+        <span class="mono mono-lg" id="profile-mark">N</span>
+        <div>
+          <strong id="profile-name">Nicolas</strong>
+          <span id="profile-mail">nicolas@exemple.fr</span>
+        </div>
+      </div>
+      <h3>Comptes IMAP</h3>
+      <div class="acct-list" role="listbox" id="account-menu" aria-label="Comptes">
+        <button type="button" role="option" data-compte="tous" aria-selected="true">Tous les comptes<small>Vue unifiée · 6 non lus</small></button>
+        <button type="button" role="option" data-compte="perso">Perso<small>nicolas@exemple.fr · synchronisé il y a 2 min</small></button>
+        <button type="button" role="option" data-compte="atelier">Atelier<small>atelier@exemple.fr · synchronisé il y a 4 min</small></button>
+        <button type="button" role="option" data-compte="facturation">Facturation<small>facturation@exemple.fr · synchronisé il y a 6 min</small></button>
+      </div>
+      <button type="button" class="btn btn-quiet add-account" id="add-account">Ajouter un compte</button>
+      <p class="note" id="add-account-note" hidden>Le compte IMAP rejoint cette liste. La vue unifiée l’affiche tout de suite.</p>
+      <h3>Raccourcis</h3>
+      <ul class="shortcut-list">
+        <li><kbd>[</kbd> Replier ou ouvrir les dossiers</li>
+        <li><kbd>\</kbd> Même bascule</li>
+        <li><kbd>N</kbd> Nouveau message</li>
+        <li><kbd>/</kbd> Recherche</li>
+        <li><kbd>R</kbd> Répondre</li>
+        <li><kbd>Échap</kbd> Fermer</li>
+      </ul>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="logout">Déconnexion</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="contact" hidden>
+    <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer la fiche"></button>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="contact-title">
+      <div class="modal-head">
+        <h2 id="contact-title">Contact</h2>
+        <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
+      </div>
+      <div class="identity">
+        <span class="mono mono-lg" id="contact-mark">C</span>
+        <div>
+          <strong id="contact-name">Camille Moreau</strong>
+          <span id="contact-mail">camille@menuiserie-moreau.fr</span>
+        </div>
+      </div>
+      <h3>Adresses</h3>
+      <ul class="contact-addrs" id="contact-addrs">
+        <li>camille@menuiserie-moreau.fr</li>
+      </ul>
+      <h3 id="contact-note-label">Notes</h3>
+      <p class="contact-note" id="contact-note">Menuiserie Moreau · cliente, lot chêne.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="contact-book">Voir dans le carnet</button>
+        <a class="btn btn-primary" id="contact-write" href="compose.html">Écrire</a>
+      </div>
+    </div>
+  </div>
+  <script src="mockup.js"></script>
+</body>
+</html>

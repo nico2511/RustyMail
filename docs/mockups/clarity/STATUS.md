@@ -1,6 +1,8 @@
 # Statut dossier Clarity
 
-**Direction repo : v10.** Les mockups UX officiels vivent ici (`inbox`, `fil`, `compose` + captures `clarity-latest-*.png`).
+**Archive.** La direction officielle est [`../productivity/`](../productivity/). Ne pas continuer Clarity v2–v10.
+
+Ancien statut : v10 était la direction (`inbox`, `fil`, `compose` + captures `clarity-latest-*.png`).
 
 ## v10 (actuel — à prolonger)
 
