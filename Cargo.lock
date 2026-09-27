@@ -5764,7 +5764,7 @@ checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
 name = "rustymail"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "dirs 5.0.1",
  "dotenvy",
@@ -5793,7 +5793,7 @@ dependencies = [
 
 [[package]]
 name = "rustymail-application"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "pulldown-cmark 0.13.3",
  "rustymail-domain",
@@ -5805,14 +5805,14 @@ dependencies = [
 
 [[package]]
 name = "rustymail-domain"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "rustymail-infrastructure"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "async-imap",
  "async-native-tls",
@@ -5856,7 +5856,7 @@ dependencies = [
 
 [[package]]
 name = "rustymail-llm"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "regex",
  "reqwest 0.12.28",
@@ -5868,7 +5868,7 @@ dependencies = [
 
 [[package]]
 name = "rustymail-modules"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "ego-tree",
  "regex",
@@ -5882,7 +5882,7 @@ dependencies = [
 
 [[package]]
 name = "rustymail-semantic"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "ndarray",
  "ort",
