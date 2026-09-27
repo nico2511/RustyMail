@@ -35,7 +35,7 @@ export async function openOrganizationV2View(): Promise<void> {
   state.organizationV2.scanning = true;
   render();
   try {
-    const report = await orgV2ScanAccount(acc.id);
+    const report = await orgV2ScanAccount(acc.id, Boolean(state.appPrefs.ai.featureOrgProposalsEnabled));
     state.organizationV2.report = report;
     state.organizationV2.applyMessage = `${report.proposals.length} action(s).`;
   } catch (e) {

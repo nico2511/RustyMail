@@ -167,3 +167,64 @@ pub fn mark_batch_undone(db_path: &Path, account_id: &str, batch_id: &str) -> Re
     .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+/// Marque seulement les fils réellement annulés. Les échecs restent `undone = 0`.
+pub fn mark_threads_undone(
+    db_path: &Path,
+    account_id: &str,
+    batch_id: &str,
+    thread_ids: &[String],
+) -> Result<(), String> {
+    if thread_ids.is_empty() {
+        return Ok(());
+    }
+    let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    for thread_id in thread_ids {
+        tx.execute(
+            "UPDATE org_apply_history SET undone = 1
+             WHERE account_id = ?1 AND batch_id = ?2 AND thread_id = ?3 AND undone = 0",
+            params![account_id.trim(), batch_id.trim(), thread_id.trim()],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn partial_undo_leaves_failed_rows() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("h.db");
+        let _conn = open_sqlite_migrated(&path).expect("migrate");
+        record_apply_entries(
+            &path,
+            "a1",
+            "batch-1",
+            &[
+                (
+                    "t1".into(),
+                    "archive".into(),
+                    "INBOX".into(),
+                    Some("Archive".into()),
+                ),
+                (
+                    "t2".into(),
+                    "archive".into(),
+                    "INBOX".into(),
+                    Some("Archive".into()),
+                ),
+            ],
+        )
+        .expect("record");
+        mark_threads_undone(&path, "a1", "batch-1", &["t1".into()]).expect("mark");
+        let left = list_batch_entries(&path, "a1", "batch-1").expect("list");
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].thread_id, "t2");
+    }
+}

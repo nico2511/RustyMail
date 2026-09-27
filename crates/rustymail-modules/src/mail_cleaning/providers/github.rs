@@ -63,13 +63,24 @@ impl ProviderDetector for GitHubDetector {
 }
 
 fn html_suggests_github(html: &str) -> bool {
-    html.to_ascii_lowercase().contains("github")
+    let h = html.to_ascii_lowercase();
+    h.contains("github.com")
+        || h.contains("githubusercontent.com")
+        || h.contains("githubnoreply.com")
+}
+
+fn html_has_github_url(html: &str) -> bool {
+    html_suggests_github(html)
 }
 
 pub struct GitHubCleaner;
 
 impl ProviderCleaner for GitHubCleaner {
     fn clean(&self, html: &str, ctx: &CleaningInput<'_>) -> Result<String, CleanError> {
+        // Un sujet « GitHub » sans domaine ni URL ne doit pas réécrire le mail.
+        if !sender_domain_is_github(ctx.sender_email) && !html_has_github_url(html) {
+            return Err(CleanError::NoDigest);
+        }
         try_github_digest(html, ctx).ok_or(CleanError::NoDigest)
     }
 
@@ -307,6 +318,14 @@ mod tests {
             plain_body: None,
         };
         assert_eq!(d.detect(&ctx), DetectionConfidence::Weak);
+
+        let ctx = CleaningInput {
+            sender_email: "someone@example.com",
+            subject: "Notes",
+            html_preview: Some("<p>mon projet github interne</p>"),
+            plain_body: None,
+        };
+        assert_eq!(d.detect(&ctx), DetectionConfidence::None);
     }
 
     #[test]

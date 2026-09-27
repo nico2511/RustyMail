@@ -17,11 +17,11 @@ pub use attrs::strip_presentation_attrs;
 pub use images::is_outlook_noise_img;
 pub use prune::prune_empty_boilerplate;
 
-pub const GENERIC_RULE_SET_VERSION: &str = "9";
+pub const GENERIC_RULE_SET_VERSION: &str = "10";
 
 const REMOVABLE_TAGS: &[&str] = &[
     "script", "noscript", "iframe", "object", "embed", "style", "form", "input", "button",
-    "select", "textarea", "meta", "link",
+    "select", "textarea", "meta", "link", "video", "audio", "svg", "source",
 ];
 
 /// Structural cleanup before provider-specific passes (safe for Markdown conversion).

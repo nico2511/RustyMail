@@ -860,7 +860,11 @@ fn matches_thread_filters(thread: &rustymail_domain::Thread, query: &SearchQuery
         }
     }
 
-    if !query.tags.iter().all(|tag| thread_satisfies_tag(thread, tag)) {
+    if !query
+        .tags
+        .iter()
+        .all(|tag| thread_satisfies_tag(thread, tag))
+    {
         return false;
     }
 
@@ -1073,10 +1077,7 @@ pub fn sqlite_search_threads_unified(
         }
     }
 
-    let hybrid_alpha = query
-        .hybrid_lexical_weight
-        .unwrap_or(0.55)
-        .clamp(0.0, 1.0);
+    let hybrid_alpha = query.hybrid_lexical_weight.unwrap_or(0.55).clamp(0.0, 1.0);
 
     let mut thread_ids: Vec<String> = match query.mode {
         SearchMode::Lexical => lexical_thread_ids,
@@ -1133,7 +1134,10 @@ pub fn sqlite_search_threads_unified(
     let facets_only = text_lc.is_none()
         && senders_empty
         && query.tags.is_empty()
-        && query.language.as_ref().map_or(true, |s| s.trim().is_empty())
+        && query
+            .language
+            .as_ref()
+            .map_or(true, |s| s.trim().is_empty())
         && (query.has_attachment.is_some()
             || query.min_security_score.is_some()
             || query.relative_days.is_some()

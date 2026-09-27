@@ -329,11 +329,7 @@ fn parse_activity_after(iso: &str) -> Option<DateTime<Utc>> {
 }
 
 pub fn count_new_for_saved_search(db_path: &Path, saved: &SavedSearch) -> Result<usize, String> {
-    let since = match saved
-        .last_seen_at
-        .as_deref()
-        .and_then(parse_activity_after)
-    {
+    let since = match saved.last_seen_at.as_deref().and_then(parse_activity_after) {
         Some(dt) => Some(dt),
         None => return Ok(0),
     };

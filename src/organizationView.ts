@@ -160,6 +160,7 @@ export async function orgApplyProposal(
   actionOverride?: OrgActionOverride | null,
   deleteMailboxAck?: string,
   threadIds?: string[] | null,
+  batchId?: string | null,
 ): Promise<OrgApplyProgress> {
   return invoke<OrgApplyProgress>("org_apply_proposal_cmd", {
     payload: {
@@ -170,6 +171,7 @@ export async function orgApplyProposal(
       deleteMailboxAck: deleteMailboxAck ?? null,
       actionOverride: actionOverride ?? null,
       threadIds: threadIds ?? null,
+      batchId: batchId ?? null,
     },
   });
 }

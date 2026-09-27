@@ -21,7 +21,7 @@ use crate::mail_ops::{
 };
 use crate::mailbox_local_cache::purge_mailbox_local_cache;
 use crate::org_apply_history::{
-    latest_undoable_batch_id, list_batch_entries, mark_batch_undone, new_batch_id,
+    latest_undoable_batch_id, list_batch_entries, mark_threads_undone, new_batch_id,
     record_apply_entries,
 };
 use crate::org_retag::org_retag_account;
@@ -150,12 +150,9 @@ async fn org_delete_mailboxes(
             match imap_session_select_variants(&mut session, &select_variants, Some(&list)).await {
                 Ok((m, _)) => m,
                 Err(e) => {
-                    let _ = purge_mailbox_local_cache(path, account_id, &logical);
                     errors.push(format!(
-                        "{logical}: absent du serveur — cache local retiré ({e})"
+                        "{logical}: sélection IMAP impossible ({e}). Cache local conservé."
                     ));
-                    done += 1;
-                    threads_affected.push(format!("mailbox:{logical}"));
                     continue;
                 }
             };
@@ -233,6 +230,7 @@ pub async fn org_apply_proposal_with(
     proposal: OrgProposal,
     thread_ids: Option<Vec<String>>,
     action_override: Option<&str>,
+    batch_id: Option<&str>,
 ) -> Result<OrgApplyProgress, String> {
     let accounts = load_accounts(path)?;
     let account = accounts
@@ -288,7 +286,11 @@ pub async fn org_apply_proposal_with(
     let mut sync_mailboxes: HashSet<String> = HashSet::new();
     let mut threads_affected: Vec<String> = Vec::new();
     let mut history_entries: Vec<(String, String, String, Option<String>)> = Vec::new();
-    let batch_id = new_batch_id();
+    let batch_id = batch_id
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(new_batch_id);
 
     let trash_folder = if matches!(action, OrgSuggestedAction::Trash) {
         list_selectable_mailboxes(&account)
@@ -300,8 +302,12 @@ pub async fn org_apply_proposal_with(
     };
 
     let archive_dest_hint = if matches!(action, OrgSuggestedAction::Archive) {
-        org_resolve_archive_path(path, ids.first().map(|(t, _)| t.as_str()).unwrap_or(""))
-            .ok()
+        org_resolve_archive_path(
+            path,
+            account_id,
+            ids.first().map(|(t, _)| t.as_str()).unwrap_or(""),
+        )
+        .ok()
     } else {
         None
     };
@@ -393,7 +399,7 @@ pub async fn org_apply_proposal_with(
 /// Dry-run : liste exacte des moves sans IMAP.
 pub fn org_preview_proposal(
     path: &Path,
-    _account_id: &str,
+    account_id: &str,
     proposal: &OrgProposal,
     thread_ids: Option<&[String]>,
     action_override: Option<&str>,
@@ -408,19 +414,16 @@ pub fn org_preview_proposal(
     } else {
         proposal.thread_refs.iter().collect()
     };
-    let archive_hint = if matches!(action, OrgSuggestedAction::Archive) {
-        refs.first()
-            .and_then(|r| org_resolve_archive_path(path, &r.thread_id).ok())
-    } else {
-        None
-    };
     let mut items = Vec::new();
     for r in refs {
         if r.thread_id.starts_with("mailbox:") {
             continue;
         }
         let (action_str, to_mb) = match action {
-            OrgSuggestedAction::Archive => ("archive", archive_hint.clone()),
+            OrgSuggestedAction::Archive => (
+                "archive",
+                org_resolve_archive_path(path, account_id, &r.thread_id).ok(),
+            ),
             OrgSuggestedAction::Trash => ("trash", Some("Trash".into())),
             OrgSuggestedAction::Move => ("move", proposal.target_mailbox.clone()),
             OrgSuggestedAction::MarkRead => ("markRead", None),
@@ -512,7 +515,10 @@ pub async fn org_undo_last_batch(
             Err(err) => errors.push(format!("{}: {err}", e.thread_id)),
         }
     }
-    mark_batch_undone(path, account_id, &batch_id)?;
+    let undone_ids: Vec<String> = threads_affected.clone();
+    if !undone_ids.is_empty() {
+        mark_threads_undone(path, account_id, &batch_id, &undone_ids)?;
+    }
     Ok(OrgApplyProgress {
         done,
         total,
@@ -523,18 +529,31 @@ pub async fn org_undo_last_batch(
     })
 }
 
-pub fn org_resolve_archive_path(path: &Path, thread_id: &str) -> Result<String, String> {
+pub fn org_resolve_archive_path(
+    path: &Path,
+    account_id: &str,
+    thread_id: &str,
+) -> Result<String, String> {
     let prefs_path = crate::app_prefs::prefs_path_from_db_dir(path.parent().unwrap_or(path));
     let prefs = crate::app_prefs::load_app_prefs(&prefs_path);
     let layout = crate::archive_layout::parse_archive_layout(&prefs.general.archive_layout);
     let conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
-    let received_at: String = conn
-        .query_row(
+    let account_id = account_id.trim();
+    let received_at: String = if account_id.is_empty() {
+        conn.query_row(
             "SELECT COALESCE(MAX(received_at), datetime('now')) FROM messages WHERE thread_id = ?1",
             [thread_id],
             |r| r.get(0),
         )
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+    } else {
+        conn.query_row(
+            "SELECT COALESCE(MAX(received_at), datetime('now')) FROM messages WHERE thread_id = ?1 AND account_id = ?2",
+            params![thread_id, account_id],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?
+    };
     let flat = "Archive".to_string();
     Ok(crate::archive_layout::resolve_archive_target(
         layout,
@@ -704,7 +723,7 @@ mod tests {
         .expect("account");
         drop(conn);
         let proposal = sample_proposal("t1", false);
-        let err = org_apply_proposal_with(&path, "a1", proposal, None, None)
+        let err = org_apply_proposal_with(&path, "a1", proposal, None, None, None)
             .await
             .expect_err("non applicable");
         assert!(err.contains("conseil"));

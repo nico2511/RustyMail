@@ -43,7 +43,7 @@ fn outlook_fixture_keeps_body_strips_mso_and_quote_noise() {
     let out = clean_html_for_markdown(&reg, &ctx, html);
 
     assert_eq!(out.resolved_provider, ProviderId::Generic);
-    assert_eq!(out.generic_rule_set_version, "9");
+    assert_eq!(out.generic_rule_set_version, "10");
     let low = out.html.to_ascii_lowercase();
     assert!(low.contains("message principal outlook"));
     assert!(!low.contains("[if mso]"));
@@ -96,7 +96,7 @@ fn outlook_forward_chain_builds_conversation_report() {
     let reg = ProviderRegistry::builtin();
     let out = clean_html_for_markdown(&reg, &ctx, html);
 
-    assert_eq!(out.generic_rule_set_version, "9");
+    assert_eq!(out.generic_rule_set_version, "10");
     assert!(out.html.contains("rm-conversation-report"));
     assert!(out.html.contains("Message transféré"));
     assert!(out.html.contains("brief logistique"));
@@ -118,4 +118,20 @@ fn keeps_useful_small_logo_not_tracker_pixel() {
 
     assert!(out.html.contains("logo.png"));
     assert!(!out.html.contains("pixel"));
+}
+
+#[test]
+fn strips_style_video_svg_and_small_tracker() {
+    let html = r#"<div><p>Bonjour</p><style>body{background:url(https://track.example/x)}</style><video src="https://evil.example/v.mp4"></video><svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg><img src="https://track.example/open.gif" width="2" height="2" alt=""/></div>"#;
+    let msg = generic_message(html.into());
+    let ctx = CleaningInput::from_message(&msg);
+    let reg = ProviderRegistry::builtin();
+    let out = clean_html_for_markdown(&reg, &ctx, html);
+    let low = out.html.to_ascii_lowercase();
+    assert!(low.contains("bonjour"));
+    assert!(!low.contains("<style"));
+    assert!(!low.contains("<video"));
+    assert!(!low.contains("<svg"));
+    assert!(!low.contains("open.gif"));
+    assert!(!low.contains("evil.example"));
 }

@@ -111,9 +111,8 @@ fn write_oauth_embed_rs(vars: &BTreeMap<String, String>) {
     }
     code.push_str("}\n");
 
-    std::fs::write(&dest, code).unwrap_or_else(|e| {
-        panic!("écriture de {} impossible: {e}", dest.display())
-    });
+    std::fs::write(&dest, code)
+        .unwrap_or_else(|e| panic!("écriture de {} impossible: {e}", dest.display()));
 }
 
 fn main() {

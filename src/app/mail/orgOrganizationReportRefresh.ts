@@ -32,7 +32,7 @@ export async function refreshOrganizationV2Report(): Promise<void> {
   state.organizationV2.applyMessage = "Mise à jour…";
   render();
   try {
-    const report = await orgV2ScanAccount(acc.id);
+    const report = await orgV2ScanAccount(acc.id, Boolean(state.appPrefs.ai.featureOrgProposalsEnabled));
     state.organizationV2.report = report;
     state.organizationV2.applyMessage = `${report.proposals.length} action(s) en file.`;
   } catch (e) {

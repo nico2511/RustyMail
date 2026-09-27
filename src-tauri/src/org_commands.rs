@@ -46,6 +46,9 @@ pub struct OrgApplyPayload {
     /// Carte affichée côté UI (obligatoire pour `llm-*`, recommandé pour toutes les cartes).
     #[serde(default)]
     pub proposal_snapshot: Option<OrgProposal>,
+    /// Même identifiant pour tous les chunks d’un apply V2 (undo d’un seul lot).
+    #[serde(default)]
+    pub batch_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -67,6 +70,8 @@ pub struct OrgRetagThreadsPayload {
 #[serde(rename_all = "camelCase")]
 pub struct OrgArchivePathPayload {
     pub thread_id: String,
+    #[serde(default)]
+    pub account_id: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -279,6 +284,9 @@ pub async fn org_apply_proposal_cmd(
     if effective_action == OrgSuggestedAction::DeleteMailbox {
         ipc_guard::validate_delete_mailbox_ack(payload.delete_mailbox_ack.as_deref())?;
     }
+    if let Some(ref batch_id) = payload.batch_id {
+        ipc_guard::validate_org_batch_id(batch_id)?;
+    }
 
     let db = paths.db_path.clone();
     let thread_ids = payload.thread_ids.clone();
@@ -288,6 +296,7 @@ pub async fn org_apply_proposal_cmd(
         proposal,
         thread_ids,
         payload.action_override.as_deref(),
+        payload.batch_id.as_deref(),
     )
     .await?;
 
@@ -358,11 +367,17 @@ pub async fn org_resolve_archive_path_cmd(
     payload: OrgArchivePathPayload,
 ) -> Result<String, String> {
     ipc_guard::validate_thread_id(&payload.thread_id)?;
+    if !payload.account_id.trim().is_empty() {
+        ipc_guard::validate_account_id(&payload.account_id)?;
+    }
     let db = paths.db_path.clone();
     let thread_id = payload.thread_id.clone();
-    tauri::async_runtime::spawn_blocking(move || org_resolve_archive_path(&db, &thread_id))
-        .await
-        .map_err(|e| format!("org archive path join: {e}"))?
+    let account_id = payload.account_id.trim().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        org_resolve_archive_path(&db, &account_id, &thread_id)
+    })
+    .await
+    .map_err(|e| format!("org archive path join: {e}"))?
 }
 
 #[tauri::command]

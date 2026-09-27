@@ -30,6 +30,13 @@ describe("org V2 apply helpers", () => {
   it("collecte et découpe les ids", () => {
     const ids = collectOrgProposalApplyIds(sampleProposal());
     expect(ids).toEqual(["t1", "t2"]);
+    const withExtra = collectOrgProposalApplyIds(
+      sampleProposal({
+        threadIds: ["t1", "t2", "t3"],
+        totalCount: 3,
+      }),
+    );
+    expect(withExtra).toEqual(["t1", "t2", "t3"]);
     expect(chunkStringIds(["a", "b", "c", "d", "e"], 2)).toEqual([
       ["a", "b"],
       ["c", "d"],

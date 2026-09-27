@@ -62,7 +62,9 @@ Front-end reads via **`invokeAiCacheGet`** (`ipc_bridge.ts`) with dedup and time
 | `set_app_prefs` | W file | AI URL validation |
 | LLM commands | W cache / Net | `llm_gate`; JSON validators; untrusted mail wrapper |
 | `ai_cache_get` | R | Validated keys only |
-| Org center apply | Net+W | Trash/delete mailbox backend acks |
+| Org center apply | Net+W | Trash/delete mailbox backend acks ; optional `batchId` (hex UUID) shared across V2 chunks |
+| Updater plugin | Net | Capabilities `updater:default` (check, download, install). Downloads happen in Rust, not the WebView. No install without a user click. |
+| Process restart | Sys | `process:allow-restart` only — `process:allow-exit` is not granted |
 | Demo account reset/remove | W | Scoped to `playground@demo.rustymail.app` |
 
 ## Command families (status)

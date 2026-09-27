@@ -8,10 +8,33 @@ import {
 } from "./mailUnsubscribeLinks";
 import { stripOutlookDisplayNoiseFromDoc } from "./mailEmailHtmlOutlookStripRun";
 import {
+  dropActiveContentFromHtml,
   normalizeEmailLinksInDoc,
   sanitizeEmailImagesInDoc,
   stripUnsafeInlineStylesInEmailDoc,
 } from "./mailEmailHtmlSanitizeDomRun";
+
+const FORBIDDEN_ACTIVE_TAGS = [
+  "script",
+  "iframe",
+  "object",
+  "embed",
+  "link",
+  "meta",
+  "base",
+  "form",
+  "input",
+  "button",
+  "textarea",
+  "select",
+  "style",
+  "video",
+  "audio",
+  "svg",
+  "math",
+  "picture",
+  "source",
+];
 
 export function sanitizeEmailHtml(
   input: string,
@@ -21,10 +44,12 @@ export function sanitizeEmailHtml(
   const relocateUnsubscribe = opts?.relocateUnsubscribe !== false;
   const stripOutlookNoise = opts?.stripOutlookNoise === true;
   try {
-    const clean = DOMPurify.sanitize(String(input), {
-      FORBID_TAGS: ["script", "iframe", "object", "embed", "link", "meta", "base", "form", "input", "button", "textarea", "select"],
+    const stripped = dropActiveContentFromHtml(String(input));
+    const clean = DOMPurify.sanitize(stripped, {
+      FORBID_TAGS: FORBIDDEN_ACTIVE_TAGS,
+      // DOMPurify bloque déjà tous les attributs on*. La liste reste explicite pour les relecteurs.
       FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur"],
-      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|cid):|data:image\/)/i,
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|cid|tel):|data:image\/(?:png|jpe?g|gif|webp|bmp);base64,)/i,
     });
     const doc = new DOMParser().parseFromString(String(clean), "text/html");
     flattenNestedParagraphInDocument(doc);

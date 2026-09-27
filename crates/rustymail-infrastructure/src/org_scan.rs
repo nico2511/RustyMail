@@ -408,19 +408,21 @@ fn make_proposal(
     explain_signals: Vec<String>,
 ) -> OrgProposal {
     let total = refs.len();
-    let sample: Vec<_> = refs
-        .into_iter()
-        .take(20)
-        .map(|r| enrich_thread_ref(conn, account_id, r))
-        .collect();
+    // Les 20 premiers sont enrichis pour l’affichage ; le reste reste applicable (ids + dossier).
+    let mut iter = refs.into_iter();
+    let mut kept = Vec::with_capacity(total);
+    for r in iter.by_ref().take(20) {
+        kept.push(enrich_thread_ref(conn, account_id, r));
+    }
+    kept.extend(iter);
     OrgProposal {
         id: id.to_string(),
         kind,
         section: section.to_string(),
         title: title.to_string(),
         rationale: rationale.to_string(),
-        thread_ids: sample.iter().map(|r| r.thread_id.clone()).collect(),
-        thread_refs: sample,
+        thread_ids: kept.iter().map(|r| r.thread_id.clone()).collect(),
+        thread_refs: kept,
         suggested_action: action,
         target_mailbox: target,
         confidence: 0.85,
@@ -1208,5 +1210,52 @@ mod tests {
         assert!(proposals
             .iter()
             .all(|p| p.explain_signals.iter().any(|s| s.starts_with("keywords:"))));
+    }
+
+    #[test]
+    fn make_proposal_keeps_every_id_beyond_display_sample() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("org.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        insert_account(&conn, "a1");
+        let mut refs = Vec::new();
+        for i in 0..25 {
+            let id = format!("t{i}");
+            conn.execute(
+                "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags, is_followed)
+                 VALUES (?1, 'a1', 'INBOX', 'root', ?2, '', 0)",
+                params![id, format!("Sujet {i}")],
+            )
+            .expect("thread");
+            conn.execute(
+                "INSERT INTO messages (id, thread_id, account_id, mailbox, imap_uid, sender_name, sender_email, subject, received_at, body, is_read, position)
+                 VALUES (?1, ?2, 'a1', 'INBOX', ?3, 'A', 'a@x.com', ?4, '2020-01-01T00:00:00Z', '', 1, 0)",
+                params![format!("m{i}"), id, i + 1, format!("Sujet {i}")],
+            )
+            .expect("message");
+            refs.push(OrgThreadRef {
+                thread_id: id,
+                mailbox: "INBOX".into(),
+                subject: format!("Sujet {i}"),
+                ..Default::default()
+            });
+        }
+        let proposal = make_proposal(
+            &conn,
+            "a1",
+            "stale-inbox-read",
+            OrgProposalKind::StaleInboxRead,
+            "range",
+            "Inbox ancienne",
+            "why",
+            refs,
+            OrgSuggestedAction::Archive,
+            None,
+            vec!["inbox".into()],
+        );
+        assert_eq!(proposal.total_count, 25);
+        assert_eq!(proposal.thread_ids.len(), 25);
+        assert_eq!(proposal.thread_refs.len(), 25);
+        assert_eq!(proposal.thread_ids[24], "t24");
     }
 }

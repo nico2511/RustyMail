@@ -21,7 +21,8 @@ const V2_KINDS: &[OrgProposalKind] = &[
 ];
 
 const V2_FOCUS_NOTE: &str = "Inbox ancienne, désinscriptions, transactionnels, doublons cross-folder, \
-    règles mots-clés, dossiers vides. Les propositions IA n’apparaissent que si le LLM est activé.";
+    règles mots-clés, dossiers vides. L’action porte sur tous les fils détectés (la carte n’en affiche qu’un échantillon). \
+    Les propositions IA n’apparaissent que si le LLM est activé. La normalisation des tags reste dans Organiser (v1).";
 
 fn kind_allowed(kind: OrgProposalKind) -> bool {
     V2_KINDS.contains(&kind)

@@ -100,7 +100,7 @@ export function renderSidebar(): string {
           : ""
       }
       <div class="sidebar-footer">
-        <button type="button" class="folder-button ${state.view === "organizationV2" ? "active" : ""}" data-action="open-organization-v2-view" title="Organiser V2 — structure boîte (sans LLM). Les regroupements par critères = vues enregistrées.">
+        <button type="button" class="folder-button ${state.view === "organizationV2" ? "active" : ""}" data-action="open-organization-v2-view" title="Organiser V2 — heuristiques locales. Propositions IA seulement si elles sont activées dans Paramètres.">
           <span class="folder-icon">O2</span><span class="folder-name">Organiser V2</span>
         </button>
         <button type="button" class="folder-button" data-action="settings">

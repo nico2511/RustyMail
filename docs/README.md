@@ -33,7 +33,9 @@ English documentation for the RustyMail desktop mail client. Start at the [repos
 
 | Document | Contents |
 | -------- | -------- |
-| [RELEASE.md](RELEASE.md) | GitHub Actions, tagging, local `tauri:build` |
+| [RELEASE.md](RELEASE.md) | GitHub Actions, tagging, updater Windows, local `tauri:build` |
+| [ORGANISER_V2.md](ORGANISER_V2.md) | État des mécaniques Organiser v2 |
+| [LECTURE_HTML.md](LECTURE_HTML.md) | État du nettoyage HTML à la lecture |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Layout, tests, PR expectations |
 
 ## Assets

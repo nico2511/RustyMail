@@ -767,7 +767,7 @@ pub async fn resolve_archive_destination(
             .to_string()
     })?;
     let layout = parse_archive_layout(&prefs.general.archive_layout);
-    let received_at = latest_thread_received_at(path, thread_id)?;
+    let received_at = latest_thread_received_at(path, &account.id.0, thread_id)?;
     let logical_path = resolve_archive_target(
         layout,
         &prefs.general.archive_root,
@@ -859,11 +859,15 @@ pub async fn move_thread_to_archive(
     })
 }
 
-fn latest_thread_received_at(path: &Path, thread_id: &str) -> Result<String, String> {
+fn latest_thread_received_at(
+    path: &Path,
+    account_id: &str,
+    thread_id: &str,
+) -> Result<String, String> {
     let conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
     conn.query_row(
-        "SELECT COALESCE(MAX(received_at), datetime('now')) FROM messages WHERE thread_id = ?1",
-        [thread_id],
+        "SELECT COALESCE(MAX(received_at), datetime('now')) FROM messages WHERE thread_id = ?1 AND account_id = ?2",
+        rusqlite::params![thread_id, account_id],
         |r| r.get(0),
     )
     .map_err(|e| e.to_string())

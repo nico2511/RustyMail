@@ -274,11 +274,16 @@ export function renderOrganizationV2View(
             const mailboxSamples = p.threadRefs.filter((r) => isMailboxRef(r)).slice(0, 12);
             const rowSamples = [...threadSamples, ...mailboxSamples].slice(0, 12);
             const samplesHtml = rowSamples.map((r) => renderThreadSample(r, p)).join("");
-            const mailboxes = [...new Set(p.threadRefs.map((r) => r.mailbox?.trim()).filter(Boolean))] as string[];
+            const mailboxesAll = [...new Set(p.threadRefs.map((r) => r.mailbox?.trim()).filter(Boolean))] as string[];
+            const mailboxes = mailboxesAll.slice(0, 8);
+            const moreMailboxes = mailboxesAll.length - mailboxes.length;
             const mailboxChipsHtml =
               mailboxes.length > 0
-                ? `<div class="org-mailbox-chips">${mailboxes.map((mb) => mailboxChip(mb)).join("")}</div>`
+                ? `<div class="org-mailbox-chips">${mailboxes.map((mb) => mailboxChip(mb)).join("")}${
+                    moreMailboxes > 0 ? `<span class="dim">+ ${moreMailboxes} dossier(s)</span>` : ""
+                  }</div>`
                 : "";
+            const hiddenSamples = Math.max(0, (p.totalCount ?? 0) - rowSamples.length);
             const advisoryOnly = !isProposalApplicable(p);
             const countLabel =
               mailboxSamples.length > 0 || (p.threadRefs[0] && isMailboxRef(p.threadRefs[0]))
@@ -305,6 +310,11 @@ export function renderOrganizationV2View(
                   : advisoryOnly
                     ? `<p class="dim">Conseil structurel — pas d’application automatique.</p>`
                     : ""
+              }
+              ${
+                !advisoryOnly && hiddenSamples > 0
+                  ? `<p class="dim org-sample-hint">${hiddenSamples} autre(s) inclus dans l’action, non listés ici.</p>`
+                  : ""
               }
               <div class="org-card__actions org-card__actions--multi org-card__actions--v2">
                 ${

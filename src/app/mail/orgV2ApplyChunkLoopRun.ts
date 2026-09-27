@@ -27,6 +27,7 @@ export async function applyOrgV2ProposalChunks(
     threadsAffected: [],
   };
   let cancelled = false;
+  const batchId = crypto.randomUUID();
 
   for (let i = 0; i < chunks.length; i++) {
     if (state.organizationV2.applyCancelRequested) {
@@ -42,6 +43,7 @@ export async function applyOrgV2ProposalChunks(
       actionOverride,
       deleteMailboxAck,
       chunk,
+      batchId,
     );
     merged = mergeOrgApplyProgress(merged, p);
     state.organizationV2.applyDone = merged.done;
