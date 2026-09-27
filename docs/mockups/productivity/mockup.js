@@ -375,9 +375,13 @@
     btn.addEventListener("click", () => {
       const turn = btn.closest(".turn");
       if (!turn) return;
-      const willOpen = !turn.classList.contains("is-open");
-      document.querySelectorAll(".turn").forEach((other) => setTurn(other, false));
-      if (willOpen) setTurn(turn, true);
+      const openCount = document.querySelectorAll(".turn.is-open").length;
+      const wasOpen = turn.classList.contains("is-open");
+      if (wasOpen && openCount === 1) {
+        setTurn(turn, false);
+        return;
+      }
+      document.querySelectorAll(".turn").forEach((other) => setTurn(other, other === turn));
     });
   });
 
