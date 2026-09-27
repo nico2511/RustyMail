@@ -7,16 +7,24 @@
     if (link.dataset.nav === page) link.setAttribute("aria-current", "page");
   });
 
-  const railBtn = document.getElementById("rail-toggle");
-  if (railBtn && app) {
-    railBtn.addEventListener("click", () => {
-      const collapsed = app.classList.toggle("is-rail-collapsed");
-      railBtn.setAttribute("aria-expanded", String(!collapsed));
-      const label = collapsed ? "Afficher les dossiers" : "Masquer les dossiers";
-      railBtn.setAttribute("aria-label", label);
-      railBtn.title = label;
-    });
+  function syncRail(collapsed) {
+    if (!app) return;
+    app.classList.toggle("is-rail-collapsed", collapsed);
+    const btn = document.getElementById("rail-toggle");
+    if (!btn) return;
+    btn.setAttribute("aria-expanded", String(!collapsed));
+    const label = collapsed ? "Afficher les dossiers" : "Masquer les dossiers";
+    btn.setAttribute("aria-label", label);
+    btn.title = label + " ([)";
+    const text = btn.querySelector(".label");
+    if (text) text.textContent = collapsed ? "Dossiers" : "Réduire";
   }
+
+  if (app?.classList.contains("is-rail-collapsed")) syncRail(true);
+
+  document.getElementById("rail-toggle")?.addEventListener("click", () => {
+    syncRail(!app.classList.contains("is-rail-collapsed"));
+  });
 
   function setPanel(open) {
     const panel = document.querySelector(".panel");
@@ -36,33 +44,57 @@
     });
   });
 
-  const accountBtn = document.getElementById("account-btn");
-  const accountMenu = document.getElementById("account-menu");
-  if (accountBtn && accountMenu) {
-    accountBtn.addEventListener("click", () => {
-      const open = accountMenu.hasAttribute("hidden");
-      accountMenu.hidden = !open;
-      accountBtn.setAttribute("aria-expanded", String(open));
-    });
-    accountMenu.querySelectorAll("button").forEach((option) => {
-      option.addEventListener("click", () => {
-        const name = option.dataset.name || "";
-        const mail = option.dataset.mail || "";
-        const mark = option.dataset.mark || "";
-        const nameEl = document.getElementById("account-name");
-        const mailEl = document.getElementById("account-mail");
-        const markEl = document.getElementById("account-mark");
-        if (nameEl) nameEl.textContent = name;
-        if (mailEl) mailEl.textContent = mail;
-        if (markEl) markEl.textContent = mark;
-        accountMenu.querySelectorAll("button").forEach((b) => {
-          b.setAttribute("aria-selected", String(b === option));
-        });
-        accountMenu.hidden = true;
-        accountBtn.setAttribute("aria-expanded", "false");
-      });
+  function setDialog(id, open) {
+    const dialog = document.getElementById(id);
+    if (!dialog) return;
+    dialog.hidden = !open;
+    document.querySelectorAll(`[aria-controls="${id}"]`).forEach((btn) => {
+      btn.setAttribute("aria-expanded", String(open));
     });
   }
+
+  document.querySelectorAll("[data-open-profile]").forEach((btn) => {
+    btn.addEventListener("click", () => setDialog("profile", true));
+  });
+  document.querySelectorAll("[data-open-props]").forEach((btn) => {
+    btn.addEventListener("click", () => setDialog("props", true));
+  });
+  document.querySelectorAll("[data-open-contact]").forEach((btn) => {
+    btn.addEventListener("click", () => setDialog("contact", true));
+  });
+  document.querySelectorAll("[data-close-modal]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const dialog = btn.closest(".modal");
+      if (dialog) dialog.hidden = true;
+    });
+  });
+
+  document.getElementById("account-menu")?.querySelectorAll("button").forEach((option) => {
+    option.addEventListener("click", () => {
+      const name = option.dataset.name || "";
+      const mail = option.dataset.mail || "";
+      const mark = option.dataset.mark || "";
+      const markEl = document.getElementById("account-mark");
+      const nameEl = document.getElementById("account-name");
+      const profileName = document.getElementById("profile-name");
+      const profileMail = document.getElementById("profile-mail");
+      const profileMark = document.getElementById("profile-mark");
+      if (markEl) markEl.textContent = mark;
+      if (nameEl) nameEl.textContent = name;
+      if (profileName) profileName.textContent = name;
+      if (profileMail) profileMail.textContent = mail;
+      if (profileMark) profileMark.textContent = mark;
+      document.getElementById("profile-open")?.setAttribute("title", "Compte — " + name);
+      option.parentElement?.querySelectorAll("button").forEach((other) => {
+        other.setAttribute("aria-selected", String(other === option));
+      });
+    });
+  });
+
+  document.getElementById("logout")?.addEventListener("click", (event) => {
+    event.currentTarget.textContent = "Déconnecté";
+    event.currentTarget.disabled = true;
+  });
 
   document.querySelectorAll("[data-filter]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -234,11 +266,27 @@
     if (note) note.hidden = false;
   });
 
+  document.querySelectorAll(".turn-sum").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const turn = btn.closest(".turn");
+      if (!turn) return;
+      const willOpen = !turn.classList.contains("is-open");
+      document.querySelectorAll(".turn.is-open").forEach((open) => {
+        open.classList.remove("is-open");
+        open.querySelector(".turn-sum")?.setAttribute("aria-expanded", "false");
+        const body = open.querySelector(".turn-body");
+        if (body) body.hidden = true;
+      });
+      if (willOpen) {
+        turn.classList.add("is-open");
+        btn.setAttribute("aria-expanded", "true");
+        const body = turn.querySelector(".turn-body");
+        if (body) body.hidden = false;
+      }
+    });
+  });
+
   document.addEventListener("click", (event) => {
-    if (accountMenu && accountBtn && !accountBtn.contains(event.target) && !accountMenu.contains(event.target)) {
-      accountMenu.hidden = true;
-      accountBtn.setAttribute("aria-expanded", "false");
-    }
     if (moveMenu && moveBtn && !moveBtn.contains(event.target) && !moveMenu.contains(event.target)) {
       moveMenu.hidden = true;
       moveBtn.setAttribute("aria-expanded", "false");
@@ -248,13 +296,22 @@
   document.addEventListener("keydown", (event) => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName) || event.target.isContentEditable;
     if (event.key === "Escape") {
+      const openDialog = document.querySelector(".modal:not([hidden])");
+      if (openDialog) {
+        openDialog.hidden = true;
+        return;
+      }
       setPanel(false);
-      if (accountMenu) accountMenu.hidden = true;
       if (moveMenu) moveMenu.hidden = true;
       if (typing) event.target.blur();
       return;
     }
     if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "[" || event.key === "\\") {
+      event.preventDefault();
+      syncRail(!app?.classList.contains("is-rail-collapsed"));
+      return;
+    }
     if (event.key === "/") {
       const search = document.getElementById("q");
       if (search) {
@@ -295,4 +352,6 @@
       row.hidden = true;
     });
   }
+
+  if (new URLSearchParams(location.search).get("profil") === "1") setDialog("profile", true);
 })();

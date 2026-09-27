@@ -27,7 +27,7 @@
     <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4 4 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
   </svg>
 
-  <div class="app">
+  <div class="app is-rail-collapsed">
     <header class="chrome">
       <a class="brand" href="index.html">RustyMail</a>
       <span class="chrome-title">Rédaction</span>
@@ -41,19 +41,10 @@
     <div class="workspace">
       <aside class="rail" aria-label="Dossiers">
         <div class="rail-top">
-          <div class="account-wrap">
-            <button type="button" class="account" id="account-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="account-menu">
-              <span class="mono" id="account-mark">N</span>
-              <span class="account-id">
-                <strong id="account-name">Nicolas</strong>
-                <small id="account-mail">nicolas@exemple.fr</small>
-              </span>
-            </button>
-            <div class="pop pop-account" id="account-menu" role="listbox" hidden>
-              <button type="button" role="option" aria-selected="true" data-name="Nicolas" data-mail="nicolas@exemple.fr" data-mark="N">Nicolas<small>nicolas@exemple.fr</small></button>
-              <button type="button" role="option" data-name="Facturation" data-mail="facturation@exemple.fr" data-mark="F">Facturation<small>facturation@exemple.fr</small></button>
-            </div>
-          </div>
+          <button type="button" class="avatar-btn" id="profile-open" data-open-profile aria-haspopup="dialog" aria-controls="profile" aria-expanded="false" title="Compte — Nicolas">
+            <span class="mono" id="account-mark">N</span>
+            <span class="sr" id="account-name">Nicolas</span>
+          </button>
           <a class="btn btn-primary btn-compose" href="compose.html?nouveau=1">
             <svg class="ico"><use href="#i-pen"/></svg>
             <span>Nouveau message</span>
@@ -82,10 +73,11 @@
         </nav>
         <div class="rail-foot">
           <button type="button" class="folder" title="Organiser la boîte"><svg class="ico"><use href="#i-layers"/></svg><span class="label">Organiser</span></button>
-          <button type="button" class="folder" title="Paramètres"><svg class="ico"><use href="#i-sliders"/></svg><span class="label">Paramètres</span></button>
-          <button type="button" class="rail-collapse" id="rail-toggle" aria-expanded="true" aria-label="Masquer les dossiers" title="Masquer les dossiers">
+          <button type="button" class="folder" data-open-profile title="Paramètres du compte"><svg class="ico"><use href="#i-sliders"/></svg><span class="label">Paramètres</span></button>
+          <button type="button" class="rail-collapse" id="rail-toggle" aria-expanded="false" aria-label="Afficher les dossiers" title="Afficher les dossiers ([)">
             <svg class="ico"><use href="#i-chevron"/></svg>
-            <span class="label">Réduire</span>
+            <span class="label">Dossiers</span>
+            <kbd class="kbd rail-kbd">[</kbd>
           </button>
         </div>
       </aside>
@@ -205,8 +197,11 @@ Nicolas</pre>
     </div>
 
     <footer class="status">
-      <span class="sync"><i aria-hidden="true"></i> Brouillon conservé sur cet appareil</span>
-      <span class="keys"><kbd>M</kbd> aperçu</span>
+      <button type="button" class="sync" data-open-profile title="Brouillon local · à l’instant">
+        <i aria-hidden="true"></i>
+        <span class="sr">Brouillon conservé sur cet appareil.</span>
+      </button>
+      <span class="status-hint"><kbd>[</kbd> dossiers</span>
       <nav class="walk" aria-label="Parcours des maquettes">
         <a href="index.html" data-nav="hub">Sommaire</a>
         <a href="inbox.html" data-nav="inbox">Réception</a>
@@ -214,6 +209,39 @@ Nicolas</pre>
         <a href="compose.html" data-nav="compose">Rédaction</a>
       </nav>
     </footer>
+  </div>
+  <div class="modal" id="profile" hidden>
+    <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer le compte"></button>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <div class="modal-head">
+        <h2 id="profile-title">Compte</h2>
+        <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
+      </div>
+      <div class="identity">
+        <span class="mono mono-lg" id="profile-mark">N</span>
+        <div>
+          <strong id="profile-name">Nicolas</strong>
+          <span id="profile-mail">nicolas@exemple.fr</span>
+        </div>
+      </div>
+      <h3>Comptes IMAP</h3>
+      <div class="acct-list" role="listbox" id="account-menu" aria-label="Comptes">
+        <button type="button" role="option" aria-selected="true" data-name="Nicolas" data-mail="nicolas@exemple.fr" data-mark="N">Nicolas<small>nicolas@exemple.fr · synchronisé il y a 2 min</small></button>
+        <button type="button" role="option" data-name="Facturation" data-mail="facturation@exemple.fr" data-mark="F">Facturation<small>facturation@exemple.fr · synchronisé il y a 6 min</small></button>
+      </div>
+      <h3>Raccourcis</h3>
+      <ul class="shortcut-list">
+        <li><kbd>[</kbd> Replier ou ouvrir les dossiers</li>
+        <li><kbd>\</kbd> Même bascule</li>
+        <li><kbd>N</kbd> Nouveau message</li>
+        <li><kbd>/</kbd> Recherche</li>
+        <li><kbd>R</kbd> Répondre</li>
+        <li><kbd>Échap</kbd> Fermer</li>
+      </ul>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="logout">Déconnexion</button>
+      </div>
+    </div>
   </div>
   <script src="mockup.js"></script>
 </body>

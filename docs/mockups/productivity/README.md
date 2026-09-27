@@ -19,21 +19,32 @@ Aucun build. Ouvrir `index.html` dans un navigateur (fichier local ou serveur st
 
 Polices embarquées dans `fonts/` (pas d’appel réseau).
 
-Parcours : sommaire → réception → fil → rédaction. La barre d’état reprend les trois liens. Dans la réception, le fil de Camille Moreau ouvre la discussion ; **Répondre** ouvre la rédaction. **Nouveau message** (`N`) ouvre une rédaction vide (`compose.html?nouveau=1`).
+Parcours : sommaire → réception → fil → rédaction. La barre d’état reprend les trois liens. Dans la réception, le fil de Camille Moreau ouvre la discussion ; **Répondre** ouvre la rédaction, rail déjà replié. **Nouveau message** (`N`) ouvre une rédaction vide (`compose.html?nouveau=1`).
+
+## Rail replié
+
+Le volet dossiers se replie sur une barre d’icônes (bouton **Réduire**, ou touche `[` — `\` fait la même bascule). En **rédaction**, le rail est replié dès l’ouverture pour laisser presque toute la largeur à l’écriture. Le rouvrir : même touche, ou le chevron en bas du rail.
+
+## Infos à la demande
+
+Le compte ne reste pas affiché dans le rail. L’avatar (ou **Paramètres**, ou le point de synchro) ouvre une modale : identité, comptes IMAP, raccourcis, déconnexion. Lien direct : `inbox.html?profil=1`.
+
+Dans le fil, **Détails** ouvre les propriétés du message (sécurité, tags, copie). L’adresse de l’expéditeur ouvre une fiche contact. Le volet Aide / Réécriture reste un onglet de bord, fermé par défaut.
 
 ## Ce que chaque écran prouve
 
 | Écran | Fichier | Preuve |
 | ----- | ------- | ------ |
-| Réception | `inbox.html` | Hiérarchie des non-lus, expéditeur / objet / aperçu / date, actions au survol et au clavier, dossiers en retrait, recherche atteignable, filtres Tous / Non lus / Suivis. |
-| Fil | `thread.html` | Sujet, participants, pile de messages, citation repliée, fragment HTML nettoyé, pièce jointe, répondre / archiver / corbeille / déplacer. Volet Aide fermé par défaut. |
-| Rédaction | `compose.html` | À / Cc / Cci, objet, markdown, aperçu, historique de brouillon, pièces jointes, envoyer. Réécriture en volet secondaire. |
+| Réception | `inbox.html` | Hiérarchie des non-lus, expéditeur / objet / aperçu / date, actions au survol, recherche, filtres. Compte en modale. |
+| Fil | `thread.html` | Messages anciens repliés, message actif développé, citation repliée, HTML nettoyé en badges, pièce jointe. |
+| Rédaction | `compose.html` | Rail replié, À / Cc / Cci, markdown, aperçu, historique, pièces jointes, envoyer. Réécriture en onglet. |
 
 ## Captures
 
-- `images/inbox.png`
-- `images/thread.png`
-- `images/compose.png`
+- `images/inbox.png` — réception, rail ouvert
+- `images/profile-modal.png` — modale compte
+- `images/thread.png` — fil scannable
+- `images/compose.png` — rédaction, rail replié
 
 ## Hors périmètre
 

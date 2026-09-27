@@ -43,19 +43,10 @@
     <div class="workspace">
       <aside class="rail" aria-label="Dossiers">
         <div class="rail-top">
-          <div class="account-wrap">
-            <button type="button" class="account" id="account-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="account-menu">
-              <span class="mono" id="account-mark">N</span>
-              <span class="account-id">
-                <strong id="account-name">Nicolas</strong>
-                <small id="account-mail">nicolas@exemple.fr</small>
-              </span>
-            </button>
-            <div class="pop pop-account" id="account-menu" role="listbox" hidden>
-              <button type="button" role="option" aria-selected="true" data-name="Nicolas" data-mail="nicolas@exemple.fr" data-mark="N">Nicolas<small>nicolas@exemple.fr</small></button>
-              <button type="button" role="option" data-name="Facturation" data-mail="facturation@exemple.fr" data-mark="F">Facturation<small>facturation@exemple.fr</small></button>
-            </div>
-          </div>
+          <button type="button" class="avatar-btn" id="profile-open" data-open-profile aria-haspopup="dialog" aria-controls="profile" aria-expanded="false" title="Compte — Nicolas">
+            <span class="mono" id="account-mark">N</span>
+            <span class="sr" id="account-name">Nicolas</span>
+          </button>
           <a class="btn btn-primary btn-compose" href="compose.html?nouveau=1">
             <svg class="ico"><use href="#i-pen"/></svg>
             <span>Nouveau message</span>
@@ -84,10 +75,11 @@
         </nav>
         <div class="rail-foot">
           <button type="button" class="folder" title="Organiser la boîte"><svg class="ico"><use href="#i-layers"/></svg><span class="label">Organiser</span></button>
-          <button type="button" class="folder" title="Paramètres"><svg class="ico"><use href="#i-sliders"/></svg><span class="label">Paramètres</span></button>
-          <button type="button" class="rail-collapse" id="rail-toggle" aria-expanded="true" aria-label="Masquer les dossiers" title="Masquer les dossiers">
+          <button type="button" class="folder" data-open-profile title="Paramètres du compte"><svg class="ico"><use href="#i-sliders"/></svg><span class="label">Paramètres</span></button>
+          <button type="button" class="rail-collapse" id="rail-toggle" aria-expanded="true" aria-label="Masquer les dossiers" title="Masquer les dossiers ([)">
             <svg class="ico"><use href="#i-chevron"/></svg>
             <span class="label">Réduire</span>
+            <kbd class="kbd rail-kbd">[</kbd>
           </button>
         </div>
       </aside>
@@ -96,17 +88,14 @@
         <header class="thread-head">
           <a class="back" href="inbox.html"><svg class="ico"><use href="#i-chevron"/></svg> Réception</a>
           <h1 class="subject-xl">Contrat d’atelier — relecture de l’article 4</h1>
-          <p class="people"><strong>Camille Moreau</strong>, vous · 3 messages · <span class="secure">DKIM, SPF et DMARC conformes</span></p>
-          <div class="tags">
-            <button type="button" class="tag" title="Rechercher le tag Contrat">Contrat</button>
-            <button type="button" class="tag" title="Rechercher le tag Chêne">Chêne</button>
-          </div>
+          <p class="people">Camille Moreau, vous · 3 messages</p>
           <div class="actions">
             <a class="btn btn-primary" href="compose.html"><svg class="ico"><use href="#i-reply"/></svg> Répondre</a>
             <a class="btn" href="compose.html"><svg class="ico"><use href="#i-reply-all"/></svg> Répondre à tous</a>
             <button type="button" class="btn"><svg class="ico"><use href="#i-forward"/></svg> Transférer</button>
             <span class="spacer"></span>
             <button type="button" class="btn btn-quiet" id="follow-btn" aria-pressed="true">Suivi</button>
+            <button type="button" class="btn btn-quiet" data-open-props aria-controls="props" aria-expanded="false">Détails</button>
             <button type="button" class="btn"><svg class="ico"><use href="#i-archive"/></svg> Archiver</button>
             <div class="move-wrap">
               <button type="button" class="btn" id="move-btn" aria-expanded="false" aria-controls="move-menu">Déplacer</button>
@@ -122,71 +111,78 @@
         </header>
 
         <div class="thread-scroll">
-          <article class="msg">
-            <div class="who">
-              <strong>Camille Moreau</strong>
-              <span class="addr">camille@menuiserie-moreau.fr</span>
-              <time datetime="2026-09-26T09:14">Aujourd’hui, 09:14</time>
-            </div>
-            <div class="prose">
-              <p>Bonjour Nicolas,</p>
-              <p>Peux-tu relire l’article 4 avant vendredi ? Le notaire veut figer la date de livraison et le numéro de lot du chêne. Je t’ai laissé la version reçue hier soir.</p>
-              <p>Merci,<br>Camille</p>
-            </div>
-          </article>
-
-          <article class="msg">
-            <div class="who">
-              <strong>Vous</strong>
-              <span class="addr">nicolas@exemple.fr</span>
-              <time datetime="2026-09-26T11:40">Aujourd’hui, 11:40</time>
-            </div>
-            <div class="prose">
-              <p>Camille,</p>
-              <p>La livraison du 12 juin tient si le chêne part lundi. Je corrige la clause de réserve de propriété pour citer le lot 18-C.</p>
-              <p>Nicolas</p>
-            </div>
-          </article>
-
-          <article class="msg">
-            <div class="who">
-              <strong>Camille Moreau</strong>
-              <span class="addr">camille@menuiserie-moreau.fr</span>
-              <span class="cc">Copie : Maître Julien Elbaz</span>
-              <time datetime="2026-09-26T14:22">Aujourd’hui, 14:22</time>
-            </div>
-            <div class="prose">
-              <p>Parfait. Je joins l’échéancier tel que le notaire l’a mis dans son message. Dis-moi si les montants te conviennent.</p>
-              <figure class="clean">
-                <figcaption>
-                  <span>HTML nettoyé</span>
-                  <span>Images distantes bloquées</span>
-                </figcaption>
-                <table>
-                  <thead>
-                    <tr><th>Jalon</th><th>Date</th><th class="num">Montant</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td>Acompte</td><td>2 mai</td><td class="num">4 800 €</td></tr>
-                    <tr><td>Livraison</td><td>12 juin</td><td class="num">7 200 €</td></tr>
-                    <tr><td>Solde</td><td>À réception</td><td class="num">3 000 €</td></tr>
-                  </tbody>
-                </table>
-              </figure>
-              <div class="filechip">
-                <svg class="ico" aria-hidden="true"><use href="#i-clip"/></svg>
-                <span>echeancier-notaire.pdf</span>
-                <span class="meta">86 Ko</span>
-                <button type="button" class="btn btn-quiet">Ouvrir</button>
+          <div class="talk" role="list">
+            <article class="turn is-folded" role="listitem">
+              <span class="dot" aria-hidden="true"></span>
+              <button type="button" class="turn-sum" aria-expanded="false">
+                <span class="turn-name">Camille Moreau</span>
+                <span class="turn-preview">Peux-tu relire l’article 4 avant vendredi ?</span>
+                <span class="turn-when"><time datetime="2026-09-26T09:14">09:14</time></span>
+              </button>
+              <div class="turn-body prose" hidden>
+                <p>Bonjour Nicolas,</p>
+                <p>Peux-tu relire l’article 4 avant vendredi ? Le notaire veut figer la date de livraison et le numéro de lot du chêne. Je t’ai laissé la version reçue hier soir.</p>
+                <p>Merci,<br>Camille</p>
               </div>
-              <details class="cited">
-                <summary>Afficher la citation</summary>
-                <blockquote>
-                  <p>La livraison du 12 juin tient si le chêne part lundi. Je corrige la clause de réserve de propriété pour citer le lot 18-C.</p>
-                </blockquote>
-              </details>
-            </div>
-          </article>
+            </article>
+
+            <article class="turn is-folded" role="listitem">
+              <span class="dot" aria-hidden="true"></span>
+              <button type="button" class="turn-sum" aria-expanded="false">
+                <span class="turn-name">Vous</span>
+                <span class="turn-preview">La livraison du 12 juin tient si le chêne part lundi.</span>
+                <span class="turn-when"><time datetime="2026-09-26T11:40">11:40</time></span>
+              </button>
+              <div class="turn-body prose" hidden>
+                <p>Camille,</p>
+                <p>La livraison du 12 juin tient si le chêne part lundi. Je corrige la clause de réserve de propriété pour citer le lot 18-C.</p>
+                <p>Nicolas</p>
+              </div>
+            </article>
+
+            <article class="turn is-open is-focus" role="listitem">
+              <span class="dot" aria-hidden="true"></span>
+              <button type="button" class="turn-sum" aria-expanded="true">
+                <span class="turn-name">Camille Moreau</span>
+                <span class="turn-preview">Parfait. Je joins l’échéancier du notaire.</span>
+                <span class="turn-when"><time datetime="2026-09-26T14:22">14:22</time><span class="quiet-tag">Non lu</span></span>
+              </button>
+              <div class="turn-body">
+                <p class="mini-badges">
+                  <button type="button" class="linkish" data-open-contact>camille@menuiserie-moreau.fr</button>
+                  <span class="quiet-tag">HTML nettoyé</span>
+                  <span class="quiet-tag">Images distantes bloquées</span>
+                </p>
+                <div class="prose">
+                  <p>Parfait. Je joins l’échéancier tel que le notaire l’a mis dans son message. Dis-moi si les montants te conviennent.</p>
+                </div>
+                <figure class="clean">
+                  <table>
+                    <thead>
+                      <tr><th>Jalon</th><th>Date</th><th class="num">Montant</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>Acompte</td><td>2 mai</td><td class="num">4 800 €</td></tr>
+                      <tr><td>Livraison</td><td>12 juin</td><td class="num">7 200 €</td></tr>
+                      <tr><td>Solde</td><td>À réception</td><td class="num">3 000 €</td></tr>
+                    </tbody>
+                  </table>
+                </figure>
+                <div class="filechip">
+                  <svg class="ico" aria-hidden="true"><use href="#i-clip"/></svg>
+                  <span>echeancier-notaire.pdf</span>
+                  <span class="meta">86 Ko</span>
+                  <button type="button" class="btn btn-quiet">Ouvrir</button>
+                </div>
+                <details class="cited">
+                  <summary>Citation · votre message de 11:40</summary>
+                  <blockquote>
+                    <p>La livraison du 12 juin tient si le chêne part lundi. Je corrige la clause de réserve de propriété pour citer le lot 18-C.</p>
+                  </blockquote>
+                </details>
+              </div>
+            </article>
+          </div>
         </div>
 
         <button type="button" class="edge-tab" data-panel-toggle aria-controls="aide" aria-expanded="false">Aide</button>
@@ -215,8 +211,11 @@
     </div>
 
     <footer class="status">
-      <span class="sync"><i aria-hidden="true"></i> IMAP · synchronisé il y a 2 min</span>
-      <span class="keys"><kbd>R</kbd> répondre <kbd>Échap</kbd> fermer l’aide</span>
+      <button type="button" class="sync" data-open-profile title="IMAP · synchronisé il y a 2 min">
+        <i aria-hidden="true"></i>
+        <span class="sr">Synchronisé il y a 2 min. Ouvrir le compte.</span>
+      </button>
+      <span class="status-hint"><kbd>[</kbd> dossiers</span>
       <nav class="walk" aria-label="Parcours des maquettes">
         <a href="index.html" data-nav="hub">Sommaire</a>
         <a href="inbox.html" data-nav="inbox">Réception</a>
@@ -224,6 +223,69 @@
         <a href="compose.html" data-nav="compose">Rédaction</a>
       </nav>
     </footer>
+  </div>
+  <div class="modal" id="profile" hidden>
+    <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer le compte"></button>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <div class="modal-head">
+        <h2 id="profile-title">Compte</h2>
+        <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
+      </div>
+      <div class="identity">
+        <span class="mono mono-lg" id="profile-mark">N</span>
+        <div>
+          <strong id="profile-name">Nicolas</strong>
+          <span id="profile-mail">nicolas@exemple.fr</span>
+        </div>
+      </div>
+      <h3>Comptes IMAP</h3>
+      <div class="acct-list" role="listbox" id="account-menu" aria-label="Comptes">
+        <button type="button" role="option" aria-selected="true" data-name="Nicolas" data-mail="nicolas@exemple.fr" data-mark="N">Nicolas<small>nicolas@exemple.fr · synchronisé il y a 2 min</small></button>
+        <button type="button" role="option" data-name="Facturation" data-mail="facturation@exemple.fr" data-mark="F">Facturation<small>facturation@exemple.fr · synchronisé il y a 6 min</small></button>
+      </div>
+      <h3>Raccourcis</h3>
+      <ul class="shortcut-list">
+        <li><kbd>[</kbd> Replier ou ouvrir les dossiers</li>
+        <li><kbd>\</kbd> Même bascule</li>
+        <li><kbd>N</kbd> Nouveau message</li>
+        <li><kbd>/</kbd> Recherche</li>
+        <li><kbd>R</kbd> Répondre</li>
+        <li><kbd>Échap</kbd> Fermer</li>
+      </ul>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="logout">Déconnexion</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="props" hidden>
+    <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer les détails"></button>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="props-title">
+      <div class="modal-head">
+        <h2 id="props-title">Propriétés du message</h2>
+        <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
+      </div>
+      <dl class="props">
+        <dt>Compte</dt><dd>nicolas@exemple.fr</dd>
+        <dt>Sécurité</dt><dd>DKIM, SPF et DMARC conformes</dd>
+        <dt>Tags</dt><dd>Contrat, Chêne</dd>
+        <dt>Copie</dt><dd>Maître Julien Elbaz</dd>
+        <dt>Dossier</dt><dd>Boîte de réception</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="modal" id="contact" hidden>
+    <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer la fiche"></button>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="contact-title">
+      <div class="modal-head">
+        <h2 id="contact-title">Camille Moreau</h2>
+        <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
+      </div>
+      <p class="contact-mail">camille@menuiserie-moreau.fr</p>
+      <p>Carnet d’adresses. La fiche s’ouvre ici, elle ne reste pas dans le fil.</p>
+      <div class="modal-actions">
+        <a class="btn btn-primary" href="compose.html">Écrire</a>
+      </div>
+    </div>
   </div>
   <script src="mockup.js"></script>
 </body>
