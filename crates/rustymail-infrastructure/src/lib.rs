@@ -31,6 +31,7 @@ mod oauth_mail;
 mod org_apply;
 mod org_apply_history;
 mod org_consolidate;
+mod org_decisions;
 mod org_mailbox_structure;
 mod org_memory;
 mod org_post_move;
@@ -1327,6 +1328,7 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
     unsubscribe_detect::migrate_message_unsubscribe_urls(connection)?;
     let _ = unsubscribe_detect::migrate_resort_unsubscribe_urls(connection);
     org_memory::migrate_org_memory(connection)?;
+    org_decisions::migrate_org_decisions(connection)?;
     org_apply_history::migrate_org_apply_history(connection)?;
     saved_searches::migrate_saved_searches(connection)?;
     search_history::migrate_search_history(connection)?;
@@ -1460,6 +1462,8 @@ fn forget_keyring_entry(account_id: &str) {
 /// Supprime un compte : messages, pièces jointes (BLOB), **vecteurs de recherche sémantique** (`message_embeddings`),
 /// fils, états IMAP, ligne compte SQLite, secret dans le trousseau, puis `VACUUM` pour recycler l’espace du fichier BD.
 ///
+/// Purge aussi la mémoire Organiser du compte : `org_decisions`, `org_memory`, `org_apply_history`.
+///
 /// Les modèles IA **téléchargés** (ex. MiniLM ONNX, Whisper) restent sur disque : ils sont partagés entre comptes.
 /// Les **règles anti-newsletter** (`newsletter_rules`) sont globales au profil, pas par compte : elles ne sont pas effacées.
 ///
@@ -1528,6 +1532,7 @@ pub fn delete_account(db_path: impl AsRef<Path>, account_id: &str) -> Result<(),
         .map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM draft_revisions WHERE account_id = ?1", [id])
         .map_err(|e| e.to_string())?;
+    org_decisions::purge_account_org_state(&tx, id)?;
     let n = tx
         .execute("DELETE FROM accounts WHERE id = ?1", [id])
         .map_err(|e| e.to_string())?;

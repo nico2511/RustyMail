@@ -216,6 +216,11 @@ pub fn unignore_mailbox(path: &Path, account_id: &str, mailbox: &str) -> Result<
     Ok(())
 }
 
+/// Mémorise un lot exact (`org_memory`) et le motif réutilisable (`org_decisions`).
+///
+/// Seuls les gestes applied (succès complet), dismissed et snoozed arrivent ici.
+/// Un apply partiel, annulé ou en erreur n’appelle pas cette fonction.
+/// Le diagnostic et les recommandations textuelles ne sont pas des décisions.
 pub fn record_proposal_decision(
     path: &Path,
     account_id: &str,
@@ -223,7 +228,8 @@ pub fn record_proposal_decision(
     decision: OrgV2DecisionKind,
     snooze_days: Option<u32>,
 ) -> Result<String, String> {
-    let conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
+    let mut conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
     let rule_key = proposal_rule_key(proposal);
     let fingerprint = proposal_scope_fingerprint(proposal);
     let (decision_str, snooze_until) = match decision {
@@ -240,7 +246,7 @@ pub fn record_proposal_decision(
     };
     let thread_json = serde_json::to_string(&proposal.thread_ids).ok();
     upsert_memory(
-        &conn,
+        &tx,
         account_id,
         "proposal",
         &rule_key,
@@ -249,6 +255,15 @@ pub fn record_proposal_decision(
         snooze_until.as_deref(),
         thread_json.as_deref(),
     )?;
+    crate::org_decisions::upsert_proposal_decision(
+        &tx,
+        account_id,
+        proposal,
+        decision_str,
+        snooze_until.as_deref(),
+        &fingerprint,
+    )?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(fingerprint)
 }
 
@@ -363,7 +378,9 @@ pub fn filter_proposals_with_memory(
 
     let mut kept = Vec::new();
     for mut p in proposals.drain(..) {
-        if memory_suppresses_proposal(conn, account_id, &p)? {
+        if memory_suppresses_proposal(conn, account_id, &p)?
+            || crate::org_decisions::llm_pattern_suppressed(conn, account_id, &p)?
+        {
             suppressed += 1;
             continue;
         }
