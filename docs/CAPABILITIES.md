@@ -104,7 +104,7 @@ Opening a message produces a `CleanedMessageView`:
 
 ## Generative AI (HTTP)
 
-No in-process llama.cpp. Calls via HTTP to OpenRouter and/or llama-server.
+No in-process llama.cpp. Calls via HTTP to OpenRouter, llama-server, and/or Ollama.
 
 Commands include: translate, rewrite, grammar, quick replies, Q&A, inbox digest, security augment, NL search, org proposals.
 
@@ -127,7 +127,7 @@ Commands include: translate, rewrite, grammar, quick replies, Q&A, inbox digest,
 - HTML trust: DOMPurify + guards (scripts, remote media, CSS `url()`), not a full “text-only by default” policy
 - Desktop updates: Windows NSIS via `tauri-plugin-updater` once a minisign key pair is configured (see [RELEASE.md](RELEASE.md))
 - IMAP IDLE watches **INBOX** continuously; Sent/Drafts/Trash + the UI-focused folder sync on a secondary cadence
-- Generative AI requires external server or OpenRouter
+- Generative AI requires OpenRouter, llama-server, or Ollama (HTTP)
 - Some tag/summary paths stay **deterministic** until an LLM is reachable
 - UI locale packs: `fr` and `en`; not every string may be translated yet
 

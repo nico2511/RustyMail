@@ -69,6 +69,10 @@ pub fn validate_app_prefs_ai_urls(prefs: &AppPrefs) -> Result<(), String> {
     if !lb.is_empty() {
         validate_openai_compatible_base_url(lb)?;
     }
+    let ol = prefs.ai.ollama_base_url.trim();
+    if !ol.is_empty() {
+        validate_openai_compatible_base_url(ol)?;
+    }
     Ok(())
 }
 

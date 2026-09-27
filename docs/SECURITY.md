@@ -70,8 +70,8 @@ Module `crates/rustymail-llm/src/privacy.rs` redacts when `LlmEngine::exfiltrate
 - Emails, phones, IBAN, cards, Bearer/JWT tokens, `message_id=` prefixes
 
 **Always redacted:** OpenRouter  
-**Redacted:** non-loopback OpenAI-compatible URLs  
-**Not redacted:** llama-server on loopback (`127.0.0.1`, `localhost`, `[::1]`)
+**Redacted:** non-loopback OpenAI-compatible URLs (llama-server or Ollama)  
+**Not redacted:** llama-server or Ollama on loopback (`127.0.0.1`, `localhost`, `[::1]`)
 
 ### AI cache
 

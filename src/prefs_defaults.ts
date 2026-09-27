@@ -95,6 +95,11 @@ export type AppPrefsAi = {
   llamaServerSpawnEnabled: boolean;
   /** `llama-server` (PATH winget) ou chemin absolu vers l’exe. */
   llamaServerBinaryPath: string;
+  /** `auto` | `openrouter` | `llama-server` | `ollama`. */
+  chatBackend: "auto" | "openrouter" | "llama-server" | "ollama";
+  ollamaEnabled: boolean;
+  ollamaBaseUrl: string;
+  ollamaModel: string;
   aiPanelWidthPx: number;
   /** Disposition fil : seule la lecture type document est prise en charge. */
   threadLayout: "reading";
@@ -189,6 +194,10 @@ export function defaultAppPrefs(): AppPrefs {
       llamaServerAllowCpuOverride: false,
       llamaServerSpawnEnabled: false,
       llamaServerBinaryPath: "",
+      chatBackend: "auto",
+      ollamaEnabled: false,
+      ollamaBaseUrl: "http://127.0.0.1:11434/v1",
+      ollamaModel: "",
       aiPanelWidthPx: 340,
       threadLayout: "reading",
       aiBackgroundAutoSemanticIndex: false,
@@ -301,6 +310,16 @@ export function normalizeAiPrefsMerged(ai: AppPrefsAi): AppPrefsAi {
     merged.llamaServerSpawnEnabled = d.llamaServerSpawnEnabled;
   }
   merged.llamaServerBinaryPath = (merged.llamaServerBinaryPath ?? d.llamaServerBinaryPath).trim();
+  const backend = String(merged.chatBackend ?? "").trim();
+  merged.chatBackend =
+    backend === "openrouter" || backend === "llama-server" || backend === "ollama" || backend === "auto"
+      ? backend
+      : "auto";
+  if (typeof merged.ollamaEnabled !== "boolean") {
+    merged.ollamaEnabled = d.ollamaEnabled;
+  }
+  merged.ollamaBaseUrl = (merged.ollamaBaseUrl ?? d.ollamaBaseUrl).trim() || d.ollamaBaseUrl;
+  merged.ollamaModel = (merged.ollamaModel ?? d.ollamaModel).trim();
   for (const key of [
     "featureThreadSummaryEnabled",
     "featureThreadTranslateEnabled",

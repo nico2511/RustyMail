@@ -42,7 +42,7 @@ space ::= [ \t\n]*
 "#;
 
 /// Orientation Organiser : diagnostic, recommandations, actions proposées.
-/// Ordre des clés fixe pour llama-server. OpenRouter ignore la grammaire ; le validateur reste la source de vérité.
+/// Ordre des clés fixe pour llama-server. OpenRouter et Ollama ignorent la grammaire ; le validateur reste la source de vérité.
 pub const ORG_ORIENTATION_JSON_GBNF: &str = r#"
 root ::= "{" space diag-kv "," space rec-kv "," space act-kv "}"
 diag-kv ::= "\"diagnosis\"" space ":" space string

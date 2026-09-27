@@ -8,14 +8,17 @@ RustyMail separates **small on-device models** (search + dictation) from **gener
 | ----- | ---------- | --------------- |
 | Semantic search | MiniLM L6 v2 (ONNX) | First launch bootstrap (~90 MB) |
 | Dictation | whisper.cpp GGML (tiny at bootstrap) | First launch bootstrap |
-| Chat / summaries / etc. | GGUF via HF cache + **llama-server** OR **OpenRouter** | Only when local LLM enabled in Settings |
+| Chat / summaries / etc. | **OpenRouter**, **llama-server**, or **Ollama** | GGUF download only when local LLM enabled |
 
-The desktop app **does not link llama.cpp**. Generative calls use HTTP `POST /v1/chat/completions` toward:
+The desktop app **does not link llama.cpp**. Generative calls use the same HTTP client: `POST /v1/chat/completions` toward:
 
 - **OpenRouter** (API key in keyring), and/or
-- **llama-server** (or any OpenAI-compatible server), typically `http://127.0.0.1:8080/v1`
+- **llama-server** (or any OpenAI-compatible server), typically `http://127.0.0.1:8080/v1`, or
+- **Ollama**, typically `http://127.0.0.1:11434/v1` plus the model name from `ollama list`
 
-GPU usage is determined by your **external** llama-server process.
+Settings → IA → Moteurs chooses the backend: Sur mon PC (llama-server), Cloud (OpenRouter), Hybride, or **Ollama**. `chatBackend` is `auto`, `openrouter`, `llama-server`, or `ollama` (`auto` keeps the previous priority: OpenRouter, then llama-server, then Ollama if that one is enabled).
+
+GPU usage for llama-server is determined by the **external** process. Ollama manages its own device; RustyMail does not apply the llama-server GPU gate to it.
 
 ## First-run bootstrap
 
@@ -49,6 +52,17 @@ Chat GGUF (~2 GB default: Qwen2.5-3B Q4) downloads only when **`localLlmEnabled`
 
 Default HF target (prefs): `Qwen/Qwen2.5-3B-Instruct-GGUF` / `qwen2.5-3b-instruct-q4_k_m.gguf`
 
+GBNF grammars are sent **only** to llama-server. OpenRouter and Ollama ignore them; Rust validators stay the source of truth (Organiser orientation included).
+
+## Ollama
+
+1. Run Ollama (`ollama serve`) and pull a model (`ollama pull llama3.2`)
+2. Settings → IA → Moteurs → **Ollama**
+3. Base URL default `http://127.0.0.1:11434/v1`, model name as in `ollama list`
+4. Status probes `GET {base}/models` (about 2s). If nothing answers, the line says **injoignable** and Organiser shows that message instead of inventing an orientation
+
+No API key. Loopback Ollama is not treated as third-party exfiltration. A remote Ollama URL is redacted like any other non-loopback OpenAI-compatible host. RustyMail does not install or start the Ollama binary.
+
 ## OpenRouter
 
 - Enable in Settings; set model id (default `openai/gpt-4o-mini`)
@@ -57,7 +71,7 @@ Default HF target (prefs): `Qwen/Qwen2.5-3B-Instruct-GGUF` / `qwen2.5-3b-instruc
 
 ## Privacy & redaction
 
-Before sending prompts to **third-party** endpoints (OpenRouter, non-loopback URLs), `rustymail-llm` redacts emails, phones, IBAN, cards, Bearer/JWT tokens. **Loopback llama-server** keeps full content (stays on machine). See [SECURITY.md](SECURITY.md).
+Before sending prompts to **third-party** endpoints (OpenRouter, non-loopback URLs), `rustymail-llm` redacts emails, phones, IBAN, cards, Bearer/JWT tokens. **Loopback llama-server and loopback Ollama** keep full content (stays on machine). See [SECURITY.md](SECURITY.md).
 
 ## Dictation
 
@@ -104,7 +118,7 @@ SQLite `ai_cache` stores LLM responses with TTL by key prefix. The WebView may *
 
 ## JSON contracts
 
-Structured LLM outputs are validated in Rust (`ai_llm_contracts`). GBNF grammars apply on llama-server only. See [LLM_CONTRACTS.md](LLM_CONTRACTS.md).
+Structured LLM outputs are validated in Rust (`ai_llm_contracts`). GBNF grammars apply on llama-server only; Ollama and OpenRouter rely on the same Rust checks. See [LLM_CONTRACTS.md](LLM_CONTRACTS.md).
 
 ## Related
 

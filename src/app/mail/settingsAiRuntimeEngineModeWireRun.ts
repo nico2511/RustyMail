@@ -14,26 +14,30 @@ export async function tryHandleSettingsAiRuntimeEngineModeWire(
 ): Promise<boolean> {
   if (action !== "ai-engine-mode") return false;
   const mode = element?.dataset.engineMode?.trim();
-  if (mode !== "local" && mode !== "cloud" && mode !== "hybrid") return true;
+  if (mode !== "local" && mode !== "cloud" && mode !== "hybrid" && mode !== "ollama") return true;
   state.aiEngineSettingsTab = mode;
-  if (mode === "local") {
-    applyEngineConnectionMode(state.appPrefs.ai, "local");
-  } else if (mode === "hybrid") {
-    applyEngineConnectionMode(state.appPrefs.ai, "hybrid");
+  if (mode === "local" || mode === "hybrid" || mode === "ollama") {
+    applyEngineConnectionMode(state.appPrefs.ai, mode);
+  } else {
+    applyEngineConnectionMode(state.appPrefs.ai, "cloud");
   }
   syncLlmEnginePrefsToDom(state.appPrefs.ai);
   render();
   void (async () => {
-    if (mode === "local" || mode === "hybrid") {
-      try {
-        await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
-      } catch (e) {
-        toast(tauriErrorMessage(e));
-        return;
-      }
+    try {
+      await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
+    } catch (e) {
+      toast(tauriErrorMessage(e));
+      return;
     }
     toast(
-      mode === "local" ? "Mode Sur mon PC." : mode === "cloud" ? "Mode Cloud." : "Mode Hybride enregistré.",
+      mode === "local"
+        ? "Mode Sur mon PC."
+        : mode === "cloud"
+          ? "Mode Cloud."
+          : mode === "ollama"
+            ? "Mode Ollama enregistré."
+            : "Mode Hybride enregistré.",
     );
     await refreshLlmRuntimeStatus(false);
     render();

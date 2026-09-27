@@ -88,7 +88,7 @@ Front-end reads via **`invokeAiCacheGet`** (`ipc_bridge.ts`) with dedup and time
 | Aspect | Behavior |
 | ------ | -------- |
 | `generate_json` | JSON extraction + deserialize; optional GBNF merge |
-| GBNF grammar | Sent to **llama-server** only; ignored on OpenRouter |
+| GBNF grammar | Sent to **llama-server** only; ignored on OpenRouter and Ollama |
 | Business validation | Callers + `ai_llm_contracts` — see [LLM_CONTRACTS.md](LLM_CONTRACTS.md) |
 
 ## Local CI regression targets

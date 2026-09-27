@@ -318,6 +318,19 @@ pub struct AiPrefs {
     #[serde(default)]
     pub llama_server_binary_path: String,
 
+    /// `auto` (priorité OpenRouter puis llama-server, puis Ollama si activé), `openrouter`, `llama-server` ou `ollama`.
+    #[serde(default = "default_chat_backend")]
+    pub chat_backend: String,
+    /// Ollama local (`/v1`). Utilisé si `chat_backend` vaut `ollama`, ou en secours quand `auto` et les autres moteurs sont incomplets.
+    #[serde(default)]
+    pub ollama_enabled: bool,
+    /// Ex. `http://127.0.0.1:11434/v1` (sans slash final).
+    #[serde(default = "default_ollama_base_url")]
+    pub ollama_base_url: String,
+    /// Nom vu par `ollama list` (ex. `llama3.2`).
+    #[serde(default)]
+    pub ollama_model: String,
+
     #[serde(default = "default_feature_thread_summary_enabled")]
     pub feature_thread_summary_enabled: bool,
     #[serde(default = "default_feature_thread_translate_enabled")]
@@ -465,6 +478,24 @@ fn default_llama_server_model() -> String {
     String::new()
 }
 
+fn default_chat_backend() -> String {
+    "auto".to_string()
+}
+
+fn default_ollama_base_url() -> String {
+    "http://127.0.0.1:11434/v1".to_string()
+}
+
+/// `auto`, `openrouter`, `llama-server` ou `ollama`. Toute autre valeur retombe sur `auto`.
+pub fn normalized_chat_backend(raw: &str) -> &'static str {
+    match raw.trim() {
+        "openrouter" => "openrouter",
+        "llama-server" => "llama-server",
+        "ollama" => "ollama",
+        _ => "auto",
+    }
+}
+
 fn default_feature_thread_summary_enabled() -> bool {
     true
 }
@@ -564,6 +595,10 @@ impl Default for AiPrefs {
             llama_server_allow_cpu_override: false,
             llama_server_spawn_enabled: false,
             llama_server_binary_path: String::new(),
+            chat_backend: default_chat_backend(),
+            ollama_enabled: false,
+            ollama_base_url: default_ollama_base_url(),
+            ollama_model: String::new(),
             feature_thread_summary_enabled: default_feature_thread_summary_enabled(),
             feature_thread_translate_enabled: default_feature_thread_translate_enabled(),
             feature_message_translate_enabled: default_feature_message_translate_enabled(),
@@ -642,6 +677,10 @@ pub fn load_app_prefs(prefs_path: &Path) -> AppPrefs {
     }
     if prefs.ai.llama_server_base_url.trim().is_empty() {
         prefs.ai.llama_server_base_url = default_llama_server_base_url();
+    }
+    prefs.ai.chat_backend = normalized_chat_backend(&prefs.ai.chat_backend).to_string();
+    if prefs.ai.ollama_base_url.trim().is_empty() {
+        prefs.ai.ollama_base_url = default_ollama_base_url();
     }
     prefs
 }

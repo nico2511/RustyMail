@@ -216,6 +216,12 @@ export type LlmRuntimeStatus = {
   llamaServerSpawnEnabled: boolean;
   llamaServerBinaryPath: string;
   llamaServerNCtx?: number | null;
+  chatBackend?: string;
+  ollamaEnabled?: boolean;
+  ollamaBaseUrl?: string;
+  ollamaModel?: string;
+  ollamaReachable?: boolean | null;
+  ollamaStatusMessage?: string | null;
 };
 
 export type AppCapabilities = {

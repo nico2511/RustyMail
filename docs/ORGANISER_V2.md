@@ -4,6 +4,8 @@ Relevé après relecture du scan, de l’apply IMAP et de l’UI (`organizationV
 
 La vue Organiser utile **passe par le LLM**. Les heuristiques préparent le contexte (candidats, compteurs, ids). La sortie affichée est une **orientation** : diagnostic, recommandations, actions proposées. Le cœur mail (IMAP, lecture, envoi) ne dépend pas de ce module. Si le LLM n’est pas joignable, ou si « Propositions Organiser » est désactivé, l’écran affiche un message d’état et **n’invente pas** d’orientation.
 
+Le moteur est celui des Paramètres → IA : OpenRouter, llama-server ou **Ollama** (URL + modèle, souvent `http://127.0.0.1:11434/v1`). Ollama ne reçoit pas la grammaire GBNF ; `validate_org_orientation_shape` s’applique quand même. Si Ollama ne répond pas, le message contient « Ollama injoignable » (sonde `GET /v1/models`).
+
 ## Ce qui fonctionne
 
 | Mécanique | Détail |

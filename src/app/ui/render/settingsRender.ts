@@ -565,7 +565,7 @@ function renderSettingsDeveloperPanel(): string {
         <li><strong>Données</strong> — SQLite + WAL (<code>rusqlite</code>), JSON prefs, trousseau OS</li>
         <li><strong>Mail</strong> — IMAP (<code>async-imap</code>), SMTP (<code>lettre</code>), pièces jointes</li>
         <li><strong>Recherche</strong> — lexical + mode hybrid / sémantique (<code>rustymail-semantic</code>, ONNX MiniLM)</li>
-        <li><strong>IA</strong> — OpenRouter ou serveur compatible OpenAI, llama-server, dictée Whisper</li>
+        <li><strong>IA</strong> — OpenRouter, llama-server ou Ollama, dictée Whisper</li>
       </ul>
       <p class="dim" style="margin:12px 0 0;font-size:12px;line-height:1.5">Détails : <code>README.md</code> et <code>docs/</code>.</p>
     </article>
