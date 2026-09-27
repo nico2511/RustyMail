@@ -68,4 +68,4 @@ Un clic sur un nom ou une adresse — dans le fil ou dans la liste — ouvre une
 
 ## Hors périmètre
 
-La vague 1 du runtime `src/` reprend le chrome (tokens, typo, rail). Clarity reste une archive, à ne pas prolonger. Teintes de compte, accordéon et modales restent à faire.
+La vague 1 du runtime `src/` reprend le chrome (tokens, typo, rail). La vague 2 (`src/styles/productivity-wave2.css`) ajoute la réception multi-compte, l’accordéon du fil et le rail icônes 56 px. Captures : `wave2-src/`. Clarity reste une archive, à ne pas prolonger.

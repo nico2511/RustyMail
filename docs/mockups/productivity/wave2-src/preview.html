@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>RustyMail — aperçu vague 2</title>
+    <link rel="stylesheet" href="../../../../src/styles.css" />
+    <link rel="stylesheet" href="../../../../src/styles/productivity-shell.css" />
+    <link rel="stylesheet" href="../../../../src/styles/productivity-wave2.css" />
+    <style>
+      html, body, #app { height: 100%; }
+      .preview-note { display: none; }
+    </style>
+  </head>
+  <body class="appearance-bg-light">
+    <div id="app" class="app-shell ai-collapsed"></div>
+    <script>
+      const shot = new URLSearchParams(location.search).get("shot") || "inbox";
+      const collapsed = shot === "rail-collapsed";
+      const filtered = shot === "inbox-account";
+      const thread = shot === "thread";
+      const app = document.getElementById("app");
+      app.className = "app-shell ai-collapsed" + (collapsed ? " sidebar-collapsed" : "");
+
+      const rail = `
+        <aside class="sidebar" aria-label="Mail navigation">
+          <button type="button" class="sidebar-collapse-edge" aria-label="${collapsed ? "Afficher les dossiers" : "Masquer les dossiers"}" title="${collapsed ? "Agrandir le volet" : "Réduire le volet"}">
+            <span class="sidebar-collapse-edge__glyph" aria-hidden="true"></span>
+          </button>
+          <div class="sidebar-header">
+            <div class="sidebar-header-top">
+              <div class="sidebar-account">
+                <button type="button" class="avatar large sidebar-account-avatar" title="Comptes" aria-label="Comptes">N</button>
+                <span class="sidebar-account-copy"><strong>RustyMail</strong><small class="dim" style="display:block">nicolas@exemple.fr</small></span>
+              </div>
+            </div>
+            <div class="sidebar-actions">
+              <button type="button" class="primary-button sidebar-compose" title="Composer" aria-label="Composer">
+                <span class="sidebar-compose-glyph" aria-hidden="true">+</span>
+                <span class="sidebar-compose-label">Composer</span>
+                <span class="kbd">N</span>
+              </button>
+            </div>
+          </div>
+          <nav class="folder-list" aria-label="Folders">
+            <div class="sidebar-folder-group sidebar-folder-group--accounts">
+              <button type="button" class="folder-button folder-button--account${filtered ? "" : " active"}" title="Tous les comptes — 6 non lus">
+                <span class="folder-icon" aria-hidden="true">∗</span>
+                <span class="folder-name">Tous les comptes</span>
+                <span class="folder-count folder-count-unread">6</span>
+              </button>
+              <button type="button" class="folder-button folder-button--account" data-account-hue="slate" title="Perso">
+                <span class="folder-icon">P</span><span class="folder-name">Perso</span>
+                <span class="folder-count folder-count-unread">1</span>
+              </button>
+              <button type="button" class="folder-button folder-button--account" data-account-hue="olive" title="Atelier">
+                <span class="folder-icon">A</span><span class="folder-name">Atelier</span>
+                <span class="folder-count folder-count-unread">3</span>
+              </button>
+              <button type="button" class="folder-button folder-button--account${filtered ? " folder-button--scope" : ""}" data-account-hue="plum" title="Facturation">
+                <span class="folder-icon">F</span><span class="folder-name">Facturation</span>
+                <span class="folder-count folder-count-unread">2</span>
+              </button>
+            </div>
+            <div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">Perso · IMAP</span></div>
+            <div class="sidebar-folder-group">
+              <button class="folder-button${filtered ? " active" : ""}" title="Boîte de réception"><span class="folder-icon">IN</span><span class="folder-name">Boîte de réception</span><span class="folder-count folder-count-wrap"><span class="folder-count-num">12</span><span class="folder-count-unread">1</span></span></button>
+              <button class="folder-button" title="Brouillons"><span class="folder-icon">DR</span><span class="folder-name">Brouillons</span></button>
+              <button class="folder-button" title="Envoyés"><span class="folder-icon">SE</span><span class="folder-name">Envoyés</span></button>
+              <button class="folder-button" title="Archive"><span class="folder-icon">AR</span><span class="folder-name">Archive</span></button>
+            </div>
+            <button type="button" class="folder-button" title="Dossiers"><span class="folder-icon">Ar</span><span class="folder-name">Dossiers</span></button>
+          </nav>
+          <div class="sidebar-footer">
+            <button type="button" class="folder-button" title="Paramètres"><span class="folder-icon">ST</span><span class="folder-name">Paramètres</span><span class="folder-count">3</span></button>
+          </div>
+        </aside>`;
+
+      function row(hue, name, who, subject, preview, when, unread) {
+        return `<div class="thread-row inbox-thread-row${unread ? " thread-row--unread" : ""}" data-account-hue="${hue}" role="listitem">
+          <button type="button" class="thread-row-main inbox-thread-row-main">
+            <span class="avatar inbox-thread-avatar">${who.slice(0, 1)}</span>
+            <span class="inbox-thread-stack">
+              <span class="inbox-thread-line1">
+                <span class="inbox-thread-from">${who}</span>
+                ${filtered ? "" : `<span class="inbox-acct" data-account-hue="${hue}"><span class="inbox-acct-dot" aria-hidden="true"></span>${name}</span>`}
+              </span>
+              <span class="inbox-thread-subject">${unread ? '<span class="inbox-unread-dot" aria-hidden="true"></span>' : ""}<strong>${subject}</strong></span>
+              <p class="thread-preview inbox-thread-preview">${preview}</p>
+            </span>
+          </button>
+          <div class="inbox-thread-date-col"><time class="inbox-thread-date-label dim">${when}</time></div>
+        </div>`;
+      }
+
+      const inboxRows = filtered
+        ? [
+            row("plum", "Facturation", "Banque Rhône", "Relevé d’avril", "Votre relevé est disponible. Solde au 30 avril : 18 420,16 €.", "Hier", true),
+            row("plum", "Facturation", "Urssaf", "Échéance mai", "Le prélèvement de mai est programmé le 15.", "lun.", true),
+            row("plum", "Facturation", "Atelier bois", "Facture 184", "Merci, le virement est arrivé ce matin.", "12 mai", false),
+          ].join("")
+        : [
+            row("olive", "Atelier", "Camille Moreau", "Le chêne est arrivé", "Les plateaux sont au séchoir. On peut caler la visite jeudi.", "09:40", true),
+            row("olive", "Atelier", "Transport Sillon", "Avis de passage", "Colis 2/3 en instance au dépôt de Gerland.", "08:10", true),
+            row("plum", "Facturation", "Banque Rhône", "Relevé d’avril", "Votre relevé est disponible. Solde au 30 avril : 18 420,16 €.", "Hier", true),
+            row("slate", "Perso", "La Revue du bois", "Édition de mai", "Séchoir, finitions à l’huile, et un portrait d’atelier en Savoie.", "mar.", true),
+            row("olive", "Atelier", "Hugo Martin", "Livraison du chêne", "Le camion passe mardi entre 8 h et 10 h.", "lun.", false),
+            row("plum", "Facturation", "Urssaf", "Échéance mai", "Le prélèvement de mai est programmé le 15.", "12 mai", false),
+          ].join("");
+
+      const scopeHue = filtered ? ' data-account-hue="plum"' : "";
+      const scopeName = filtered ? "Facturation" : "Tous les comptes";
+      const scopeUnread = filtered ? "2 non lus" : "6 non lus";
+
+      const inboxMain = `
+        <main class="main">
+          <section class="thread-view inbox-index" aria-label="Inbox">
+            <header class="inbox-appbar">
+              <div class="inbox-appbar-top">
+                <div class="inbox-appbar-intro">
+                  <div class="inbox-mailbox-title-row">
+                    <div class="inbox-scope"${scopeHue}>
+                      <button type="button" class="inbox-scope-btn" aria-expanded="false">
+                        <span class="inbox-scope-name">${scopeName}</span>
+                        <span class="inbox-scope-chevron" aria-hidden="true"></span>
+                      </button>
+                      <span class="inbox-scope-unread">${scopeUnread}</span>
+                    </div>
+                  </div>
+                  <p class="inbox-mailbox-sub">${filtered ? "3 sur 3 conversations" : "6 sur 6 conversations"}</p>
+                </div>
+              </div>
+            </header>
+            <div class="inbox-panel surface">
+              <div class="inbox-thread-list" role="list">${inboxRows}</div>
+            </div>
+          </section>
+        </main>`;
+
+      const threadMain = `
+        <main class="main">
+          <section class="thread-view thread-reading thread-reading--reading-layout" aria-label="Fil de discussion">
+            <header class="thread-reading-head">
+              <div class="thread-reading-hero">
+                <h1 class="thread-reading-title">Le chêne est arrivé</h1>
+                <p class="thread-reading-stats dim">3 messages</p>
+                <div class="thread-accordion-bar" role="group" aria-label="Pliage des messages">
+                  <button type="button" class="ghost-button thread-accordion-btn">Tout replier</button>
+                  <button type="button" class="ghost-button thread-accordion-btn">Tout développer</button>
+                </div>
+              </div>
+            </header>
+            <div class="thread-messages thread-messages-reading">
+              <article class="message thread-msg thread-msg--open thread-msg--unread thread-msg--head">
+                <span class="avatar thread-msg-avatar">C</span>
+                <div class="message-stack">
+                  <header class="message-head-row">
+                    <button type="button" class="thread-msg-fold" aria-expanded="true" aria-label="Replier ce message"><span class="thread-msg-fold-chevron"></span></button>
+                    <div class="thread-msg-head-main"><span class="thread-msg-from">Camille Moreau</span><span class="thread-msg-head-sep">·</span><time class="thread-msg-time">09:40</time></div>
+                  </header>
+                  <div class="thread-msg-card">
+                    <div class="message-text"><p>Les plateaux sont au séchoir. On peut caler la visite jeudi, en fin de matinée si tu es à l’atelier.</p><p>Je laisse le relevé d’humidité avec le premier plateau.</p></div>
+                  </div>
+                </div>
+              </article>
+              <article class="message thread-msg thread-msg--folded thread-msg--head">
+                <span class="avatar thread-msg-avatar">H</span>
+                <div class="message-stack">
+                  <header class="message-head-row">
+                    <button type="button" class="thread-msg-fold" aria-expanded="false" aria-label="Développer ce message"><span class="thread-msg-fold-chevron"></span></button>
+                    <div class="thread-msg-head-main"><span class="thread-msg-from">Hugo Martin</span><span class="thread-msg-head-sep">·</span><time class="thread-msg-time">hier</time></div>
+                  </header>
+                  <button type="button" class="thread-msg-fold-preview">Le camion passe mardi entre 8 h et 10 h. Prévoir quelqu’un à l’atelier.</button>
+                  <div class="thread-msg-card"><div class="message-text"><p>Le camion passe mardi entre 8 h et 10 h.</p></div></div>
+                </div>
+              </article>
+              <article class="message thread-msg thread-msg--folded">
+                <span class="avatar thread-msg-avatar">N</span>
+                <div class="message-stack">
+                  <header class="message-head-row">
+                    <button type="button" class="thread-msg-fold" aria-expanded="false" aria-label="Développer ce message"><span class="thread-msg-fold-chevron"></span></button>
+                    <div class="thread-msg-head-main"><span class="thread-msg-from">Nicolas</span><span class="thread-msg-head-sep">·</span><time class="thread-msg-time">lun.</time></div>
+                  </header>
+                  <button type="button" class="thread-msg-fold-preview">Oui, je serai là. On déballe dès l’arrivée.</button>
+                  <div class="thread-msg-card"><div class="message-text"><p>Oui, je serai là.</p></div></div>
+                </div>
+              </article>
+            </div>
+          </section>
+        </main>`;
+
+      const status = `<div class="status-bar-wrap"><div class="status-bar"><span class="status-bar-app">RustyMail</span><span class="dim">Synchronisé</span></div></div>`;
+      app.innerHTML = rail + (thread ? threadMain : inboxMain) + status;
+    </script>
+  </body>
+</html>

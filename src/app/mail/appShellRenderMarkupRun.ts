@@ -5,6 +5,7 @@ import { renderComposer } from "../ui/render/composerRender";
 import { renderMain } from "../ui/render/mainViewRender";
 import { renderSearchModal } from "../ui/render/searchRender";
 import { renderSettingsAiModal } from "../ui/render/settingsRender";
+import { renderAccountModalHtml } from "../ui/render/accountScopeRender";
 import { renderSidebar } from "../ui/render/sidebarRender";
 import { renderGlobalStatusFooter } from "../ui/render/statusFooterRender";
 import {
@@ -74,6 +75,7 @@ export function buildAppShellInnerHtml(options: {
     ${renderSettingsAiModal()}
     ${renderAiQuickPanelOverlay()}
     ${renderGlobalStatusFooter()}
+    ${renderAccountModalHtml()}
   `;
 }
 

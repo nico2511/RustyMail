@@ -2,6 +2,8 @@ import { render } from "../dispatch";
 import { state } from "../state";
 import { goBack, navigateToInbox, navigateToBreadcrumbIndex } from "./appNavActions";
 import { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";
+import { nextAccordionAfterToggle } from "./threadAccordion";
+import { sortMessagesByReceivedDescending } from "./threadMessageSort";
 import { pickImapMailboxFallback } from "./mailboxImapFallback";
 import { switchMailbox } from "./switchMailboxAction";
 
@@ -25,6 +27,21 @@ export async function tryHandleThreadNavWire(action: string, element?: HTMLEleme
       if (state.view === "compose") return true;
       state.sidebarCollapsed = !state.sidebarCollapsed;
       writeSidebarCollapsedPreference(state.sidebarCollapsed);
+      render();
+      return true;
+    case "thread-accordion-toggle": {
+      const id = element?.dataset.msgId?.trim() ?? "";
+      const ids = sortMessagesByReceivedDescending(state.selectedThread?.messages ?? []).map((m) => m.messageId);
+      state.threadAccordion = nextAccordionAfterToggle(state.threadAccordion, id, ids);
+      render();
+      return true;
+    }
+    case "thread-accordion-expand-all":
+      state.threadAccordion = "all";
+      render();
+      return true;
+    case "thread-accordion-collapse-all":
+      state.threadAccordion = "none";
       render();
       return true;
     case "leave-saved-drafts-mailbox":

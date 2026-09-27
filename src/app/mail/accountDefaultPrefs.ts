@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { isSavedDraftsVirtualMailbox, preferredInboxMailboxName } from "../../mailboxKinds";
+import { isSavedDraftsVirtualMailbox, isUnifiedInboxMailbox, preferredInboxMailboxName } from "../../mailboxKinds";
 import {
   DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY,
   defaultListFilterFromRaw,
@@ -34,6 +34,7 @@ export function applyDefaultAccountFromPrefs(): void {
 }
 
 export function ensureValidSelectedMailbox(): void {
+  if (isUnifiedInboxMailbox(state.selectedMailbox)) return;
   if (isSavedDraftsVirtualMailbox(state.selectedMailbox) && isTauriRuntime()) return;
   if (!state.mailboxes.length) return;
   const resolved = resolveMailboxInList(state.mailboxes, state.selectedMailbox);
