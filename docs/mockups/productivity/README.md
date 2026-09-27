@@ -35,9 +35,9 @@ Dans le fil, **Détails** ouvre les propriétés du message (sécurité, tags, c
 
 Trois boîtes : **Perso** (`nicolas@exemple.fr`), **Atelier** (`atelier@exemple.fr`), **Facturation** (`facturation@exemple.fr`).
 
-`inbox.html` et `inbox.html?compte=tous` montrent le courrier mélangé, du plus récent au plus ancien. Chaque ligne indique son compte en gris, à droite du nom — moins fort que l’expéditeur et l’objet.
+`inbox.html` et `inbox.html?compte=tous` montrent le courrier mélangé, du plus récent au plus ancien. Chaque ligne garde le nom du compte, teinté pour le scan : **Perso en ardoise**, **Atelier en olive**, **Facturation en prune**. La pastille reprend la même teinte. Le cuivre reste l’accent de l’interface (non-lu, Répondre, Envoyer), pas la couleur d’un compte.
 
-Le rail, le titre de la liste ou la modale compte choisit une boîte. Le titre, l’adresse et les non-lus suivent. Les compteurs restent alignés : 6 au total, 1 en Perso, 3 à l’Atelier, 2 en Facturation.
+Le rail, le titre de la liste ou la modale compte choisit une boîte, avec la même couleur. Sur une seule boîte, la teinte passe dans le titre et le rail ; la liste elle-même reste blanche. Les non-lus suivent. Les compteurs restent alignés : 6 au total, 1 en Perso, 3 à l’Atelier, 2 en Facturation.
 
 Liens : `inbox.html?compte=tous`, `?compte=perso`, `?compte=atelier`, `?compte=facturation`. `inbox.html?profil=1` ouvre la modale sur la vue active, avec la synchro de chaque compte et **Ajouter un compte** en retrait. L’avatar reste Nicolas : le compte n’est pas affiché en permanence dans le rail.
 
@@ -53,7 +53,7 @@ Un clic sur un nom ou une adresse — dans le fil ou dans la liste — ouvre une
 
 | Écran | Fichier | Preuve |
 | ----- | ------- | ------ |
-| Réception | `inbox.html` | Vue unifiée ou filtrée par compte, compte en gris sur chaque ligne, non-lus globaux et par compte. |
+| Réception | `inbox.html` | Vue unifiée ou filtrée. Perso ardoise, Atelier olive, Facturation prune — le nom du compte reste écrit. |
 | Fil | `thread.html` | Chaque message pliable (chevron, accordéon), non-lu marqué cuivre, citation repliée, HTML nettoyé en badges, pièce jointe. Nom ou adresse → modale contact. |
 | Rédaction | `compose.html` | Rail replié, À / Cc / Cci, markdown, aperçu, historique, pièces jointes, envoyer. Réécriture en onglet. |
 

@@ -66,6 +66,12 @@
   --copper: #c4491d;
   --copper-press: #a33c18;
   --copper-deep: #8a3416;
+  --acct-perso: #3d4c63;
+  --acct-atelier: #4a5336;
+  --acct-facturation: #5c4458;
+  --acct-perso-rail: #b9c6d6;
+  --acct-atelier-rail: #c6d0b4;
+  --acct-facturation-rail: #d4c3cf;
   --rail: #17191e;
   --rail-raised: #262a32;
   --rail-text: #e7e9ee;
@@ -464,7 +470,13 @@ kbd, .kbd {
 
 .folder.is-account .count { color: #d7b5a4; }
 
-.folder.is-scope .count { color: #f2b89a; font-weight: 600; }
+.folder.is-account[data-compte="perso"] .mono { color: var(--acct-perso-rail); background: #24303c; }
+.folder.is-account[data-compte="atelier"] .mono { color: var(--acct-atelier-rail); background: #2a3124; }
+.folder.is-account[data-compte="facturation"] .mono { color: var(--acct-facturation-rail); background: #322830; }
+
+.folder.is-account[data-compte="perso"].is-scope { box-shadow: inset 2px 0 0 var(--acct-perso-rail); }
+.folder.is-account[data-compte="atelier"].is-scope { box-shadow: inset 2px 0 0 var(--acct-atelier-rail); }
+.folder.is-account[data-compte="facturation"].is-scope { box-shadow: inset 2px 0 0 var(--acct-facturation-rail); }
 
 .app.is-rail-collapsed .folder.is-account {
   justify-content: center;
@@ -635,6 +647,23 @@ kbd, .kbd {
   font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--ink);
+}
+
+.app[data-compte="perso"] .scope-name { color: var(--acct-perso); }
+.app[data-compte="atelier"] .scope-name { color: var(--acct-atelier); }
+.app[data-compte="facturation"] .scope-name { color: var(--acct-facturation); }
+
+.app[data-compte="perso"] .scope-name::before,
+.app[data-compte="atelier"] .scope-name::before,
+.app[data-compte="facturation"] .scope-name::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
 }
 
 .scope-btn .ico {
@@ -883,6 +912,9 @@ button.from {
 }
 
 .acct {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
   flex: none;
   font-family: var(--sans);
@@ -891,6 +923,19 @@ button.from {
   color: var(--faint);
   white-space: nowrap;
 }
+
+.acct::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.row[data-compte="perso"] .acct { color: var(--acct-perso); }
+.row[data-compte="atelier"] .acct { color: var(--acct-atelier); }
+.row[data-compte="facturation"] .acct { color: var(--acct-facturation); }
 
 .app[data-compte="perso"] .acct,
 .app[data-compte="atelier"] .acct,
@@ -1681,6 +1726,35 @@ button.from:hover { text-decoration: underline; text-underline-offset: 2px; }
 .acct-list button[aria-selected="true"] {
   border-color: var(--copper);
   background: var(--select);
+}
+
+.acct-list button[data-compte],
+.pop button[data-compte] {
+  position: relative;
+  padding-left: 22px;
+}
+
+.acct-list button[data-compte="perso"],
+.pop button[data-compte="perso"] { color: var(--acct-perso); }
+.acct-list button[data-compte="atelier"],
+.pop button[data-compte="atelier"] { color: var(--acct-atelier); }
+.acct-list button[data-compte="facturation"],
+.pop button[data-compte="facturation"] { color: var(--acct-facturation); }
+
+.acct-list button[data-compte="perso"]::before,
+.pop button[data-compte="perso"]::before,
+.acct-list button[data-compte="atelier"]::before,
+.pop button[data-compte="atelier"]::before,
+.acct-list button[data-compte="facturation"]::before,
+.pop button[data-compte="facturation"]::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 14px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .shortcut-list {
