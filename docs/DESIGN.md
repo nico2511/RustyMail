@@ -1,99 +1,66 @@
 # Design & UI
 
-Source of truth for the **shipped** front end (`src/styles.css`, `src/main.ts`): tokens, Composer / Inbox screens, and known pitfalls. **Implementation wins** over aspirational mockups for what the app does today.
+Official visual direction for the **next** RustyMail interface: the productivity mockups in [`docs/mockups/productivity/`](mockups/productivity/README.md).
 
-The **next** interface direction is not this pastel system and not Clarity. It is the productivity mockups: [`docs/mockups/productivity/`](mockups/productivity/README.md). Implement that direction; do not extend Clarity.
+Open `docs/mockups/productivity/index.html` (no build). Captures live in `docs/mockups/productivity/images/`.
 
-## Principles
+The running app in `src/` still ships the **Clarity v10 pastel** shell (`src/styles/tokens.css`, `src/styles.css`, `src/styles/appearance.css`). That CSS is the current release, not the direction to extend. A later implementation PR replaces it. Do not treat cream, sage, or lavender as the product direction.
 
-- **Theme:** Warm **pastel light** — cream surfaces (`--deep` → `--surface` → `--elevated`); neither pure white nor slate-dark. Subtle borders (`--border` / `--border-weak`).
-- **Accents:** Soft sage (`--sm-primary`), dusty rose (`--sm-tertiary`), optional lavender / peach / sky tokens for chips and highlights.
-- **Radii:** `--radius-btn: 8px` and slightly rounder panels (`--radius-sm` … `--radius-lg`) for a calm, approachable feel.
-- **Density:** Inbox and thread lists stay airy and professional; readable contrast on pastel backgrounds (`--text` on `--surface`).
+Clarity mockups (`docs/mockups/clarity/`, v2–v10) are an **archive**. Do not continue them.
+
+## Language
+
+- **Rail:** charcoal (`#17191e`). Collapses to an icon strip. On compose it starts collapsed so writing is almost full width.
+- **Surface:** white. Ink is near-black. Borders are cool gray.
+- **Accent:** copper (`#c4491d`) only for unread, send, reply, new message, and focus. It is not an account color.
+- **No costume:** not cream, not sage, not lavender, not Clarity teal.
 
 ## Typography
 
-- **UI:** `system-ui` stack (local only — no Google Fonts).
-- **Composer (markdown):** monospace on `.composer-mail-shell .composer-body textarea`
-- **Text colors:** `--text`, `--muted`, `--dim` — prefer variables over hard-coded grays
+Two families, both local (no network):
 
-## Palette & tokens (`:root`)
+- **Literata** — reading mail: subject, body, list subject and preview.
+- **IBM Plex Sans** — chrome: rail, buttons, filters, modals, account labels.
 
-Pastel reference (2026 refonte):
+## Hierarchy
 
-| Role | Token | Example |
-| ---- | ----- | ------- |
-| Canvas | `--deep` | Warm gray-cream |
-| Panels | `--base`, `--surface`, `--elevated` | Layered off-whites |
-| Accent | `--accent` (= `--sm-primary`) | Sage green |
-| Warm accent | `--accent-warm`, `--accent-peach` | Tags, highlights |
-| Primary button | `--btn-primary-fill` + `--btn-primary-text` | Sage fill, dark text |
-| Secondary | `--btn-secondary-*` | Light gray fill |
-| Overlays | `--scrim`, `--scrim-heavy` | Modals / AI quick panel |
-| Destructive | `--sm-danger-*`, `--danger` | Soft coral |
+What matters stays in front: subject, sender, the open message body, Reply, Send, New message, unread.
 
-Legacy **Slate Monolith** dark palette was replaced by this light pastel system; old `guidance-color.png` remains historical reference only.
+Everything else recedes — smaller, grayer, or behind a chevron, a tab, a modal, a hover, or the collapsed rail — and stays one click, one hover, or one shortcut away. That includes metadata, tags, DKIM, sync, account, contact, help, rewrite, shortcuts, and secondary counts.
 
-## Surfaces & layout
+## Multi-account
 
-- **`.surface` / `.surface-sm`:** cards with shadows `--carved` / `--carved-sm`
-- **Inbox:** `inbox-*` (app bar, chips, list panel)
-- **Thread reading:** `.thread-reading` — header (subject, participants + avatars, Archive / Reply, `thread-zen` summary when `state.aiOutput`), **full width** of main panel
-- **List:** no tag column on the right; mailbox choice via **sidebar** only
+The inbox is multi-account. Unified view **Tous les comptes** mixes mail by time. Each row names its account. A filtered view shows one mailbox; the title and unread count follow.
 
-## Composer: `.composer-mail-shell`
+Account hues are muted and separate from copper. The name is always written; color is not the only signal.
 
-- `<section class="compose-view composer-mail-shell">` — mail compose only (not account setup)
-- Palette follows global pastel tokens
-- **Send:** global primary (`--btn-primary-fill`)
-- Markdown / active tone: `--accent`, `--accent-dim`
-- **`composer-accent-outline`:** Add attachment, Adjust tone
-- **Cc · Bcc:** `.compose-link` → `--accent`
+| Account | Hue | Text on white |
+| ------- | --- | ------------- |
+| Perso | slate | `#3d4c63` |
+| Atelier | olive | `#4a5336` |
+| Facturation | plum | `#5c4458` |
 
-### Layout
+The same hues mark the rail, the list-title switcher, and the account modal. On a single-account view the hue moves into the title and the rail; the list surface stays white.
 
-- **Chrome:** close, title (New message / Reply / Forward), preview, Send
-- **`compose-meta-card`:** To, Cc/Bcc, Subject, Files; advanced multipart HTML at bottom (`composer-advanced--footnote`)
-- **`compose-editor-sheet`:** tone + Markdown, textarea + preview, dictation
-- **`persistDraft`:** if `#compose-cc` / `#compose-bcc` absent from DOM, do not clear `draft.cc` / `draft.bcc`
-- After attachment changes: call **`render()`** for chips and counters
+Demo: `inbox.html?compte=tous`, `?compte=perso`, `?compte=atelier`, `?compte=facturation`, `inbox.html?profil=1`.
 
-### Markdown toolbar
+## Screens
 
-- Bold, italic, underline, lists, link, image URL, inline/block code, quote, undo/redo
-- Body edits: **`finalizeMarkdownToolbarEdit`** → **`schedulePreviewUpdate`**
-- **Preview:** `computePreview()` must not full `render()` on every keystroke (recreates `#compose-body` and jumps caret) — target DOM update on `.composer-body .preview` when preview visible
+| Mocked | File | Proves |
+| ------ | ---- | ------ |
+| Hub | `productivity/index.html` | The three-screen path |
+| Inbox | `inbox.html` | Unified and filtered mail, account color, unread |
+| Thread | `thread.html` | Every message folds; contact modal; copper on the unread |
+| Compose | `compose.html` | Collapsed rail, markdown, send |
 
-### Attachments
+Not mocked here, and still real product: Organiser, full Settings, the address book as a page, OAuth setup, model install. The contact and account **modals** stand in for those overlays. Do not invent new product mechanics in the mockups.
 
-- Drop on **`.composer-mail-shell`**; **`AbortController`** for listeners; `dragenter` / `dragleave` counter
+## What not to follow
 
-## Copy & locale
-
-- UI strings come from `src/locales/{fr,en}.json` via `src/i18n.ts`
-- **`general.motherLanguage`** pref selects UI locale
-- Use `<span class="kbd">` for keyboard shortcut hints
-
-## Reference files
-
-| Topic | Location |
-| ----- | -------- |
-| CSS tokens | `src/styles.css` (`:root`) |
-| Inbox | `.inbox-*`, `.thread-row` |
-| Composer | `.compose-*`, `.composer-*` |
-| Attachment logic | `pickAttachments`, `bindComposerDropzone`, `persistDraft` — `main.ts` |
-
-## Theme & appearance (Clarity v10)
-
-- **Light default:** Douce cream tokens in `src/styles/tokens.css`.
-- **Modifiers:** `src/styles/appearance.css` — Contrast+, lavender accent, warm **dark** (`clarity-dark`), system preference via **Settings → Appearance**.
-- **Email HTML:** `.message-html` keeps a light canvas in dark app theme so third-party mail stays readable.
-
-## Possible evolutions
-
-- Three-column layout refinements (AI rail + editor + wide panel)
-- Rich editor with unified undo beyond Markdown toolbar
+- `src/styles/tokens.css` pastel tokens (`--sm-primary`, cream surfaces, lavender) — shipped UI only.
+- `docs/guidance-color.png` — historical Slate Monolith reference, not this palette.
+- `docs/mockups/clarity/`, `vNext/`, `alternatives/` — closed explorations.
 
 ---
 
-*Older “North Star” / Slate Monolith docs were consolidated; this file tracks the shipping UI.*
+*Shipped CSS stays Clarity v10 until a separate implementation PR. This file is the guidance for that PR.*

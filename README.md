@@ -40,7 +40,7 @@ Full index: **[docs/README.md](docs/README.md)**
 | IPC / Tauri commands | [docs/IPC_SECURITY.md](docs/IPC_SECURITY.md) |
 | Feature matrix | [docs/CAPABILITIES.md](docs/CAPABILITIES.md) |
 | Product vision | [docs/PRODUCT.md](docs/PRODUCT.md) |
-| UI design | [docs/DESIGN.md](docs/DESIGN.md) |
+| UI design | [docs/DESIGN.md](docs/DESIGN.md) — next direction is the productivity mockups; shipped CSS is still Clarity v10 |
 | Releases & CI | [docs/RELEASE.md](docs/RELEASE.md) |
 | Contributing | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
 

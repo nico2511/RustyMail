@@ -1,45 +1,34 @@
 # Règles mockups UX — RustyMail
 
-## Direction en cours
+## Direction officielle
 
-Les maquettes **[`productivity/`](productivity/)** sont la direction UX officielle. Elles sont **volontairement indépendantes** des classes de l’app, de `tokens.css` et de Clarity : validation visuelle d’abord, implémentation dans `src/` ensuite.
+Les maquettes **[`productivity/`](productivity/)** sont la direction UX. Charcoal, blanc, cuivre, Literata pour la lecture, IBM Plex Sans pour le chrome. Elles ne reprennent pas les classes de l’app, ni `tokens.css`, ni Clarity.
 
-Le prochain travail d’interface implémente **cette** direction. Clarity (v2–v10) est une archive — ne pas la prolonger.
+Toute **nouvelle** proposition d’interface s’itère dans `productivity/` (HTML statique, captures dans `productivity/images/`). L’implémentation dans `src/` viendra dans une PR séparée. D’ici là, le CSS livré reste le shell pastel Clarity v10 — ce n’est pas la cible.
 
-La règle « composants existants uniquement » ci-dessous reste vraie pour les fichiers historiques (`clarity/`, `inbox-faithful.html`). Elle **ne s’applique pas** à `productivity/`.
+Clarity (v2–v10) est une **archive**. Ne pas la prolonger, ne pas s’en servir comme base.
 
-## Règle historique (fichiers fidèles)
+## Ce qui ne s’applique plus comme direction
 
-**Les maquettes fidèles au shell livré reposent sur les composants et classes déjà présents dans l’application.**
+L’ancienne règle « maquettes = composants et tokens déjà dans l’app » (palette pastel v0.2.0, classes `.primary-button` / `.thread-row`, pas de design parallèle) **ne guide plus** les nouvelles maquettes.
 
-- **Aucune hallucination** : pas de widgets, palettes, modes ou layouts inventés qui n’existent pas dans le code produit.
-- **Source de vérité** : rendu HTML (`src/app/ui/render/*`), styles (`src/styles.css`, `src/styles/tokens.css`), actions `data-action` câblées dans `wireEventsDom*`.
-- **Tokens** : palette **pastel v0.2.0** (`--sm-primary`, `--btn-primary-fill`, etc.) — pas de design parallèle non branché.
+Elle reste vraie seulement pour les fichiers historiques qui gèlent le shell livré :
 
-Si un besoin UX n’est pas couvert par un composant existant, il faut **d’abord** l’implémenter dans l’app (ou ouvrir une issue explicite), **ensuite** le mockup/documenter — jamais l’inverse.
+- [`inbox-faithful.html`](inbox-faithful.html), [`faithful-components-demo.html`](faithful-components-demo.html)
+- le dossier [`clarity/`](clarity/)
 
-## Fichiers de référence
-
-| Besoin | Où regarder |
-| ------ | ------------- |
-| Boutons | `.primary-button`, `.ghost-button`, `.icon-pill`, `.icon-button` — `src/styles.css` |
-| Liste inbox | `.thread-row`, `.inbox-thread-row`, `listRender.ts` |
-| Sidebar | `sidebarRender.ts`, `.sidebar` |
-| Brief / digest | `actionBriefHtml.ts`, `mailboxDigest`, classes `inbox-brief-*` |
-| Recherche | `searchRender.ts`, modale `#search-modal` |
-| Compose | `composerRender.ts`, `.composer-mail-shell`, `[data-tone]` |
-| Shell | `appShellRenderMarkupRun.ts`, `docs/UX-NOTE.md` |
-| Inventaire détaillé | [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md) |
+Là, pas de widget inventé : le rendu vient de `src/app/ui/render/*` et les styles de `src/styles.css` + `src/styles/tokens.css`. Cet inventaire est dans [`APP-COMPONENT-INVENTORY.md`](APP-COMPONENT-INVENTORY.md). Il décrit l’app d’aujourd’hui, pas `productivity/`.
 
 ## Dossier `clarity/` — archive
 
-Clarity v2–v10 n’est **plus** la direction. Ne pas itérer ces pages. Voir [`productivity/README.md`](productivity/README.md).
+Ne pas itérer ces pages. Voir [`productivity/README.md`](productivity/README.md) et [`../UX-NOTE.md`](../UX-NOTE.md).
 
 ## Visuels
 
-Chaque changement des maquettes productivité doit inclure une capture à jour dans `productivity/images/` (`inbox.png`, `thread.png`, `compose.png`).
+Chaque changement visible de `productivity/` met à jour les captures dans `productivity/images/` (`inbox.png`, `inbox-facturation.png`, `thread.png`, `compose.png`, `profile-modal.png`, `contact-modal.png`).
 
-## Mockup inbox conforme
+## Mockup fidèle (historique)
 
-- Fichier : [`inbox-faithful.html`](inbox-faithful.html) — shell + sidebar + `listRender` (statique).
+- Fichier : [`inbox-faithful.html`](inbox-faithful.html).
 - Styles : `../../src/styles/tokens.css` + `../../src/styles.css` uniquement.
+- Pas la direction suivante.

@@ -1,6 +1,8 @@
-# Mockups UX vNext — « Focus Paper »
+# Mockups UX vNext — « Focus Paper » (archive)
 
-Proposition **visuelle uniquement** (non implémentée dans l’app v0.2.0). Objectif : garder l’esprit calme de RustyMail, réduire la charge cognitive, recentrer sur lire / écrire.
+**Clos.** Ce n’est pas la direction. Les maquettes officielles sont dans [`../productivity/`](../productivity/).
+
+Proposition **visuelle uniquement** (non implémentée dans l’app v0.2.0). Objectif historique : garder l’esprit calme de RustyMail, réduire la charge cognitive, recentrer sur lire / écrire.
 
 ## Principes vs v0.2.0
 
