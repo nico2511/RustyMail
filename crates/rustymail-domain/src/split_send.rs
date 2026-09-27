@@ -45,7 +45,7 @@ pub fn plan_split(
     }
 
     let mut items: Vec<(String, u64)> = attachments.to_vec();
-    items.sort_by(|a, b| b.1.cmp(&a.1));
+    items.sort_by_key(|a| std::cmp::Reverse(a.1));
 
     let server_target = (budget_bytes as f64 * 1.4_f64).round() as u64;
     let mut chunks: Vec<SplitChunk> = Vec::new();
