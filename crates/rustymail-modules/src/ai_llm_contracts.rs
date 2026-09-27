@@ -41,6 +41,28 @@ char ::= [^"\\] | "\\" .
 space ::= [ \t\n]*
 "#;
 
+/// Orientation Organiser : diagnostic, recommandations, actions proposées.
+/// Ordre des clés fixe pour llama-server. OpenRouter ignore la grammaire ; le validateur reste la source de vérité.
+pub const ORG_ORIENTATION_JSON_GBNF: &str = r#"
+root ::= "{" space diag-kv "," space rec-kv "," space act-kv "}"
+diag-kv ::= "\"diagnosis\"" space ":" space string
+rec-kv ::= "\"recommendations\"" space ":" space string-arr
+act-kv ::= "\"actions\"" space ":" space action-arr
+action-arr ::= "[" space (action ("," space action)*)? space "]"
+action ::= "{" space title-kv "," space rat-kv "," space ids-kv "," space kw-kv "," space sug-kv "," space mb-kv "}"
+title-kv ::= "\"title\"" space ":" space string
+rat-kv ::= "\"rationale\"" space ":" space string
+ids-kv ::= "\"threadIds\"" space ":" space string-arr
+kw-kv ::= "\"searchKeywords\"" space ":" space string-arr
+sug-kv ::= "\"suggestedAction\"" space ":" space action-enum
+mb-kv ::= "\"targetMailbox\"" space ":" space (string | "null")
+action-enum ::= "\"archive\"" | "\"move\"" | "\"trash\"" | "\"markRead\""
+string-arr ::= "[" space (string ("," space string)*)? space "]"
+string ::= "\"" char* "\""
+char ::= [^"\\] | "\\" .
+space ::= [ \t\n]*
+"#;
+
 /// `{"answer":"…","evidenceMessageIds":[…]}`
 pub const QA_THREAD_JSON_GBNF: &str = r#"
 root ::= "{" space ans-kv "," space ev-kv "}"
@@ -75,6 +97,31 @@ const MAX_CONTACT_TOPICS: usize = 12;
 const MAX_SEARCH_TEXT_CHARS: usize = 4_096;
 const MAX_SEARCH_SENDERS: usize = 20;
 const MAX_SEARCH_TAGS: usize = 40;
+
+const MIN_ORG_DIAGNOSIS_CHARS: usize = 8;
+const MAX_ORG_DIAGNOSIS_CHARS: usize = 1_200;
+const MIN_ORG_RECOMMENDATIONS: usize = 1;
+const MAX_ORG_RECOMMENDATIONS: usize = 6;
+const MAX_ORG_RECOMMENDATION_CHARS: usize = 400;
+const MAX_ORG_ACTIONS: usize = 5;
+const MAX_ORG_ACTION_TITLE_CHARS: usize = 160;
+const MAX_ORG_ACTION_RATIONALE_CHARS: usize = 800;
+const MAX_ORG_ACTION_THREAD_IDS: usize = 20;
+const MAX_ORG_ACTION_THREAD_ID_CHARS: usize = 128;
+const MAX_ORG_ACTION_KEYWORDS: usize = 6;
+const MAX_ORG_ACTION_KEYWORD_CHARS: usize = 40;
+const MAX_ORG_TARGET_MAILBOX_CHARS: usize = 200;
+
+/// Forme JSON d’une action d’orientation Organiser (avant filtrage des ids).
+#[derive(Debug, Clone)]
+pub struct OrgOrientationActionShape<'a> {
+    pub title: &'a str,
+    pub rationale: &'a str,
+    pub thread_ids: &'a [String],
+    pub search_keywords: &'a [String],
+    pub suggested_action: &'a str,
+    pub target_mailbox: Option<&'a str>,
+}
 
 fn err_msg(s: impl Into<String>) -> LlmError {
     LlmError::Msg(s.into())
@@ -314,6 +361,101 @@ pub fn validate_search_nl_shape(
     Ok(())
 }
 
+fn org_action_allowed(action: &str) -> bool {
+    matches!(
+        action.trim().to_ascii_lowercase().as_str(),
+        "archive" | "move" | "trash" | "markread" | "mark_read"
+    )
+}
+
+/// Rejette une orientation vide, trop grande, ou une action hors enum.
+/// N’invente pas de diagnostic de repli : l’appelant affiche un état d’erreur.
+pub fn validate_org_orientation_shape(
+    diagnosis: &str,
+    recommendations: &[String],
+    actions: &[OrgOrientationActionShape<'_>],
+) -> Result<(), LlmError> {
+    let diagnosis_n = diagnosis.trim().chars().count();
+    if diagnosis_n < MIN_ORG_DIAGNOSIS_CHARS || diagnosis_n > MAX_ORG_DIAGNOSIS_CHARS {
+        return Err(err_msg(format!(
+            "Orientation : diagnostic hors bornes ({MIN_ORG_DIAGNOSIS_CHARS}–{MAX_ORG_DIAGNOSIS_CHARS} caractères)."
+        )));
+    }
+    if recommendations.len() < MIN_ORG_RECOMMENDATIONS
+        || recommendations.len() > MAX_ORG_RECOMMENDATIONS
+    {
+        return Err(err_msg(format!(
+            "Orientation : 1 à {MAX_ORG_RECOMMENDATIONS} recommandations attendues."
+        )));
+    }
+    for (i, rec) in recommendations.iter().enumerate() {
+        let n = rec.trim().chars().count();
+        if n == 0 || n > MAX_ORG_RECOMMENDATION_CHARS {
+            return Err(err_msg(format!(
+                "Orientation : recommandation {i} hors bornes (max {MAX_ORG_RECOMMENDATION_CHARS})."
+            )));
+        }
+    }
+    if actions.len() > MAX_ORG_ACTIONS {
+        return Err(err_msg(format!(
+            "Orientation : trop d’actions (max {MAX_ORG_ACTIONS})."
+        )));
+    }
+    for (i, action) in actions.iter().enumerate() {
+        let title_n = action.title.trim().chars().count();
+        if title_n < 2 || title_n > MAX_ORG_ACTION_TITLE_CHARS {
+            return Err(err_msg(format!(
+                "Orientation : titre d’action {i} hors bornes."
+            )));
+        }
+        let rationale_n = action.rationale.trim().chars().count();
+        if rationale_n < 4 || rationale_n > MAX_ORG_ACTION_RATIONALE_CHARS {
+            return Err(err_msg(format!(
+                "Orientation : justification d’action {i} hors bornes."
+            )));
+        }
+        if !org_action_allowed(action.suggested_action) {
+            return Err(err_msg(format!(
+                "Orientation : suggestedAction inconnu pour l’action {i}."
+            )));
+        }
+        if action.thread_ids.len() > MAX_ORG_ACTION_THREAD_IDS {
+            return Err(err_msg(format!(
+                "Orientation : trop de threadIds (action {i}, max {MAX_ORG_ACTION_THREAD_IDS})."
+            )));
+        }
+        if action
+            .thread_ids
+            .iter()
+            .any(|id| id.trim().chars().count() > MAX_ORG_ACTION_THREAD_ID_CHARS)
+        {
+            return Err(err_msg(format!(
+                "Orientation : threadId trop long (action {i})."
+            )));
+        }
+        if action.search_keywords.len() > MAX_ORG_ACTION_KEYWORDS {
+            return Err(err_msg(format!(
+                "Orientation : trop de searchKeywords (action {i})."
+            )));
+        }
+        if action
+            .search_keywords
+            .iter()
+            .any(|k| k.trim().chars().count() > MAX_ORG_ACTION_KEYWORD_CHARS)
+        {
+            return Err(err_msg("Orientation : mot-clé trop long.".to_string()));
+        }
+        if let Some(mb) = action.target_mailbox {
+            if mb.trim().chars().count() > MAX_ORG_TARGET_MAILBOX_CHARS {
+                return Err(err_msg(format!(
+                    "Orientation : targetMailbox trop long (action {i})."
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -380,6 +522,48 @@ mod tests {
             None
         )
         .is_err());
+    }
+
+    #[test]
+    fn org_orientation_rejects_empty_diagnosis_and_unknown_action() {
+        let recs = vec!["Archiver les newsletters lues de plus de 30 jours.".into()];
+        assert!(validate_org_orientation_shape("court", &recs, &[]).is_err());
+        assert!(validate_org_orientation_shape("   ", &recs, &[]).is_err());
+        assert!(validate_org_orientation_shape(
+            "La boîte contient surtout des newsletters lues.",
+            &[],
+            &[]
+        )
+        .is_err());
+        let bad = OrgOrientationActionShape {
+            title: "Trop",
+            rationale: "Action inconnue à ne pas appliquer.",
+            thread_ids: &[],
+            search_keywords: &[],
+            suggested_action: "deleteEverything",
+            target_mailbox: None,
+        };
+        assert!(validate_org_orientation_shape(
+            "La boîte contient surtout des newsletters lues.",
+            &recs,
+            &[bad],
+        )
+        .is_err());
+        let ids = vec!["t1".to_string()];
+        let ok = OrgOrientationActionShape {
+            title: "Archiver l’inbox ancienne",
+            rationale: "Ces fils lus n’ont plus d’activité récente.",
+            thread_ids: &ids,
+            search_keywords: &[],
+            suggested_action: "archive",
+            target_mailbox: None,
+        };
+        assert!(validate_org_orientation_shape(
+            "La boîte contient surtout des newsletters lues.",
+            &recs,
+            &[ok],
+        )
+        .is_ok());
     }
 
     #[test]

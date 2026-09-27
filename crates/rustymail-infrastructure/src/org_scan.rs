@@ -5,8 +5,8 @@ use std::path::Path;
 
 use rusqlite::{params, Connection};
 use rustymail_domain::{
-    OrgProposal, OrgProposalKind, OrgProposalSource, OrgScanLlmStatus, OrgScanReport, OrgScanStats,
-    OrgSuggestedAction, OrgThreadRef,
+    OrgOrientation, OrgProposal, OrgProposalKind, OrgProposalSource, OrgScanLlmStatus,
+    OrgScanReport, OrgScanStats, OrgSuggestedAction, OrgThreadRef,
 };
 
 use crate::app_prefs::{load_app_prefs, prefs_path_from_db_dir};
@@ -18,7 +18,7 @@ use crate::org_consolidate::scan_duplicate_threads;
 use crate::org_mailbox_structure::analyze_mailbox_structure;
 use crate::org_retag::{effective_thread_mailbox, sender_is_transactional, thread_tags_stale};
 use rustymail_llm::LlmEngine;
-use rustymail_modules::ai_org_proposals::org_proposals_with_llm;
+use rustymail_modules::ai_org_proposals::org_orientation_with_llm;
 
 const SAMPLE_LIMIT: usize = 500;
 
@@ -259,28 +259,134 @@ pub fn enrich_org_report_llm_refs(
     Ok(())
 }
 
-/// Propositions LLM rattachées aux fils réels du compte (catalogue + recherche mots-clés).
-pub fn org_llm_proposals_for_account(
+fn one_line(text: &str, max_chars: usize) -> String {
+    text.chars()
+        .filter(|c| *c != '\n' && *c != '\r')
+        .take(max_chars)
+        .collect()
+}
+
+fn kind_context_label(kind: OrgProposalKind) -> &'static str {
+    match kind {
+        OrgProposalKind::UnreadOutsideInbox => "unread-outside-inbox",
+        OrgProposalKind::StaleInboxRead => "stale-inbox-read",
+        OrgProposalKind::UnsubscribeNewsletter => "unsubscribe-newsletter",
+        OrgProposalKind::UnsubscribeTransactional => "unsubscribe-transactional",
+        OrgProposalKind::NewsletterRuleUnfiled => "newsletter-unfiled",
+        OrgProposalKind::TransactionalNotification => "transactional",
+        OrgProposalKind::BulkTrashCandidate => "bulk-trash",
+        OrgProposalKind::CustomKeywordCluster => "keyword-cluster",
+        OrgProposalKind::DuplicateThreadCrossMailbox => "duplicate-cross-mailbox",
+        OrgProposalKind::OrphanThreadRepair => "orphan-thread",
+        OrgProposalKind::StaleTags => "stale-tags",
+        OrgProposalKind::SemanticTagRefresh => "semantic-tags",
+        OrgProposalKind::EmptyMailbox => "empty-mailbox",
+        OrgProposalKind::FlatMailboxTree => "flat-mailbox-tree",
+        OrgProposalKind::LlmCluster => "llm-cluster",
+    }
+}
+
+fn action_context_label(action: OrgSuggestedAction) -> &'static str {
+    match action {
+        OrgSuggestedAction::Move => "move",
+        OrgSuggestedAction::Archive => "archive",
+        OrgSuggestedAction::Trash => "trash",
+        OrgSuggestedAction::MarkRead => "markRead",
+        OrgSuggestedAction::Retag => "retag",
+        OrgSuggestedAction::RepairThreading => "repairThreading",
+        OrgSuggestedAction::DeleteMailbox => "deleteMailbox",
+    }
+}
+
+/// Contexte heuristique pour le prompt d’orientation. Ce n’est pas la sortie affichée.
+pub fn format_org_heuristic_context(proposals: &[OrgProposal]) -> String {
+    let mut lines = Vec::new();
+    for proposal in proposals.iter().take(12) {
+        let ids: Vec<&str> = proposal
+            .thread_ids
+            .iter()
+            .chain(proposal.thread_refs.iter().map(|r| &r.thread_id))
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && !s.starts_with("mailbox:"))
+            .take(6)
+            .collect();
+        let mut seen = HashSet::new();
+        let ids: Vec<&str> = ids.into_iter().filter(|id| seen.insert(*id)).collect();
+        lines.push(format!(
+            "- {} | {} | count={} | action={} | ids={}",
+            kind_context_label(proposal.kind),
+            one_line(&proposal.title, 80),
+            proposal.total_count,
+            action_context_label(proposal.suggested_action),
+            ids.join(",")
+        ));
+    }
+    if lines.is_empty() {
+        "(aucun candidat heuristique)".into()
+    } else {
+        lines.join("\n")
+    }
+}
+
+fn extend_valid_ids_from_heuristics(valid_ids: &mut HashSet<String>, proposals: &[OrgProposal]) {
+    for proposal in proposals {
+        for id in proposal
+            .thread_ids
+            .iter()
+            .chain(proposal.thread_refs.iter().map(|r| &r.thread_id))
+        {
+            let id = id.trim();
+            if !id.is_empty() && !id.starts_with("mailbox:") {
+                valid_ids.insert(id.to_string());
+            }
+        }
+    }
+}
+
+/// Orientation LLM + actions rattachées aux fils réels (catalogue, candidats, mots-clés).
+pub fn org_llm_orientation_for_account(
     db_path: &Path,
     account_id: &str,
-    heuristic_proposal_count: usize,
+    heuristic_proposals: &[OrgProposal],
     engine: &mut LlmEngine,
     output_language: &str,
-) -> Result<Vec<OrgProposal>, String> {
+) -> Result<(OrgOrientation, Vec<OrgProposal>), String> {
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
-    let (catalog, valid_ids) = build_org_llm_thread_catalog(&conn, account_id, LLM_CATALOG_LIMIT)?;
-    if catalog.is_empty() {
-        return Ok(Vec::new());
+    let (catalog, mut valid_ids) =
+        build_org_llm_thread_catalog(&conn, account_id, LLM_CATALOG_LIMIT)?;
+    extend_valid_ids_from_heuristics(&mut valid_ids, heuristic_proposals);
+    let heuristic_context = format_org_heuristic_context(heuristic_proposals);
+    if catalog.trim().is_empty() && valid_ids.is_empty() {
+        return Err("Aucun fil indexé : impossible de produire une orientation.".into());
     }
-    let raw = org_proposals_with_llm(
+    let parsed = org_orientation_with_llm(
         engine,
         account_id,
         &catalog,
-        heuristic_proposal_count,
+        &heuristic_context,
         &valid_ids,
         output_language,
     )?;
-    Ok(hydrate_llm_proposals(&conn, account_id, &valid_ids, raw))
+    let actions = hydrate_llm_proposals(&conn, account_id, &valid_ids, parsed.actions);
+    Ok((parsed.orientation, actions))
+}
+
+/// Actions LLM seules (Organiser v1). L’orientation complète est portée par le scan v2.
+pub fn org_llm_proposals_for_account(
+    db_path: &Path,
+    account_id: &str,
+    heuristic_proposals: &[OrgProposal],
+    engine: &mut LlmEngine,
+    output_language: &str,
+) -> Result<Vec<OrgProposal>, String> {
+    org_llm_orientation_for_account(
+        db_path,
+        account_id,
+        heuristic_proposals,
+        engine,
+        output_language,
+    )
+    .map(|(_orientation, actions)| actions)
 }
 
 pub fn org_scan_account(
@@ -1118,6 +1224,33 @@ mod tests {
             params![format!("msg-{thread_id}"), thread_id, account_id, received_at],
         )
         .expect("message");
+    }
+
+    #[test]
+    fn heuristic_context_lists_kind_and_thread_id() {
+        let proposal = OrgProposal {
+            id: "h1".into(),
+            kind: OrgProposalKind::StaleInboxRead,
+            section: "range".into(),
+            title: "Inbox lue".into(),
+            rationale: "vieux".into(),
+            thread_refs: vec![],
+            thread_ids: vec!["thr-1".into()],
+            suggested_action: OrgSuggestedAction::Archive,
+            target_mailbox: None,
+            confidence: 0.5,
+            source: OrgProposalSource::Heuristic,
+            total_count: 3,
+            applicable: true,
+            llm_search_keywords: vec![],
+            explain_rule_id: None,
+            explain_signals: vec![],
+            unsubscribe_links: vec![],
+        };
+        let text = format_org_heuristic_context(&[proposal]);
+        assert!(text.contains("stale-inbox-read"));
+        assert!(text.contains("thr-1"));
+        assert!(text.contains("archive"));
     }
 
     #[test]

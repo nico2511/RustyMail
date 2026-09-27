@@ -1,16 +1,19 @@
 # Organiser v2 — état des mécaniques
 
-Relevé après relecture du scan heuristique, de l’apply IMAP et de l’UI (`organizationViewV2`, `org_v2_scan`, `org_apply`). Le centre reste utile **sans LLM** : les cartes heuristiques ne dépendent pas d’un modèle.
+Relevé après relecture du scan, de l’apply IMAP et de l’UI (`organizationViewV2`, `org_v2_scan`, `org_apply`).
+
+La vue Organiser utile **passe par le LLM**. Les heuristiques préparent le contexte (candidats, compteurs, ids). La sortie affichée est une **orientation** : diagnostic, recommandations, actions proposées. Le cœur mail (IMAP, lecture, envoi) ne dépend pas de ce module. Si le LLM n’est pas joignable, ou si « Propositions Organiser » est désactivé, l’écran affiche un message d’état et **n’invente pas** d’orientation.
 
 ## Ce qui fonctionne
 
 | Mécanique | Détail |
 | --- | --- |
-| Scan | `org_v2_scan_account` filtre le scan complet puis applique la mémoire (ignoré, reporté, déjà traité). |
-| Cartes | Inbox lue ancienne, désinscriptions, transactionnels, doublons cross-dossiers, règles mots-clés, dossiers vides, conseil d’arbre plat (non applicable). |
+| Contexte | `org_v2_scan_account` filtre le scan heuristique puis la mémoire. Ce contexte est envoyé au modèle, il n’est pas la file affichée. |
+| Orientation | JSON `diagnosis` + `recommendations` + `actions`, validé dans `validate_org_orientation_shape` (`docs/LLM_CONTRACTS.md`). |
+| Actions | Cartes issues des `actions` LLM (ids du catalogue ou des candidats, sinon mots-clés). Apply inchangé : archive, corbeille, déplacement. |
 | Apply | Archive `Archive/AAAA/MM-mois` selon les préférences, corbeille, déplacement, suppression de dossiers vides. |
 | Confirmations | Corbeille : modale + case + jeton `bulk-trash-org`. Dossiers vides : modale + case + jeton `delete-mailbox`. Archive / déplacement : confirmation avant le lot. |
-| LLM | Cartes `llm-*` seulement si « Propositions Organiser (LLM) » est activé, y compris à l’ouverture de la vue et après rafraîchissement. |
+| Sans LLM | Message explicite. File d’actions vide. |
 | Undo | Un apply V2 en plusieurs paquets partage un `batchId`. L’annulation ne marque le lot fait que pour les fils réellement revenus en arrière. |
 
 L’action d’une carte porte sur **tous** les fils détectés (plafond de scan 500). L’écran n’en liste qu’un échantillon et le signale.

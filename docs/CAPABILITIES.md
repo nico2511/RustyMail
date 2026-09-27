@@ -37,7 +37,7 @@ RustyMail is a **local-first desktop mail client**: **IMAP** sync, **SMTP** send
 | Folder management | Create, rename, delete, subscribe on IMAP |
 | Pagination | SQL `LIMIT`/`OFFSET` thread list + “Load more” |
 | Trash | Move to Trash + empty trash |
-| **Organization center** | Sidebar “Organiser V2”: heuristic scan without LLM, batch cards (stale inbox, unsubscribe, transactional, cross-folder duplicates, keyword rules, empty folders). Tag normalization stays on Organiser v1. Archive `Archive/YYYY/MM-month`. Optional LLM cards when the preference is on |
+| **Organization center** | Sidebar “Organiser V2”: heuristics prepare context only. The view shows an LLM orientation (diagnosis, recommendations, proposed actions) validated in Rust. If the model is unreachable, a status message is shown and no orientation is invented. Tag normalization stays on Organiser v1. Archive `Archive/YYYY/MM-month`. Mail core does not require the LLM |
 
 ---
 

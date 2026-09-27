@@ -26,6 +26,7 @@ Single business flow per feature: prompt → generation → JSON → **Rust vali
 | `TRANSLATION_PLAIN_JSON_GBNF` | `{ translatedText, preservedEntityIds[], detectedSourceLang }` |
 | `QA_THREAD_JSON_GBNF` | `{ answer, evidenceMessageIds[] }` |
 | `SECURITY_FINDINGS_GBNF` (`mail_security`) | `{ findings[{ code, severity, messageFr }] }` — max 3 findings enforced post-parse |
+| `ORG_ORIENTATION_JSON_GBNF` | `{ diagnosis, recommendations[], actions[{ title, rationale, threadIds[], searchKeywords[], suggestedAction, targetMailbox }] }` — `validate_org_orientation_shape` |
 
 ## Untrusted mail in prompts
 

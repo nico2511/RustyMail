@@ -175,8 +175,11 @@ pub use org_post_move::{
     post_move_heuristic_refresh, spawn_post_move_background_sync, PostMoveRefreshOutcome,
 };
 pub use org_retag::{org_retag_account, org_retag_threads};
-pub use org_scan::{enrich_org_report_llm_refs, org_llm_proposals_for_account, org_scan_account};
-pub use org_v2_scan::org_v2_scan_account;
+pub use org_scan::{
+    enrich_org_report_llm_refs, format_org_heuristic_context, org_llm_orientation_for_account,
+    org_llm_proposals_for_account, org_scan_account,
+};
+pub use org_v2_scan::{org_v2_scan_account, org_v2_with_llm_outcome};
 pub use saved_searches::{
     delete_saved_search, get_saved_search, list_saved_searches, mark_saved_search_seen,
     migrate_saved_searches, upsert_saved_search,
