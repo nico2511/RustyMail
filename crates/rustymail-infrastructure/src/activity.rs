@@ -619,6 +619,12 @@ mod tests {
         .expect("record");
         assert_eq!(n, 1);
         let conn = open_sqlite_migrated(&path).expect("open");
+        // Même milliseconde que `Utc::now()` : `occurred_at < maintenant` n’est pas garanti.
+        conn.execute(
+            "UPDATE activity_events SET occurred_at = '2000-01-01T00:00:00.000000000Z'",
+            [],
+        )
+        .expect("antidater");
         let purged = purge_activity_events_older_than(&conn, 0).expect("purge");
         assert_eq!(purged, 1);
     }
