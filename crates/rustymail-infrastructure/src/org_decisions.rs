@@ -875,6 +875,20 @@ mod tests {
             upsert_proposal_decision(&conn, "acc", &card, "dismissed", None, "fp").expect("weak");
         }
         assert_eq!(decision_count(&conn, "acc").expect("count"), 200);
+        // L’horloge Windows n’est pas monotone à l’échelle de la boucle : on fige
+        // `updated_at` pour que « le plus ancien à support 1 » soit déterministe.
+        conn.execute(
+            "UPDATE org_decisions SET updated_at = '2020-01-01T00:00:00.000Z'
+             WHERE pattern_key = 'move|Box0|-|-|invoice'",
+            [],
+        )
+        .expect("age box0");
+        conn.execute(
+            "UPDATE org_decisions SET updated_at = '2024-06-01T00:00:00.000Z'
+             WHERE support_count = 1 AND pattern_key != 'move|Box0|-|-|invoice'",
+            [],
+        )
+        .expect("age other weak rows");
         let extra = proposal(|p| {
             p.target_mailbox = Some("Box-extra".into());
             p.thread_ids = vec!["extra".into()];
