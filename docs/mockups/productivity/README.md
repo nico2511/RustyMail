@@ -2,7 +2,7 @@
 
 Direction UX **officielle** pour la suite de RustyMail. Ces écrans remplacent Clarity : le prochain travail d’interface implémente **cette** direction, pas Clarity (v2–v10 compris).
 
-Ce ne sont pas des variantes de `tokens.css`, ni du costume crème-sauge, ni du teal. Le langage visuel part de zéro : rail charbon, surface blanche, encre foncée, accent cuivre seulement pour le non-lu, l’envoi et le focus. **Literata sert à lire le courrier** (objet, corps, aperçus de liste) ; **IBM Plex Sans sert aux menus et au chrome** (rail, boutons, filtres, modales).
+Ce ne sont pas des variantes de `tokens.css`, ni du costume crème-sauge, ni du teal. Le langage visuel part de zéro : rail charbon, surface blanche, encre foncée, accent cuivre seulement pour le non-lu, l’envoi et le focus. **Literata sert à lire le courrier** (objet, corps, aperçus de liste) ; **IBM Plex Sans sert aux menus et au chrome** (rail, boutons, filtres, modales). Ce qui compte reste visible — sujet, expéditeur, corps du message actif, Répondre, Envoyer, Nouveau, non-lus — et le reste (métadonnées, tags, sync, compte, contact, aide, réécriture, raccourcis, compteurs) passe en retrait, toujours à un clic, un survol ou un raccourci.
 
 ## Principes
 
