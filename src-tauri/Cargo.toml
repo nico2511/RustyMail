@@ -10,7 +10,7 @@ name = "rustymail_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "~2.7.0", features = [] }
 
 [dependencies]
 rustymail-application = { path = "../crates/rustymail-application" }
@@ -21,16 +21,16 @@ rustymail-llm = { path = "../crates/rustymail-llm" }
 rfd = "0.15"
 serde.workspace = true
 serde_json.workspace = true
-tauri = { version = "2.11", features = [] }
+tauri = { version = "~2.12.0", features = [] }
 ureq = { version = "2.9", default-features = false, features = ["tls"] }
 dirs = "5"
 hound = "3.5"
 env_logger = "0.11"
 log = "0.4"
 dotenvy = "0.15"
-tauri-plugin-opener = "2"
-tauri-plugin-updater = "2"
-tauri-plugin-process = "2"
+tauri-plugin-opener = "~2.5.4"
+tauri-plugin-updater = "~2.13.0"
+tauri-plugin-process = "~2.4.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 transcribe-rs = { version = "0.3.11", default-features = false, features = ["whisper-cpp", "whisper-metal"] }
@@ -43,8 +43,8 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_JobObjects",
   "Win32_System_Threading",
 ] }
-webview2-com = "0.38.2"
-windows-core = "0.61"
+webview2-com = "0.39"
+windows-core = "0.62"
 
 # whisper.cpp en CPU sans SDK Vulkan obligatoire. Option : ajouter whisper-vulkan / whisper-cuda ici si besoin.
 [target.'cfg(not(target_os = "macos"))'.dependencies]
