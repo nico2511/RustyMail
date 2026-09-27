@@ -11,7 +11,7 @@ Les maquettes à suivre sont dans **[`productivity/`](productivity/)** :
 
 Détail : [`productivity/README.md`](productivity/README.md). Principes : [`../UX-NOTE.md`](../UX-NOTE.md) et [`../DESIGN.md`](../DESIGN.md). Captures : `productivity/images/`.
 
-Le CSS dans `src/` est encore le shell pastel Clarity v10. Ces maquettes disent quoi construire ensuite. Elles ne décrivent pas le CSS déjà livré, et cette PR ne le modifie pas.
+La vague 1 du shell (tokens, typo, rail) est dans `src/`. Ces maquettes restent la cible : teintes de compte, accordéon du fil et modales compte / contact ne sont pas encore dans l’application.
 
 ## Clarity — archive, ne pas continuer
 

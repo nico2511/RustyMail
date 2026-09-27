@@ -28,7 +28,7 @@ export function applyAppearanceFromPrefs(general: AppPrefsGeneral): void {
   document.body.classList.toggle("clarity-session", !dark && sessionOn);
 
   const lightMods = !dark;
-  document.body.classList.toggle("clarity-contrast-plus", lightMods && contrast);
+  document.body.classList.toggle("clarity-contrast-plus", contrast);
   document.body.classList.toggle("clarity-accent-lavender", lightMods && lavender);
 
   document.documentElement.style.colorScheme = dark ? "dark" : "light";

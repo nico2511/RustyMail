@@ -71,14 +71,14 @@
     },
     "appearance": {
       "heading": "Appearance",
-      "explain": "Clarity v10 light (Soft session by default), warm dark mode, or follow the system. Contrast+ and lavender apply in light mode only.",
+      "explain": "Productivity light theme: charcoal rail, white surface, copper accent. Dark mode keeps copper. Contrast+ strengthens ink in both light and dark. The cream session and lavender accent no longer change the interface (temporary limitation).",
       "colorScheme": "Theme",
       "schemeLight": "Light",
       "schemeDark": "Dark",
       "schemeSystem": "System",
-      "sessionComfort": "Soft session (low-glare cream)",
+      "sessionComfort": "Soft session — no effect (cream removed)",
       "contrastPlus": "Contrast+",
-      "accentLavender": "Lavender accent (buttons)",
+      "accentLavender": "Lavender accent — no effect (removed)",
       "aiPanelWidth": "Right panel width (px)",
       "save": "Save appearance"
     },

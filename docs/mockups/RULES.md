@@ -4,7 +4,7 @@
 
 Les maquettes **[`productivity/`](productivity/)** sont la direction UX. Charcoal, blanc, cuivre, Literata pour la lecture, IBM Plex Sans pour le chrome. Elles ne reprennent pas les classes de l’app, ni `tokens.css`, ni Clarity.
 
-Toute **nouvelle** proposition d’interface s’itère dans `productivity/` (HTML statique, captures dans `productivity/images/`). L’implémentation dans `src/` viendra dans une PR séparée. D’ici là, le CSS livré reste le shell pastel Clarity v10 — ce n’est pas la cible.
+Toute **nouvelle** proposition d’interface s’itère dans `productivity/` (HTML statique, captures dans `productivity/images/`). La vague 1 du shell est dans `src/`. Le reste de ces maquettes (teintes de compte, accordéon, modales) n’est pas encore le CSS livré.
 
 Clarity (v2–v10) est une **archive**. Ne pas la prolonger, ne pas s’en servir comme base.
 

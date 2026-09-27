@@ -2,7 +2,7 @@
 
 Guidance officielle pour la **prochaine** interface de RustyMail. Les écrans de référence sont les maquettes [`docs/mockups/productivity/`](mockups/productivity/README.md). Ouvrir `index.html` dans ce dossier, sans build.
 
-**Le code `src/` ne suit pas encore cette note.** Le ship actuel reste le shell **pastel Clarity v10** (`src/styles/tokens.css`, `src/styles.css`, `src/styles/appearance.css` : crème, sauge, lavande, thème sombre). Il le reste jusqu’à une **PR d’implémentation séparée**. Ne pas étendre ce costume. Ne pas traiter Clarity (v2–v10) comme la direction.
+**Vague 1 est dans `src/`.** Le chrome suit cette note : rail charbon, surface blanche, cuivre, Literata pour lire, IBM Plex Sans pour le chrome (`tokens.css`, `productivity-shell.css`, `appearance.css`). Crème, sauge et lavande ne sont plus le clair par défaut. Le sombre et Contraste+ restent, retintés cuivre. Encore maquette seulement (vague 2) : vue unifiée et teintes de compte, accordéon message par message, modales compte et contact. Ne pas traiter Clarity (v2–v10) comme la direction.
 
 ## Principes
 
@@ -65,4 +65,4 @@ Clarity v2–v10, Focus Paper (`vNext/`) et les alternatives couleur sont closes
 
 ---
 
-*Ship actuel : shell pastel Clarity v10 dans `src/`. Cette note décrit ce qu’une PR d’interface ultérieure doit implémenter.*
+*Vague 1 (tokens, typo, shell) est dans `src/`. Cette note décrit encore la cible, dont ce que la vague 2 doit implémenter.*

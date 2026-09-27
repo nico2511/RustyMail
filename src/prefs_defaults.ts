@@ -43,11 +43,11 @@ export type AppPrefsGeneral = {
   activitySuggestionsEnabled?: boolean;
   /** Thème interface : clair, sombre, ou suivre le système. */
   colorScheme?: "light" | "dark" | "system";
-  /** Palette Douce (crème basse luminance) en mode clair. */
+  /** Ancienne palette Douce. Conservée ; sans effet visuel depuis la vague productivité 1. */
   sessionComfort?: boolean;
-  /** Lisibilité renforcée (clair uniquement). */
+  /** Lisibilité renforcée (clair et sombre). */
   contrastPlus?: boolean;
-  /** Variante bouton primaire lavande (clair uniquement). */
+  /** Ancien accent lavande. Conservé ; sans effet visuel depuis la vague productivité 1. */
   accentLavender?: boolean;
 };
 
