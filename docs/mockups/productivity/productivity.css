@@ -449,7 +449,27 @@ kbd, .kbd {
   color: rgba(154, 163, 176, 0.72);
 }
 
-.folder.is-current .count { color: #f2b89a; font-weight: 600; font-size: 12px; }
+.folder .mono {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  font-size: 10px;
+}
+
+.folder.is-account { color: var(--rail-text); }
+
+.folder.is-scope {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.folder.is-account .count { color: #d7b5a4; }
+
+.folder.is-scope .count { color: #f2b89a; font-weight: 600; }
+
+.app.is-rail-collapsed .folder.is-account {
+  justify-content: center;
+  padding-inline: 0;
+}
 
 .tree { margin: 0; }
 
@@ -583,17 +603,55 @@ kbd, .kbd {
 
 .list-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
 }
 
-.list-title h1 {
-  margin: 0;
+.scope-wrap { position: relative; min-width: 0; }
+
+.scope-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  font-family: var(--sans);
+}
+
+.scope-kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--faint);
+}
+
+.scope-name {
+  display: block;
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.015em;
-  color: var(--ink-soft);
+  color: var(--ink);
+}
+
+.scope-btn .ico {
+  width: 14px;
+  height: 14px;
+  color: var(--faint);
+  transform: rotate(-90deg);
+}
+
+.scope-btn[aria-expanded="true"] .ico { transform: rotate(90deg); }
+
+.scope-wrap .pop { top: calc(100% + 6px); left: 0; min-width: 240px; }
+
+.scope-mail {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .list-title p {
@@ -819,9 +877,24 @@ button.from {
   padding: 0;
   font-family: var(--sans);
   font-size: inherit;
+  min-width: 0;
   cursor: pointer;
   text-align: left;
 }
+
+.acct {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.app[data-compte="perso"] .acct,
+.app[data-compte="atelier"] .acct,
+.app[data-compte="facturation"] .acct { display: none; }
 
 button.from:hover { text-decoration: underline; text-underline-offset: 2px; }
 
@@ -1657,11 +1730,10 @@ button.from:hover { text-decoration: underline; text-underline-offset: 2px; }
   font-size: 14px;
 }
 
-.contact-note {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 14px;
-  line-height: 1.45;
+.add-account {
+  margin-top: 8px;
+  height: 28px;
+  padding: 0 2px;
 }
 
 /* Hub ------------------------------------------------------------------- */

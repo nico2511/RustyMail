@@ -31,6 +31,16 @@ Le compte ne reste pas affiché dans le rail. L’avatar (ou **Paramètres**, ou
 
 Dans le fil, **Détails** ouvre les propriétés du message (sécurité, tags, copie). Le volet Aide / Réécriture reste un onglet de bord, fermé par défaut.
 
+## Réception multi-compte
+
+Trois boîtes : **Perso** (`nicolas@exemple.fr`), **Atelier** (`atelier@exemple.fr`), **Facturation** (`facturation@exemple.fr`).
+
+`inbox.html` et `inbox.html?compte=tous` montrent le courrier mélangé, du plus récent au plus ancien. Chaque ligne indique son compte en gris, à droite du nom — moins fort que l’expéditeur et l’objet.
+
+Le rail, le titre de la liste ou la modale compte choisit une boîte. Le titre, l’adresse et les non-lus suivent. Les compteurs restent alignés : 6 au total, 1 en Perso, 3 à l’Atelier, 2 en Facturation.
+
+Liens : `inbox.html?compte=tous`, `?compte=perso`, `?compte=atelier`, `?compte=facturation`. `inbox.html?profil=1` ouvre la modale sur la vue active, avec la synchro de chaque compte et **Ajouter un compte** en retrait. L’avatar reste Nicolas : le compte n’est pas affiché en permanence dans le rail.
+
 ## Chaque message se plie
 
 Chaque message du fil est pliable, pas seulement les plus anciens. Un chevron sur la ligne le développe ; le message déjà ouvert se replie (un seul à la fois). Le non-lu garde son trait cuivre, même replié. **Tout replier** et **Tout développer** sont dans la barre du fil.
@@ -43,14 +53,15 @@ Un clic sur un nom ou une adresse — dans le fil ou dans la liste — ouvre une
 
 | Écran | Fichier | Preuve |
 | ----- | ------- | ------ |
-| Réception | `inbox.html` | Hiérarchie des non-lus, expéditeur / objet / aperçu / date, actions au survol, recherche, filtres. Compte en modale. |
+| Réception | `inbox.html` | Vue unifiée ou filtrée par compte, compte en gris sur chaque ligne, non-lus globaux et par compte. |
 | Fil | `thread.html` | Chaque message pliable (chevron, accordéon), non-lu marqué cuivre, citation repliée, HTML nettoyé en badges, pièce jointe. Nom ou adresse → modale contact. |
 | Rédaction | `compose.html` | Rail replié, À / Cc / Cci, markdown, aperçu, historique, pièces jointes, envoyer. Réécriture en onglet. |
 
 ## Captures
 
-- `images/inbox.png` — réception, rail ouvert
-- `images/profile-modal.png` — modale compte
+- `images/inbox.png` — réception unifiée, compte sur chaque ligne
+- `images/inbox-facturation.png` — boîte Facturation seule
+- `images/profile-modal.png` — modale compte, trois IMAP
 - `images/thread.png` — fil, messages pliables
 - `images/contact-modal.png` — modale contact
 - `images/compose.png` — rédaction, rail replié

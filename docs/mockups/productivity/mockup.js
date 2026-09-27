@@ -161,26 +161,20 @@
     });
   });
 
-  document.getElementById("account-menu")?.querySelectorAll("button").forEach((option) => {
+  document.querySelectorAll("#account-menu [data-compte]").forEach((option) => {
     option.addEventListener("click", () => {
-      const name = option.dataset.name || "";
-      const mail = option.dataset.mail || "";
-      const mark = option.dataset.mark || "";
-      const markEl = document.getElementById("account-mark");
-      const nameEl = document.getElementById("account-name");
-      const profileName = document.getElementById("profile-name");
-      const profileMail = document.getElementById("profile-mail");
-      const profileMark = document.getElementById("profile-mark");
-      if (markEl) markEl.textContent = mark;
-      if (nameEl) nameEl.textContent = name;
-      if (profileName) profileName.textContent = name;
-      if (profileMail) profileMail.textContent = mail;
-      if (profileMark) profileMark.textContent = mark;
-      document.getElementById("profile-open")?.setAttribute("title", "Compte — " + name);
-      option.parentElement?.querySelectorAll("button").forEach((other) => {
-        other.setAttribute("aria-selected", String(other === option));
-      });
+      if (page === "inbox") setCompte(option.dataset.compte);
+      else {
+        option.parentElement?.querySelectorAll("[data-compte]").forEach((other) => {
+          other.setAttribute("aria-selected", String(other === option));
+        });
+      }
     });
+  });
+
+  document.getElementById("add-account")?.addEventListener("click", () => {
+    const note = document.getElementById("add-account-note");
+    if (note) note.hidden = false;
   });
 
   document.getElementById("logout")?.addEventListener("click", (event) => {
@@ -188,37 +182,105 @@
     event.currentTarget.disabled = true;
   });
 
-  document.querySelectorAll("[data-filter]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const filter = btn.dataset.filter;
-      document.querySelectorAll("[data-filter]").forEach((b) => {
-        b.setAttribute("aria-pressed", String(b === btn));
-      });
-      const rows = document.querySelectorAll(".row");
-      let shown = 0;
-      rows.forEach((row) => {
-        const unread = row.classList.contains("is-unread");
-        const follow = row.classList.contains("is-follow");
-        const visible = filter === "all" || (filter === "unread" && unread) || (filter === "follow" && follow);
-        row.hidden = !visible;
-        if (visible) shown += 1;
-      });
-      const empty = document.getElementById("filter-empty");
-      if (empty) empty.hidden = shown !== 0;
-    });
-  });
+  const accounts = {
+    tous: { title: "Tous les comptes", mail: "Perso, Atelier, Facturation", boxes: "Boîtes", sync: "3 comptes · synchronisés" },
+    perso: { title: "Perso", mail: "nicolas@exemple.fr", boxes: "Boîtes · Perso", sync: "Perso · synchronisé il y a 2 min" },
+    atelier: { title: "Atelier", mail: "atelier@exemple.fr", boxes: "Boîtes · Atelier", sync: "Atelier · synchronisé il y a 4 min" },
+    facturation: { title: "Facturation", mail: "facturation@exemple.fr", boxes: "Boîtes · Facturation", sync: "Facturation · synchronisé il y a 6 min" },
+  };
 
-  function unreadTotal() {
-    return document.querySelectorAll(".row.is-unread").length;
+  let currentCompte = "tous";
+  let currentFilter = "all";
+
+  function unreadIn(id) {
+    return [...document.querySelectorAll(".row.is-unread")].filter((row) => id === "tous" || row.dataset.compte === id).length;
+  }
+
+  function rowVisible(row) {
+    const accountOk = currentCompte === "tous" || row.dataset.compte === currentCompte;
+    const unread = row.classList.contains("is-unread");
+    const follow = row.classList.contains("is-follow");
+    const filterOk = currentFilter === "all" || (currentFilter === "unread" && unread) || (currentFilter === "follow" && follow);
+    return accountOk && filterOk;
+  }
+
+  function applyRows() {
+    let shown = 0;
+    document.querySelectorAll(".row").forEach((row) => {
+      const visible = rowVisible(row);
+      row.hidden = !visible;
+      if (visible) shown += 1;
+    });
+    const empty = document.getElementById("filter-empty");
+    if (empty) empty.hidden = shown !== 0;
   }
 
   function paintUnread() {
-    const total = unreadTotal();
+    ["tous", "perso", "atelier", "facturation"].forEach((id) => {
+      const n = unreadIn(id);
+      document.querySelectorAll(`[data-compte-count="${id}"]`).forEach((el) => {
+        el.textContent = String(n);
+      });
+    });
+    const scoped = unreadIn(currentCompte);
     const label = document.getElementById("unread-count");
-    if (label) label.textContent = total + (total > 1 ? " non lus" : " non lu");
+    if (label) label.textContent = scoped + (scoped > 1 ? " non lus" : " non lu");
     const badge = document.querySelector("[data-count='inbox']");
-    if (badge) badge.textContent = String(total);
+    if (badge) badge.textContent = String(scoped);
+    const tousMenu = document.querySelector("#scope-menu [data-compte='tous'] small");
+    if (tousMenu) tousMenu.textContent = scopedLabel(unreadIn("tous"));
+    const tousModal = document.querySelector("#account-menu [data-compte='tous'] small");
+    if (tousModal) tousModal.textContent = "Vue unifiée · " + scopedLabel(unreadIn("tous"));
   }
+
+  function scopedLabel(n) {
+    return n + (n > 1 ? " non lus" : " non lu");
+  }
+
+  function setCompte(id) {
+    if (!accounts[id]) id = "tous";
+    currentCompte = id;
+    const meta = accounts[id];
+    const title = document.getElementById("box-title");
+    if (title) title.textContent = meta.title;
+    const mail = document.getElementById("scope-mail");
+    if (mail) mail.textContent = meta.mail;
+    const boxes = document.getElementById("boxes-label");
+    if (boxes) boxes.textContent = meta.boxes;
+    if (page === "inbox") {
+      const chrome = document.querySelector(".chrome-title");
+      if (chrome) chrome.textContent = meta.title;
+      document.title = "RustyMail — " + meta.title;
+      const sync = document.querySelector(".sync");
+      if (sync) sync.title = meta.sync;
+      const url = new URL(location.href);
+      if (id === "tous" && url.searchParams.get("compte") && url.searchParams.get("compte") !== "tous") {
+        url.searchParams.delete("compte");
+      } else if (id !== "tous") {
+        url.searchParams.set("compte", id);
+      }
+      history.replaceState(null, "", url);
+    }
+    document.querySelector(".app")?.setAttribute("data-compte", id);
+    document.querySelectorAll(".folder[data-compte], #account-menu [data-compte], #scope-menu [data-compte]").forEach((el) => {
+      const on = el.dataset.compte === id;
+      el.classList.toggle("is-scope", on && el.classList.contains("folder"));
+      if (el.getAttribute("role") === "option") el.setAttribute("aria-selected", String(on));
+      if (el.getAttribute("role") === "menuitemradio") el.setAttribute("aria-checked", String(on));
+    });
+    applyRows();
+    paintUnread();
+  }
+
+  document.querySelectorAll("[data-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentFilter = btn.dataset.filter;
+      document.querySelectorAll("[data-filter]").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b === btn));
+      });
+      applyRows();
+    });
+  });
 
   document.querySelectorAll("[data-read]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -230,6 +292,23 @@
       btn.title = name;
       btn.setAttribute("aria-label", name);
       paintUnread();
+    });
+  });
+
+  const scopeBtn = document.getElementById("scope-btn");
+  const scopeMenu = document.getElementById("scope-menu");
+  scopeBtn?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const open = scopeMenu?.hidden;
+    if (scopeMenu) scopeMenu.hidden = !open;
+    scopeBtn.setAttribute("aria-expanded", String(Boolean(open)));
+  });
+  document.querySelectorAll(".rail [data-compte], #scope-menu [data-compte]").forEach((btn) => {
+    if (page !== "inbox") return;
+    btn.addEventListener("click", () => {
+      setCompte(btn.dataset.compte);
+      if (scopeMenu) scopeMenu.hidden = true;
+      scopeBtn?.setAttribute("aria-expanded", "false");
     });
   });
 
@@ -398,6 +477,10 @@
       moveMenu.hidden = true;
       moveBtn.setAttribute("aria-expanded", "false");
     }
+    if (scopeMenu && scopeBtn && !scopeBtn.contains(event.target) && !scopeMenu.contains(event.target)) {
+      scopeMenu.hidden = true;
+      scopeBtn.setAttribute("aria-expanded", "false");
+    }
   });
 
   document.addEventListener("keydown", (event) => {
@@ -461,6 +544,7 @@
   }
 
   const params = new URLSearchParams(location.search);
+  if (page === "inbox") setCompte(params.get("compte") || "tous");
   if (params.get("profil") === "1") setDialog("profile", true);
   if (params.get("contact") === "1") openContact("camille");
 })();

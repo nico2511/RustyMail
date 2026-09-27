@@ -64,12 +64,28 @@
             <svg class="ico"><use href="#i-people"/></svg>
             <span class="label">Carnet</span>
           </button>
-          <p class="section">Courrier</p>
-          <button type="button" class="folder" title="Boîtes de réception de tous les comptes">
-            <svg class="ico"><use href="#i-inbox"/></svg>
+          <p class="section">Comptes</p>
+          <button type="button" class="folder is-account is-scope" data-compte="tous" title="Vue unifiée">
+            <svg class="ico"><use href="#i-layers"/></svg>
             <span class="label">Tous les comptes</span>
-            <span class="count">9</span>
+            <span class="count" data-compte-count="tous">6</span>
           </button>
+          <button type="button" class="folder is-account" data-compte="perso" title="nicolas@exemple.fr">
+            <span class="mono">N</span>
+            <span class="label">Perso</span>
+            <span class="count" data-compte-count="perso">1</span>
+          </button>
+          <button type="button" class="folder is-account" data-compte="atelier" title="atelier@exemple.fr">
+            <span class="mono">A</span>
+            <span class="label">Atelier</span>
+            <span class="count" data-compte-count="atelier">3</span>
+          </button>
+          <button type="button" class="folder is-account" data-compte="facturation" title="facturation@exemple.fr">
+            <span class="mono">F</span>
+            <span class="label">Facturation</span>
+            <span class="count" data-compte-count="facturation">2</span>
+          </button>
+          <p class="section" id="boxes-label">Boîtes</p>
           <a class="folder is-current" href="inbox.html" aria-current="page">
             <svg class="ico"><use href="#i-inbox"/></svg>
             <span class="label">Boîte de réception</span>
@@ -129,9 +145,24 @@
       <main class="list">
         <header class="list-head">
           <div class="list-title">
-            <h1>Boîte de réception</h1>
+            <div class="scope-wrap">
+              <button type="button" class="scope-btn" id="scope-btn" aria-expanded="false" aria-controls="scope-menu" aria-haspopup="menu">
+                <span>
+                  <span class="scope-kicker">Boîte de réception</span>
+                  <span class="scope-name" id="box-title">Tous les comptes</span>
+                </span>
+                <svg class="ico" aria-hidden="true"><use href="#i-chevron"/></svg>
+              </button>
+              <div class="pop" id="scope-menu" hidden role="menu">
+                <button type="button" role="menuitemradio" data-compte="tous" aria-checked="true">Tous les comptes<small>6 non lus</small></button>
+                <button type="button" role="menuitemradio" data-compte="perso">Perso<small>nicolas@exemple.fr</small></button>
+                <button type="button" role="menuitemradio" data-compte="atelier">Atelier<small>atelier@exemple.fr</small></button>
+                <button type="button" role="menuitemradio" data-compte="facturation">Facturation<small>facturation@exemple.fr</small></button>
+              </div>
+            </div>
             <p id="unread-count">6 non lus</p>
           </div>
+          <p class="scope-mail" id="scope-mail">Perso, Atelier, Facturation</p>
           <div class="search">
             <div class="search-field">
               <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
@@ -153,7 +184,7 @@
         <div class="rows" role="list">
           <p class="filter-empty" id="filter-empty" hidden>Aucun message dans ce filtre.</p>
 
-          <article class="row is-unread is-follow is-selected" role="listitem">
+          <article class="row is-unread is-follow is-selected" role="listitem" data-compte="atelier">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
@@ -162,7 +193,7 @@
                   <button type="button" class="from" data-who="camille">Camille Moreau</button>
                   <span class="sr">suivi, non lu, 3 messages</span>
                   <span class="nmsg" title="3 messages">3</span>
-                </span>
+                <span class="acct">Atelier</span></span>
                 <span class="line2">
                   <span class="subj">Contrat d’atelier</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -178,7 +209,7 @@
             </div>
           </article>
 
-          <article class="row is-unread" role="listitem">
+          <article class="row is-unread" role="listitem" data-compte="facturation">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
@@ -186,7 +217,7 @@
                   <button type="button" class="from" data-who="elbaz">Maître Julien Elbaz</button>
                   <span class="sr">non lu, 2 messages</span>
                   <span class="nmsg" title="2 messages">2</span>
-                </span>
+                <span class="acct">Facturation</span></span>
                 <span class="line2">
                   <span class="subj">Projet d’acte</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -202,11 +233,11 @@
             </div>
           </article>
 
-          <article class="row is-unread" role="listitem">
+          <article class="row is-unread" role="listitem" data-compte="atelier">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
-                <span class="line1"><button type="button" class="from" data-who="sillon">Transport Sillon</button><span class="sr">non lu</span></span>
+                <span class="line1"><button type="button" class="from" data-who="sillon">Transport Sillon</button><span class="sr">non lu</span><span class="acct">Atelier</span></span>
                 <span class="line2">
                   <span class="subj">Avis de passage</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -222,7 +253,7 @@
             </div>
           </article>
 
-          <article class="row is-unread" role="listitem">
+          <article class="row is-unread" role="listitem" data-compte="facturation">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
@@ -230,7 +261,7 @@
                   <button type="button" class="from" data-who="rhone">Banque Rhône</button>
                   <span class="sr">non lu, pièce jointe</span>
                   <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
-                </span>
+                <span class="acct">Facturation</span></span>
                 <span class="line2">
                   <span class="subj">Relevé d’avril</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -246,7 +277,7 @@
             </div>
           </article>
 
-          <article class="row is-unread is-follow" role="listitem">
+          <article class="row is-unread is-follow" role="listitem" data-compte="atelier">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
@@ -254,7 +285,7 @@
                   <svg class="flag" aria-hidden="true"><use href="#i-bookmark"/></svg>
                   <button type="button" class="from" data-who="hugo">Hugo Martin</button>
                   <span class="sr">suivi, non lu</span>
-                </span>
+                <span class="acct">Atelier</span></span>
                 <span class="line2">
                   <span class="subj">Livraison du chêne</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -270,7 +301,7 @@
             </div>
           </article>
 
-          <article class="row is-unread" role="listitem">
+          <article class="row is-unread" role="listitem" data-compte="perso">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
@@ -278,7 +309,7 @@
                   <button type="button" class="from" data-who="revue">La Revue du bois</button>
                   <span class="sr">non lu, infolettre</span>
                   <span class="quiet-tag">Infolettre</span>
-                </span>
+                <span class="acct">Perso</span></span>
                 <span class="line2">
                   <span class="subj">Édition de mai</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -294,14 +325,14 @@
             </div>
           </article>
 
-          <article class="row" role="listitem">
+          <article class="row" role="listitem" data-compte="atelier">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
                   <button type="button" class="from" data-who="ines">Inès Navarro</button>
                   <span class="nmsg" title="4 messages">4</span>
-                </span>
+                <span class="acct">Atelier</span></span>
                 <span class="line2">
                   <span class="subj">Planning de juin</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -317,14 +348,14 @@
             </div>
           </article>
 
-          <article class="row" role="listitem">
+          <article class="row" role="listitem" data-compte="facturation">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
                   <button type="button" class="from" data-who="lea">Léa Charpentier</button>
                   <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
-                </span>
+                <span class="acct">Facturation</span></span>
                 <span class="line2">
                   <span class="subj">Facture 2026-041 réglée</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -340,14 +371,14 @@
             </div>
           </article>
 
-          <article class="row" role="listitem">
+          <article class="row" role="listitem" data-compte="atelier">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
                   <button type="button" class="from" data-who="seve">Imprimerie Sève</button>
                   <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
-                </span>
+                <span class="acct">Atelier</span></span>
                 <span class="line2">
                   <span class="subj">BAT couverture</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -363,11 +394,11 @@
             </div>
           </article>
 
-          <article class="row" role="listitem">
+          <article class="row" role="listitem" data-compte="atelier">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
-                <span class="line1"><button type="button" class="from" data-who="paul">Paul Hedin</button></span>
+                <span class="line1"><button type="button" class="from" data-who="paul">Paul Hedin</button><span class="acct">Atelier</span></span>
                 <span class="line2">
                   <span class="subj">Devis quincaillerie</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -383,11 +414,11 @@
             </div>
           </article>
 
-          <article class="row" role="listitem">
+          <article class="row" role="listitem" data-compte="perso">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
-                <span class="line1"><button type="button" class="from" data-who="bellevue">SCI Bellevue</button></span>
+                <span class="line1"><button type="button" class="from" data-who="bellevue">SCI Bellevue</button><span class="acct">Perso</span></span>
                 <span class="line2">
                   <span class="subj">Appel de charges</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -403,14 +434,14 @@
             </div>
           </article>
 
-          <article class="row" role="listitem">
+          <article class="row" role="listitem" data-compte="atelier">
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
                   <button type="button" class="from" data-who="marie">Marie Duval</button>
                   <span class="nmsg" title="2 messages">2</span>
-                </span>
+                <span class="acct">Atelier</span></span>
                 <span class="line2">
                   <span class="subj">Échantillons d’huile</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -432,9 +463,9 @@
     </div>
 
     <footer class="status">
-      <button type="button" class="sync" data-open-profile title="IMAP · synchronisé il y a 2 min">
+      <button type="button" class="sync" data-open-profile title="3 comptes · synchronisés">
         <i aria-hidden="true"></i>
-        <span class="sr">Synchronisé il y a 2 min. Ouvrir le compte.</span>
+        <span class="sr">3 comptes synchronisés. Ouvrir le compte.</span>
       </button>
       <span class="status-hint"><kbd>[</kbd> dossiers</span>
       <nav class="walk" aria-label="Parcours des maquettes">
@@ -461,9 +492,13 @@
       </div>
       <h3>Comptes IMAP</h3>
       <div class="acct-list" role="listbox" id="account-menu" aria-label="Comptes">
-        <button type="button" role="option" aria-selected="true" data-name="Nicolas" data-mail="nicolas@exemple.fr" data-mark="N">Nicolas<small>nicolas@exemple.fr · synchronisé il y a 2 min</small></button>
-        <button type="button" role="option" data-name="Facturation" data-mail="facturation@exemple.fr" data-mark="F">Facturation<small>facturation@exemple.fr · synchronisé il y a 6 min</small></button>
+        <button type="button" role="option" data-compte="tous" aria-selected="true">Tous les comptes<small>Vue unifiée · 6 non lus</small></button>
+        <button type="button" role="option" data-compte="perso">Perso<small>nicolas@exemple.fr · synchronisé il y a 2 min</small></button>
+        <button type="button" role="option" data-compte="atelier">Atelier<small>atelier@exemple.fr · synchronisé il y a 4 min</small></button>
+        <button type="button" role="option" data-compte="facturation">Facturation<small>facturation@exemple.fr · synchronisé il y a 6 min</small></button>
       </div>
+      <button type="button" class="btn btn-quiet add-account" id="add-account">Ajouter un compte</button>
+      <p class="note" id="add-account-note" hidden>Le compte IMAP rejoint cette liste. La vue unifiée l’affiche tout de suite.</p>
       <h3>Raccourcis</h3>
       <ul class="shortcut-list">
         <li><kbd>[</kbd> Replier ou ouvrir les dossiers</li>

@@ -5,7 +5,7 @@
 Les maquettes à suivre sont dans **[`productivity/`](productivity/)** :
 
 - [`index.html`](productivity/index.html) → [`inbox.html`](productivity/inbox.html) → [`thread.html`](productivity/thread.html) → [`compose.html`](productivity/compose.html)
-- Langage visuel **neuf** (rail charbon repliable, surface blanche, accent cuivre, compte et contact en modale, chaque message du fil pliable). Literata pour lire le courrier, IBM Plex Sans pour les menus. Pas les tokens pastel, pas Clarity.
+- Langage visuel **neuf** (rail charbon repliable, surface blanche, accent cuivre, réception multi-compte, compte et contact en modale, chaque message du fil pliable). Literata pour lire le courrier, IBM Plex Sans pour les menus. Pas les tokens pastel, pas Clarity.
 - Le prochain travail d’interface **implémente cette direction**, il ne prolonge pas Clarity.
 
 Détail : [`productivity/README.md`](productivity/README.md). Captures : `productivity/images/`.
