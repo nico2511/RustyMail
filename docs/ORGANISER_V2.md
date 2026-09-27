@@ -27,6 +27,17 @@ L’action d’une carte porte sur **tous** les fils détectés (plafond de scan
 - Une erreur de sélection IMAP sur un dossier vide ne purge plus le cache local.
 - L’aperçu d’archive calcule le dossier cible fil par fil, filtré par compte.
 
+## Mémoire des décisions
+
+Valider, ignorer ou reporter une carte enregistre deux choses, dans `record_proposal_decision` uniquement :
+
+- `org_memory` masque **ce lot** (mêmes fils). Il ne revient pas à l’écran.
+- `org_decisions` retient le **motif** (`action|cible|règle|domaine|mots-clés`, 200 lignes max par compte). L’orientation suivante en voit au plus 8 lignes (~600 caractères), dans un bloc non fiable, avant le rognage du catalogue. Un moteur hors loopback passe par la même rédaction que le reste du courrier.
+
+Un motif ignoré deux fois (`dismissed`, `support_count >= 2`) est retiré des actions LLM et compté dans `suppressedCount`. Un motif appliqué pèse sur la proposition suivante. Archive, corbeille, déplacement et suppression de dossier restent confirmés par l’utilisateur.
+
+Sans LLM, ou si « Propositions Organiser » est désactivé, ces lignes restent en base et aucune orientation n’est inventée. Supprimer le compte purge `org_decisions`, `org_memory` et `org_apply_history`.
+
 ## Volontairement hors de cette passe
 
 - Carte « tags périmés » : le scan existe (`scan_stale_tags`) mais reste sur Organiser v1. V2 ne l’affiche pas, pour ne pas ajouter une action de retag sans le même parcours de confirmation.
@@ -34,3 +45,4 @@ L’action d’une carte porte sur **tous** les fils détectés (plafond de scan
 - `OrphanThreadRepair` et `SemanticTagRefresh` n’ont pas de scanner.
 - La corbeille d’une **ligne** d’échantillon passe encore par l’action fil habituelle, pas par la modale de lot. Le lot « tout mettre en corbeille » reste confirmé.
 - Un dossier absent du LIST IMAP (cache fantôme) a encore son cache local retiré. Une erreur de sélection IMAP ne purge plus ce cache et n’est pas comptée comme un succès.
+- Pas d’index vectoriel des décisions, pas de promotion silencieuse vers une règle de mots-clés ou l’archivage auto, pas de validation individuelle des puces de recommandation.

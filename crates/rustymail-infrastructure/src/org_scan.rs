@@ -223,7 +223,8 @@ pub fn hydrate_llm_proposals(
             .iter()
             .map(|r| r.thread_id.clone())
             .collect();
-        proposal.llm_search_keywords.clear();
+        // Conservés sur la carte : le motif `org_decisions` s’en sert à l’enregistrement.
+        proposal.llm_search_keywords = keywords;
         out.push(proposal);
     }
     out
@@ -359,11 +360,13 @@ pub fn org_llm_orientation_for_account(
     if catalog.trim().is_empty() && valid_ids.is_empty() {
         return Err("Aucun fil indexé : impossible de produire une orientation.".into());
     }
+    let prior_decisions = crate::org_decisions::format_prior_decisions_block(&conn, account_id)?;
     let parsed = org_orientation_with_llm(
         engine,
         account_id,
         &catalog,
         &heuristic_context,
+        &prior_decisions,
         &valid_ids,
         output_language,
     )?;

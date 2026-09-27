@@ -73,6 +73,10 @@ Module `crates/rustymail-llm/src/privacy.rs` redacts when `LlmEngine::exfiltrate
 **Redacted:** non-loopback OpenAI-compatible URLs (llama-server or Ollama)  
 **Not redacted:** llama-server or Ollama on loopback (`127.0.0.1`, `localhost`, `[::1]`)
 
+Organiser’s prior-decisions block uses the same path (`redact_user_content_if_needed` inside `untrusted_mail_content_block`). The block carries action, target mailbox, rule id, one sender domain and a few keywords — not message bodies, full addresses, or thread id lists. See [ORGANISER_V2.md](ORGANISER_V2.md).
+
+Deleting an account purges that account’s `org_decisions`, `org_memory`, and `org_apply_history` rows from `rustymail.sqlite3`. Newsletter rules stay global to the profile.
+
 ### AI cache
 
 SQLite `ai_cache` stores model **responses** in plaintext with TTL by key prefix. WebView cannot write arbitrary cache entries.
