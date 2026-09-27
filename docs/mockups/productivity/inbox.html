@@ -159,7 +159,7 @@
               <span class="copy">
                 <span class="line1">
                   <svg class="flag" aria-hidden="true"><use href="#i-bookmark"/></svg>
-                  <span class="from">Camille Moreau</span>
+                  <button type="button" class="from" data-who="camille">Camille Moreau</button>
                   <span class="sr">suivi, non lu, 3 messages</span>
                   <span class="nmsg" title="3 messages">3</span>
                 </span>
@@ -183,7 +183,7 @@
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
-                  <span class="from">Maître Julien Elbaz</span>
+                  <button type="button" class="from" data-who="elbaz">Maître Julien Elbaz</button>
                   <span class="sr">non lu, 2 messages</span>
                   <span class="nmsg" title="2 messages">2</span>
                 </span>
@@ -206,7 +206,7 @@
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
-                <span class="line1"><span class="from">Transport Sillon</span><span class="sr">non lu</span></span>
+                <span class="line1"><button type="button" class="from" data-who="sillon">Transport Sillon</button><span class="sr">non lu</span></span>
                 <span class="line2">
                   <span class="subj">Avis de passage</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -227,7 +227,7 @@
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
-                  <span class="from">Banque Rhône</span>
+                  <button type="button" class="from" data-who="rhone">Banque Rhône</button>
                   <span class="sr">non lu, pièce jointe</span>
                   <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
                 </span>
@@ -252,7 +252,7 @@
               <span class="copy">
                 <span class="line1">
                   <svg class="flag" aria-hidden="true"><use href="#i-bookmark"/></svg>
-                  <span class="from">Hugo Martin</span>
+                  <button type="button" class="from" data-who="hugo">Hugo Martin</button>
                   <span class="sr">suivi, non lu</span>
                 </span>
                 <span class="line2">
@@ -275,7 +275,7 @@
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
-                  <span class="from">La Revue du bois</span>
+                  <button type="button" class="from" data-who="revue">La Revue du bois</button>
                   <span class="sr">non lu, infolettre</span>
                   <span class="quiet-tag">Infolettre</span>
                 </span>
@@ -299,7 +299,7 @@
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
-                  <span class="from">Inès Navarro</span>
+                  <button type="button" class="from" data-who="ines">Inès Navarro</button>
                   <span class="nmsg" title="4 messages">4</span>
                 </span>
                 <span class="line2">
@@ -322,7 +322,7 @@
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
-                  <span class="from">Léa Charpentier</span>
+                  <button type="button" class="from" data-who="lea">Léa Charpentier</button>
                   <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
                 </span>
                 <span class="line2">
@@ -345,7 +345,7 @@
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
-                  <span class="from">Imprimerie Sève</span>
+                  <button type="button" class="from" data-who="seve">Imprimerie Sève</button>
                   <svg class="clip" aria-hidden="true"><use href="#i-clip"/></svg>
                 </span>
                 <span class="line2">
@@ -367,7 +367,7 @@
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
-                <span class="line1"><span class="from">Paul Hedin</span></span>
+                <span class="line1"><button type="button" class="from" data-who="paul">Paul Hedin</button></span>
                 <span class="line2">
                   <span class="subj">Devis quincaillerie</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -387,7 +387,7 @@
             <a href="thread.html">
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
-                <span class="line1"><span class="from">SCI Bellevue</span></span>
+                <span class="line1"><button type="button" class="from" data-who="bellevue">SCI Bellevue</button></span>
                 <span class="line2">
                   <span class="subj">Appel de charges</span>
                   <span class="sep" aria-hidden="true">—</span>
@@ -408,7 +408,7 @@
               <span class="pip" aria-hidden="true"></span>
               <span class="copy">
                 <span class="line1">
-                  <span class="from">Marie Duval</span>
+                  <button type="button" class="from" data-who="marie">Marie Duval</button>
                   <span class="nmsg" title="2 messages">2</span>
                 </span>
                 <span class="line2">
@@ -475,6 +475,32 @@
       </ul>
       <div class="modal-actions">
         <button type="button" class="btn" id="logout">Déconnexion</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="contact" hidden>
+    <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer la fiche"></button>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="contact-title">
+      <div class="modal-head">
+        <h2 id="contact-title">Contact</h2>
+        <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
+      </div>
+      <div class="identity">
+        <span class="mono mono-lg" id="contact-mark">C</span>
+        <div>
+          <strong id="contact-name">Camille Moreau</strong>
+          <span id="contact-mail">camille@menuiserie-moreau.fr</span>
+        </div>
+      </div>
+      <h3>Adresses</h3>
+      <ul class="contact-addrs" id="contact-addrs">
+        <li>camille@menuiserie-moreau.fr</li>
+      </ul>
+      <h3 id="contact-note-label">Notes</h3>
+      <p class="contact-note" id="contact-note">Menuiserie Moreau · cliente, lot chêne.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="contact-book">Voir dans le carnet</button>
+        <a class="btn btn-primary" id="contact-write" href="compose.html">Écrire</a>
       </div>
     </div>
   </div>

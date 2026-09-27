@@ -88,7 +88,16 @@
         <header class="thread-head">
           <a class="back" href="inbox.html"><svg class="ico"><use href="#i-chevron"/></svg> Réception</a>
           <h1 class="subject-xl">Contrat d’atelier — relecture de l’article 4</h1>
-          <p class="people">Camille Moreau, vous · 3 messages</p>
+          <p class="people">
+            <button type="button" class="linkish" data-open-contact data-who="camille">Camille Moreau</button>
+            <span>,</span>
+            <button type="button" class="linkish" data-open-profile>vous</button>
+            <span>· 3 messages</span>
+            <span class="fold-tools">
+              <button type="button" class="linkish" id="fold-all">Tout replier</button>
+              <button type="button" class="linkish" id="unfold-all">Tout développer</button>
+            </span>
+          </p>
           <div class="actions">
             <a class="btn btn-primary" href="compose.html"><svg class="ico"><use href="#i-reply"/></svg> Répondre</a>
             <a class="btn" href="compose.html"><svg class="ico"><use href="#i-reply-all"/></svg> Répondre à tous</a>
@@ -114,11 +123,16 @@
           <div class="talk" role="list">
             <article class="turn is-folded" role="listitem">
               <span class="dot" aria-hidden="true"></span>
-              <button type="button" class="turn-sum" aria-expanded="false">
-                <span class="turn-name">Camille Moreau</span>
-                <span class="turn-preview">Peux-tu relire l’article 4 avant vendredi ?</span>
-                <span class="turn-when"><time datetime="2026-09-26T09:14">09:14</time></span>
-              </button>
+              <div class="turn-line">
+                <button type="button" class="turn-fold" aria-expanded="false" aria-label="Développer le message de Camille Moreau">
+                  <svg class="ico" aria-hidden="true"><use href="#i-chevron"/></svg>
+                </button>
+                <button type="button" class="turn-name" data-open-contact data-who="camille">Camille Moreau</button>
+                <button type="button" class="turn-rest" aria-expanded="false">
+                  <span class="turn-preview">Peux-tu relire l’article 4 avant vendredi ?</span>
+                  <span class="turn-when"><time datetime="2026-09-26T09:14">09:14</time></span>
+                </button>
+              </div>
               <div class="turn-body prose" hidden>
                 <p>Bonjour Nicolas,</p>
                 <p>Peux-tu relire l’article 4 avant vendredi ? Le notaire veut figer la date de livraison et le numéro de lot du chêne. Je t’ai laissé la version reçue hier soir.</p>
@@ -128,11 +142,16 @@
 
             <article class="turn is-folded" role="listitem">
               <span class="dot" aria-hidden="true"></span>
-              <button type="button" class="turn-sum" aria-expanded="false">
-                <span class="turn-name">Vous</span>
-                <span class="turn-preview">La livraison du 12 juin tient si le chêne part lundi.</span>
-                <span class="turn-when"><time datetime="2026-09-26T11:40">11:40</time></span>
-              </button>
+              <div class="turn-line">
+                <button type="button" class="turn-fold" aria-expanded="false" aria-label="Développer le message de vous">
+                  <svg class="ico" aria-hidden="true"><use href="#i-chevron"/></svg>
+                </button>
+                <button type="button" class="turn-name" data-open-profile>Vous</button>
+                <button type="button" class="turn-rest" aria-expanded="false">
+                  <span class="turn-preview">La livraison du 12 juin tient si le chêne part lundi.</span>
+                  <span class="turn-when"><time datetime="2026-09-26T11:40">11:40</time></span>
+                </button>
+              </div>
               <div class="turn-body prose" hidden>
                 <p>Camille,</p>
                 <p>La livraison du 12 juin tient si le chêne part lundi. Je corrige la clause de réserve de propriété pour citer le lot 18-C.</p>
@@ -142,14 +161,19 @@
 
             <article class="turn is-open is-focus" role="listitem">
               <span class="dot" aria-hidden="true"></span>
-              <button type="button" class="turn-sum" aria-expanded="true">
-                <span class="turn-name">Camille Moreau</span>
-                <span class="turn-preview">Parfait. Je joins l’échéancier du notaire.</span>
-                <span class="turn-when"><time datetime="2026-09-26T14:22">14:22</time><span class="quiet-tag">Non lu</span></span>
-              </button>
+              <div class="turn-line">
+                <button type="button" class="turn-fold" aria-expanded="true" aria-label="Replier le message de Camille Moreau">
+                  <svg class="ico" aria-hidden="true"><use href="#i-chevron"/></svg>
+                </button>
+                <button type="button" class="turn-name" data-open-contact data-who="camille">Camille Moreau</button>
+                <button type="button" class="turn-rest" aria-expanded="true">
+                  <span class="turn-preview">Parfait. Je joins l’échéancier du notaire.</span>
+                  <span class="turn-when"><time datetime="2026-09-26T14:22">14:22</time><span class="quiet-tag">Non lu</span></span>
+                </button>
+              </div>
               <div class="turn-body">
                 <p class="mini-badges">
-                  <button type="button" class="linkish" data-open-contact>camille@menuiserie-moreau.fr</button>
+                  <button type="button" class="linkish" data-open-contact data-who="camille">camille@menuiserie-moreau.fr</button>
                   <span class="quiet-tag">HTML nettoyé</span>
                   <span class="quiet-tag">Images distantes bloquées</span>
                 </p>
@@ -277,13 +301,25 @@
     <button type="button" class="modal-backdrop" data-close-modal aria-label="Fermer la fiche"></button>
     <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="contact-title">
       <div class="modal-head">
-        <h2 id="contact-title">Camille Moreau</h2>
+        <h2 id="contact-title">Contact</h2>
         <button type="button" class="icon-btn" data-close-modal aria-label="Fermer">×</button>
       </div>
-      <p class="contact-mail">camille@menuiserie-moreau.fr</p>
-      <p>Carnet d’adresses. La fiche s’ouvre ici, elle ne reste pas dans le fil.</p>
+      <div class="identity">
+        <span class="mono mono-lg" id="contact-mark">C</span>
+        <div>
+          <strong id="contact-name">Camille Moreau</strong>
+          <span id="contact-mail">camille@menuiserie-moreau.fr</span>
+        </div>
+      </div>
+      <h3>Adresses</h3>
+      <ul class="contact-addrs" id="contact-addrs">
+        <li>camille@menuiserie-moreau.fr</li>
+      </ul>
+      <h3 id="contact-note-label">Notes</h3>
+      <p class="contact-note" id="contact-note">Menuiserie Moreau · cliente, lot chêne.</p>
       <div class="modal-actions">
-        <a class="btn btn-primary" href="compose.html">Écrire</a>
+        <button type="button" class="btn" id="contact-book">Voir dans le carnet</button>
+        <a class="btn btn-primary" id="contact-write" href="compose.html">Écrire</a>
       </div>
     </div>
   </div>

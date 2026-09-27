@@ -59,8 +59,100 @@
   document.querySelectorAll("[data-open-props]").forEach((btn) => {
     btn.addEventListener("click", () => setDialog("props", true));
   });
+  const contacts = {
+    camille: {
+      name: "Camille Moreau",
+      mark: "C",
+      addrs: ["camille@menuiserie-moreau.fr"],
+      note: "Menuiserie Moreau · cliente, lot chêne.",
+      inBook: true,
+    },
+    elbaz: {
+      name: "Maître Julien Elbaz",
+      mark: "J",
+      addrs: ["elbaz@etude-elbaz.fr"],
+      note: "Notaire · copie du contrat d’atelier.",
+      inBook: true,
+    },
+    sillon: { name: "Transport Sillon", mark: "T", addrs: ["avis@transport-sillon.fr"], note: "", inBook: false },
+    rhone: { name: "Banque Rhône", mark: "B", addrs: ["releves@banque-rhone.fr"], note: "", inBook: false },
+    hugo: { name: "Hugo Martin", mark: "H", addrs: ["hugo.martin@exemple.fr"], note: "", inBook: false },
+    revue: { name: "La Revue du bois", mark: "R", addrs: ["redaction@revue-du-bois.fr"], note: "", inBook: false },
+    ines: { name: "Inès Navarro", mark: "I", addrs: ["ines.navarro@exemple.fr"], note: "", inBook: false },
+    lea: { name: "Léa Charpentier", mark: "L", addrs: ["lea.charpentier@exemple.fr"], note: "", inBook: false },
+    seve: { name: "Imprimerie Sève", mark: "S", addrs: ["bat@imprimerie-seve.fr"], note: "", inBook: false },
+    paul: { name: "Paul Hedin", mark: "P", addrs: ["paul.hedin@exemple.fr"], note: "", inBook: false },
+    bellevue: { name: "SCI Bellevue", mark: "B", addrs: ["charges@sci-bellevue.fr"], note: "", inBook: false },
+    marie: { name: "Marie Duval", mark: "M", addrs: ["marie.duval@exemple.fr"], note: "", inBook: false },
+  };
+
+  let contactId = "camille";
+
+  function paintContact(id) {
+    const person = contacts[id];
+    if (!person) return;
+    contactId = id;
+    const name = document.getElementById("contact-name");
+    const mail = document.getElementById("contact-mail");
+    const mark = document.getElementById("contact-mark");
+    const list = document.getElementById("contact-addrs");
+    const note = document.getElementById("contact-note");
+    const noteLabel = document.getElementById("contact-note-label");
+    const book = document.getElementById("contact-book");
+    if (name) name.textContent = person.name;
+    if (mail) mail.textContent = person.addrs[0] || "";
+    if (mark) mark.textContent = person.mark;
+    if (list) {
+      list.replaceChildren();
+      person.addrs.forEach((addr) => {
+        const li = document.createElement("li");
+        li.textContent = addr;
+        list.append(li);
+      });
+    }
+    const hasNote = Boolean(person.note);
+    if (note) {
+      note.hidden = !hasNote;
+      note.textContent = person.note;
+    }
+    if (noteLabel) noteLabel.hidden = !hasNote;
+    if (book) book.textContent = person.inBook ? "Voir dans le carnet" : "Ajouter au carnet";
+  }
+
+  function openContact(id) {
+    if (!document.getElementById("contact")) return;
+    paintContact(id || "camille");
+    setDialog("contact", true);
+  }
+
   document.querySelectorAll("[data-open-contact]").forEach((btn) => {
-    btn.addEventListener("click", () => setDialog("contact", true));
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openContact(btn.dataset.who || "camille");
+    });
+  });
+
+  document.querySelectorAll(".from[data-who]").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openContact(btn.dataset.who);
+    });
+  });
+
+  document.querySelectorAll(".row a").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      if (event.target.closest("[data-who]")) event.preventDefault();
+    });
+  });
+
+  document.getElementById("contact-book")?.addEventListener("click", () => {
+    const person = contacts[contactId];
+    if (!person) return;
+    person.inBook = true;
+    const book = document.getElementById("contact-book");
+    if (book) book.textContent = "Voir dans le carnet";
   });
   document.querySelectorAll("[data-close-modal]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -266,24 +358,35 @@
     if (note) note.hidden = false;
   });
 
-  document.querySelectorAll(".turn-sum").forEach((btn) => {
+  function setTurn(turn, open) {
+    turn.classList.toggle("is-open", open);
+    turn.classList.toggle("is-folded", !open);
+    turn.querySelectorAll(".turn-fold, .turn-rest").forEach((btn) => {
+      btn.setAttribute("aria-expanded", String(open));
+    });
+    const body = turn.querySelector(".turn-body");
+    if (body) body.hidden = !open;
+    const fold = turn.querySelector(".turn-fold");
+    const who = turn.querySelector(".turn-name")?.textContent.trim() || "ce message";
+    if (fold) fold.setAttribute("aria-label", (open ? "Replier" : "Développer") + " le message de " + who);
+  }
+
+  document.querySelectorAll(".turn-fold, .turn-rest").forEach((btn) => {
     btn.addEventListener("click", () => {
       const turn = btn.closest(".turn");
       if (!turn) return;
       const willOpen = !turn.classList.contains("is-open");
-      document.querySelectorAll(".turn.is-open").forEach((open) => {
-        open.classList.remove("is-open");
-        open.querySelector(".turn-sum")?.setAttribute("aria-expanded", "false");
-        const body = open.querySelector(".turn-body");
-        if (body) body.hidden = true;
-      });
-      if (willOpen) {
-        turn.classList.add("is-open");
-        btn.setAttribute("aria-expanded", "true");
-        const body = turn.querySelector(".turn-body");
-        if (body) body.hidden = false;
-      }
+      document.querySelectorAll(".turn").forEach((other) => setTurn(other, false));
+      if (willOpen) setTurn(turn, true);
     });
+  });
+
+  document.getElementById("fold-all")?.addEventListener("click", () => {
+    document.querySelectorAll(".turn").forEach((turn) => setTurn(turn, false));
+  });
+
+  document.getElementById("unfold-all")?.addEventListener("click", () => {
+    document.querySelectorAll(".turn").forEach((turn) => setTurn(turn, true));
   });
 
   document.addEventListener("click", (event) => {
@@ -353,5 +456,7 @@
     });
   }
 
-  if (new URLSearchParams(location.search).get("profil") === "1") setDialog("profile", true);
+  const params = new URLSearchParams(location.search);
+  if (params.get("profil") === "1") setDialog("profile", true);
+  if (params.get("contact") === "1") openContact("camille");
 })();
