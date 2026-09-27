@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./styles/productivity-shell.css";
 
 import { applyAppearanceFromPrefs, ensureAppearanceSystemListener } from "./appearance";
 import { registerAllAppModules } from "./app/mail/appModuleRegistry";

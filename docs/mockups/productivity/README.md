@@ -68,4 +68,4 @@ Un clic sur un nom ou une adresse — dans le fil ou dans la liste — ouvre une
 
 ## Hors périmètre
 
-Pas de changement du runtime `src/`. Clarity reste dans le dépôt comme archive, à ne pas prolonger.
+La vague 1 du runtime `src/` reprend le chrome (tokens, typo, rail). Clarity reste une archive, à ne pas prolonger. Teintes de compte, accordéon et modales restent à faire.

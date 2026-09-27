@@ -1,6 +1,6 @@
 # Inventaire composants UX existants (RustyMail v0.2.0)
 
-Liste **factuelle** du shell **livré** (pastel Clarity v10). Elle sert à lire le code actuel.
+Liste du shell **avant** la vague productivité (structure des composants). Le visuel livré est maintenant charbon / blanc / cuivre ; cette liste décrit encore la structure, pas les teintes.
 
 Ce n’est **pas** la direction. Les nouvelles maquettes sont dans [`productivity/`](productivity/). Voir [`RULES.md`](RULES.md).
 

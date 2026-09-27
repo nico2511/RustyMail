@@ -4,7 +4,7 @@ Official visual direction for the **next** RustyMail interface: the productivity
 
 Open `docs/mockups/productivity/index.html` (no build). Captures live in `docs/mockups/productivity/images/`.
 
-The running app in `src/` still ships the **Clarity v10 pastel** shell (`src/styles/tokens.css`, `src/styles.css`, `src/styles/appearance.css`). That CSS is the current release, not the direction to extend. A later implementation PR replaces it. Do not treat cream, sage, or lavender as the product direction.
+Wave 1 in `src/` ports the **shell**: charcoal rail, white surface, copper accent, Literata for reading and IBM Plex Sans for chrome (`src/styles/tokens.css`, `src/styles/productivity-shell.css`, `src/styles/appearance.css`). Cream, sage, and lavender are no longer the light default. Dark mode and Contrast+ stay, retinted with copper. Still mockup-only (wave 2): unified multi-account hues, per-message accordion, account and contact modal redesigns.
 
 Clarity mockups (`docs/mockups/clarity/`, v2–v10) are an **archive**. Do not continue them.
 
@@ -57,10 +57,10 @@ Not mocked here, and still real product: Organiser, full Settings, the address b
 
 ## What not to follow
 
-- `src/styles/tokens.css` pastel tokens (`--sm-primary`, cream surfaces, lavender) — shipped UI only.
+- Cream, sage, and lavender as a light theme. `tokens.css` now carries the productivity palette; do not put the pastel costume back.
 - `docs/guidance-color.png` — historical Slate Monolith reference, not this palette.
 - `docs/mockups/clarity/`, `vNext/`, `alternatives/` — closed explorations.
 
 ---
 
-*Shipped CSS stays Clarity v10 until a separate implementation PR. This file is the guidance for that PR.*
+*Wave 1 (tokens, type, shell) is in `src/`. This file remains the target for what wave 2 still has to implement.*

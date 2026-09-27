@@ -1,77 +1,164 @@
+/* Productivité — vague 1.
+   Polices locales (mêmes fichiers que docs/mockups/productivity/fonts/). Pas d’appel réseau.
+   Le clair par défaut est charbon / blanc / cuivre. Crème, sauge et lavande ne sont plus la palette. */
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-sans-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-sans-400-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-sans-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-sans-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Literata";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/literata-480-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Literata";
+  font-style: normal;
+  font-weight: 480;
+  font-display: swap;
+  src: url("./fonts/literata-480-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Literata";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/literata-480-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Literata";
+  font-style: italic;
+  font-weight: 480;
+  font-display: swap;
+  src: url("./fonts/literata-480-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Literata";
+  font-style: normal;
+  font-weight: 650;
+  font-display: swap;
+  src: url("./fonts/literata-650-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Literata";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/literata-650-normal.woff2") format("woff2");
+}
+
 :root {
   color-scheme: light;
-  /* Local-only fonts (no Google Fonts). */
-  font-family: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --space-1: 6px;
-  --space-2: 10px;
-  --space-3: 14px;
-  --space-4: 18px;
-  --space-5: 24px;
-  --radius-sm: 10px;
-  --radius-md: 12px;
-  --radius-lg: 14px;
-  /* Boutons : coins adoucis (thème pastel) */
-  --radius-btn: 8px;
-  /* Motion */
+  --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-serif: "Literata", "Iowan Old Style", Palatino, "Palatino Linotype", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-btn: 7px;
+
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --t-fast: 120ms;
   --t-med: 180ms;
   --t-slow: 320ms;
 
-  /* Surfaces — crème chaud Clarity v10 Douce ( défaut ) */
-  --deep: #d8d3cb;
-  --base: #ded9d1;
-  --surface: #e8e4dc;
-  --elevated: #f0ece5;
-  --hover: #d6d0c8;
-  --active: #cac4bb;
-  --surface-elevated: #f7f4ef;
-  --border: rgba(68, 64, 58, 0.14);
-  --border-weak: rgba(68, 64, 58, 0.09);
-  --border-strong: rgba(58, 54, 48, 0.28);
+  /* Rail charbon + surface blanche. --deep est un lavis, pas le fond fenêtre. */
+  --rail: #17191e;
+  --rail-raised: #262a32;
+  --rail-text: #e7e9ee;
+  --rail-mute: #9aa3b0;
+  --deep: #f3f5f7;
+  --base: #ffffff;
+  --surface: #ffffff;
+  --elevated: #f7f8fa;
+  --hover: #f3f5f7;
+  --active: #e8ecf1;
+  --surface-elevated: #ffffff;
+  --wash: #f3f5f7;
+  --select: #f7eee8;
 
-  /* Accents pastels (sauge, rose poussière, lavande) */
-  --sm-primary: #7a9a86;
-  --sm-secondary: #8a9088;
-  --sm-tertiary: #b89298;
-  --sm-neutral: #9a9690;
-  --sm-danger-surface: rgba(210, 140, 130, 0.28);
-  --sm-danger-surface-hover: rgba(210, 140, 130, 0.38);
-  --sm-danger-border: rgba(190, 110, 100, 0.35);
-  --sm-danger-fg: #a85555;
+  --border: #e3e7ee;
+  --border-weak: #eef1f5;
+  --border-strong: #cfd6df;
 
-  --accent: var(--sm-primary);
-  --accent-hover: #688a74;
-  --accent-dim: rgba(122, 154, 134, 0.22);
+  --text: #16191e;
+  --muted: #4e5864;
+  --dim: #73808c;
+
+  --copper: #c4491d;
+  --copper-press: #a33c18;
+  --sm-primary: var(--copper);
+  --sm-secondary: #4e5864;
+  --sm-tertiary: var(--copper);
+  --sm-neutral: #73808c;
+  --sm-danger-surface: rgba(157, 44, 44, 0.1);
+  --sm-danger-surface-hover: rgba(157, 44, 44, 0.16);
+  --sm-danger-border: rgba(157, 44, 44, 0.35);
+  --sm-danger-fg: #9d2c2c;
+
+  --accent: var(--copper);
+  --accent-hover: var(--copper-press);
+  --accent-dim: rgba(196, 73, 29, 0.12);
   --accent-2: var(--sm-secondary);
-  --accent-warm: var(--sm-tertiary);
-  --accent-lavender: #a8a4c8;
+  --accent-warm: var(--copper);
+  --accent-lavender: var(--copper);
   --accent-peach: #d4a88a;
-  --accent-sky: #8ab4c8;
+  --accent-sky: #73808c;
 
-  --btn-primary-fill: #b8cfc4;
-  --btn-primary-fill-hover: #c6dbd2;
-  --btn-primary-text: #2a332e;
-  --btn-primary-border: rgba(42, 51, 46, 0.14);
+  --btn-primary-fill: var(--copper);
+  --btn-primary-fill-hover: var(--copper-press);
+  --btn-primary-text: #ffffff;
+  --btn-primary-border: var(--copper);
 
-  --btn-secondary-bg: #ddd8d0;
-  --btn-secondary-bg-hover: #d0cac1;
-  --btn-secondary-border: rgba(72, 68, 62, 0.22);
+  --btn-secondary-bg: #ffffff;
+  --btn-secondary-bg-hover: #f3f5f7;
+  --btn-secondary-border: #cfd6df;
+  --btn-outlined-border: #cfd6df;
 
-  --btn-outlined-border: rgba(58, 54, 48, 0.22);
+  --danger: #9d2c2c;
+  --success: #1f6b45;
+  --warn: #8a5a14;
 
-  --text: #34362f;
-  --muted: rgba(52, 54, 47, 0.76);
-  --dim: rgba(52, 54, 47, 0.5);
-  --danger: #a85555;
-  --success: #5a9a72;
-  --warn: #a89250;
+  --scrim: rgba(18, 22, 28, 0.42);
+  --scrim-heavy: rgba(18, 22, 28, 0.62);
+  --shadow-panel: 0 10px 28px rgba(18, 22, 28, 0.12);
+  --shadow-modal: 0 16px 48px rgba(18, 22, 28, 0.18);
 
-  --scrim: rgba(48, 44, 40, 0.28);
-  --scrim-heavy: rgba(52, 48, 44, 0.44);
-  --shadow-panel: 0 8px 28px rgba(58, 52, 44, 0.12);
-  --shadow-modal: 0 16px 48px rgba(58, 52, 44, 0.18);
-
-  --carved: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 10px rgba(58, 52, 44, 0.07);
-  --carved-sm: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 4px rgba(58, 52, 44, 0.06);
+  --carved: 0 1px 2px rgba(18, 22, 28, 0.04);
+  --carved-sm: 0 1px 1px rgba(18, 22, 28, 0.04);
 }

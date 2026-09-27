@@ -18,7 +18,7 @@ English documentation for the RustyMail desktop mail client. Start at the [repos
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Crates, layers, data paths, frontend boundaries |
 | [PRODUCT.md](PRODUCT.md) | Vision, goals, version history summary |
 | [CAPABILITIES.md](CAPABILITIES.md) | Feature matrix (what works today) |
-| [DESIGN.md](DESIGN.md) | Official next UI: productivity mockups (charcoal, white, copper). Shipped CSS is still Clarity v10 until a later PR |
+| [DESIGN.md](DESIGN.md) | Productivity UI. Wave 1 shell is in `src/` (charcoal, white, copper, Literata / Plex). Wave 2 remains mockup-only |
 | [UX-NOTE.md](UX-NOTE.md) | Same direction in French: shell, principles, mocked vs unmocked screens |
 
 ## AI & security
