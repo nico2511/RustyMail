@@ -19,10 +19,12 @@ import { renderMailboxDigestTriggerButton } from "../../mail/mailboxDigest";
 import { cleanThreadListPreview } from "../../mail/mailListPreviewClean";
 import { searchViewBatchJobStatusText } from "../../mail/searchViewBatch";
 import { iconSvg } from "../../lib/iconSvg";
+import { accountHueForId, accountShortLabel } from "../../lib/accountHue";
 import { initials } from "../../lib/tags";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
 import type { ThreadListItem } from "../../types";
+import { inboxScopeTitleEligible, renderInboxScopeTitleHtml } from "./accountScopeRender";
 import {
   renderAccountsRecoveryBanner,
   renderDefaultAccountPromptBanner,
@@ -73,14 +75,18 @@ function renderThreadRow(thread: ThreadListItem): string {
   const mbRaw = thread.mailbox ?? state.selectedMailbox ?? "INBOX";
   const { label: folderLabel } = threadMailboxListLabel(mbRaw);
   const folderTitle = escapeAttr(threadMailboxColumnTitle(mbRaw));
-  const accountBadge = (() => {
+  const accountCue = (() => {
     const aid = thread.accountId?.trim();
-    if (!aid || !isUnifiedInboxMailbox(state.selectedMailbox)) return "";
+    if (!aid || !isUnifiedInboxMailbox(state.selectedMailbox)) return { badge: "", hue: "" };
     const acc = state.accounts.find((a) => a.id === aid);
-    const label = (acc?.email || acc?.displayName || aid).trim();
-    if (!label) return "";
-    return `<span class="inbox-thread-account-badge dim" title="${escapeAttr(label)}">${escapeHtml(label)}</span>`;
+    const short = acc ? accountShortLabel(acc) : aid;
+    const full = (acc?.email || acc?.displayName || aid).trim();
+    if (!short) return { badge: "", hue: "" };
+    const hue = accountHueForId(aid, state.accounts.map((a) => a.id));
+    const badge = `<span class="inbox-acct" data-account-hue="${hue}" title="${escapeAttr(full)}"><span class="inbox-acct-dot" aria-hidden="true"></span>${escapeHtml(short)}</span>`;
+    return { badge, hue };
   })();
+  const accountBadge = accountCue.badge;
   const unread = Boolean(thread.unread);
   const toggleSeenTitle = unread ? "Marquer comme lu" : "Marquer comme non lu";
   const activityRaw = thread.lastActivity ?? "";
@@ -173,7 +179,7 @@ function renderThreadRow(thread: ThreadListItem): string {
   const previewClean = cleanThreadListPreview(thread.preview);
 
   return `
-    <div class="thread-row inbox-thread-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}" role="listitem">
+    <div class="thread-row inbox-thread-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}"${accountCue.hue ? ` data-account-hue="${accountCue.hue}"` : ""} role="listitem">
       <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}">
         <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(firstParticipant)}</span>
         <span class="inbox-thread-stack">
@@ -339,7 +345,15 @@ export function renderList(mode: "full" | "threads-only" | "filters-only" = "ful
                   ? `<button type="button" class="ghost-button inbox-back-imap-btn" data-action="clear-search-exit" title="Quitter la recherche et revenir au dossier">← ${escapeHtml(threadMailboxListLabel(mailboxTitleRaw).label)}</button>`
                 : ""
               }
-              <h1 class="inbox-mailbox-title${searchContext ? " inbox-mailbox-title--search" : ""}">${mailboxLabel}</h1>
+              ${
+                inboxScopeTitleEligible(listMailbox, {
+                  draft: draftBoxVirtual,
+                  search: searchContext,
+                  panel: Boolean(panelMb),
+                })
+                  ? renderInboxScopeTitleHtml()
+                  : `<h1 class="inbox-mailbox-title${searchContext ? " inbox-mailbox-title--search" : ""}">${mailboxLabel}</h1>`
+              }
               ${
                 savedView && (savedView.newCount ?? 0) > 0
                   ? `<span class="inbox-view-new-pill" aria-label="${savedView.newCount} nouveau${savedView.newCount === 1 ? "" : "x"}">+${savedView.newCount}</span>`

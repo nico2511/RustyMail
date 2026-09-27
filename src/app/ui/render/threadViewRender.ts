@@ -10,6 +10,7 @@ import { initials } from "../../lib/tags";
 import { threadTagsForModal } from "../../lib/threadTagsModal";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
+import { messageAccordionOpen, threadMessageFoldPreview } from "../../mail/threadAccordion";
 import { canonicalEmailForNlMatch } from "../../mail/searchAccountResolve";
 import { firstMatchingNewsletterRule, newsletterEmailListed } from "../../mail/newsletterRulesMatch";
 import type {
@@ -264,6 +265,14 @@ export function renderThread() {
           <p class="thread-reading-stats dim">
             ${msgs.length} message${msgs.length === 1 ? "" : "s"}${attachmentCount > 0 ? ` · ${attachmentCount} pièce${attachmentCount === 1 ? "" : "s"} jointe${attachmentCount === 1 ? "" : "s"}` : ""}
           </p>
+          ${
+            msgs.length > 1
+              ? `<div class="thread-accordion-bar" role="group" aria-label="Pliage des messages">
+                  <button type="button" class="ghost-button thread-accordion-btn" data-action="thread-accordion-collapse-all" aria-pressed="${state.threadAccordion === "none" ? "true" : "false"}">Tout replier</button>
+                  <button type="button" class="ghost-button thread-accordion-btn" data-action="thread-accordion-expand-all" aria-pressed="${state.threadAccordion === "all" ? "true" : "false"}">Tout développer</button>
+                </div>`
+              : ""
+          }
 
           ${participantLinks.length ? `<div class="thread-participants-block">
               <span class="thread-kicker">Participants</span>
@@ -320,7 +329,9 @@ export function renderThread() {
         </aside>` : ""}
 
       <div class="thread-messages thread-messages-reading">
-        ${msgs
+        ${(() => {
+          const messageIdsDesc = msgs.map((m) => m.messageId);
+          return msgs
           .map((message, i) => {
             const prev = msgs[i - 1];
             const sameSenderAsPrev =
@@ -368,18 +379,30 @@ export function renderThread() {
               : `<time class="thread-msg-time thread-msg-time--inline"${isoWhen ? ` datetime="${escapeAttr(isoWhen)}"` : ""}>${escapeHtml(renderDeps().formatThreadReadingWhen(message.receivedAt))}</time>`;
             const anchorId = renderDeps().threadMessageAnchorId(message.messageId, i);
             const anchorName = message.messageId.trim() || anchorId;
+            const msgOpen = messageAccordionOpen(state.threadAccordion, message.messageId, messageIdsDesc);
+            const unreadMark = Boolean(threadUnreadNav) && i === 0;
+            const foldPreview = threadMessageFoldPreview(message.cleanedText || message.sourceText || "");
+            const foldLabel = msgOpen ? "Replier ce message" : "Développer ce message";
             return `
               ${daySeparator}
               ${participantFirst}
               ${recipientPresenceHtml}
               <a class="thread-msg-anchor" name="${escapeAttr(anchorName)}" id="${escapeAttr(anchorId)}" aria-hidden="true"></a>
-              <article class="message thread-msg ${isMine ? "mine" : ""} ${laneRight ? "thread-msg--lane-right" : ""} ${isRoot ? "thread-msg--root" : ""} ${isSolo ? "thread-msg--solo" : ""} ${showsHtmlBubble ? "has-html" : ""} ${showMeta ? "thread-msg--head" : "compact"}" style="${accentVars}">
+              <article class="message thread-msg ${msgOpen ? "thread-msg--open" : "thread-msg--folded"} ${unreadMark ? "thread-msg--unread" : ""} ${isMine ? "mine" : ""} ${laneRight ? "thread-msg--lane-right" : ""} ${isRoot ? "thread-msg--root" : ""} ${isSolo ? "thread-msg--solo" : ""} ${showsHtmlBubble ? "has-html" : ""} ${showMeta ? "thread-msg--head" : "compact"}" style="${accentVars}">
                 ${showAvatar ? `<span class="avatar thread-msg-avatar">${initials(message.sender)}</span>` : `<span class="avatar avatar-spacer" aria-hidden="true"></span>`}
                 <div class="message-stack">
                   <header class="message-head-row${showMeta ? "" : " message-head-row--compact"}">
+                    <button type="button" class="thread-msg-fold" data-action="thread-accordion-toggle" data-msg-id="${escapeAttr(message.messageId)}" aria-expanded="${msgOpen ? "true" : "false"}" aria-label="${escapeAttr(foldLabel)}" title="${escapeAttr(foldLabel)}">
+                      <span class="thread-msg-fold-chevron" aria-hidden="true"></span>
+                    </button>
                     <div class="thread-msg-head-main">${headMainHtml}</div>
                     ${headActionsHtml}
                   </header>
+                  ${
+                    msgOpen
+                      ? ""
+                      : `<button type="button" class="thread-msg-fold-preview" data-action="thread-accordion-toggle" data-msg-id="${escapeAttr(message.messageId)}">${escapeHtml(foldPreview)}</button>`
+                  }
                   <div class="thread-msg-card mail-security-tier ${renderDeps().mailSecurityTierClass(renderDeps().normalizedMailSecurity(message))}">
                     ${renderMessageBody(message, eff, unsubLinks)}
                     ${inlineTr}
@@ -399,7 +422,8 @@ export function renderThread() {
               </article>
             `;
           })
-          .join("")}
+          .join("");
+        })()}
       </div>
 
       ${

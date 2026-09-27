@@ -1,6 +1,6 @@
 /* Chrome shell productivité (vague 1).
    Importé après styles.css pour gagner la cascade, sans réécrire le HTML.
-   Hors scope : pastilles multi-compte, accordéon du fil, modales compte/contact. */
+   Pastilles multi-compte, accordéon et rail 56 px : productivity-wave2.css. */
 
 .noise {
   display: none;

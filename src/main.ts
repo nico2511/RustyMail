@@ -1,5 +1,6 @@
 import "./styles.css";
 import "./styles/productivity-shell.css";
+import "./styles/productivity-wave2.css";
 
 import { applyAppearanceFromPrefs, ensureAppearanceSystemListener } from "./appearance";
 import { registerAllAppModules } from "./app/mail/appModuleRegistry";

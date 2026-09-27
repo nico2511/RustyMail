@@ -38,6 +38,7 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
   const keepAi =
     opts?.preserveAi && openThreadDeps.threadAiSummaryScoped() && threadIdsMatch(state.aiThreadScope, tid);
   if (String(prev) !== String(tid)) {
+    state.threadAccordion = "latest";
     state.threadQuickReplyOpen = false;
     state.threadTagsModalOpen = false;
     if (!keepAi) {

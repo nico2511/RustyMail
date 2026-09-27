@@ -102,6 +102,15 @@ export type State = {
   selectedMailbox: string;
   mailboxes: string[];
   mailboxUnread: Record<string, number>;
+  /**
+   * Non-lus des réceptions par compte (commande existante `mailbox_unread_counts`).
+   * Vide tant que l’IPC n’a pas répondu — le rail, la modale et le titre lisent cette map.
+   */
+  accountInboxUnread: Record<string, number>;
+  /** Menu de filtre sous le titre « Tous les comptes » / compte. */
+  inboxAccountMenuOpen: boolean;
+  /** Modale comptes (avatar). Mêmes compteurs que le rail et le filtre. */
+  accountModalOpen: boolean;
   /** Compteurs puces filtre liste (dossier courant + suivis compte). */
   inboxFilterCounts: InboxFilterCounts | null;
   mailboxTotal: Record<string, number>;
@@ -288,8 +297,13 @@ export type State = {
   llmPrefetchInFlight: boolean;
   /** Passage « idle » : écriture cache synthèse / traduction (SQLite) en arrière-plan. */
   idleAiCachePrefetchBusy: boolean;
-  /** Panneau dossiers gauche masqué (largeur lecture seule au centre). */
+  /** Rail gauche replié : barre d’icônes 56 px (pas une colonne à 0). */
   sidebarCollapsed: boolean;
+  /**
+   * Accordéon du fil. `latest` = seul le plus récent est ouvert, `all` / `none`,
+   * ou l’id du message ouvert.
+   */
+  threadAccordion: string;
   /** Nombre de brouillons « Sauvés » (hors IMAP) pour le compte courant. */
   savedDraftsMailboxCount: number;
   /** Arbre dossiers perso : nœuds ouverts (clé = chemin). */

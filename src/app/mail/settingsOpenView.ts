@@ -8,6 +8,8 @@ import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 export function openSettingsView(): void {
   beginNavigation("settings", { resetStack: true });
   state.view = "settings";
+  state.accountModalOpen = false;
+  state.inboxAccountMenuOpen = false;
   state.aiOpen = false;
   clearThreadAiSummaryState();
   state.settingsTab = "accounts";

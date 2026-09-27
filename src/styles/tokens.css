@@ -121,6 +121,13 @@
   --dim: #73808c;
 
   --copper: #c4491d;
+  /* Identité de compte — pastels muets, distincts du cuivre. */
+  --acct-slate: #3d4c63;
+  --acct-olive: #4a5336;
+  --acct-plum: #5c4458;
+  --acct-slate-rail: #b9c6d6;
+  --acct-olive-rail: #c6d0b4;
+  --acct-plum-rail: #d4c3cf;
   --copper-press: #a33c18;
   --sm-primary: var(--copper);
   --sm-secondary: #4e5864;

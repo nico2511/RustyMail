@@ -8,6 +8,7 @@ import {
   resetMailboxDigestForNavigation,
 } from "./mailboxDigest";
 import { syncActivityRecordingPrefs } from "./threadActivityTracking";
+import { isUnifiedInboxMailbox } from "../../mailboxKinds";
 import { defaultListFilterFromPrefs, ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 import { loadAddressBookSidebarCount } from "./loadAddressBookSidebarCount";
 
@@ -35,6 +36,7 @@ export async function switchActiveAccount(accountId: string): Promise<void> {
   if (!id || !state.accounts.some((a) => a.id === id)) return;
   const d = switchDeps();
   state.selectedAccountId = id;
+  if (isUnifiedInboxMailbox(state.selectedMailbox)) state.selectedMailbox = "INBOX";
   state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: id }, [], BOOT_INVOKE_TIMEOUT_MS);
   ensureValidSelectedMailbox();
   state.search = "";

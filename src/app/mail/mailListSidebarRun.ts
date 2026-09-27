@@ -9,6 +9,7 @@ import { render } from "../dispatch";
 import { safeInvoke, withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { state } from "../state";
+import { refreshAccountInboxUnreads } from "./accountInboxUnreadRun";
 import { folderManagerPanelMailbox } from "./mailboxPanelContext";
 import { mergeMailboxFolderStatsForUi, sidebarFolderNamesForCounts } from "./mailboxSidebarStats";
 
@@ -69,5 +70,6 @@ export async function loadMailboxUnread() {
   const { unread, total } = mergeMailboxFolderStatsForUi(folderList, rows);
   state.mailboxUnread = unread;
   state.mailboxTotal = total;
+  await refreshAccountInboxUnreads();
   void loadInboxFilterCounts();
 }
