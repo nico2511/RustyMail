@@ -54,8 +54,8 @@ Outputs (Cargo **workspace** → repo-root `target/release/`; fallback `src-taur
 
 ## Versioning
 
-- Package version in `package.json`, `src-tauri/tauri.conf.json`, and workspace `Cargo.toml` (currently `0.3.0`)
-- Tag format: `v0.3.0` (must match release workflow pattern)
+- Package version in `package.json`, `src-tauri/tauri.conf.json`, and workspace `Cargo.toml` (currently `0.3.1`)
+- Tag format: `v0.3.1` (must match release workflow pattern)
 
 ## Mises à jour automatiques (Windows)
 
@@ -95,7 +95,7 @@ Secrets du dépôt (Settings → Secrets and variables → Actions) :
 
 Les variables d’environnement de signature ne sont **pas** lues depuis un `.env` du dépôt au moment du bundle Tauri.
 
-La clé publique embarquée dans un binaire doit être la paire de la clé privée qui signe cette release. Le placeholder `REMPLACER_PAR_LA_CLE_PUBLIQUE_MINISIGN` fait échouer la vérification (message dans Paramètres) tant qu’il n’est pas remplacé **avant** le build qui doit pouvoir se mettre à jour.
+La clé publique embarquée dans un binaire doit être la paire de la clé privée qui signe cette release. Pour **0.3.1**, le placeholder `REMPLACER_PAR_LA_CLE_PUBLIQUE_MINISIGN` a été remplacé dans `plugins.updater.pubkey` (clé publique minisign uniquement ; la clé privée n’est pas dans le dépôt). Le secret GitHub Actions `TAURI_SIGNING_PRIVATE_KEY` doit contenir cette clé privée, sinon le job de release publie l’installeur sans `.sig` ni `latest.json`.
 
 ### Fichiers publiés
 

@@ -25,7 +25,7 @@ Before publishing an installable bundle (MSI/NSIS):
 
 ### Updater
 
-8b. The minisign **private** key exists only as the GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY` (optional password secret). It is not in the repo, the installer, or release notes. The matching **public** key is the `plugins.updater.pubkey` string in `tauri.conf.json`. Until that placeholder is replaced, clients cannot verify updates. See [RELEASE.md](RELEASE.md).
+8b. The minisign **private** key exists only as the GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY` (optional password secret). It is not in the repo, the installer, or release notes. The matching **public** key is the `plugins.updater.pubkey` string in `tauri.conf.json` (placeholder replaced for 0.3.1). See [RELEASE.md](RELEASE.md).
 
 ### Local data
 
