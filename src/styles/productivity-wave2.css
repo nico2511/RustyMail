@@ -532,7 +532,7 @@ body.clarity-dark {
   }
 }
 
-/* Lecture : surface unie, rythme et hiérarchie soignés. */
+/* Lecture : surface calme, caractère cuivre / Literata. */
 
 .thread-reading.thread-reading--reading-layout {
   --thread-reading-gutter: clamp(28px, 3.2vw, 40px);
@@ -546,7 +546,8 @@ body.clarity-dark {
 
 .thread-reading.thread-reading--reading-layout .thread-reading-head {
   padding-block: 16px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--copper);
+  background: var(--base);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-reading-nav {
@@ -563,7 +564,7 @@ body.clarity-dark {
 }
 
 .thread-reading.thread-reading--reading-layout .thread-back-link:hover {
-  color: var(--text);
+  color: var(--copper);
 }
 
 .thread-reading.thread-reading--reading-layout .nav-crumb--current {
@@ -574,15 +575,15 @@ body.clarity-dark {
 .thread-reading.thread-reading--reading-layout .thread-reading-title {
   font-family: var(--font-serif);
   font-weight: 650;
-  font-size: 26px;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
   color: var(--text);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-reading-stats {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 8px;
+  font-size: 12px;
   font-weight: 400;
   letter-spacing: 0.01em;
   color: var(--dim);
@@ -600,10 +601,16 @@ body.clarity-dark {
 .thread-reading.thread-reading--reading-layout .thread-msg-card,
 .thread-reading.thread-reading--reading-layout .message.has-html .thread-msg-card,
 .thread-reading.thread-reading--reading-layout .message.mine .thread-msg-card {
-  background: transparent;
-  border: 0;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   box-shadow: none;
-  padding: 8px 0 4px var(--msg-indent);
+  padding: 14px 16px 16px;
+}
+
+.thread-reading.thread-reading--reading-layout .message.mine .thread-msg-card {
+  background: var(--select);
+  border-color: color-mix(in srgb, var(--copper) 28%, var(--border));
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-fold-preview {
@@ -651,9 +658,9 @@ body.clarity-dark {
 .thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .action-bar + .action-bar::before {
   content: "";
   width: 1px;
-  height: 14px;
-  margin-inline: 6px 4px;
-  background: var(--border);
+  height: 16px;
+  margin-inline: 8px 6px;
+  background: var(--border-strong);
   align-self: center;
   flex: none;
 }
@@ -681,8 +688,43 @@ body.clarity-dark {
 .thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill-sm:hover,
 .thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill.danger:hover,
 .thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill.danger:hover {
-  color: var(--text);
-  background: var(--hover);
+  color: var(--copper);
+  background: var(--accent-dim);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions [data-action="reply"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  color: var(--btn-primary-text);
+  background: var(--btn-primary-fill);
+  border-radius: 7px;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions [data-action="reply"]::after {
+  content: "Répondre";
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions [data-action="reply"]:hover {
+  color: var(--btn-primary-text);
+  background: var(--btn-primary-fill-hover);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .thread-reply-one {
+  color: var(--copper);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .thread-reply-one:hover {
+  color: var(--copper);
+  background: var(--accent-dim);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill.danger,
@@ -710,10 +752,10 @@ body.clarity-dark {
 
 .thread-reading.thread-reading--reading-layout .thread-msg-from,
 .thread-reading.thread-reading--reading-layout .thread-msg-from.thread-participant-link {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: -0.011em;
+  font-family: var(--font-serif);
+  font-weight: 650;
+  font-size: 16px;
+  letter-spacing: -0.015em;
   color: var(--text);
 }
 
@@ -765,7 +807,7 @@ body.clarity-dark {
 }
 
 .thread-reading.thread-reading--reading-layout .thread-accordion-btn:hover {
-  color: var(--text);
+  color: var(--copper);
   background: transparent;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -787,7 +829,7 @@ body.clarity-dark {
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--copper);
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .pane-header small {
@@ -829,6 +871,11 @@ body.clarity-dark {
   font-size: 13px;
   line-height: 1.4;
   color: var(--text);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .details-row + .details-row {
+  padding-top: 10px;
+  border-top: 1px solid var(--border-weak);
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .details-row > .dim {
@@ -879,11 +926,11 @@ body.clarity-dark {
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .ai-action.surface-sm {
-  background: transparent;
-  border-color: transparent;
+  background: var(--elevated);
+  border: 1px solid var(--border);
   box-shadow: none;
-  border-radius: 6px;
-  padding: 8px 8px;
+  border-radius: 8px;
+  padding: 8px 10px;
   gap: 10px;
 }
 
@@ -892,7 +939,7 @@ body.clarity-dark {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--dim);
+  color: var(--copper);
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .ai-action strong {
@@ -903,5 +950,6 @@ body.clarity-dark {
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .ai-action.surface-sm:hover {
-  background: var(--hover);
+  background: var(--select);
+  border-color: color-mix(in srgb, var(--copper) 35%, var(--border));
 }
