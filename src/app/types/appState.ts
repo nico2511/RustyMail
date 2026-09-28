@@ -71,8 +71,8 @@ export type State = {
   searchModalOpen: boolean;
   /** Modale Paramètres → IA (catégorie ouverte). */
   settingsAiModal: SettingsAiModalId | null;
-  /** Onglet visible dans Paramètres → Moteurs (PC / Cloud / Hybride). */
-  aiEngineSettingsTab: "local" | "cloud" | "hybrid" | "ollama";
+  /** Mode visible dans Paramètres → IA. */
+  aiEngineSettingsTab: "off" | "local" | "cloud" | "hybrid" | "ollama";
   promptCatalog: PromptCatalogItem[] | null;
   promptCatalogLoadError: string;
   appPrefs: AppPrefs;

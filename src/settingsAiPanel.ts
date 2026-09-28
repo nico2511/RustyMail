@@ -35,10 +35,23 @@ export function contextPresetIndex(n: number): number {
   return best;
 }
 
-export type EngineConnectionMode = "local" | "cloud" | "hybrid" | "ollama";
+export type EngineConnectionMode = "off" | "local" | "cloud" | "hybrid" | "ollama";
+
+function disableChatEngines(ai: AppPrefsAi): void {
+  ai.ollamaEnabled = false;
+  ai.openrouterEnabled = false;
+  ai.llamaServerEnabled = false;
+  ai.aiCloudLlmFallback = false;
+}
 
 export function applyEngineConnectionMode(ai: AppPrefsAi, mode: EngineConnectionMode): void {
+  if (mode === "off") {
+    disableChatEngines(ai);
+    ai.chatBackend = "auto";
+    return;
+  }
   if (mode === "ollama") {
+    disableChatEngines(ai);
     ai.chatBackend = "ollama";
     ai.ollamaEnabled = true;
     if (!ai.ollamaBaseUrl.trim()) {
@@ -46,25 +59,25 @@ export function applyEngineConnectionMode(ai: AppPrefsAi, mode: EngineConnection
     }
     return;
   }
-  ai.ollamaEnabled = false;
   if (mode === "local") {
+    disableChatEngines(ai);
     ai.chatBackend = "llama-server";
-    ai.openrouterEnabled = false;
     ai.llamaServerEnabled = true;
-    ai.aiCloudLlmFallback = false;
     ai.localLlmEnabled = true;
-  } else if (mode === "cloud") {
+    return;
+  }
+  if (mode === "cloud") {
+    disableChatEngines(ai);
     ai.chatBackend = "openrouter";
     ai.openrouterEnabled = true;
-    ai.llamaServerEnabled = false;
-    ai.aiCloudLlmFallback = false;
-  } else {
-    ai.chatBackend = "auto";
-    ai.openrouterEnabled = true;
-    ai.llamaServerEnabled = true;
-    ai.aiCloudLlmFallback = true;
-    ai.localLlmEnabled = true;
+    return;
   }
+  ai.chatBackend = "auto";
+  ai.ollamaEnabled = false;
+  ai.openrouterEnabled = true;
+  ai.llamaServerEnabled = true;
+  ai.aiCloudLlmFallback = true;
+  ai.localLlmEnabled = true;
 }
 
 export type SettingsAiModalId =
@@ -137,8 +150,20 @@ export interface SettingsAiPanelDeps {
   llmPrefetchInFlight: boolean;
   llmCachedGgufFilenames: string[];
   bootstrapModelsCompleted: boolean;
-  /** Onglet visible dans Paramètres → Moteurs (indépendant des cases cochées). */
+  /** Mode affiché dans Paramètres → IA (aligné sur les prefs au rendu). */
   engineSettingsTab: EngineConnectionMode;
+}
+
+/** Replis ouverts dans Paramètres → IA (survit au re-rendu, pas persisté). */
+const settingsAiFoldsOpen = new Set<string>();
+
+export function rememberSettingsAiFold(id: string, open: boolean): void {
+  if (open) settingsAiFoldsOpen.add(id);
+  else settingsAiFoldsOpen.delete(id);
+}
+
+function foldOpenAttr(id: string): string {
+  return settingsAiFoldsOpen.has(id) ? " open" : "";
 }
 
 const SETTINGS_AI_MODAL_IDS: readonly SettingsAiModalId[] = [
@@ -189,32 +214,30 @@ export function engineConnectionMode(ai: AppPrefsAi): EngineConnectionMode {
   if (backend === "ollama") return "ollama";
   if (backend === "openrouter") return "cloud";
   if (backend === "llama-server") return "local";
+  if (!ai.ollamaEnabled && !ai.openrouterEnabled && !ai.llamaServerEnabled) return "off";
   if (ai.ollamaEnabled && !ai.openrouterEnabled && !ai.llamaServerEnabled) return "ollama";
-  if (ai.openrouterEnabled && ai.llamaServerEnabled && ai.aiCloudLlmFallback) return "hybrid";
+  if (ai.openrouterEnabled && ai.llamaServerEnabled) return "hybrid";
   if (ai.openrouterEnabled && !ai.llamaServerEnabled) return "cloud";
   if (ai.llamaServerEnabled && !ai.openrouterEnabled) return "local";
-  if (ai.openrouterEnabled && ai.llamaServerEnabled) return "hybrid";
-  return "local";
+  return "off";
 }
 
-function renderEngineModePicker(engineSettingsTab: EngineConnectionMode): string {
-  const mode = engineSettingsTab;
-  const btn = (id: EngineConnectionMode, label: string, hint: string) => {
-    const active = mode === id ? " settings-engine-mode-btn--active" : "";
-    return `<button type="button" class="settings-engine-mode-btn${active}" data-action="ai-engine-mode" data-engine-mode="${id}" title="${hint}">
-      <span class="settings-engine-mode-btn__label">${label}</span>
+function renderEngineModePicker(mode: EngineConnectionMode): string {
+  const btn = (id: EngineConnectionMode, label: string, hint: string, extraClass = "") => {
+    const active = mode === id ? " settings-ai-mode-btn--active" : "";
+    return `<button type="button" role="radio" aria-checked="${mode === id ? "true" : "false"}" class="settings-ai-mode-btn${active}${extraClass}" data-action="ai-engine-mode" data-engine-mode="${id}">
+      <span class="settings-ai-mode-btn__title">${label}</span>
+      <span class="settings-ai-mode-btn__hint">${hint}</span>
     </button>`;
   };
   return `
-    <div class="settings-engine-mode" role="group" aria-label="Mode de connexion IA">
-      ${btn("local", "Sur mon PC", "llama-server + modèle local")}
-      ${btn("cloud", "Cloud", "OpenRouter (pas de gros fichier local)")}
-      ${btn("hybrid", "Hybride", "PC en priorité, repli cloud si le local échoue")}
-      ${btn("ollama", "Ollama", "Ollama local, API compatible OpenAI")}
-    </div>
-    <p class="settings-explain settings-explain--lead dim" style="margin-top:8px">
-      Comment l’app appelle le modèle de texte. Dictée et recherche sémantique : onglets dédiés.
-    </p>`;
+    <div class="settings-ai-modes" role="radiogroup" aria-label="Mode de fonctionnement">
+      ${btn("ollama", "Ollama", "Modèle local sur cette machine")}
+      ${btn("cloud", "OpenRouter", "Modèle cloud, clé dans le trousseau")}
+      ${btn("local", "llama-server", "Serveur local déjà lancé")}
+      ${btn("off", "Désactivée", "Pas d’appel à un modèle")}
+      ${btn("hybrid", "Hybride", "llama-server, puis OpenRouter si le local ne démarre pas", " settings-ai-mode-btn--extra")}
+    </div>`;
 }
 
 function renderContextSizeSlider(ai: AppPrefsAi, escapeAttr: (s: string) => string): string {
@@ -254,18 +277,7 @@ function renderUnifiedCloudKeySection(deps: SettingsAiPanelDeps): string {
           <button type="button" class="ghost-button" data-action="clear-cloud-api-key">Supprimer</button>
         </div>
       </div>
-      ${SETTINGS_AI_AUTOSAVE_HINT}
     </div>`;
-}
-
-function countEnabledInGroup(groupIndex: number, ai: AppPrefsAi): { on: number; total: number } {
-  const group = getAiFeatureToggleGroups()[groupIndex];
-  if (!group) return { on: 0, total: 0 };
-  let on = 0;
-  for (const item of group.items) {
-    if (isAiFeatureEnabled(ai, item.key)) on++;
-  }
-  return { on, total: group.items.length };
 }
 
 function renderAiFeatureGroupToggles(groupIndex: number, deps: SettingsAiPanelDeps): string {
@@ -552,33 +564,24 @@ function renderLlmPrefetchProgressRow(
     </div>`;
 }
 
-function renderEnginesHybridFallbackSection(ai: AppPrefsAi): string {
-  return `
-    <hr class="settings-section-divider" />
-    <div class="settings-ai-subsection">
-      <h4 class="settings-ai-subsection__title">Priorité hybride</h4>
-      <label class="settings-form-check" for="prefs-ai-cloud-fallback">
-        <input type="checkbox" id="prefs-ai-cloud-fallback" ${ai.aiCloudLlmFallback ? "checked" : ""} />
-        <span class="settings-form-check-text"><span class="settings-form-check-title">Repli cloud si llama-server échoue</span> <span class="dim">(OpenRouter utilisé seulement si le moteur local ne démarre pas)</span></span>
-      </label>
-    </div>`;
+function renderHiddenEngineFlag(id: string, checked: boolean): string {
+  return `<input type="checkbox" id="${id}" ${checked ? "checked" : ""} hidden tabindex="-1" aria-hidden="true" />`;
 }
 
-function renderEnginesOpenRouterSection(deps: SettingsAiPanelDeps): string {
+function renderEnginesOpenRouterFields(deps: SettingsAiPanelDeps, heading: string | null): string {
   const { ai, escapeAttr } = deps;
   const current = ai.openrouterModel.trim();
   const presetOpts = OPENROUTER_MODEL_PRESETS.map(
     (p) =>
       `<option value="${escapeAttr(p.id)}" ${current === p.id ? "selected" : ""}>${p.label}</option>`,
   ).join("");
-  const customSelected = current && !OPENROUTER_MODEL_PRESETS.some((p) => p.id === current);
+  const customSelected = Boolean(current && !OPENROUTER_MODEL_PRESETS.some((p) => p.id === current));
+  const title = heading ? `<h3 class="settings-ai-mode-fields__title">${heading}</h3>` : "";
   return `
-    <div class="settings-ai-subsection">
-      <h4 class="settings-ai-subsection__title">Cloud (OpenRouter)</h4>
-      <label class="settings-form-check" for="prefs-openrouter-enabled" style="margin-bottom:10px">
-        <input type="checkbox" id="prefs-openrouter-enabled" ${ai.openrouterEnabled ? "checked" : ""} />
-        <span class="settings-form-check-text"><span class="settings-form-check-title">Activer OpenRouter</span></span>
-      </label>
+    <div class="settings-ai-mode-fields__block">
+      ${title}
+      ${renderHiddenEngineFlag("prefs-openrouter-enabled", true)}
+      ${renderUnifiedCloudKeySection(deps)}
       <div class="settings-form-row">
         <label class="compose-field-label" for="prefs-openrouter-model-preset">Modèle</label>
         <select class="settings-ctl settings-ctl-select" id="prefs-openrouter-model-preset">
@@ -587,63 +590,68 @@ function renderEnginesOpenRouterSection(deps: SettingsAiPanelDeps): string {
           <option value="__custom__" ${customSelected ? "selected" : ""}>Autre identifiant…</option>
         </select>
       </div>
-      <div class="settings-form-row" style="margin-top:8px">
+      <div class="settings-form-row">
         <label class="compose-field-label" for="prefs-openrouter-model">Identifiant modèle</label>
         <input class="settings-ctl" type="text" id="prefs-openrouter-model" value="${escapeAttr(ai.openrouterModel)}" placeholder="openai/gpt-4o-mini" autocomplete="off" spellcheck="false" />
       </div>
       <p class="settings-form-field-hint dim">
-        <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer">Liste des modèles OpenRouter ↗</a>
+        <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer">Liste des modèles OpenRouter</a>
       </p>
-      <div class="settings-form-row" style="margin-top:10px">
-        <label class="compose-field-label" for="prefs-openrouter-base-url">URL API</label>
-        <input class="settings-ctl" type="url" id="prefs-openrouter-base-url" value="${escapeAttr(ai.openrouterBaseUrl)}" placeholder="https://openrouter.ai/api/v1" autocomplete="off" spellcheck="false" />
-      </div>
+      <details class="settings-ai-advanced" data-fold="adv-openrouter"${foldOpenAttr("adv-openrouter")}>
+        <summary>Avancé</summary>
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-openrouter-base-url">URL API</label>
+          <input class="settings-ctl" type="url" id="prefs-openrouter-base-url" value="${escapeAttr(ai.openrouterBaseUrl)}" placeholder="https://openrouter.ai/api/v1" autocomplete="off" spellcheck="false" />
+        </div>
+      </details>
     </div>`;
 }
 
-function renderEnginesLlamaSection(deps: SettingsAiPanelDeps): string {
+function renderEnginesLlamaFields(deps: SettingsAiPanelDeps, heading: string | null): string {
   const { ai, escapeAttr, llamaServerApiKeySet } = deps;
   const binaryPlaceholder = ai.llamaServerBinaryPath.trim() || "llama-server";
+  const title = heading ? `<h3 class="settings-ai-mode-fields__title">${heading}</h3>` : "";
   return `
-    <div class="settings-ai-subsection">
-      <h4 class="settings-ai-subsection__title">Sur votre PC (llama-server)</h4>
-      <label class="settings-form-check" for="prefs-llama-server-enabled" style="margin-bottom:10px">
-        <input type="checkbox" id="prefs-llama-server-enabled" ${ai.llamaServerEnabled ? "checked" : ""} />
-        <span class="settings-form-check-text"><span class="settings-form-check-title">Activer llama-server</span></span>
-      </label>
-      <label class="settings-form-check" for="prefs-llama-server-spawn-enabled" style="margin-bottom:10px">
-        <input type="checkbox" id="prefs-llama-server-spawn-enabled" ${ai.llamaServerSpawnEnabled ? "checked" : ""} />
-        <span class="settings-form-check-text"><span class="settings-form-check-title">Lancer llama-server depuis RustyMail</span></span>
-      </label>
+    <div class="settings-ai-mode-fields__block">
+      ${title}
+      ${renderHiddenEngineFlag("prefs-llama-server-enabled", true)}
       <div class="settings-form-row">
-        <label class="compose-field-label" for="prefs-llama-server-binary-path">Commande llama-server</label>
-        <input class="settings-ctl" type="text" id="prefs-llama-server-binary-path" value="${escapeAttr(ai.llamaServerBinaryPath)}" placeholder="${escapeAttr(binaryPlaceholder)}" autocomplete="off" spellcheck="false" />
-      </div>
-      <div class="settings-form-footer" style="margin:8px 0;padding:0;border:none;display:flex;flex-wrap:wrap;gap:8px">
-        <button type="button" class="ghost-button" data-action="pick-llama-server-binary-path">Parcourir…</button>
-        <button type="button" class="ghost-button" data-action="llama-server-winget-install">Installer via winget</button>
-      </div>
-      <div class="settings-form-row">
-        <label class="compose-field-label" for="prefs-llama-server-base-url">URL API</label>
+        <label class="compose-field-label" for="prefs-llama-server-base-url">URL</label>
         <input class="settings-ctl" type="url" id="prefs-llama-server-base-url" value="${escapeAttr(ai.llamaServerBaseUrl)}" placeholder="http://127.0.0.1:8080/v1" autocomplete="off" spellcheck="false" />
       </div>
-      <div class="settings-form-row" style="margin-top:8px">
-        <label class="compose-field-label" for="prefs-llama-server-model">Modèle côté serveur</label>
-        <input class="settings-ctl" type="text" id="prefs-llama-server-model" value="${escapeAttr(ai.llamaServerModel)}" placeholder="Vide si lancement auto" autocomplete="off" spellcheck="false" />
+      <div class="settings-form-row">
+        <label class="compose-field-label" for="prefs-llama-server-model">Modèle</label>
+        <input class="settings-ctl" type="text" id="prefs-llama-server-model" value="${escapeAttr(ai.llamaServerModel)}" placeholder="Vide si le serveur n’a qu’un modèle" autocomplete="off" spellcheck="false" />
       </div>
-      ${renderContextSizeSlider(ai, escapeAttr)}
-      <label class="settings-form-check" for="prefs-llama-server-cpu-override" style="margin-top:10px">
-        <input type="checkbox" id="prefs-llama-server-cpu-override" ${ai.llamaServerAllowCpuOverride ? "checked" : ""} />
-        <span class="settings-form-check-text"><span class="settings-form-check-title">Autoriser llama-server sans GPU détecté</span></span>
-      </label>
-      <details class="settings-ai-advanced-inline" style="margin-top:12px">
-        <summary class="dim" style="cursor:pointer">Clé Bearer optionnelle (serveur local)</summary>
-        <p class="dim" style="margin:8px 0;font-size:12px">${llamaServerApiKeySet ? "Clé enregistrée." : "Aucune clé."}</p>
-        <div class="settings-inline-key-row">
-          <input class="settings-ctl" type="password" id="prefs-llama-server-api-key" placeholder="Bearer optionnel" autocomplete="new-password" spellcheck="false" />
-          <div class="settings-inline-key-row__actions">
-            <button type="button" class="primary-button" data-action="save-llama-server-api-key">Enregistrer</button>
-            <button type="button" class="ghost-button" data-action="clear-llama-server-api-key">Supprimer</button>
+      <p class="settings-form-field-hint dim">Laissez le modèle vide si llama-server est déjà lancé avec un seul fichier.</p>
+      <details class="settings-ai-advanced" data-fold="adv-llama"${foldOpenAttr("adv-llama")}>
+        <summary>Avancé — lancement, fichier .gguf, clé</summary>
+        <label class="settings-form-check" for="prefs-llama-server-spawn-enabled">
+          <input type="checkbox" id="prefs-llama-server-spawn-enabled" ${ai.llamaServerSpawnEnabled ? "checked" : ""} />
+          <span class="settings-form-check-text"><span class="settings-form-check-title">Lancer llama-server depuis RustyMail</span></span>
+        </label>
+        <div class="settings-form-row">
+          <label class="compose-field-label" for="prefs-llama-server-binary-path">Commande llama-server</label>
+          <input class="settings-ctl" type="text" id="prefs-llama-server-binary-path" value="${escapeAttr(ai.llamaServerBinaryPath)}" placeholder="${escapeAttr(binaryPlaceholder)}" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="settings-ai-mode-actions">
+          <button type="button" class="ghost-button" data-action="pick-llama-server-binary-path">Parcourir…</button>
+          <button type="button" class="ghost-button" data-action="llama-server-winget-install">Installer via winget</button>
+        </div>
+        ${renderContextSizeSlider(ai, escapeAttr)}
+        <label class="settings-form-check" for="prefs-llama-server-cpu-override">
+          <input type="checkbox" id="prefs-llama-server-cpu-override" ${ai.llamaServerAllowCpuOverride ? "checked" : ""} />
+          <span class="settings-form-check-text"><span class="settings-form-check-title">Autoriser llama-server sans GPU détecté</span></span>
+        </label>
+        ${renderEnginesLocalModelSection(deps)}
+        <div class="settings-ai-key">
+          <p class="settings-form-field-hint dim">${llamaServerApiKeySet ? "Clé Bearer enregistrée dans le trousseau." : "Aucune clé Bearer."}</p>
+          <div class="settings-inline-key-row">
+            <input class="settings-ctl" type="password" id="prefs-llama-server-api-key" placeholder="Bearer optionnel" autocomplete="new-password" spellcheck="false" />
+            <div class="settings-inline-key-row__actions">
+              <button type="button" class="primary-button" data-action="save-llama-server-api-key">Enregistrer</button>
+              <button type="button" class="ghost-button" data-action="clear-llama-server-api-key">Supprimer</button>
+            </div>
           </div>
         </div>
       </details>
@@ -694,86 +702,120 @@ function renderEnginesLocalModelSection(deps: SettingsAiPanelDeps): string {
     </div>`;
 }
 
-function renderEnginesOllamaSection(deps: SettingsAiPanelDeps): string {
+function renderEnginesOllamaFields(deps: SettingsAiPanelDeps): string {
   const { ai, escapeAttr } = deps;
   return `
-    <div class="settings-ai-subsection">
-      <h4 class="settings-ai-subsection__title">Ollama</h4>
-      <p class="settings-explain settings-explain--lead dim">
-        Même client HTTP que llama-server (<code>/v1/chat/completions</code>). Ollama ne reçoit pas de grammaire GBNF : le JSON (orientation Organiser comprise) est validé dans Rust.
-      </p>
+    <div class="settings-ai-mode-fields__block">
+      <p class="settings-ai-help">Ollama sur cette machine. Lancez <code>ollama serve</code>, puis indiquez un modèle déjà tiré (<code>ollama list</code>, ou <code>ollama pull</code>).</p>
       <div class="settings-form-row">
-        <label class="compose-field-label" for="prefs-ollama-base-url">URL API</label>
+        <label class="compose-field-label" for="prefs-ollama-base-url">URL</label>
         <input class="settings-ctl" type="url" id="prefs-ollama-base-url" value="${escapeAttr(ai.ollamaBaseUrl)}" placeholder="http://127.0.0.1:11434/v1" autocomplete="off" spellcheck="false" />
       </div>
-      <div class="settings-form-row" style="margin-top:8px">
+      <div class="settings-form-row">
         <label class="compose-field-label" for="prefs-ollama-model">Modèle</label>
         <input class="settings-ctl" type="text" id="prefs-ollama-model" value="${escapeAttr(ai.ollamaModel)}" placeholder="llama3.2" autocomplete="off" spellcheck="false" />
       </div>
-      <p class="settings-form-field-hint dim">Nom tel que <code>ollama list</code>. Si le statut dit injoignable, lancez <code>ollama serve</code>.</p>
     </div>`;
 }
 
-function ollamaStatusLine(ls: SettingsAiLlmRuntimeStatus, escapeHtml: (s: string) => string): string {
-  if (ls.chatBackend !== "ollama" && !ls.ollamaEnabled) return "";
-  const reach =
-    ls.ollamaReachable === true ? "joignable" : ls.ollamaReachable === false ? "injoignable" : "non testé";
-  const detail = ls.ollamaStatusMessage?.trim()
-    ? ` · ${escapeHtml(ls.ollamaStatusMessage.trim())}`
-    : "";
-  const model = ls.ollamaModel?.trim()
-    ? ` · modèle <code>${escapeHtml(ls.ollamaModel.trim())}</code>`
-    : "";
-  return `<li>Ollama : <strong>${reach}</strong>${model}${detail}</li>`;
+export type LlmConnectionStatusTone = "ok" | "warn" | "err" | "idle";
+
+export function llmConnectionStatus(
+  mode: EngineConnectionMode,
+  deps: SettingsAiPanelDeps,
+): { tone: LlmConnectionStatusTone; text: string } {
+  const { ai, isTauri, openrouterApiKeySet, llmRuntimeStatus: ls } = deps;
+  if (mode === "off") {
+    return { tone: "idle", text: "Désactivée. Le courrier n’appelle pas de modèle." };
+  }
+  if (!isTauri) {
+    return { tone: "idle", text: "Le test de connexion se fait dans l’application bureau." };
+  }
+  if (mode === "ollama") {
+    const model = (ai.ollamaModel || ls?.ollamaModel || "").trim();
+    if (!model) return { tone: "warn", text: "Modèle manquant. Indiquez le nom donné par ollama list." };
+    if (!ls || ls.ollamaReachable == null) return { tone: "idle", text: "Pas encore testé." };
+    if (ls.ollamaReachable === true) return { tone: "ok", text: "Ollama joignable." };
+    return { tone: "err", text: ls.ollamaStatusMessage?.trim() || "Ollama injoignable." };
+  }
+  if (mode === "cloud" || mode === "hybrid") {
+    const keySet = openrouterApiKeySet || Boolean(ls?.openrouterApiKeySet);
+    const model = (ai.openrouterModel || ls?.openrouterModel || "").trim();
+    if (!keySet) return { tone: "warn", text: "Clé API manquante." };
+    if (!model) return { tone: "warn", text: "Modèle OpenRouter manquant." };
+  }
+  if (mode === "local" || mode === "hybrid") {
+    const url = (ai.llamaServerBaseUrl || ls?.llamaServerBaseUrl || "").trim();
+    if (!url) return { tone: "warn", text: "URL llama-server manquante." };
+  }
+  if (!ls) return { tone: "idle", text: "Pas encore testé." };
+  if (mode === "cloud") {
+    return ls.llmGateOpen
+      ? { tone: "ok", text: "OpenRouter prêt." }
+      : { tone: "err", text: ls.llmGateHint?.trim() || "OpenRouter non prêt." };
+  }
+  if (mode === "local") {
+    return ls.llmGateOpen
+      ? { tone: "ok", text: "llama-server prêt." }
+      : { tone: "err", text: ls.llmGateHint?.trim() || "llama-server non prêt." };
+  }
+  if (mode === "hybrid") {
+    return ls.llmGateOpen
+      ? { tone: "ok", text: "Hybride prêt (local, sinon OpenRouter)." }
+      : { tone: "err", text: ls.llmGateHint?.trim() || "Hybride non prêt." };
+  }
+  return { tone: "idle", text: "Pas encore testé." };
+}
+
+function renderConnectionStatus(mode: EngineConnectionMode, deps: SettingsAiPanelDeps): string {
+  const status = llmConnectionStatus(mode, deps);
+  const test =
+    mode === "off"
+      ? ""
+      : `<div class="settings-ai-mode-actions">
+          <button type="button" class="primary-button" data-action="ai-test-connection">Tester la connexion</button>
+        </div>`;
+  return `${test}<p class="settings-ai-status settings-ai-status--${status.tone}" role="status">${deps.escapeHtml(status.text)}</p>`;
+}
+
+function renderModeFields(mode: EngineConnectionMode, deps: SettingsAiPanelDeps): string {
+  if (mode === "off") {
+    return `<p class="settings-ai-help">Aucun modèle n’est appelé. Le courrier, les dossiers et la recherche par mots-clés restent disponibles.</p>`;
+  }
+  if (mode === "ollama") {
+    return `${renderEnginesOllamaFields(deps)}${renderConnectionStatus(mode, deps)}`;
+  }
+  if (mode === "cloud") {
+    return `
+      <p class="settings-ai-help">La clé reste dans le trousseau du système. Elle n’est pas écrite dans les fichiers du projet.</p>
+      ${renderEnginesOpenRouterFields(deps, null)}
+      ${renderConnectionStatus(mode, deps)}`;
+  }
+  if (mode === "local") {
+    return `
+      <p class="settings-ai-help">URL du serveur déjà lancé. Le modèle peut rester vide s’il n’y en a qu’un.</p>
+      ${renderEnginesLlamaFields(deps, null)}
+      ${renderConnectionStatus(mode, deps)}`;
+  }
+  return `
+    <p class="settings-ai-help">llama-server en priorité. OpenRouter seulement si le serveur local ne démarre pas.</p>
+    ${renderEnginesLlamaFields(deps, "llama-server")}
+    ${renderEnginesOpenRouterFields(deps, "OpenRouter")}
+    <label class="settings-form-check" for="prefs-ai-cloud-fallback">
+      <input type="checkbox" id="prefs-ai-cloud-fallback" ${deps.ai.aiCloudLlmFallback ? "checked" : ""} />
+      <span class="settings-form-check-text"><span class="settings-form-check-title">Repli OpenRouter si llama-server ne démarre pas</span></span>
+    </label>
+    ${renderConnectionStatus(mode, deps)}`;
 }
 
 function renderEnginesBody(deps: SettingsAiPanelDeps): string {
-  const { ai, escapeHtml, isTauri, engineSettingsTab, llmRuntimeStatus: ls } = deps;
-  const showCloud = engineSettingsTab === "cloud" || engineSettingsTab === "hybrid";
-  const showLocal = engineSettingsTab === "local" || engineSettingsTab === "hybrid";
-  const ollamaSection =
-    engineSettingsTab === "ollama"
-      ? `
-    <hr class="settings-section-divider" />
-    ${renderEnginesOllamaSection(deps)}`
-      : "";
-  const cloudSections = showCloud
-    ? `
-    <hr class="settings-section-divider" />
-    ${renderUnifiedCloudKeySection(deps)}
-    <hr class="settings-section-divider" />
-    ${renderEnginesOpenRouterSection(deps)}`
-    : "";
-  const hybridSection = engineSettingsTab === "hybrid" ? renderEnginesHybridFallbackSection(ai) : "";
-  const localSections = showLocal
-    ? `
-    <hr class="settings-section-divider" />
-    ${renderEnginesLlamaSection(deps)}
-    ${renderEnginesLocalModelSection(deps)}`
-    : "";
+  const mode = engineConnectionMode(deps.ai);
   return `
-    ${renderEngineModePicker(engineSettingsTab)}
-    ${cloudSections}
-    ${hybridSection}
-    ${localSections}
-    ${ollamaSection}
-    ${SETTINGS_AI_AUTOSAVE_HINT}
-    ${
-      !isTauri
-        ? `<p class="settings-explain settings-explain--lead">Statut LLM : app desktop uniquement.</p>`
-        : ls
-          ? `<div class="settings-semantic-stats surface-sm" style="margin:14px 0 0;padding:12px 14px;border-radius:var(--radius-lg);font-size:13px;line-height:1.55" role="status">
-            <strong>Statut</strong>
-            <ul style="margin:8px 0 0;padding-left:1.15em">
-              <li>OpenRouter : <strong>${ls.openrouterEnabled ? "activé" : "désactivé"}</strong>${ls.openrouterEnabled ? ` · modèle <code>${escapeHtml(ls.openrouterModel)}</code>` : ""}${ls.openrouterApiKeySet ? "" : ' · <span class="dim">clé manquante</span>'}</li>
-              <li>llama-server : <strong>${ls.llamaServerEnabled ? "activé" : "désactivé"}</strong>${ls.llamaServerEnabled ? ` · <code style="word-break:break-all">${escapeHtml(ls.llamaServerBaseUrl)}</code>` : ""}</li>
-              ${ollamaStatusLine(ls, escapeHtml)}
-              <li>Fichier modèle : <strong>${ls.modelFilePresent ? "présent" : "absent"}</strong>${ls.expectedPathDisplay ? ` · <code style="word-break:break-all;font-size:12px">${escapeHtml(ls.expectedPathDisplay)}</code>` : ""}</li>
-              <li>Fonctions IA : <strong>${ls.llmGateOpen ? "disponibles" : "indisponibles"}</strong>${!ls.llmGateOpen && ls.llmGateHint ? ` — ${escapeHtml(ls.llmGateHint)}` : ""}</li>
-            </ul>
-          </div>`
-          : `<p class="settings-explain settings-explain--lead dim" style="margin-top:12px">Statut inconnu — utilisez <strong>Configurer recommandé</strong>.</p>`
-    }`;
+    ${renderEngineModePicker(mode)}
+    <div class="settings-ai-mode-fields" data-ai-mode="${mode}">
+      ${renderModeFields(mode, deps)}
+    </div>
+    <p class="dim settings-ai-autosave-hint">Les changements sont enregistrés automatiquement.</p>`;
 }
 
 function renderBackgroundBody(deps: SettingsAiPanelDeps): string {
@@ -794,72 +836,116 @@ function renderBackgroundBody(deps: SettingsAiPanelDeps): string {
       <input type="checkbox" id="prefs-bg-idle-ai-cache" ${ai.aiBackgroundIdleLlmCachePrefetch ? "checked" : ""} />
       <span class="settings-form-check-text"><span class="settings-form-check-title">Cache IA en période calme (liste)</span> <span class="dim">(après chargement du dossier : synthèses et traductions de fil vers SQLite pour les conversations visibles — sans ouvrir le panneau IA ; requiert moteur prêt)</span></span>
     </label>
-    <label class="settings-form-check" for="prefs-ai-cloud-fallback">
-      <input type="checkbox" id="prefs-ai-cloud-fallback" ${ai.aiCloudLlmFallback ? "checked" : ""} />
-      <span class="settings-form-check-text"><span class="settings-form-check-title">Repli cloud si le LLM local ne démarre pas</span> <span class="dim">(OpenRouter utilisé seulement si les deux moteurs sont configurés et que llama-server échoue à l’initialisation)</span></span>
-    </label>
-    <p class="dim settings-ai-autosave-hint" style="margin-top:12px">Le mode <strong>Hybride</strong> se règle aussi dans <strong>Moteurs &amp; connexion</strong>.</p>
+    <p class="settings-ai-help">Le repli OpenRouter se règle avec le mode Hybride, en haut de cette page.</p>
     ${SETTINGS_AI_AUTOSAVE_HINT}`;
 }
 
-function hubRow(modalId: SettingsAiModalId, title: string, meta: string): string {
+function renderFeatureToggle(item: { key: string; label: string; description: string }, deps: SettingsAiPanelDeps): string {
+  const { ai, escapeHtml, escapeAttr } = deps;
+  const on = Boolean(ai[item.key as AiFeatureKey]);
   return `
-    <button type="button" class="settings-ai-hub-row" data-action="open-settings-ai-modal" data-ai-modal="${modalId}">
-      <span class="settings-ai-hub-row__main">
-        <span class="settings-ai-hub-row__title">${title}</span>
-        <span class="settings-ai-hub-row__meta dim">${meta}</span>
+    <label class="settings-form-check ai-feature-toggle">
+      <input type="checkbox" data-ai-feature="${escapeAttr(item.key)}" ${on ? "checked" : ""} />
+      <span class="settings-form-check-text">
+        <span class="settings-form-check-title">${escapeHtml(item.label)}</span>
+        <span class="dim settings-ai-feature-desc">${escapeHtml(item.description)}</span>
       </span>
-      <span class="settings-ai-hub-row__chev" aria-hidden="true">›</span>
-    </button>`;
+    </label>`;
+}
+
+function renderInlineFeatures(deps: SettingsAiPanelDeps): string {
+  const { ai, escapeHtml, escapeAttr } = deps;
+  const groups = getAiFeatureToggleGroups()
+    .map((group) => ({
+      title: group.title,
+      items: group.items.filter((item) => item.key !== "featureOrgProposalsEnabled"),
+    }))
+    .filter((group) => group.items.length > 0);
+  return `
+    <p class="settings-ai-help">Ce que l’assistant peut faire dans le courrier. Le moteur se règle au-dessus.</p>
+    ${groups
+      .map(
+        (group) => `
+      <fieldset class="settings-ai-features-group ai-feature-group">
+        <legend class="ai-feature-group__title">${escapeHtml(group.title)}</legend>
+        <div class="ai-feature-group__items">
+          ${group.items.map((item) => renderFeatureToggle(item, deps)).join("")}
+        </div>
+      </fieldset>`,
+      )
+      .join("")}
+    <div class="settings-form-row">
+      <label class="compose-field-label" for="prefs-auto-thread-summary-min">Seuil de synthèse auto (messages)</label>
+      <input class="settings-ctl" type="number" id="prefs-auto-thread-summary-min" min="2" max="50" step="1"
+        value="${escapeAttr(String(ai.autoThreadSummaryMinMessages))}" autocomplete="off" />
+    </div>
+    <div class="settings-ai-mode-actions">
+      <button type="button" class="ghost-button" data-action="ai-features-all-on">Tout activer</button>
+      <button type="button" class="ghost-button" data-action="ai-features-all-off">Tout désactiver</button>
+    </div>`;
+}
+
+function renderOrganiserSecondary(deps: SettingsAiPanelDeps): string {
+  const item = getAiFeatureToggleGroups()
+    .flatMap((group) => group.items)
+    .find((entry) => entry.key === "featureOrgProposalsEnabled");
+  if (!item) return "";
+  return `
+    <p class="settings-ai-help">Propositions dans Organiser. Rien n’est appliqué tout seul.</p>
+    ${renderFeatureToggle(item, deps)}`;
+}
+
+function settingsAiFold(id: string, title: string, meta: string, body: string): string {
+  return `
+    <details class="settings-ai-fold" data-fold="${id}"${foldOpenAttr(id)}>
+      <summary>
+        <span class="settings-ai-fold__title">${title}</span>
+        <span class="settings-ai-fold__meta dim">${meta}</span>
+      </summary>
+      <div class="settings-ai-fold__body">${body}</div>
+    </details>`;
 }
 
 export function renderSettingsAiHub(deps: SettingsAiPanelDeps): string {
-  const { ai, escapeHtml, llmRuntimeStatus: ls, semOk } = deps;
-  const featureRows = getAiFeatureToggleGroups().map((group, idx) => {
-    const { on, total } = countEnabledInGroup(idx, ai);
-    const modalId = `features-${idx}` as SettingsAiModalId;
-    return hubRow(modalId, escapeHtml(group.title), `${on}/${total} activée${on !== 1 ? "s" : ""}`);
-  }).join("");
-  const bgOn = [
-    ai.aiBackgroundAutoSemanticIndex,
-    ai.aiBackgroundLlmPrefetch,
-    ai.aiBackgroundIdleLlmCachePrefetch,
-    ai.aiCloudLlmFallback,
-  ].filter(Boolean).length;
-  const dictBackend =
-    ai.dictationBackend === "cloud" ? "cloud"
-    : ai.dictationBackend === "local_http" ? "local_http"
-    : "whisper_cpp";
-  const dictationMeta =
-    ai.dictationEnabled ?
-      dictBackend === "whisper_cpp" ? "Whisper.cpp"
-      : dictBackend === "cloud" ? "Cloud"
-      : "Compagnon HTTP"
-    : "Désactivée";
-  const semanticMeta =
-    semOk ?
-      ai.semanticSearchEnabled ? "Hybride activée" : "Hybride désactivée"
+  const { ai, escapeHtml, semOk } = deps;
+  const featureOn = getAiFeatureToggleGroups()
+    .flatMap((group) => group.items)
+    .filter((item) => item.key !== "featureOrgProposalsEnabled" && isAiFeatureEnabled(ai, item.key)).length;
+  const featureTotal = getAiFeatureToggleGroups()
+    .flatMap((group) => group.items)
+    .filter((item) => item.key !== "featureOrgProposalsEnabled").length;
+  const dictationMeta = !ai.dictationEnabled
+    ? "Désactivée"
+    : ai.dictationBackend === "cloud"
+      ? "Cloud"
+      : ai.dictationBackend === "local_http"
+        ? "Compagnon HTTP"
+        : "Whisper.cpp";
+  const semanticMeta = semOk
+    ? ai.semanticSearchEnabled
+      ? "Activée"
+      : "Modèle présent"
     : "Modèle absent";
-  const llmMeta =
-    ls?.llmGateOpen ? "Moteur prêt"
-    : ai.chatBackend === "ollama" || ai.ollamaEnabled || ai.openrouterEnabled || ai.llamaServerEnabled
-      ? "Configuration incomplète"
-      : "Non configuré";
+  const orgOn = isAiFeatureEnabled(ai, "featureOrgProposalsEnabled");
   return `
-    <div class="settings-ai-hub">
-      <p class="settings-explain settings-explain--lead">
-        <strong>Fonctionnalités</strong> (ce que l’IA fait) et <strong>moteurs</strong> (PC, cloud, hybride ou Ollama) sont séparés. Ouvrez une ligne pour régler une catégorie.
-      </p>
-      <h3 class="thread-kicker settings-form-kicker settings-ai-block-heading">Moteurs</h3>
-      ${hubRow("engines", "Moteurs &amp; connexion", llmMeta)}
-      <h3 class="thread-kicker settings-form-kicker settings-ai-block-heading" style="margin-top:18px">Fonctionnalités</h3>
-      ${featureRows}
-      ${hubRow("features-common", "Options communes", `Seuil auto : ${ai.autoThreadSummaryMinMessages} msg.`)}
-      <h3 class="thread-kicker settings-form-kicker settings-ai-block-heading" style="margin-top:18px">Autres moteurs</h3>
-      ${hubRow("dictation", "Dictée", dictationMeta)}
-      ${hubRow("semantic", "Recherche locale", semanticMeta)}
-      ${hubRow("background", escapeHtml(t("settings.ai.tabBackground")), `${bgOn}/4`)}
-      ${hubRow("prompts", escapeHtml(t("settings.ai.tabPrompts")), escapeHtml(t("settings.ai.promptsReadOnly")))}
+    <div class="settings-ai-panel">
+      <section class="settings-ai-block" aria-labelledby="settings-ai-mode-heading">
+        <h2 id="settings-ai-mode-heading" class="settings-ai-block__title">Mode</h2>
+        <p class="settings-ai-help">Un seul mode à la fois. Les autres réglages sont repliés plus bas.</p>
+        ${renderEnginesBody(deps)}
+      </section>
+      ${settingsAiFold("features", "Fonctionnalités", `${featureOn}/${featureTotal}`, renderInlineFeatures(deps))}
+      ${settingsAiFold("organiser", "Organiser", orgOn ? "Activé" : "Désactivé", renderOrganiserSecondary(deps))}
+      ${settingsAiFold("dictation", "Dictée", dictationMeta, renderDictationBody(deps))}
+      ${settingsAiFold("semantic", "Recherche locale", semanticMeta, renderSemanticBody(deps))}
+      ${settingsAiFold("background", "Arrière-plan", "", renderBackgroundBody(deps))}
+      ${settingsAiFold(
+        "prompts",
+        escapeHtml(t("settings.ai.tabPrompts")),
+        escapeHtml(t("settings.ai.promptsReadOnly")),
+        `<p class="settings-ai-help">${escapeHtml(t("settings.ai.promptsLead"))}</p>
+         <button type="button" class="ghost-button" data-action="open-settings-ai-modal" data-ai-modal="prompts">Voir le catalogue</button>`,
+      )}
     </div>`;
 }
 

@@ -8,13 +8,19 @@ import {
   handleSettingsAiModalSelectChange,
 } from "./settingsAiDomWireModalHandlersRun";
 
+function aiPrefsSurface(target: HTMLElement): boolean {
+  if (target.closest(".settings-ai-modal-body")) return Boolean(state.settingsAiModal);
+  return Boolean(
+    target.closest(".settings-ai-panel") && state.view === "settings" && state.settingsTab === "ai",
+  );
+}
+
 export function wireSettingsAiDomModalChangeListener(signal: AbortSignal, immediateCheckboxIds: Set<string>): void {
   document.addEventListener(
     "change",
     (ev: Event) => {
-      if (!state.settingsAiModal) return;
       const t = ev.target as HTMLElement | null;
-      if (!t?.closest(".settings-ai-modal-body")) return;
+      if (!t || !aiPrefsSurface(t)) return;
       const id = (t as HTMLInputElement | HTMLSelectElement).id ?? "";
       if (id && immediateCheckboxIds.has(id)) {
         if (t instanceof HTMLInputElement) handleSettingsAiModalImmediateCheckbox(id, t);
@@ -62,10 +68,9 @@ export function wireSettingsAiDomModalInputListener(signal: AbortSignal): void {
   document.addEventListener(
     "input",
     (ev: Event) => {
-      if (!state.settingsAiModal) return;
       const t = ev.target as HTMLElement | null;
       if (!(t instanceof HTMLInputElement) || t.id !== "prefs-local-llm-ctx-range") return;
-      if (!t.closest(".settings-ai-modal-body")) return;
+      if (!aiPrefsSurface(t)) return;
       applyContextSliderIndex(Number.parseInt(t.value, 10));
       captureAiPrefsFieldsFromDom(state.appPrefs);
       schedulePersistAiPrefsFromDom({ skipDomCapture: true });

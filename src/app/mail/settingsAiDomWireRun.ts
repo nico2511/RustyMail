@@ -7,6 +7,7 @@ import { normalizeAiPrefsMerged } from "../../prefs_defaults";
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { state } from "../state";
+import { rememberSettingsAiFold } from "../../settingsAiPanel";
 import { wireSettingsAiDomEngineAndBackgroundListeners } from "./settingsAiDomWireEnginesRun";
 import { wireSettingsAiDomModalListeners } from "./settingsAiDomWireModalRun";
 
@@ -26,6 +27,17 @@ export function wireSettingsAiDomListeners(signal: AbortSignal, immediateCheckbo
         })();
       },
       { signal }
+    );
+  });
+
+  document.querySelectorAll<HTMLDetailsElement>("details[data-fold]").forEach((el) => {
+    el.addEventListener(
+      "toggle",
+      () => {
+        const id = el.dataset.fold;
+        if (id) rememberSettingsAiFold(id, el.open);
+      },
+      { signal },
     );
   });
 

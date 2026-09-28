@@ -13,7 +13,7 @@ function threadQaMicFooterHint(): string {
     return "Insertion de la question dictée…";
   }
   if (!isTauriRuntime()) return "Dictée : l’app bureau Tauri est requise.";
-  if (!state.appPrefs.ai.dictationEnabled) return "Dictée désactivée — Paramètres → IA & dictée.";
+  if (!state.appPrefs.ai.dictationEnabled) return "Dictée désactivée — Paramètres → IA.";
   const b = state.appPrefs.ai.dictationBackend;
   const ptt = composePushToTalkTargetCode();
   const pttFrag = ptt ? ` ou maintenir ${composePushToTalkShortcutLabel()}` : "";
@@ -38,7 +38,7 @@ export function composeMicFooterHint(): string {
     return "Dictée en cours d’insertion…";
   }
   if (!isTauriRuntime()) return "Dictée : l’app bureau Tauri est requise.";
-  if (!state.appPrefs.ai.dictationEnabled) return "Dictée désactivée — Paramètres → IA & dictée.";
+  if (!state.appPrefs.ai.dictationEnabled) return "Dictée désactivée — Paramètres → IA.";
   const b = state.appPrefs.ai.dictationBackend;
   const ptt = composePushToTalkTargetCode();
   const pttFrag = ptt ? ` ou maintenir ${composePushToTalkShortcutLabel()}` : "";

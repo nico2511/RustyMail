@@ -42,7 +42,9 @@ export async function persistEngineCheckboxToggle(message: string): Promise<void
     await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
     toast(message);
     await refreshLlmRuntimeStatus(false);
-    if (state.settingsAiModal === "engines") render();
+    if (state.settingsAiModal === "engines" || (state.view === "settings" && state.settingsTab === "ai")) {
+      render();
+    }
   } catch (e) {
     toast(tauriErrorMessage(e));
   }

@@ -11,6 +11,7 @@ import { loadAccountsFromBackend } from "./accountsLoadAction";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
 import { loadNewsletterRules } from "./newsletterRulesLoad";
 import { refreshAddressBookList } from "./addressBookWireActions";
+import { syncAiEngineSettingsTabFromPrefs } from "./settingsLlmRuntime";
 import {
   ensureValidSelectedMailbox,
   openSettingsView,
@@ -66,6 +67,7 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
           state.accountServersPanelOpen = state.settingsSelectedAccountId !== "new";
         }
         state.settingsTab = tab;
+        if (tab === "ai") syncAiEngineSettingsTabFromPrefs();
         render();
         if (tab === "autoSenders") void loadNewsletterRules().then(() => render());
         if (tab === "ai") void refreshSemanticEmbeddingCounts();

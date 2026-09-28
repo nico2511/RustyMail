@@ -6,12 +6,12 @@ export function buildMailboxBriefGateBannerHtml(): string {
   const hint = state.llmRuntimeStatus?.llmGateHint?.trim();
   const detail =
     hint ||
-    "Activez OpenRouter (clé + modèle) ou llama-server (URL + modèle, ou lancement auto avec GGUF) dans Paramètres → IA & dictée.";
+    "Activez OpenRouter (clé + modèle) ou llama-server (URL + modèle, ou lancement auto avec GGUF) dans Paramètres → IA.";
   const escaped = escapeHtml(detail);
   const inner = renderBriefMailItemCard(
     `<p class="thread-zen-par">Aucun moteur IA n’est prêt pour générer le brief.</p>
     <p class="thread-zen-par dim">${escaped}</p>
-    <p class="thread-zen-par dim">Ouvrez <strong>Paramètres → IA & dictée</strong>, puis cliquez <strong>Rafraîchir</strong>.</p>`,
+    <p class="thread-zen-par dim">Ouvrez <strong>Paramètres → IA</strong>, choisissez un mode, puis <strong>Tester la connexion</strong>.</p>`,
   );
   return renderBriefMailViewShell(inner, { kicker: "Brief indisponible" });
 }
