@@ -63,4 +63,4 @@ Optional: screenshot of desired readable rendering — helpful but secondary to 
 
 For a **new provider** (not Amazon), follow the same pattern today: MIME extraction script → fixture under `tests/fixtures/<provider>/` → Rust plugin under `mail_cleaning/providers/<name>.rs`.
 
-The intended replacement for that one-plugin-per-sender path (declarative digest templates, AI draft only outside the app, human review before any fixture lands in git) is scoped in [docs/CADRAGE_DIGEST_TEMPLATES.md](../docs/CADRAGE_DIGEST_TEMPLATES.md). It is not implemented. Do not commit raw `.eml` files either way.
+The intended replacement is a dedicated cut editor (not the mail composer): mark header / body / footer on a sample, then a reading template applies to other mails of the same sender and structure. Scoped in [docs/CADRAGE_DIGEST_TEMPLATES.md](../docs/CADRAGE_DIGEST_TEMPLATES.md). It is not implemented. Do not commit raw `.eml` files either way.

@@ -36,4 +36,4 @@ Le chrome marketing (préheader caché, barre sociale, pied légal, tableaux de 
 
 ## Suite envisagée
 
-Généraliser le digest Deblock à d’autres expéditeurs transactionnels, et fabriquer les fixtures hors de l’app (skill + revue humaine) : [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md). Ce n’est pas le comportement actuel. Le courrier personne-à-personne reste sur le générique, et l’ouverture d’un mail ne dépend pas d’un LLM.
+Généraliser le digest Deblock : un éditeur de découpe (pas le composer) marque header / body / footer, puis le template de lecture s’applique aux autres mails du même expéditeur et de la même structure. [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md). Ce n’est pas le comportement actuel. Le plugin Deblock reste la découpe compilée. Le courrier personne-à-personne reste sur le générique, et l’ouverture d’un mail ne dépend pas d’un LLM.

@@ -114,4 +114,4 @@ HTML from mail is sanitized with **DOMPurify** before render; remote images bloc
 - [IPC_SECURITY.md](IPC_SECURITY.md) — invoke command surface
 - [SECURITY.md](SECURITY.md) — encryption, keyring, release checks
 - [AI_AND_MODELS.md](AI_AND_MODELS.md) — models and generative features
-- [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md) — proposed digest templates and offline fixture flow (not shipped)
+- [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md) — proposed cut editor (header/body/footer) and reading templates (not shipped)
