@@ -220,14 +220,14 @@ function renderTreeNode(
       node.children.map((c) => renderTreeNode(state, c, depth + 1, entryByMb, deps)).join("")
     : "";
 
-  const labelHtml = `<span class="folder-tree-label">${escapeHtml(node.label)}</span>`;
+  const labelHtml = `<span class="folder-tree-label${hasChildren ? " folder-tree-label--branch" : ""}">${escapeHtml(node.label)}</span>`;
 
   const toggleBtn =
     hasChildren
       ? `<button type="button" class="folder-tree-chevron" data-action="fm-toggle-node" data-node-key="${escapeAttr(node.key)}" aria-expanded="${open}">${chev}</button>`
       : `<span class="folder-tree-chevron-spacer"></span>`;
 
-  return `<div class="folder-tree-node" data-node-key="${escapeAttr(node.key)}" style="--fm-depth:${depth}">
+  return `<div class="folder-tree-node${hasChildren ? " folder-tree-node--branch" : ""}" data-node-key="${escapeAttr(node.key)}" style="--fm-depth:${depth}">
     <div class="${rowCls}" ${mb ? `data-drop-mailbox="${escapeAttr(mb)}"` : ""}>
       <div class="folder-tree-main">
         ${toggleBtn}
@@ -310,7 +310,7 @@ export function renderFolderManagerView(
   const treeHtml =
     tree.length
       ? tree.map((n) => renderTreeNode(state, n, 0, entryByMb, deps)).join("")
-      : `<p class="dim folder-tree-empty">Aucun dossier personnel. Créez-en un avec le bouton ci-dessous.</p>`;
+      : `<p class="dim folder-tree-empty">Aucun dossier personnel. Créez-en un avec « Nouveau dossier ».</p>`;
 
   const sel = state.selectedMailbox;
   const selEntry = sel ? entryByMb.get(sel) : undefined;
@@ -365,7 +365,7 @@ export function renderFolderManagerView(
         <div class="folder-manager-list-body">${
           sel
             ? `<div class="inbox-index inbox-index--folder-embed">${renderListPanel()}</div>`
-            : `<p class="dim folder-manager-pick">Cliquez sur le bouton panneau (⊞) d’un dossier pour afficher ses mails ici.</p>`
+            : `<p class="dim folder-manager-pick">Choisissez un dossier, puis affichez ses messages.</p>`
         }</div>
       </section>
     </div>

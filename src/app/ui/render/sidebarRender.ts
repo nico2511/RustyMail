@@ -31,8 +31,8 @@ export function renderSidebar(): string {
   const avatarMark = accountMonogram(avatarLabel);
   const imapSection =
     state.accounts.length > 1 && account
-      ? `${accountShortLabel(account)} · Boîtes`
-      : "Boîtes";
+      ? `${accountShortLabel(account)} · IMAP`
+      : "IMAP";
   return `
     <aside class="sidebar" aria-label="Mail navigation">
       <button type="button" class="sidebar-collapse-edge" data-action="toggle-sidebar" aria-label="${railCollapsed ? "Afficher les dossiers" : "Masquer les dossiers"}" title="${railCollapsed ? "Agrandir le volet" : "Réduire le volet"}">
@@ -64,8 +64,7 @@ export function renderSidebar(): string {
         ${renderRailAccountScopeHtml()}
         ${
           isTauriRuntime() && account
-            ? `<div class="sidebar-section-label sidebar-section-label--in-nav"><span>Sur cet appareil</span></div>
-            <div class="sidebar-folder-group sidebar-folder-group--virtual-local">
+            ? `<div class="sidebar-folder-group sidebar-folder-group--virtual-local">
               <button type="button" class="folder-button ${state.selectedMailbox === LOCAL_SAVED_DRAFTS_MAILBOX ? "active" : ""}" data-mailbox="${escapeAttr(LOCAL_SAVED_DRAFTS_MAILBOX)}" title="Sauvés" aria-label="Sauvés — ${state.savedDraftsMailboxCount} brouillon${state.savedDraftsMailboxCount === 1 ? "" : "s"}">
                 <span class="folder-icon">Sv</span>
                 <span class="folder-name">Sauvés</span>
@@ -94,11 +93,14 @@ export function renderSidebar(): string {
             .join("")}
         </div>
 
-        <button type="button" class="folder-button ${state.view === "folderManager" ? "active" : ""}" data-action="open-folder-manager-view" title="Dossiers" aria-label="Dossiers">
-          <span class="folder-icon">Ar</span>
-          <span class="folder-name">Dossiers</span>
-          ${personalCount ? `<span class="folder-count">${personalCount}</span>` : ""}
-        </button>
+        <div class="sidebar-personal-entry">
+          <div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">Personnels</span></div>
+          <button type="button" class="folder-button folder-button--personal ${state.view === "folderManager" ? "active" : ""}" data-action="open-folder-manager-view" title="Dossiers personnels" aria-label="Dossiers personnels">
+            <span class="folder-icon">Ar</span>
+            <span class="folder-name">Dossiers</span>
+            ${personalCount ? `<span class="folder-count">${personalCount}</span>` : ""}
+          </button>
+        </div>
       </nav>
       ${
         isTauriRuntime() && account

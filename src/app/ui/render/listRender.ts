@@ -20,6 +20,7 @@ import { cleanThreadListPreview } from "../../mail/mailListPreviewClean";
 import { searchViewBatchJobStatusText } from "../../mail/searchViewBatch";
 import { iconSvg } from "../../lib/iconSvg";
 import { accountHueForId, accountShortLabel } from "../../lib/accountHue";
+import { initials } from "../../lib/tags";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
 import type { ThreadListItem } from "../../types";
@@ -113,17 +114,17 @@ function renderThreadRow(thread: ThreadListItem): string {
     const dateTip = escapeAttr(tip || activityTip);
 
     return `
-    <div class="thread-row inbox-thread-row inbox-mail-row thread-row--saved-local" data-thread-id="${escapeAttr(tid)}" role="listitem">
+    <div class="thread-row inbox-thread-row thread-row--saved-local" data-thread-id="${escapeAttr(tid)}" role="listitem">
       <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}">
+        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(firstParticipant)}</span>
         <span class="inbox-thread-stack">
           <span class="inbox-thread-line1">
             <span class="inbox-thread-from">${escapeHtml(firstParticipant)}</span>
           </span>
-          <span class="inbox-thread-line2">
+          <span class="inbox-thread-subject">
             <strong>${escapeHtml(thread.subject)}</strong>
-            <span class="inbox-thread-sep" aria-hidden="true">—</span>
-            <span class="thread-preview inbox-thread-preview">${escapeHtml(verLabel)} · ouvrir dans le compositeur</span>
           </span>
+          <p class="thread-preview inbox-thread-preview dim">${escapeHtml(verLabel)} · ouvrir dans le compositeur</p>
         </span>
       </button>
       <div class="inbox-thread-date-col inbox-thread-date-col--saved-draft" title="${dateTip}">
@@ -167,9 +168,6 @@ function renderThreadRow(thread: ThreadListItem): string {
       ? `<select class="inbox-thread-folder-move" data-action="move-thread-select" data-thread-id="${escapeAttr(tid)}" data-source-mailbox="${escapeAttr(mbRaw)}" title="Déplacer vers un autre dossier" aria-label="Déplacer ce fil vers un autre dossier"><option value="" selected>${escapeHtml(folderLabel)}</option>${moveOptionsHtml}</select>`
       : `<span class="inbox-thread-folder-label">${escapeHtml(folderLabel)}</span>`;
   const followed = Boolean(thread.followed);
-  const followMark = followed
-    ? `<span class="inbox-row-flag" title="Suivi" aria-hidden="true">${iconSvg("starFilled")}</span>`
-    : "";
   const followTitle = followed ? "Retirer du suivi" : "Suivre ce fil";
   const followIconHtml = `<button type="button" class="icon-pill inbox-thread-follow-toggle ${
     followed ? "inbox-thread-follow-toggle--on" : ""
@@ -179,28 +177,29 @@ function renderThreadRow(thread: ThreadListItem): string {
     followed ? "starFilled" : "starOutline"
   )}</button>`;
   const previewClean = cleanThreadListPreview(thread.preview);
-  const previewHtml = previewClean
-    ? `<span class="inbox-thread-sep" aria-hidden="true">—</span><span class="thread-preview inbox-thread-preview">${escapeHtml(previewClean)}</span>`
-    : "";
 
   return `
-    <div class="thread-row inbox-thread-row inbox-mail-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}"${accountCue.hue ? ` data-account-hue="${accountCue.hue}"` : ""} role="listitem">
+    <div class="thread-row inbox-thread-row ${unreadCls}" data-thread-id="${escapeAttr(tid)}"${accountCue.hue ? ` data-account-hue="${accountCue.hue}"` : ""} role="listitem">
       <button type="button" class="thread-row-main inbox-thread-row-main" data-open-thread="1" data-thread-id="${escapeAttr(tid)}">
+        <span class="avatar inbox-thread-avatar" style="background:rgba(111,122,111,.2);color:var(--sm-primary)">${initials(firstParticipant)}</span>
         <span class="inbox-thread-stack">
           <span class="inbox-thread-line1">
-            ${followMark}
             <span class="inbox-thread-from">${escapeHtml(firstParticipant)}</span>
-            ${threadGlyph}
             ${accountBadge}
-            <time class="inbox-thread-time" datetime="${activityDatetime}" title="${activityTip}">${escapeHtml(activityDisplay)}</time>
+            <time class="inbox-thread-time inbox-thread-time-narrow-only dim" datetime="${activityDatetime}" title="${activityTip}">${escapeHtml(activityDisplay)}</time>
           </span>
-          <span class="inbox-thread-line2">
+          <span class="inbox-thread-subject">
+            ${thread.unread ? '<span class="inbox-unread-dot" aria-hidden="true"></span>' : ""}
             <strong>${escapeHtml(thread.subject)}</strong>
-            ${previewHtml}
             ${attachGlyph}
+            ${threadGlyph}
           </span>
+          <p class="thread-preview inbox-thread-preview">${escapeHtml(previewClean)}</p>
         </span>
       </button>
+      <div class="inbox-thread-date-col" title="${activityTip}">
+        <time class="inbox-thread-date-label dim" datetime="${activityDatetime}">${escapeHtml(activityDisplay)}</time>
+      </div>
       <div class="inbox-thread-folder-col" title="${folderTitle}" onclick="event.stopPropagation()">
         ${folderSelectHtml}
       </div>
