@@ -532,7 +532,70 @@ body.clarity-dark {
   }
 }
 
-/* Lecture : chrome en retrait, le corps du mail reste au premier plan. */
+/* Lecture : surface unie, rythme et hiérarchie soignés. */
+
+.thread-reading.thread-reading--reading-layout {
+  --thread-reading-gutter: clamp(28px, 3.2vw, 40px);
+}
+
+.app-shell.sidebar-collapsed:not(.compose-fullscreen-active)
+  .thread-reading.thread-reading--reading-layout
+  .thread-reading-head {
+  padding-inline: var(--thread-reading-gutter);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-reading-head {
+  padding-block: 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-reading-nav {
+  margin-bottom: 16px;
+  min-height: 28px;
+  align-items: center;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-back-link {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-back-link:hover {
+  color: var(--text);
+}
+
+.thread-reading.thread-reading--reading-layout .nav-crumb--current {
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-reading-title {
+  font-family: var(--font-serif);
+  font-weight: 650;
+  font-size: 26px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-reading-stats {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--dim);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-accordion-bar {
+  margin-top: 8px;
+  gap: 16px;
+}
+
+.thread-reading.thread-reading--reading-layout .message-stack {
+  --msg-indent: 30px;
+}
 
 .thread-reading.thread-reading--reading-layout .thread-msg-card,
 .thread-reading.thread-reading--reading-layout .message.has-html .thread-msg-card,
@@ -540,6 +603,15 @@ body.clarity-dark {
   background: transparent;
   border: 0;
   box-shadow: none;
+  padding: 8px 0 4px var(--msg-indent);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-fold-preview {
+  padding-left: var(--msg-indent);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-messages.thread-messages-reading {
+  padding-top: 20px;
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-card.mail-security-tier--attention {
@@ -564,14 +636,26 @@ body.clarity-dark {
 }
 
 .thread-reading.thread-reading--reading-layout .thread-action-bar {
-  margin-top: 6px;
-  gap: 2px;
+  margin-top: 12px;
+  gap: 0;
 }
 
 .thread-reading.thread-reading--reading-layout .thread-more-actions,
 .thread-reading.thread-reading--reading-layout .thread-reading-nav-actions,
 .thread-reading.thread-reading--reading-layout .thread-msg-head-actions {
-  gap: 1px;
+  gap: 0;
+  align-items: center;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions .action-bar + .action-bar::before,
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .action-bar + .action-bar::before {
+  content: "";
+  width: 1px;
+  height: 14px;
+  margin-inline: 6px 4px;
+  background: var(--border);
+  align-self: center;
+  flex: none;
 }
 
 .thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill,
@@ -580,11 +664,12 @@ body.clarity-dark {
 .thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill-sm,
 .thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill.danger,
 .thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill.danger {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  min-height: 26px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   box-shadow: none;
   color: var(--muted);
@@ -611,27 +696,61 @@ body.clarity-dark {
   background: var(--sm-danger-surface);
 }
 
-.thread-reading.thread-reading--reading-layout .thread-more-actions .inbox-thread-follow-toggle--on {
+.thread-reading.thread-reading--reading-layout .thread-more-actions .inbox-thread-follow-toggle--on,
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .icon-pill.icon-pill--active {
   color: var(--copper);
+  background: transparent;
 }
 
-.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .icon-pill.icon-pill--active {
-  color: var(--text);
-  background: var(--hover);
+.thread-reading.thread-reading--reading-layout .thread-more-actions .inbox-thread-follow-toggle--on:hover,
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .icon-pill.icon-pill--active:hover {
+  color: var(--copper);
+  background: var(--accent-dim);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-from,
 .thread-reading.thread-reading--reading-layout .thread-msg-from.thread-participant-link {
-  font-weight: 500;
-  font-size: 13px;
-  color: var(--muted);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.011em;
+  color: var(--text);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-time,
 .thread-reading.thread-reading--reading-layout .thread-msg-time--inline {
+  font-family: var(--font-sans);
   font-weight: 400;
   font-size: 12px;
+  letter-spacing: 0.01em;
   color: var(--dim);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-head-sep {
+  color: var(--dim);
+}
+
+.thread-reading.thread-reading--reading-layout .message-head-row {
+  min-height: 28px;
+  margin-bottom: 2px;
+  gap: 8px;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-avatar,
+.thread-reading.thread-reading--reading-layout .avatar.avatar-spacer {
+  width: 28px;
+  height: 28px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.thread-reading.thread-reading--reading-layout .message {
+  margin-bottom: 20px;
+}
+
+.thread-reading.thread-reading--reading-layout .message-text {
+  letter-spacing: -0.003em;
+  line-height: 1.65;
 }
 
 .thread-reading.thread-reading--reading-layout .thread-accordion-btn {
@@ -639,11 +758,17 @@ body.clarity-dark {
   background: transparent;
   color: var(--dim);
   box-shadow: none;
+  padding: 0 !important;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .thread-reading.thread-reading--reading-layout .thread-accordion-btn:hover {
   color: var(--text);
   background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* Panneau Détails : même surface que la lecture, moins dense. Le brief de liste garde son fond. */
@@ -653,13 +778,22 @@ body.clarity-dark {
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .pane-header {
-  padding: 12px 14px 8px;
-  border-bottom-color: var(--border-weak);
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .pane-header strong {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .pane-header small {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
   color: var(--muted);
 }
 
@@ -667,6 +801,7 @@ body.clarity-dark {
   width: 28px;
   height: 28px;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
   box-shadow: none;
@@ -678,26 +813,68 @@ body.clarity-dark {
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .ai-panel-body-scroll {
-  padding: 0 12px 12px;
+  padding: 0 0 16px;
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .details-block {
-  padding: 10px 2px 6px;
-  gap: 8px;
+  padding: 16px 20px 8px;
+  gap: 12px;
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .details-row {
-  gap: 2px;
-  color: var(--muted);
-}
-
-.ai-panel:not(.ai-panel--digest-slot) .details-row strong {
-  font-weight: 500;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 1.4;
   color: var(--text);
 }
 
+.ai-panel:not(.ai-panel--digest-slot) .details-row > .dim {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .details-row strong {
+  font-family: var(--font-serif);
+  font-weight: 650;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .details-row .label {
+  background: transparent !important;
+  border-radius: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text) !important;
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .thread-tags-details-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .thread-tags-details-link:hover {
+  color: var(--text);
+  text-decoration-color: var(--text);
+}
+
 .ai-panel:not(.ai-panel--digest-slot) .ai-actions {
-  padding: 2px 0 8px;
+  margin-inline: 12px;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border-weak);
   gap: 2px;
 }
 
@@ -705,7 +882,24 @@ body.clarity-dark {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
-  padding: 7px 8px;
+  border-radius: 6px;
+  padding: 8px 8px;
+  gap: 10px;
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .ai-action.surface-sm > span:first-child {
+  min-width: 1.8em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .ai-action strong {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  color: var(--text);
 }
 
 .ai-panel:not(.ai-panel--digest-slot) .ai-action.surface-sm:hover {
