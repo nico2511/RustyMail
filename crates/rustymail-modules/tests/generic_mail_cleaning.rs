@@ -105,14 +105,16 @@ fn outlook_forward_chain_builds_conversation_report() {
 
     assert_eq!(out.generic_rule_set_version, "12");
     assert!(out.html.contains("rm-conversation-report"));
-    assert!(out.html.contains("rm-mail-folded-quote"));
+    assert!(out.html.contains("rm-conversation-turn--cited"));
+    assert!(
+        !out.html.contains("rm-mail-folded-quote"),
+        "le rapport intervenants reste lisible, hors du pli de citation"
+    );
     assert!(out.html.contains("Message transféré"));
     assert!(out.html.contains("brief logistique"));
     let reply_at = out.html.find("Message transféré").unwrap();
-    let fold_at = out.html.find("rm-mail-folded-quote").unwrap();
     let cited_at = out.html.find("brief logistique").unwrap();
-    assert!(reply_at < fold_at);
-    assert!(fold_at < cited_at);
+    assert!(reply_at < cited_at);
     assert!(out.html.contains("Alice"));
     assert!(!out.html.contains("Signature"));
     assert!(!out.html.contains("divRplyFwdMsg"));

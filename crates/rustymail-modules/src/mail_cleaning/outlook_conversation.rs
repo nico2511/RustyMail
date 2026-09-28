@@ -215,7 +215,6 @@ fn build_report(turns: Vec<Turn>) -> ConversationReport {
     html.push_str("<article class=\"rm-conversation-report\">\n");
 
     let mut plain = String::new();
-    let mut cited_html = String::new();
     for (i, turn) in turns.iter().enumerate() {
         let n = i + 1;
         let cited = i > 0;
@@ -224,47 +223,44 @@ fn build_report(turns: Vec<Turn>) -> ConversationReport {
         } else {
             String::new()
         };
-        let mut section = format!(
+        // Tours structurés (enveloppes, intervenants) : lisibles, pas repliés
+        // dans la citation. L’analyse « qui a les infos » reste à part du pli.
+        html.push_str(&format!(
             "<section class=\"rm-conversation-turn{}\" data-turn=\"{n}\"{depth_attr}>\n",
             if cited {
                 " rm-conversation-turn--cited"
             } else {
                 ""
             }
-        );
+        ));
         if cited || turn.envelope.has_any() {
-            section.push_str("<table class=\"rm-conversation-envelope\"><tbody>\n");
+            html.push_str("<table class=\"rm-conversation-envelope\"><tbody>\n");
             if !turn.envelope.from.is_empty() {
-                section.push_str(&envelope_participants_row("De", &turn.envelope.from));
+                html.push_str(&envelope_participants_row("De", &turn.envelope.from));
             }
             if !turn.envelope.sent.is_empty() {
-                section.push_str(&envelope_text_row("Envoyé", &turn.envelope.sent));
+                html.push_str(&envelope_text_row("Envoyé", &turn.envelope.sent));
             }
             if !turn.envelope.to.is_empty() {
-                section.push_str(&envelope_participants_row("À", &turn.envelope.to));
+                html.push_str(&envelope_participants_row("À", &turn.envelope.to));
             }
             if !turn.envelope.cc.is_empty() {
-                section.push_str(&envelope_participants_row("Cc", &turn.envelope.cc));
+                html.push_str(&envelope_participants_row("Cc", &turn.envelope.cc));
             }
             if !turn.envelope.bcc.is_empty() {
-                section.push_str(&envelope_participants_row("Cci", &turn.envelope.bcc));
+                html.push_str(&envelope_participants_row("Cci", &turn.envelope.bcc));
             }
             if !turn.envelope.subject.is_empty() {
-                section.push_str(&envelope_text_row("Objet", &turn.envelope.subject));
+                html.push_str(&envelope_text_row("Objet", &turn.envelope.subject));
             }
-            section.push_str("</tbody></table>\n");
+            html.push_str("</tbody></table>\n");
         }
         if !turn.body_html.trim().is_empty() {
-            section.push_str("<div class=\"rm-conversation-body\">\n");
-            section.push_str(&turn.body_html);
-            section.push_str("\n</div>\n");
+            html.push_str("<div class=\"rm-conversation-body\">\n");
+            html.push_str(&turn.body_html);
+            html.push_str("\n</div>\n");
         }
-        section.push_str("</section>\n");
-        if cited {
-            cited_html.push_str(&section);
-        } else {
-            html.push_str(&section);
-        }
+        html.push_str("</section>\n");
 
         if i > 0 {
             plain.push_str("\n--- cité ---\n\n");
@@ -279,13 +275,6 @@ fn build_report(turns: Vec<Turn>) -> ConversationReport {
         if !turn.body_text.ends_with('\n') {
             plain.push('\n');
         }
-    }
-    if !cited_html.is_empty() {
-        html.push_str(
-            "<details class=\"rm-mail-folded-quote\"><summary>Historique</summary><div class=\"rm-mail-quote-body\">\n",
-        );
-        html.push_str(&cited_html);
-        html.push_str("</div></details>\n");
     }
     html.push_str("</article>\n");
 

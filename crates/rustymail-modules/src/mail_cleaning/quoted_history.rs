@@ -1,12 +1,15 @@
-//! Historique cité hors Gmail / Apple (`blockquote`) : replié, pas effacé.
+//! Historique cité hors Gmail / Apple (`blockquote`) : séparé du dernier message.
 //!
 //! Le fil de la capture se présente comme du texte (lignes `De :` / `Envoyé :` /
 //! `Objet :`, puis `Le … a écrit :`) sans `.gmail_quote` ni en-tête Outlook dans
 //! un seul bloc. On coupe à la première frontière et on met la queue dans
-//! `<details class="rm-mail-folded-quote">`, fermé par défaut.
+//! `<details class="rm-mail-folded-quote">`. Fermé, le dernier mail se lit seul ;
+//! ouvert, l’historique reste du texte (les lignes d’en-tête portent
+//! `rm-mail-quote-kicker`, le corps garde sa taille de lecture).
 //!
 //! Un transfert qui n’a pas de réponse devant reste lisible. Les digests
-//! (Amazon, Deblock, GitHub) et le rapport conversationnel ne sont pas réécrits ici.
+//! (Amazon, Deblock, GitHub) et le rapport conversationnel (intervenants)
+//! ne sont pas réécrits ici.
 
 use scraper::{ElementRef, Html, Node, Selector};
 
@@ -205,8 +208,112 @@ fn details_html(summary: &str, inner: &str) -> String {
     format!(
         r#"<details class="rm-mail-folded-quote"><summary>{}</summary><div class="rm-mail-quote-body">{}</div></details>"#,
         escape_html_text(&label),
-        inner
+        annotate_quote_kickers(inner)
     )
+}
+
+/// Marque les lignes d’en-tête / d’attribution pour la typo, sans réduire le corps.
+fn annotate_quote_kickers(inner: &str) -> String {
+    let doc = Html::parse_fragment(inner);
+    let Ok(sel) = Selector::parse("p, div, blockquote, li") else {
+        return inner.to_string();
+    };
+    let mut updated = serialize_fragment(&doc);
+    let mut seen = std::collections::HashSet::new();
+    for el in doc.select(&sel) {
+        if inside_preserved(el) || has_block_child(el) || has_class(el, "rm-mail-quote-kicker") {
+            continue;
+        }
+        let text = normalize_line(&element_plain(el));
+        if text.is_empty() || text.chars().count() > 240 || !is_quote_kicker_line(&text) {
+            continue;
+        }
+        let outer = el.html();
+        if outer.is_empty() || !seen.insert(outer.clone()) {
+            continue;
+        }
+        let tagged = insert_class(&outer, "rm-mail-quote-kicker");
+        if let Some(next) = replace_once(&updated, &outer, &tagged) {
+            updated = next;
+        }
+    }
+    if updated.is_empty() {
+        inner.to_string()
+    } else {
+        updated
+    }
+}
+
+fn is_quote_kicker_line(text: &str) -> bool {
+    let lines: Vec<String> = text
+        .lines()
+        .map(normalize_line)
+        .filter(|l| !l.is_empty())
+        .collect();
+    if lines.is_empty() {
+        return false;
+    }
+    lines.iter().all(|l| is_single_kicker_line(l))
+}
+
+fn is_single_kicker_line(line: &str) -> bool {
+    if line.chars().count() > 220 {
+        return false;
+    }
+    let one = [line];
+    if line_starts_quoted_history(&one, 0) {
+        return true;
+    }
+    let low = line.to_ascii_lowercase();
+    [
+        "de :",
+        "de:",
+        "from :",
+        "from:",
+        "envoyé :",
+        "envoyé:",
+        "envoye :",
+        "envoye:",
+        "sent :",
+        "sent:",
+        "à :",
+        "à:",
+        "to :",
+        "to:",
+        "cc :",
+        "cc:",
+        "cci :",
+        "cci:",
+        "objet :",
+        "objet:",
+        "subject :",
+        "subject:",
+    ]
+    .iter()
+    .any(|prefix| low.starts_with(prefix))
+}
+
+fn insert_class(outer: &str, class: &str) -> String {
+    let Some(rest) = outer.strip_prefix('<') else {
+        return outer.to_string();
+    };
+    let Some(end) = rest.find([' ', '\n', '\t', '>']) else {
+        return outer.to_string();
+    };
+    let tag = &rest[..end];
+    let after = &rest[end..];
+    if let Some(start) = after.find("class=\"") {
+        let value_at = start + "class=\"".len();
+        let mut out = String::new();
+        out.push('<');
+        out.push_str(tag);
+        out.push_str(&after[..value_at]);
+        out.push_str(class);
+        out.push(' ');
+        out.push_str(&after[value_at..]);
+        return out;
+    }
+    format!("<{tag} class=\"{class}\"{after}")
 }
 
 fn summary_for(el: ElementRef<'_>) -> String {
@@ -409,6 +516,12 @@ mod tests {
         let quoted = out.find("document demandé").unwrap();
         assert!(reply < fold);
         assert!(fold < quoted);
+        assert!(out.contains("rm-mail-quote-kicker"));
+        assert!(
+            out.contains("rm-mail-quote-kicker\">De :")
+                || out.contains("rm-mail-quote-kicker\">De : Nicolas")
+        );
+        assert!(!out.contains("rm-mail-quote-kicker\">Voici"));
         assert!(!out.contains("rustymail:"));
     }
 
