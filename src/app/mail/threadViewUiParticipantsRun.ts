@@ -36,6 +36,7 @@ export function threadParticipantDedupKey(msg: CleanedMessageView): string {
   return `s:${normalizeThreadSenderLabel(msg.sender)}`;
 }
 
+/** Premier message envoyé par chaque expéditeur. Les entrées/sorties de boucle sont ailleurs. */
 export function threadParticipantFirstMessageIds(messages: CleanedMessageView[]): Set<string> {
   const asc = sortMessagesByReceivedAscending(messages);
   const ids = new Set<string>();
