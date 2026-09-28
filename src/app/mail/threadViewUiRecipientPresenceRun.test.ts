@@ -115,39 +115,44 @@ describe("diff de la boucle entre deux mails", () => {
     expect(emails(messages, "m2", "added")).toEqual([]);
   });
 
-  it("ne prend pas une réponse simple pour un retrait du groupe", () => {
-    const events = diff([
+  it("une réponse simple montre qui n’a pas reçu ce mail", () => {
+    const messages = [
       msg("m1", "2026-09-17T09:00:00", alice, group()),
       msg("m2", "2026-09-17T10:00:00", bob, [alice]),
-    ]);
-    expect(events.size).toBe(0);
+    ];
+    expect(emails(messages, "m2", "removed")).toEqual(["moi@exemple.fr", "carol@exemple.fr", "dave@exemple.fr"]);
+    expect(emails(messages, "m2", "added")).toEqual([]);
+    expect(emails(messages, "m1", "removed")).toEqual([]);
   });
 
-  it("ne recrée pas le groupe quand le reply-all suit une réponse simple", () => {
-    const events = diff([
+  it("le reply-all suivant rend l’info à ceux qui en avaient été exclus", () => {
+    const messages = [
       msg("m1", "2026-09-17T09:00:00", alice, group()),
       msg("m2", "2026-09-17T10:00:00", bob, [alice]),
       msg("m3", "2026-09-17T11:00:00", alice, [me, bob, carol, dave]),
-    ]);
-    expect(events.size).toBe(0);
+    ];
+    expect(emails(messages, "m2", "removed")).toEqual(["moi@exemple.fr", "carol@exemple.fr", "dave@exemple.fr"]);
+    expect(emails(messages, "m3", "added")).toEqual(["moi@exemple.fr", "carol@exemple.fr", "dave@exemple.fr"]);
+    expect(emails(messages, "m3", "removed")).toEqual([]);
   });
 
-  it("dans un fil à trois, ne confond pas Reply et le retrait du dernier tiers", () => {
-    const events = diff([
+  it("dans un fil à trois, une réponse qui oublie le tiers l’exclut", () => {
+    const messages = [
       msg("m1", "2026-09-17T09:00:00", alice, [bob, carol]),
       msg("m2", "2026-09-17T10:00:00", bob, [alice]),
-    ]);
-    expect(events.size).toBe(0);
+    ];
+    expect(emails(messages, "m2", "removed")).toEqual(["carol@exemple.fr"]);
+    expect(emails(messages, "m2", "added")).toEqual([]);
   });
 
-  it("ajoute quelqu’un copié sur une réponse simple, sans retirer le reste", () => {
+  it("une réponse simple peut à la fois copier quelqu’un et exclure les autres", () => {
     const lawyer = addr("Maître Lamy", "lamy@cabinet.fr");
-    const events = diff([
+    const messages = [
       msg("m1", "2026-09-17T09:00:00", alice, group()),
       msg("m2", "2026-09-17T10:00:00", bob, [alice, lawyer]),
-    ]);
-    expect(events.get("m2")?.added).toEqual([{ name: "Maître Lamy", email: "lamy@cabinet.fr" }]);
-    expect(events.get("m2")?.removed).toEqual([]);
+    ];
+    expect(emails(messages, "m2", "added")).toEqual(["lamy@cabinet.fr"]);
+    expect(emails(messages, "m2", "removed")).toEqual(["moi@exemple.fr", "carol@exemple.fr", "dave@exemple.fr"]);
   });
 
   it("peut à la fois ajouter et retirer sur un reply-all", () => {
@@ -187,12 +192,13 @@ describe("diff de la boucle entre deux mails", () => {
     expect(events.get("m2")?.added).toEqual([{ name: "Carol Martin", email: "carol@exemple.fr" }]);
   });
 
-  it("ne liste pas le compte qui lit le fil", () => {
+  it("signale quand le compte qui lit le fil entre dans la distribution", () => {
     const events = diff([
       msg("m1", "2026-09-17T09:00:00", alice, [bob]),
       msg("m2", "2026-09-17T10:00:00", alice, [bob, me]),
     ]);
-    expect(events.size).toBe(0);
+    expect(events.get("m2")?.added).toEqual([{ name: "Nicolas", email: OWN }]);
+    expect(events.get("m2")?.removed).toEqual([]);
   });
 
   it("déduplique la casse et un nom déjà égal à l’adresse", () => {
@@ -271,13 +277,13 @@ describe("libellé d’un participant", () => {
     expect(html.match(/marie@exemple\.fr/g)).toHaveLength(1);
   });
 
-  it("dit ajouté ou retiré de la boucle, sans répéter l’adresse", () => {
+  it("dit ajouté ou exclu de la boucle, sans répéter l’adresse", () => {
     const html = renderThreadLoopChangeNote({
       added: [{ name: "secretariat@drcourty.fr", email: "secretariat@drcourty.fr" }],
       removed: [{ name: "Carol Martin", email: "carol@exemple.fr" }],
     });
     expect(html).toContain("Ajouté à la boucle");
-    expect(html).toContain("Retiré de la boucle");
+    expect(html).toContain("Exclu de la boucle");
     expect(html).not.toContain("Première apparition");
     expect(html).not.toContain("+ To/Cc");
     expect(html).not.toContain("(secretariat@drcourty.fr)");
@@ -299,6 +305,6 @@ describe("libellé d’un participant", () => {
       ],
     });
     expect(html).toContain("Ajoutés à la boucle");
-    expect(html).toContain("Retirés de la boucle");
+    expect(html).toContain("Exclus de la boucle");
   });
 });

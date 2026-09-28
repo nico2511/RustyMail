@@ -1,16 +1,14 @@
-import { currentAccount } from "../core/accountContext";
 import type { CleanedMessageView, ThreadRecipientPresenceEvents } from "../types";
 import { escapeHtml } from "../../ui/sanitize";
 import { canonicalEmailForNlMatch } from "./searchAccountResolve";
 import { sortMessagesByReceivedAscending } from "./threadMessageSort";
 
 /**
- * Boucle d’un message = From ∪ To ∪ Cc.
- * To et Cc sont la même appartenance : passer de l’un à l’autre n’est ni un ajout ni un retrait.
- * Le premier message qui a une enveloppe sert de référence, sans événement.
- * Un message suivant ne retire quelqu’un que s’il ressemble encore à un reply-all
- * (la majorité du groupe précédent est là, et au moins trois personnes restent).
- * Une réponse étroite (reply, pas reply-all) peut ajouter un intervenant, pas vider la boucle.
+ * Boucle d’un message = From ∪ To ∪ Cc. C’est qui a eu l’info de ce mail.
+ * À et Cc comptent pareil : changer de rôle n’est ni un ajout ni une exclusion.
+ * On compare chaque message au précédent dont l’enveloppe est connue.
+ * Le premier ne liste personne : il fixe qui avait l’info au départ.
+ * Une enveloppe vide ou absente ne fabrique pas d’exclusion.
  */
 
 const PLACEHOLDER_EMAIL = "unknown@invalid";
@@ -88,16 +86,6 @@ function envelopeKnown(msg: CleanedMessageView): boolean {
   return (msg.recipients ?? []).some((recipient) => Boolean(personFrom(recipient.email ?? "", recipient.name)));
 }
 
-/** Reply-all : on garde le groupe. Reply : l’enveloppe se réduit à un ou deux interlocuteurs. */
-function isBroadLoopUpdate(active: Map<string, LoopPerson>, loop: Map<string, LoopPerson>): boolean {
-  if (active.size === 0) return false;
-  let kept = 0;
-  for (const key of active.keys()) if (loop.has(key)) kept += 1;
-  const dropped = active.size - kept;
-  if (dropped === 0) return true;
-  return kept >= 3 && dropped < kept;
-}
-
 function toEvent(person: LoopPerson): { name?: string | null; email: string } {
   return { name: person.name, email: person.email };
 }
@@ -115,7 +103,7 @@ export function formatParticipantIdentity(
 
 export function loopChangeKicker(kind: "added" | "removed", count: number): string {
   if (kind === "added") return count > 1 ? "Ajoutés à la boucle" : "Ajouté à la boucle";
-  return count > 1 ? "Retirés de la boucle" : "Retiré de la boucle";
+  return count > 1 ? "Exclus de la boucle" : "Exclu de la boucle";
 }
 
 export function renderParticipantMention(name: string | null | undefined, email: string): string {
@@ -167,74 +155,43 @@ export function renderThreadLoopChangeNote(
 
 export function threadRecipientPresenceEventsByMessageId(
   messages: CleanedMessageView[],
-  ownEmail?: string | null,
+  _ownEmail?: string | null,
 ): Map<string, ThreadRecipientPresenceEvents> {
+  void _ownEmail;
   const asc = sortMessagesByReceivedAscending(messages);
-  const rawOwn = ownEmail !== undefined ? (ownEmail ?? "") : (currentAccount()?.email ?? "");
-  const ownKey = normalizeRecipientEmailForDiff(rawOwn);
-  const seen = new Set<string>();
-  const active = new Map<string, LoopPerson>();
-  let hasBaseline = false;
+  let previous: Map<string, LoopPerson> | null = null;
   const out = new Map<string, ThreadRecipientPresenceEvents>();
-
-  const remember = (loop: Map<string, LoopPerson>) => {
-    for (const [key, person] of loop) {
-      seen.add(key);
-      const prev = active.get(key);
-      if (prev) active.set(key, mergePerson(prev, person));
-    }
-  };
 
   for (let index = 0; index < asc.length; index += 1) {
     const msg = asc[index]!;
     if (!envelopeKnown(msg)) {
-      if (index === 0 || !hasBaseline) continue;
+      if (!previous || index === 0) continue;
       const sender = personFrom((msg.senderEmail ?? "").trim() || msg.sender, msg.sender);
-      if (!sender || seen.has(sender.key) || sender.key === ownKey) continue;
-      seen.add(sender.key);
+      if (!sender || previous.has(sender.key)) continue;
+      const withSender: Map<string, LoopPerson> = new Map(previous);
+      withSender.set(sender.key, sender);
+      previous = withSender;
       out.set(msg.messageId, { added: [toEvent(sender)], removed: [] });
       continue;
     }
 
     const loop = loopOf(msg);
-    if (!hasBaseline) {
-      for (const [key, person] of loop) {
-        seen.add(key);
-        active.set(key, person);
-      }
-      hasBaseline = true;
+    if (!previous) {
+      previous = loop;
       continue;
     }
 
     const added: LoopPerson[] = [];
     for (const person of loop.values()) {
-      if (!seen.has(person.key)) added.push(person);
+      if (!previous.has(person.key)) added.push(person);
     }
-
     const removed: LoopPerson[] = [];
-    if (isBroadLoopUpdate(active, loop)) {
-      for (const person of active.values()) {
-        if (!loop.has(person.key)) removed.push(person);
-      }
-      const next = new Map<string, LoopPerson>();
-      for (const [key, person] of loop) {
-        const prev = active.get(key);
-        next.set(key, prev ? mergePerson(prev, person) : person);
-      }
-      if (ownKey && active.has(ownKey) && !next.has(ownKey)) next.set(ownKey, active.get(ownKey)!);
-      active.clear();
-      for (const [key, person] of next) active.set(key, person);
-      for (const person of removed) {
-        if (person.key !== ownKey) seen.delete(person.key);
-      }
+    for (const person of previous.values()) {
+      if (!loop.has(person.key)) removed.push(person);
     }
-
-    remember(loop);
-
-    const addedPublic = added.filter((person) => person.key !== ownKey).map(toEvent);
-    const removedPublic = removed.filter((person) => person.key !== ownKey).map(toEvent);
-    if (addedPublic.length || removedPublic.length) {
-      out.set(msg.messageId, { added: addedPublic, removed: removedPublic });
+    previous = loop;
+    if (added.length || removed.length) {
+      out.set(msg.messageId, { added: added.map(toEvent), removed: removed.map(toEvent) });
     }
   }
 
