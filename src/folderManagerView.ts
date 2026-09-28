@@ -1,5 +1,8 @@
 /** Vue Dossiers — arbre personnel interactif. */
 
+const LOCK_CLOSED_SVG = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="6.75" rx="1.2" stroke="currentColor" stroke-width="1.5"/><path d="M5.25 7V5.1a2.75 2.75 0 0 1 5.5 0V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+const LOCK_OPEN_SVG = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="6.75" rx="1.2" stroke="currentColor" stroke-width="1.5"/><path d="M5.25 7V5.1a2.75 2.75 0 0 1 5.2-1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+
 import { invoke } from "@tauri-apps/api/core";
 import { navRenderTrailHtml } from "./navigation";
 import {
@@ -174,7 +177,6 @@ function renderTreeNode(
   const badges = [
     empty ? `<span class="folder-tree-tag folder-tree-tag--empty">vide</span>` : "",
     auto ? `<span class="folder-tree-tag folder-tree-tag--auto" title="Archivage mémorisé">Auto</span>` : "",
-    locked ? `<span class="folder-tree-tag folder-tree-tag--locked" title="Dossier verrouillé">🔒</span>` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -184,16 +186,24 @@ function renderTreeNode(
       `<span class="folder-tree-counts dim">${entry.threadCount} fil${entry.threadCount === 1 ? "" : "s"} · ${entry.messageCount} msg</span>`
     : "";
 
+  const lockTitle = locked
+    ? "Cadenas actif — la suppression de ce dossier est bloquée. Cliquer pour le retirer."
+    : "Poser le cadenas pour empêcher la suppression de ce dossier";
+  const lockControl = mb
+    ? `<button type="button" class="folder-lock${locked ? " is-on" : ""}" data-action="fm-toggle-lock" data-mailbox="${escapeAttr(mb)}" data-locked="${locked ? "1" : "0"}" aria-pressed="${locked ? "true" : "false"}" title="${escapeAttr(lockTitle)}" aria-label="${escapeAttr(lockTitle)}">
+        <span class="folder-lock__icon" aria-hidden="true">${locked ? LOCK_CLOSED_SVG : LOCK_OPEN_SVG}</span>
+        ${locked ? `<span class="folder-lock__text">Protégé</span>` : ""}
+      </button>`
+    : "";
   const actions =
     mb ?
       `<span class="folder-tree-actions">
         <button type="button" class="icon-pill folder-tree-act folder-tree-act--open ${selected ? "is-active" : ""}" data-action="fm-select" data-mailbox="${escapeAttr(mb)}" title="Afficher les mails dans le panneau" aria-label="Afficher les mails de ${escapeAttr(node.label)}">${iconSvg("panel")}</button>
         <button type="button" class="icon-pill folder-tree-act" data-action="fm-sync" data-mailbox="${escapeAttr(mb)}" title="Synchroniser">↻</button>
         <button type="button" class="icon-pill folder-tree-act" data-action="fm-archive" data-mailbox="${escapeAttr(mb)}" title="Archiver">A</button>
-        <button type="button" class="icon-pill folder-tree-act ${locked ? "is-active" : ""}" data-action="fm-toggle-lock" data-mailbox="${escapeAttr(mb)}" data-locked="${locked ? "1" : "0"}" title="Cadenas">🔒</button>
         ${
           !locked
-            ? `<button type="button" class="icon-pill folder-tree-act" data-action="fm-delete" data-mailbox="${escapeAttr(mb)}" title="Supprimer">×</button>
+            ? `<button type="button" class="icon-pill folder-tree-act folder-tree-act--delete" data-action="fm-delete" data-mailbox="${escapeAttr(mb)}" title="Supprimer le dossier">×</button>
         <span class="folder-tree-drag-handle" draggable="true" data-action="fm-drag-start" data-mailbox="${escapeAttr(mb)}" title="Déplacer">⠿</span>`
             : ""
         }
@@ -237,6 +247,7 @@ function renderTreeNode(
           ${counts}
         </span>
       </div>
+      ${lockControl}
       ${actions}
     </div>
     ${childrenHtml ? `<div class="folder-tree-children">${childrenHtml}</div>` : ""}

@@ -1131,6 +1131,61 @@ body.clarity-dark {
   opacity: 1;
 }
 
+.folder-manager-page .folder-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 24px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.folder-manager-page .folder-lock__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+}
+
+.folder-manager-page .folder-lock__icon svg {
+  display: block;
+}
+
+.folder-manager-page .folder-lock:hover,
+.folder-manager-page .folder-lock:focus-visible {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.folder-manager-page .folder-lock.is-on {
+  color: var(--text);
+  background: var(--select);
+}
+
+.folder-manager-page .folder-lock.is-on .folder-lock__icon {
+  color: var(--copper);
+}
+
+.folder-manager-page .folder-lock.is-on:hover {
+  background: var(--select);
+}
+
+.folder-manager-page .folder-tree-row.folder-tree-node--locked .folder-tree-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .folder-manager-page .folder-tree-actions {
   opacity: 1;
   gap: 0;
@@ -1169,6 +1224,11 @@ body.clarity-dark {
   color: var(--copper);
   border-color: transparent;
   background: transparent;
+}
+
+.folder-manager-page .folder-tree-act--delete:hover {
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .folder-manager-pick,
