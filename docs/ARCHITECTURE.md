@@ -58,7 +58,7 @@ Adapters and persistence:
 Optional product capabilities:
 
 - **Readability pipeline** → `CleanedMessageView`
-- **`mail_cleaning`** — generic, Amazon, Deblock provider pipelines
+- **`mail_cleaning`** — generic reading path, plus Amazon, Deblock and GitHub digest plugins. A declarative template registry is scoped in [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md) and is not implemented.
 - **`mail_security`** — SPF/DKIM/DMARC heuristics, attachment risk, punycode
 - **`ai_*`** — translation, summary, Q&A, rewrite, quick replies, NL search, org proposals
 
@@ -114,3 +114,4 @@ HTML from mail is sanitized with **DOMPurify** before render; remote images bloc
 - [IPC_SECURITY.md](IPC_SECURITY.md) — invoke command surface
 - [SECURITY.md](SECURITY.md) — encryption, keyring, release checks
 - [AI_AND_MODELS.md](AI_AND_MODELS.md) — models and generative features
+- [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md) — proposed digest templates and offline fixture flow (not shipped)

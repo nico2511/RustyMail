@@ -33,3 +33,7 @@ Le chrome marketing (préheader caché, barre sociale, pied légal, tableaux de 
 - Un séparateur `-----Original Message-----` sans marqueurs Outlook : le corps cité reste dans le fil. Le rapport Outlook couvre les chaînes De / Envoyé / Objet.
 - Un expéditeur non Amazon dont le HTML ressemble au pied de page Amazon peut encore prendre le passage faible Amazon (strip de tableaux). Les fixtures Amazon fortes ne changent pas.
 - Pas de politique « texte seul par défaut ». La vue d’origine, si elle est ouverte, passe par le même DOMPurify.
+
+## Suite envisagée
+
+Généraliser le digest Deblock à d’autres expéditeurs transactionnels, et fabriquer les fixtures hors de l’app (skill + revue humaine) : [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md). Ce n’est pas le comportement actuel. Le courrier personne-à-personne reste sur le générique, et l’ouverture d’un mail ne dépend pas d’un LLM.

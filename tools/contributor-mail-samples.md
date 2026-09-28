@@ -61,4 +61,6 @@ Optional: screenshot of desired readable rendering — helpful but secondary to 
 | `Providerr_mockup/*.eml` | No (personal data; gitignored) |
 | `tests/fixtures/...*_anonymized.html` | Yes (anonymized, for CI) |
 
-For a **new provider** (not Amazon), follow the same pattern: MIME extraction script → fixture under `tests/fixtures/<provider>/` → Rust plugin under `mail_cleaning/providers/<name>.rs`.
+For a **new provider** (not Amazon), follow the same pattern today: MIME extraction script → fixture under `tests/fixtures/<provider>/` → Rust plugin under `mail_cleaning/providers/<name>.rs`.
+
+The intended replacement for that one-plugin-per-sender path (declarative digest templates, AI draft only outside the app, human review before any fixture lands in git) is scoped in [docs/CADRAGE_DIGEST_TEMPLATES.md](../docs/CADRAGE_DIGEST_TEMPLATES.md). It is not implemented. Do not commit raw `.eml` files either way.
