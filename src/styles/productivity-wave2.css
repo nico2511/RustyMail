@@ -795,6 +795,16 @@ body.clarity-dark {
   line-height: 1.65;
 }
 
+.thread-reading.thread-reading--reading-layout .message-text--clean .rm-history-fold {
+  border-top-color: var(--border);
+}
+
+.thread-reading.thread-reading--reading-layout .message-text--clean .rm-history-fold__body {
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
 .thread-reading.thread-reading--reading-layout .thread-accordion-btn {
   border: 0;
   background: transparent;

@@ -37,6 +37,17 @@ describe("sanitizeEmailHtml", () => {
     expect(html).toContain("mail-remote-image-blocked");
   });
 
+  it("garde l’historique replié quand le bruit Outlook est retiré", () => {
+    const { html } = sanitizeEmailHtml(
+      `<p>Pouvez-vous me rappeler svp</p><details class="rm-mail-folded-quote"><summary>Historique</summary><div class="rm-mail-quote-body"><p>De : Nicolas</p><p>Envoyé : mercredi</p><p>Objet : RE: Demande</p><p>Ancien message</p></div></details><div><b>De :</b> Alice<br><b>Envoyé :</b> lundi<br><b>Objet :</b> Sujet orphelin</div>`,
+      { stripOutlookNoise: true },
+    );
+    expect(html).toContain("rappeler");
+    expect(html).toContain("rm-mail-folded-quote");
+    expect(html).toContain("Ancien message");
+    expect(html.toLowerCase()).not.toContain("sujet orphelin");
+  });
+
   it("laisse une citation repliée ouvrable", () => {
     const { html } = sanitizeEmailHtml(
       `<p>Réponse</p><details class="rm-mail-folded-quote"><summary>Citation</summary><p>Ancien message</p></details>`,
