@@ -98,6 +98,8 @@ body.clarity-dark {
 .app-shell.sidebar-collapsed .folder-list {
   padding: 4px 0 8px;
   scrollbar-gutter: auto;
+  /* La liste défile ; le bouton replier/déplier (en tête) reste visible. */
+  min-height: 0;
 }
 
 .app-shell.sidebar-collapsed .sidebar .folder-button {
@@ -118,17 +120,22 @@ body.clarity-dark {
   padding: 6px 0 4px;
 }
 
-.app-shell.sidebar-collapsed .sidebar-collapse-edge {
+/* Même spécificité que l’ancien `display: none` de styles.css (rail largeur 0).
+   Le bouton doit rester cliquable dans le rail 56 px, sinon on ne peut plus déplier. */
+.app-shell.sidebar-collapsed:not(.compose-fullscreen-active) .sidebar-collapse-edge {
   display: grid;
+  pointer-events: auto;
   position: static;
   top: auto;
   right: auto;
   transform: none;
+  z-index: 6;
+  flex-shrink: 0;
   width: 40px;
   min-height: 32px;
-  margin: 6px auto 8px;
+  margin: 6px auto 4px;
   border-radius: 8px;
-  order: 5;
+  order: -1;
 }
 
 .app-shell.sidebar-collapsed .sidebar-collapse-edge__glyph {
