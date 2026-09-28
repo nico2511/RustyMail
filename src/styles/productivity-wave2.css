@@ -531,3 +531,183 @@ body.clarity-dark {
     display: inline-grid;
   }
 }
+
+/* Lecture : chrome en retrait, le corps du mail reste au premier plan. */
+
+.thread-reading.thread-reading--reading-layout .thread-msg-card,
+.thread-reading.thread-reading--reading-layout .message.has-html .thread-msg-card,
+.thread-reading.thread-reading--reading-layout .message.mine .thread-msg-card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-card.mail-security-tier--attention {
+  border-left: 3px solid rgba(138, 90, 20, 0.55);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-card.mail-security-tier--suspicion {
+  border-left: 3px solid rgba(157, 44, 44, 0.55);
+}
+
+.thread-reading.thread-reading--reading-layout .action-bar,
+.thread-reading.thread-reading--reading-layout .action-bar--ai,
+.thread-reading.thread-reading--reading-layout .action-bar--util,
+.thread-reading.thread-reading--reading-layout .action-bar--ops,
+.thread-reading.thread-reading--reading-layout .action-bar--sec,
+.thread-reading.thread-reading--reading-layout .action-bar--compact {
+  padding: 0;
+  gap: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-action-bar {
+  margin-top: 6px;
+  gap: 2px;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions,
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions {
+  gap: 1px;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill,
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .icon-pill,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill-sm,
+.thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill.danger,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill.danger {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill:hover,
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .icon-pill:hover,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill:hover,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill-sm:hover,
+.thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill.danger:hover,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill.danger:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill.danger,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill.danger {
+  color: var(--danger);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill.danger:hover,
+.thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill.danger:hover {
+  color: var(--danger);
+  background: var(--sm-danger-surface);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-more-actions .inbox-thread-follow-toggle--on {
+  color: var(--copper);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .icon-pill.icon-pill--active {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-from,
+.thread-reading.thread-reading--reading-layout .thread-msg-from.thread-participant-link {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-msg-time,
+.thread-reading.thread-reading--reading-layout .thread-msg-time--inline {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-accordion-btn {
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  box-shadow: none;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-accordion-btn:hover {
+  color: var(--text);
+  background: transparent;
+}
+
+/* Panneau Détails : même surface que la lecture, moins dense. Le brief de liste garde son fond. */
+.ai-panel:not(.ai-panel--digest-slot) {
+  background: var(--base);
+  border-left-color: var(--border);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .pane-header {
+  padding: 12px 14px 8px;
+  border-bottom-color: var(--border-weak);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .pane-header strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .pane-header .icon-button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .pane-header .icon-button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .ai-panel-body-scroll {
+  padding: 0 12px 12px;
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .details-block {
+  padding: 10px 2px 6px;
+  gap: 8px;
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .details-row {
+  gap: 2px;
+  color: var(--muted);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .details-row strong {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .ai-actions {
+  padding: 2px 0 8px;
+  gap: 2px;
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .ai-action.surface-sm {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  padding: 7px 8px;
+}
+
+.ai-panel:not(.ai-panel--digest-slot) .ai-action.surface-sm:hover {
+  background: var(--hover);
+}
