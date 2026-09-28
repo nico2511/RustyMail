@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isAiFeatureEnabled } from "../../aiFeatures";
+import { COMPOSE_GRAMMAR_JOB, composeRewriteJobLabel } from "../core/composeAiJobs";
+import { rewriteStyleLabelFr } from "../core/composeTone";
 import { LLM_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
@@ -20,22 +22,32 @@ export async function composeAiRewrite(styleRaw: string): Promise<void> {
   }
   const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
   const src = ta?.value ?? state.composeBody;
+  if (!src.trim()) {
+    toast("Le message est vide.");
+    return;
+  }
   const style = styleRaw.trim() || "Neutral";
+  const styleLabel = rewriteStyleLabelFr(style);
   if (!isTauriRuntime()) return void toast("Réécriture IA : Tauri requis.");
-  const ran = await withLlmQueue(`Réécriture ${style}`, async (signal) => {
+  const ran = await withLlmQueue(composeRewriteJobLabel(style), async (signal) => {
     if (signal.aborted) return;
-    toast(`Réécriture « ${style} »…`);
-    const res = await withTimeout(
-      invoke<{ text: string }>("llm_rewrite_compose", { text: src, style }),
-      LLM_INVOKE_TIMEOUT_MS,
-    );
-    if (signal.aborted) return;
-    state.composeCanonicalBody = res.text ?? src;
-    state.composeBody = res.text ?? src;
-    if (ta) ta.value = res.text ?? src;
-    toast("Texte réécrit.");
-    render();
-    void computePreview();
+    try {
+      const res = await withTimeout(
+        invoke<{ text: string }>("llm_rewrite_compose", { text: src, style }),
+        LLM_INVOKE_TIMEOUT_MS,
+      );
+      if (signal.aborted) return;
+      const text = res.text ?? src;
+      state.composeCanonicalBody = text;
+      state.composeBody = text;
+      if (ta) ta.value = text;
+      toast(`Texte réécrit (${styleLabel}).`);
+      render();
+      void computePreview();
+    } catch (e) {
+      if (signal.aborted) return;
+      toast(tauriErrorMessage(e));
+    }
   });
   if (ran === null) return;
 }
@@ -51,8 +63,12 @@ export async function composeAiGrammar(): Promise<void> {
   }
   const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
   const src = ta?.value ?? state.composeBody;
+  if (!src.trim()) {
+    toast("Le message est vide.");
+    return;
+  }
   if (!isTauriRuntime()) return void toast("Correction (LLM) : Tauri requis.");
-  const ran = await withLlmQueue("Orthographe", async (signal) => {
+  const ran = await withLlmQueue(COMPOSE_GRAMMAR_JOB, async (signal) => {
     if (signal.aborted) return;
     try {
       const res = await withTimeout(

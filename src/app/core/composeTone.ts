@@ -24,3 +24,23 @@ export function composeRewriteStyleFromTone(): string {
       return "Neutral";
   }
 }
+
+/** Libellé français d’un style `llm_rewrite_compose` (Formal, Concise, …). */
+export function rewriteStyleLabelFr(style: string): string {
+  switch (style.trim().toLowerCase()) {
+    case "formal":
+      return "formel";
+    case "casual":
+      return "décontracté";
+    case "concise":
+      return "plus court";
+    case "polite":
+      return "poli";
+    case "assertive":
+      return "ferme";
+    case "apologetic":
+      return "d’excuse";
+    default:
+      return "neutre";
+  }
+}
