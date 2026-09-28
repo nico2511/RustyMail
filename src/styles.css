@@ -2931,37 +2931,44 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .thread-reading .message {
-  align-items: flex-end;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
-.thread-reading .message.mine {
-  justify-content: flex-end;
-}
-
-.thread-reading .message.mine .message-stack {
-  margin-left: auto;
-}
-
-/* Voie droite (arbre / alternance) : même alignement que « moi », carte toujours en style tiers. */
+/* Fil mail : une seule colonne à gauche. « Moi », la racine et les anciennes
+   voies (lane-right / other-right) gardent la même structure — pas de miroir. */
+.thread-reading .message.mine,
 .thread-reading .message.thread-msg--other-right,
-.thread-reading .message.thread-msg--lane-right {
-  justify-content: flex-end;
+.thread-reading .message.thread-msg--lane-right,
+.thread-reading .message.thread-msg--root,
+.thread-reading .message.thread-msg--solo {
+  justify-content: flex-start;
 }
 
+.thread-reading .message.mine .message-stack,
 .thread-reading .message.thread-msg--other-right .message-stack,
-.thread-reading .message.thread-msg--lane-right .message-stack {
-  margin-left: auto;
+.thread-reading .message.thread-msg--lane-right .message-stack,
+.thread-reading .message.thread-msg--root .message-stack {
+  margin-left: 0;
+  margin-right: 0;
 }
 
+.thread-reading .message.mine .avatar,
+.thread-reading .message.mine .thread-msg-avatar,
+.thread-reading .message.mine .avatar-spacer,
 .thread-reading .message.thread-msg--other-right .thread-msg-avatar,
 .thread-reading .message.thread-msg--other-right .avatar-spacer,
 .thread-reading .message.thread-msg--lane-right .thread-msg-avatar,
 .thread-reading .message.thread-msg--lane-right .avatar-spacer {
-  order: 2;
+  order: 0;
+}
+
+.thread-reading .message.mine .message-meta {
+  justify-content: flex-start;
 }
 
 .thread-reading .message.has-html .message-stack {
-  /* Voies type chat : ~3/4 de la largeur du fil (pas plein écran). */
+  /* Hors layout lecture plein écran : largeur de carte, toujours à gauche. */
   max-width: min(75%, 112ch);
   width: min(75%, 112ch);
 }
@@ -2973,9 +2980,9 @@ button.thread-tag-chip--search:focus-visible {
   max-width: min(75%, 112ch);
 }
 
-/* Arbre : le premier message est la "racine" au centre. */
+/* Premier message : même côté que les suivants. */
 .thread-reading .message.thread-msg--root {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .thread-reading .message.thread-msg--root .message-stack {
@@ -2985,9 +2992,9 @@ button.thread-tag-chip--search:focus-visible {
   max-width: min(75%, 112ch);
 }
 
-/* Fil avec un seul mail : centré et large (~3/4). */
+/* Fil avec un seul mail : même côté, un peu plus large (newsletter). */
 .thread-reading .message.thread-msg--solo {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .thread-reading .message.thread-msg--solo .message-stack {
@@ -3010,7 +3017,8 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .thread-reading .message.mine .thread-msg-card {
-  box-shadow: inset -2px 0 0 rgba(0, 0, 0, 0.06);
+  /* Même côté que les autres : barre à gauche, teinte un peu plus marquée. */
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 48%, transparent);
 }
 
 /* Bandeau désabonnement — au-dessus du corps HTML, pas enfoui dans le footer newsletter */
@@ -3581,11 +3589,18 @@ button.thread-tag-chip--search:focus-visible {
   margin-right: 0;
 }
 
+.thread-reading.thread-reading--reading-layout .message.mine .avatar,
+.thread-reading.thread-reading--reading-layout .message.mine .thread-msg-avatar,
+.thread-reading.thread-reading--reading-layout .message.mine .avatar-spacer,
 .thread-reading.thread-reading--reading-layout .message.thread-msg--other-right .thread-msg-avatar,
 .thread-reading.thread-reading--reading-layout .message.thread-msg--other-right .avatar-spacer,
 .thread-reading.thread-reading--reading-layout .message.thread-msg--lane-right .thread-msg-avatar,
 .thread-reading.thread-reading--reading-layout .message.thread-msg--lane-right .avatar-spacer {
   order: 0;
+}
+
+.thread-reading.thread-reading--reading-layout .message.mine .message-meta {
+  justify-content: flex-start;
 }
 
 .thread-reading.thread-reading--reading-layout .message-stack,
@@ -4076,18 +4091,6 @@ button.thread-tag-chip--search:focus-visible {
   border-top: 1px solid var(--border-weak);
   border-radius: 0;
   background: rgba(0, 0, 0, 0.12);
-}
-
-.thread-reading .thread-msg.thread-msg--other-right.thread-msg--head .mail-security-panel,
-.thread-reading .thread-msg.thread-msg--lane-right.thread-msg--head .mail-security-panel {
-  right: auto;
-  left: 0;
-}
-
-.thread-reading .thread-msg.thread-msg--other-right .mail-security-pop--compact .mail-security-panel,
-.thread-reading .thread-msg.thread-msg--lane-right .mail-security-pop--compact .mail-security-panel {
-  right: auto;
-  left: 0;
 }
 
 .thread-attach-card {
@@ -5224,7 +5227,7 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .message.mine {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 @keyframes msg-in {
@@ -5262,15 +5265,16 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .message.mine .message-stack {
-  margin-left: auto;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .message.mine .avatar {
-  order: 2;
+  order: 0;
 }
 
 .message.mine .message-meta {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .message-time {
