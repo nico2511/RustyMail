@@ -75,8 +75,11 @@ pub use address_contacts::{
 };
 pub use ai_features::{ai_feature_enabled, AiFeature};
 pub use app_prefs::{
-    load_app_prefs, normalized_chat_backend, prefs_path_from_db_dir, save_app_prefs,
-    sync_draft_language_from_mother, AiPrefs, AppPrefs, GeneralPrefs, APP_PREFS_FILE,
+    load_app_prefs, load_app_prefs_required, mailbox_archive_block_reason,
+    mailbox_delete_block_reason, mailbox_rename_block_reason,
+    migrate_locked_mailboxes_after_rename, normalized_chat_backend, prefs_path_from_db_dir,
+    save_app_prefs, sync_draft_language_from_mother, AiPrefs, AppPrefs, GeneralPrefs,
+    APP_PREFS_FILE,
 };
 pub use attachment_policy::{
     attachment_needs_explicit_ack, log_attachment_audited, PREFIX_RISK_CONFIRM,
