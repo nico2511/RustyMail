@@ -74,7 +74,9 @@ pub struct GeneralPrefs {
     pub contrast_plus: bool,
     #[serde(default)]
     pub accent_lavender: bool,
-    /// Dossiers verrouillés par compte (vue Dossiers — pas de drag/delete/rename).
+    /// Dossiers verrouillés par compte (préférence locale, vue Dossiers).
+    /// Le nom exact bloque l’archivage et la suppression avec contenu.
+    /// Le renommage ne migre pas la clé ; `delete_imap_mailbox` ne consulte pas cette liste.
     #[serde(default)]
     pub locked_mailboxes_by_account: HashMap<String, Vec<String>>,
 }
