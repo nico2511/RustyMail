@@ -279,6 +279,20 @@ mod tests {
     }
 
     #[test]
+    fn orientation_accepts_fenced_json_with_trailing_prose() {
+        let raw = r#"```json
+{"diagnosis":"L’inbox mélange des newsletters lues et quelques fils à traiter.","recommendations":["Archiver le lot déjà lu."],"actions":[]}
+```
+Note : ceci n’est pas une seconde action.
+{"diagnosis":"ignoré"}
+"#;
+        let parsed = parse_org_orientation_json(raw, &ids(&[])).expect("fenced orientation");
+        assert!(parsed.orientation.diagnosis.contains("newsletters"));
+        assert_eq!(parsed.orientation.recommendations.len(), 1);
+        assert!(parsed.actions.is_empty());
+    }
+
+    #[test]
     fn orientation_rejects_missing_diagnosis_without_fallback_text() {
         let raw = r#"{"recommendations":["Ranger plus tard."],"actions":[]}"#;
         let err = parse_org_orientation_json(raw, &ids(&[])).expect_err("missing diagnosis");
