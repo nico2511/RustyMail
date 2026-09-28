@@ -6,7 +6,6 @@ import {
 import { normalizeAiPrefsMerged } from "../../prefs_defaults";
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
-import { render } from "../dispatch";
 import { state } from "../state";
 import { rememberSettingsAiFold } from "../../settingsAiPanel";
 import { wireSettingsAiDomEngineAndBackgroundListeners } from "./settingsAiDomWireEnginesRun";
@@ -17,10 +16,8 @@ export function wireSettingsAiDomListeners(signal: AbortSignal, immediateCheckbo
     el.addEventListener(
       "change",
       () => {
-        const refreshComposeBar = Boolean(el.closest(".ai-quick-panel")) && state.view === "compose";
         captureAiFeatureTogglesFromDom();
         state.appPrefs.ai = normalizeAiPrefsMerged(state.appPrefs.ai);
-        if (refreshComposeBar) render();
         void (async () => {
           try {
             await persistAiFeaturePrefs();
