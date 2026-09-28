@@ -587,6 +587,19 @@ function renderSettingsDeveloperPanel(): string {
   );
 }
 
+function settingsNavButton(tab: string, label: string, active: boolean, title?: string): string {
+  const titleAttr = title ? ` title="${escapeAttr(title)}"` : "";
+  return `<button type="button" role="tab" class="settings-tab ${active ? "settings-tab--active" : ""}"
+          data-action="settings-tab" data-settings-tab="${tab}" aria-selected="${active}"${titleAttr}>${escapeHtml(label)}</button>`;
+}
+
+function settingsNavGroup(label: string, buttons: string): string {
+  return `<div class="settings-nav__group">
+      <h2 class="settings-nav__label">${escapeHtml(label)}</h2>
+      <div class="settings-nav__tabs">${buttons}</div>
+    </div>`;
+}
+
 export function renderSettings() {
   const tabAccounts = state.settingsTab === "accounts";
   const tabGeneral = state.settingsTab === "general";
@@ -637,30 +650,33 @@ export function renderSettings() {
           <h1 class="thread-reading-title">${escapeHtml(t("settings.title"))}</h1>
         </div>
       </header>
-      <div class="settings-tabbar" role="tablist" aria-label="${escapeAttr(t("settings.sectionsAria"))}">
-        <button type="button" role="tab" class="settings-tab ${tabAccounts ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="accounts" aria-selected="${tabAccounts}">${escapeHtml(t("settings.tabs.accounts"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabGeneral ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="general" aria-selected="${tabGeneral}">${escapeHtml(t("settings.tabs.general"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabAppearance ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="appearance" aria-selected="${tabAppearance}">${escapeHtml(t("settings.tabs.appearance"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabAutoSenders ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="autoSenders" aria-selected="${tabAutoSenders}"
-          title="noreply, notifications, newsletters, ESP…">${escapeHtml(t("settings.tabs.autoSenders"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabAi ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="ai" aria-selected="${tabAi}">${escapeHtml(t("settings.tabs.ai"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabAddressBook ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="addressBook" aria-selected="${tabAddressBook}">${escapeHtml(t("settings.tabs.addressBook"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabStorage ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="storage" aria-selected="${tabStorage}"
-          title="SQLite, JSON, modèles…">${escapeHtml(t("settings.tabs.storage"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabShortcuts ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="shortcuts" aria-selected="${tabShortcuts}"
-          title="Raccourcis clavier">${escapeHtml(t("settings.tabs.shortcuts"))}</button>
-        <button type="button" role="tab" class="settings-tab ${tabDeveloper ? "settings-tab--active" : ""}"
-          data-action="settings-tab" data-settings-tab="developer" aria-selected="${tabDeveloper}"
-          title="Dépôt, crates, libs">${escapeHtml(t("settings.tabs.developer"))}</button>
-      </div>
+      <nav class="settings-nav" role="tablist" aria-label="${escapeAttr(t("settings.sectionsAria"))}">
+        ${settingsNavGroup(
+          "Courrier",
+          [
+            settingsNavButton("accounts", t("settings.tabs.accounts"), tabAccounts),
+            settingsNavButton("general", t("settings.tabs.general"), tabGeneral),
+            settingsNavButton("autoSenders", t("settings.tabs.autoSenders"), tabAutoSenders, "noreply, notifications, newsletters"),
+            settingsNavButton("addressBook", t("settings.tabs.addressBook"), tabAddressBook),
+          ].join(""),
+        )}
+        ${settingsNavGroup(
+          "Intelligence artificielle",
+          settingsNavButton("ai", t("settings.tabs.ai"), tabAi),
+        )}
+        ${settingsNavGroup(
+          "Affichage",
+          settingsNavButton("appearance", t("settings.tabs.appearance"), tabAppearance),
+        )}
+        ${settingsNavGroup(
+          "Système",
+          [
+            settingsNavButton("storage", t("settings.tabs.storage"), tabStorage, "SQLite, JSON, modèles"),
+            settingsNavButton("shortcuts", t("settings.tabs.shortcuts"), tabShortcuts, "Raccourcis clavier"),
+            settingsNavButton("developer", t("settings.tabs.developer"), tabDeveloper, "Dépôt, crates, libs"),
+          ].join(""),
+        )}
+      </nav>
       <div class="settings-body">
         ${settingsBody}
       </div>

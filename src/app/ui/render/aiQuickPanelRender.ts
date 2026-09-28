@@ -19,7 +19,7 @@ export function renderAiQuickPanelOverlay(): string {
         </div>
       </div>
       <div class="ai-quick-panel__body">${renderAiFeatureTogglesHtml()}</div>
-      <p class="dim ai-quick-panel__hint">Les changements sont enregistrés immédiatement. Paramètres détaillés → IA & dictée → Fonctionnalités.</p>
+      <p class="dim ai-quick-panel__hint">Les changements sont enregistrés immédiatement. Le détail est dans Paramètres → IA.</p>
     </div>`;
 }
 

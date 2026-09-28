@@ -19,7 +19,9 @@ function persistLlamaServerPrefAndRefresh(
       await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
       toast(successToast);
       void refreshLlmRuntimeStatus(false).then(() => {
-        if (state.settingsAiModal === "engines") render();
+        if (state.settingsAiModal === "engines" || (state.view === "settings" && state.settingsTab === "ai")) {
+          render();
+        }
       });
     } catch (e) {
       toast(tauriErrorMessage(e));

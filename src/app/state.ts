@@ -68,7 +68,7 @@ export const state: State = {
   searchMailboxPrefix: null,
   searchModalOpen: false,
   settingsAiModal: null,
-  aiEngineSettingsTab: "local",
+  aiEngineSettingsTab: "off",
   promptCatalog: null,
   promptCatalogLoadError: "",
   llmJobLabel: null,

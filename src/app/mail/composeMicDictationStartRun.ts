@@ -14,12 +14,12 @@ export function validateDictationCanStart(): boolean {
     return false;
   }
   if (!state.appPrefs.ai.dictationEnabled) {
-    toast("Activez la dictée dans Paramètres → IA & dictée.");
+    toast("Activez la dictée dans Paramètres → IA.");
     return false;
   }
   const backend = state.appPrefs.ai.dictationBackend;
   if (backend === "cloud" && !state.dictationApiKeySet) {
-    toast("Clé API absente : Paramètres → IA & dictée.");
+    toast("Clé API absente : Paramètres → IA.");
     return false;
   }
   if (
@@ -31,7 +31,7 @@ export function validateDictationCanStart(): boolean {
     return false;
   }
   if (backend === "local_http" && !state.appPrefs.ai.localCompanionBaseUrl.trim()) {
-    toast("Indiquez l’URL du compagnon local (Paramètres → IA & dictée).");
+    toast("Indiquez l’URL du compagnon local (Paramètres → IA).");
     return false;
   }
   return true;

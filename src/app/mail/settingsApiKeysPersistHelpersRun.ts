@@ -20,8 +20,12 @@ export async function requireTauriForSecretClear(): Promise<boolean> {
   return true;
 }
 
+function aiSettingsVisible(): boolean {
+  return state.settingsAiModal === "engines" || (state.view === "settings" && state.settingsTab === "ai");
+}
+
 export function refreshEnginesModalIfOpen(): void {
   void refreshLlmRuntimeStatus(false).then(() => {
-    if (state.settingsAiModal === "engines") render();
+    if (aiSettingsVisible()) render();
   });
 }
