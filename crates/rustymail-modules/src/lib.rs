@@ -64,7 +64,17 @@ pub fn clean_message(message: &Message) -> CleanedMessageView {
     };
 
     let cleaned_text = if let Some(conv) = conversation_text.filter(|s| !s.trim().is_empty()) {
+        // Rapport Outlook : le texte suit les tours affichés (y compris les cités visibles).
         conv
+    } else if let Some(html) = cleaned_html_body.as_deref() {
+        let from_html = mail_cleaning::reading_text_from_cleaned_html(html);
+        if !from_html.trim().is_empty() {
+            from_html
+        } else if !quote_result.visible_text.trim().is_empty() {
+            quote_result.visible_text
+        } else {
+            from_html
+        }
     } else {
         quote_result.visible_text
     };

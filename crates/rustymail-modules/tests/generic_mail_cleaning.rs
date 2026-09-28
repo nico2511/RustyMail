@@ -1,4 +1,5 @@
 use rustymail_domain::{EmailAddress, Message, MessageId, MessageReferences};
+use rustymail_modules::clean_message;
 use rustymail_modules::mail_cleaning::{
     clean_html_for_markdown, CleaningInput, ProviderId, ProviderRegistry,
 };
@@ -43,7 +44,7 @@ fn outlook_fixture_keeps_body_strips_mso_and_quote_noise() {
     let out = clean_html_for_markdown(&reg, &ctx, html);
 
     assert_eq!(out.resolved_provider, ProviderId::Generic);
-    assert_eq!(out.generic_rule_set_version, "10");
+    assert_eq!(out.generic_rule_set_version, "11");
     let low = out.html.to_ascii_lowercase();
     assert!(low.contains("message principal outlook"));
     assert!(!low.contains("[if mso]"));
@@ -53,7 +54,7 @@ fn outlook_fixture_keeps_body_strips_mso_and_quote_noise() {
 }
 
 #[test]
-fn gmail_fixture_removes_quote_and_signature_blocks() {
+fn gmail_fixture_folds_quote_and_attenuates_signature() {
     let html = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/fixtures/generic/gmail_thread.html"
@@ -65,9 +66,15 @@ fn gmail_fixture_removes_quote_and_signature_blocks() {
 
     let low = out.html.to_ascii_lowercase();
     assert!(low.contains("réponse courte"));
+    assert!(low.contains("rm-mail-folded-quote"));
+    assert!(low.contains("ancien message long"));
+    assert!(low.contains("rm-mail-signature"));
+    assert!(low.contains("signature gmail"));
     assert!(!low.contains("gmail_quote"));
-    assert!(!low.contains("ancien message long"));
-    assert!(!low.contains("signature gmail"));
+    let reply = low.find("réponse courte").unwrap();
+    let quoted = low.find("ancien message long").unwrap();
+    assert!(reply < low.find("rm-mail-folded-quote").unwrap());
+    assert!(quoted > reply);
 }
 
 #[test]
@@ -96,7 +103,7 @@ fn outlook_forward_chain_builds_conversation_report() {
     let reg = ProviderRegistry::builtin();
     let out = clean_html_for_markdown(&reg, &ctx, html);
 
-    assert_eq!(out.generic_rule_set_version, "10");
+    assert_eq!(out.generic_rule_set_version, "11");
     assert!(out.html.contains("rm-conversation-report"));
     assert!(out.html.contains("Message transféré"));
     assert!(out.html.contains("brief logistique"));
@@ -134,4 +141,63 @@ fn strips_style_video_svg_and_small_tracker() {
     assert!(!low.contains("<svg"));
     assert!(!low.contains("open.gif"));
     assert!(!low.contains("evil.example"));
+}
+
+#[test]
+fn apple_cite_is_folded_behind_the_reply() {
+    let html = r#"<div><p>Oui, je relis le paragraphe.</p><div>Le lun. 1 janv. 2024 à 10:00, Alice a écrit :</div><blockquote type="cite"><p>Peux-tu relire le paragraphe 2 ?</p></blockquote></div>"#;
+    let msg = generic_message(html.to_string());
+    let ctx = CleaningInput::from_message(&msg);
+    let out = clean_html_for_markdown(&ProviderRegistry::builtin(), &ctx, html);
+    assert!(out.html.contains("rm-mail-folded-quote"));
+    assert!(out.html.contains("paragraphe 2"));
+    assert!(out.html.find("Oui, je relis").unwrap() < out.html.find("paragraphe 2").unwrap());
+}
+
+#[test]
+fn discussion_body_is_not_rewritten_as_a_digest() {
+    let html = r#"<p>On en a parlé : je ne veux pas d’un digest, juste ta réponse sur le privacy review.</p><p>Le mot unsubscribe dans ce fil est un exemple, pas un pied de newsletter.</p>"#;
+    let msg = generic_message(html.to_string());
+    let ctx = CleaningInput::from_message(&msg);
+    let out = clean_html_for_markdown(&ProviderRegistry::builtin(), &ctx, html);
+    assert_eq!(out.resolved_provider, ProviderId::Generic);
+    assert!(out.html.contains("privacy review"));
+    assert!(out.html.contains("unsubscribe"));
+    assert!(!out.html.contains("rustymail:"));
+    assert!(!out.html.contains("rm-mail-folded-quote"));
+}
+
+#[test]
+fn cleaned_text_follows_visible_reply_not_plain_noise_or_folded_quote() {
+    let html = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/generic/gmail_thread.html"
+    ));
+    let mut msg = generic_message(html.to_string());
+    msg.plain_body = "BRUIT_PLAIN view in browser unsubscribe".into();
+    let view = clean_message(&msg);
+    assert!(view.cleaned_text.contains("Réponse courte"));
+    assert!(!view.cleaned_text.contains("Ancien message"));
+    assert!(!view.cleaned_text.contains("Signature Gmail"));
+    assert!(!view.cleaned_text.contains("BRUIT_PLAIN"));
+    let html_out = view.cleaned_html_body.expect("html");
+    assert!(html_out.contains("rm-mail-folded-quote"));
+    assert!(html_out.contains("Ancien message long"));
+}
+
+#[test]
+fn cleaned_text_keeps_outlook_conversation_report() {
+    let html = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/generic/outlook_forward_chain.html"
+    ));
+    let mut msg = generic_message(html.to_string());
+    msg.plain_body = "BRUIT_PLAIN hors du rapport".into();
+    let view = clean_message(&msg);
+    assert!(view.cleaned_text.contains("=== [1]"));
+    assert!(
+        view.cleaned_text.contains("brief logistique")
+            || view.cleaned_text.contains("Message transféré")
+    );
+    assert!(!view.cleaned_text.contains("BRUIT_PLAIN"));
 }

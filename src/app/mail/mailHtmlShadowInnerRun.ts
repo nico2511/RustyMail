@@ -107,7 +107,11 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-conversation-report .rm-conversation-body br{display:block;content:"";margin-bottom:0.45em}
         .mail table{max-width:100%;width:100%;border-collapse:collapse}
         .mail blockquote{padding:8px 12px;border-left:2px solid rgba(232,228,223,.12);background:rgba(255,255,255,.02);border-radius:10px}
+        .mail details.rm-mail-folded-quote{margin:10px 0 0}
+        .mail details.rm-mail-folded-quote > summary{cursor:pointer;font-size:12px;color:var(--dim,rgba(238,240,238,.62))}
+        .mail details.rm-mail-folded-quote[open]{margin-top:12px}
         .mail :is(.gmail_quote, .gmail_quote_container, blockquote.gmail_quote){display:none !important}
+        .mail details.rm-mail-folded-quote :is(.gmail_quote, .gmail_quote_container, blockquote.gmail_quote){display:block !important}
         .mail .rm-mail-signature{display:none !important}
         .mail :is(.rm-mail-forward-header, .rm-mail-outlook-quote-header){display:none !important}
         .mail.mail--clean :is(#Signature, #x_Signature, #signature, #divRplyFwdMsg, #x_divRplyFwdMsg){display:none !important}

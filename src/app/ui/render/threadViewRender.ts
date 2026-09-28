@@ -22,6 +22,7 @@ import type {
   ThreadParticipantLink,
   ThreadRecipientPresenceEvents,
 } from "../../types";
+import { renderDimmedBlocksFold } from "../../mail/dimmedBlocksFold";
 import { unsubscribeHrefScore } from "../../mail/mailUnsubscribeLinks";
 import { renderViewNavTrail } from "./listChrome";
 import { renderDeps } from "./renderDeps";
@@ -552,7 +553,7 @@ function renderMessageBody(message: CleanedMessageView, mode: MessageViewMode, u
   if (cleanHtml) {
     return `${unsubBar}<div class="message-html message-html--clean" ${mailHtmlMountAttrs(message.messageId, cleanHtml)}></div>`;
   }
-  return `<div class="message-text">${escapeHtml(message.cleanedText || message.sourceText)}</div>`;
+  return `<div class="message-text">${escapeHtml(message.cleanedText || message.sourceText)}${renderDimmedBlocksFold(message.dimmedBlocks)}</div>`;
 }
 
 function renderDaySeparator(prevReceivedAt: string | undefined, curReceivedAt: string) {

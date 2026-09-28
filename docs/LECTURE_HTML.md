@@ -1,25 +1,35 @@
 # Lecture — état du nettoyage HTML
 
-Chaîne : HTML MIME → `clean_html_builtin` (générique, puis Amazon / Deblock / GitHub si le signal est fort) → `CleanedMessageView.cleanedHtmlBody` → ombre DOM + `sanitizeEmailHtml` (DOMPurify et gardes).
+Le mail se lit comme une **discussion**. Le nettoyage générique sert ce mode : retirer le bruit qui gêne l’échange (trackers, styles, citations bruyantes, signatures lourdes), sans réécrire le courrier en carte digest.
+
+Chaîne : HTML MIME → `clean_html_builtin` (générique, puis Amazon / Deblock / GitHub **seulement** si le signal expéditeur est fort) → `CleanedMessageView.cleanedHtmlBody` → ombre DOM + `sanitizeEmailHtml` (DOMPurify et gardes).
 
 Les images distantes restent bloquées tant que la personne ne demande pas à les charger. Le cœur mail ne dépend pas d’un LLM pour ce nettoyage.
 
+## Deux chemins, pas un modèle unique
+
+| Chemin | Rôle |
+| --- | --- |
+| **Générique** (règles v11) | Lecture personne-à-personne. Le corps reste le message. Les citations Gmail et les `blockquote type="cite"` deviennent un `<details class="rm-mail-folded-quote">` fermé : la réponse est devant, l’historique se rouvre. Une citation qui est tout le message reste visible. La signature Gmail rejoint `rm-mail-signature` (masquée, comme les autres queues de signature). |
+| **Plugins Amazon, Deblock, GitHub** | Digests newsletter / notification. Ils ne sont pas étendus au courrier générique. Un mot « unsubscribe » ou « privacy » dans une discussion ne déclenche pas une réécriture. |
+
+`cleanedText` (synthèses, traduction, questions sur le fil) suit le corps affiché : le rapport de conversation Outlook quand il existe, sinon le texte du HTML nettoyé **sans** la citation repliée ni la signature masquée. Sans HTML, on garde le texte plain après signature et citations `>`.
+
+Les mentions légales du plain (`dimmedBlocks`) ne sont plus seulement coupées : dans la vue texte, elles sont dans un bloc « Mentions masquées ».
+
 ## Ce qui tient
 
-- Générique : scripts, styles, MSO/VML, citations Gmail, pixels 1×1, signatures repliées, rapports de transfert Outlook.
-- Amazon et Deblock : digests sur fixtures d’intégration existantes.
-- GitHub : digest des notifications quand l’expéditeur est `github.com` / `githubnoreply.com` (test d’intégration ajouté). Un simple mot « github » dans le HTML, ou un sujet « GitHub … » sans URL github.com, ne réécrit plus le corps.
-- Affichage : les digests GitHub utilisent les mêmes règles de tableau que Amazon et Deblock.
+- Générique : scripts, styles, MSO/VML, pixels de tracking, signatures repliées, rapports de transfert Outlook (tours visibles, pas un digest).
+- Amazon, Deblock, GitHub : digests inchangés sur leurs fixtures.
+- Affichage : filet CSS sur `.gmail_quote` restant, sauf à l’intérieur d’une citation repliée. `.rm-mail-signature` reste masquée.
 
-## Correctifs de cette passe
+## Frontière volontaire
 
-- Le passage générique retire aussi `video`, `audio`, `svg` et `source` (règles v10).
-- Un pixel 2×2 ou 3×3 n’est retiré que s’il pointe vers un hôte de tracking. Un petit fichier sans ce signal est conservé.
-- Côté lecture, les balises actives (`style`, `video`, `svg`, `source`, …) sont retirées avec leur contenu avant DOMPurify, pour ne pas laisser une feuille CSS (et ses `url()`) en texte visible. Les `srcset` restants sont vidés. Les `data:image/svg+xml` ne sont pas acceptés sur les images.
+Le chrome marketing (préheader caché, barre sociale, pied légal, tableaux de mise en page) n’est **pas** retiré par le générique. Ces heuristiques abîment un fil de discussion et copieraient le rendu digest. Elles restent dans les plugins quand l’expéditeur est reconnu.
 
 ## Hors scope
 
-- Juger le phishing des liens GitHub ou Amazon qui ont l’air légitimes (reste du côté `mail_security`).
-- Replier les citations Gmail au lieu de les retirer : choix actuel, le fil cité HTML n’est pas réaffiché dans la vue nettoyée.
+- Juger le phishing des liens qui ont l’air légitimes (reste du côté `mail_security`).
+- Un séparateur `-----Original Message-----` sans marqueurs Outlook : le corps cité reste dans le fil. Le rapport Outlook couvre les chaînes De / Envoyé / Objet.
 - Un expéditeur non Amazon dont le HTML ressemble au pied de page Amazon peut encore prendre le passage faible Amazon (strip de tableaux). Les fixtures Amazon fortes ne changent pas.
 - Pas de politique « texte seul par défaut ». La vue d’origine, si elle est ouverte, passe par le même DOMPurify.
