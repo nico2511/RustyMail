@@ -170,9 +170,8 @@ textarea {
   opacity: 0.92;
 }
 
-.app-shell.sidebar-collapsed:not(.compose-fullscreen-active) .sidebar-collapse-edge {
-  display: none;
-}
+/* Le bouton reste dans le rail (productivity-wave2). Ne pas le masquer :
+   une fois replié, c’est le seul contrôle pour déplier. */
 
 .sidebar-header {
   position: sticky;

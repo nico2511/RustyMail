@@ -1,6 +1,8 @@
 /** Centre d'organisation — scan, cartes, application par lots. */
 
 import { invoke } from "@tauri-apps/api/core";
+import { LLM_INVOKE_TIMEOUT_MS } from "./app/core/timeouts";
+import { withTimeout } from "./app/lib/tauriCommand";
 import { navRenderTrailHtml } from "./navigation";
 
 export type OrgProposalKind =
@@ -143,13 +145,20 @@ export function defaultOrganizationState(): OrganizationViewState {
   };
 }
 
+const ORG_SCAN_TIMEOUT_MESSAGE =
+  "Délai dépassé : l’analyse n’a pas abouti. Vérifiez le moteur IA (Ollama, llama-server ou OpenRouter) puis réessayez.";
+
 export async function orgScanAccount(
   accountId: string,
   includeLlm: boolean,
 ): Promise<OrgScanReport> {
-  return invoke<OrgScanReport>("org_scan_account_cmd", {
-    payload: { accountId, includeLlm },
-  });
+  return withTimeout(
+    invoke<OrgScanReport>("org_scan_account_cmd", {
+      payload: { accountId, includeLlm },
+    }),
+    LLM_INVOKE_TIMEOUT_MS,
+    ORG_SCAN_TIMEOUT_MESSAGE,
+  );
 }
 
 export async function orgApplyProposal(

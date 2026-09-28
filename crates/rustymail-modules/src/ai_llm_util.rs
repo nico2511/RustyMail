@@ -244,43 +244,135 @@ fn json_unclosed_depth(s: &str) -> usize {
     stack.len()
 }
 
+/// Retire un bloc ``` … ``` (balise de langue optionnelle). Le texte hors clôture est ignoré
+/// seulement si l’intérieur contient un objet ou un tableau.
+fn markdown_fenced_json(raw: &str) -> Option<String> {
+    let t = raw.trim().trim_start_matches('\u{feff}');
+    let start = t.find("```")?;
+    let after = &t[start + 3..];
+    let after = after.trim_start_matches('\u{feff}');
+    let (body, closed) = if let Some(end) = after.find("```") {
+        (after[..end].trim(), true)
+    } else {
+        (after.trim(), false)
+    };
+    let body = strip_fence_language_line(body);
+    if body.contains('{') || body.contains('[') {
+        Some(body.to_string())
+    } else if closed {
+        None
+    } else {
+        Some(body.to_string())
+    }
+}
+
+fn strip_fence_language_line(body: &str) -> &str {
+    let Some(nl) = body.find(['\n', '\r']) else {
+        return body
+            .strip_prefix("json")
+            .or_else(|| body.strip_prefix("JSON"))
+            .unwrap_or(body)
+            .trim_start();
+    };
+    let first = body[..nl].trim();
+    let lang = !first.is_empty()
+        && !first.contains('{')
+        && !first.contains('[')
+        && first
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '+');
+    if lang {
+        body[nl + 1..].trim_start()
+    } else {
+        body
+    }
+}
+
+fn prepare_json_source(raw: &str) -> String {
+    let t = raw.trim().trim_start_matches('\u{feff}');
+    if let Some(inner) = markdown_fenced_json(t) {
+        if inner.contains('{') || inner.contains('[') {
+            return inner;
+        }
+    }
+    t.to_string()
+}
+
+/// Fin du premier objet/tableau JSON valide (le décodeur s’arrête avant le texte qui suit).
+fn first_json_value_end(slice: &str) -> Option<usize> {
+    let mut stream = serde_json::Deserializer::from_str(slice).into_iter::<serde_json::Value>();
+    let value = stream.next()?.ok()?;
+    match value {
+        serde_json::Value::Object(_) | serde_json::Value::Array(_) => Some(stream.byte_offset()),
+        _ => None,
+    }
+}
+
+/// Fin d’un objet/tableau équilibré (chaînes respectées), même s’il reste des virgules trainantes.
+fn balanced_json_end(slice: &str) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut in_string = false;
+    let mut escape = false;
+    let mut started = false;
+    for (i, c) in slice.char_indices() {
+        if in_string {
+            if escape {
+                escape = false;
+                continue;
+            }
+            if c == '\\' {
+                escape = true;
+                continue;
+            }
+            if c == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match c {
+            '"' => in_string = true,
+            '{' | '[' => {
+                depth += 1;
+                started = true;
+            }
+            '}' | ']' => {
+                depth -= 1;
+                if started && depth == 0 {
+                    return Some(i + c.len_utf8());
+                }
+                if depth < 0 {
+                    return None;
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn next_json_opener(s: &str) -> Option<usize> {
+    s.find(['{', '['])
+}
+
+/// Premier objet ou tableau JSON : fences markdown retirées, texte après une valeur valide ignoré.
+/// Un document tronqué (accolades non fermées) est conservé pour la réparation.
 pub(crate) fn extract_json_candidate(raw: &str) -> String {
-    let t = raw.trim();
-    if let Some(start_fence) = t.find("```") {
-        let after = &t[start_fence + 3..];
-        let after = after.strip_prefix("json").unwrap_or(after).trim_start();
-        if let Some(end_fence) = after.find("```") {
-            return after[..end_fence].trim().to_string();
+    let t = prepare_json_source(raw);
+    let t = t.trim();
+    let mut search = 0usize;
+    while let Some(rel) = next_json_opener(&t[search..]) {
+        let start = search + rel;
+        let slice = &t[start..];
+        if let Some(end) = first_json_value_end(slice) {
+            return slice[..end].to_string();
         }
-        return after.trim().to_string();
-    }
-    // Tableau racine avant objet : évite de ne garder que le premier `{…}` interne.
-    if t.starts_with('[') {
-        if let Some(j) = t.rfind(']') {
-            return t[..=j].to_string();
+        if let Some(end) = balanced_json_end(slice) {
+            return slice[..end].to_string();
         }
-        return t.to_string();
-    }
-    if let Some(i) = t.find('{') {
-        let rest = &t[i..];
-        // JSON tronqué : ne pas couper au dernier `}` interne (sinon parse EOF / invalide).
-        if json_unclosed_depth(rest) > 0 {
-            return rest.to_string();
+        if json_unclosed_depth(slice) > 0 {
+            return slice.to_string();
         }
-        if let Some(j) = rest.rfind('}') {
-            return rest[..=j].to_string();
-        }
-        return rest.to_string();
-    }
-    if let Some(i) = t.find('[') {
-        let rest = &t[i..];
-        if json_unclosed_depth(rest) > 0 {
-            return rest.to_string();
-        }
-        if let Some(j) = rest.rfind(']') {
-            return rest[..=j].to_string();
-        }
-        return rest.to_string();
+        search = start + slice.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
     }
     t.to_string()
 }
@@ -395,7 +487,17 @@ fn parse_json_with_optional_repair<T: DeserializeOwned>(s: &str) -> Result<T, Ll
 }
 
 pub(crate) fn parse_model_json<T: DeserializeOwned>(raw: &str) -> Result<T, LlmError> {
+    if raw.trim().is_empty() {
+        return Err(LlmError::InvalidJson(
+            "Réponse du modèle vide : aucun JSON exploitable.".into(),
+        ));
+    }
     let s = extract_json_candidate(raw);
+    if !s.contains('{') && !s.contains('[') {
+        return Err(LlmError::InvalidJson(
+            "Réponse du modèle sans JSON exploitable (objet ou tableau attendu).".into(),
+        ));
+    }
     parse_json_with_optional_repair(&s)
 }
 
@@ -454,6 +556,30 @@ mod tests {
         let cand = extract_json_candidate(partial);
         assert!(cand.starts_with('{'));
         assert!(json_unclosed_depth(&cand) > 0);
+    }
+
+    #[test]
+    fn extract_json_drops_fences_and_trailing_object() {
+        let raw = "Voici l’orientation :\n```json\n{\"diagnosis\":\"ok\",\"recommendations\":[],\"actions\":[]}\n```\n{\"note\":1}\n";
+        let cand = extract_json_candidate(raw);
+        let v: serde_json::Value = serde_json::from_str(&cand).expect("first object");
+        assert_eq!(v["diagnosis"], "ok");
+        assert!(v.get("note").is_none());
+    }
+
+    #[test]
+    fn parse_model_json_tolerates_trailing_characters() {
+        let raw = "{\n  \"diagnosis\": \"boîte encombrée\"\n}\n\n{\"diagnosis\":\"deuxième\"}\n";
+        let v: serde_json::Value = parse_model_json(raw).expect("first value");
+        assert_eq!(v["diagnosis"], "boîte encombrée");
+    }
+
+    #[test]
+    fn parse_model_json_reports_when_no_json_remains() {
+        let err = parse_model_json::<serde_json::Value>("Je ne peux pas répondre en JSON.")
+            .expect_err("prose");
+        let msg = err.to_string();
+        assert!(msg.contains("sans JSON exploitable"), "{msg}");
     }
 
     #[test]

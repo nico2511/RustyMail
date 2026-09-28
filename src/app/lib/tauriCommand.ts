@@ -1,9 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { DEFAULT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 
-export function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+export function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage = "Tauri command timeout",
+): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error("Tauri command timeout")), timeoutMs);
+    const timeout = window.setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
     promise.then(
       (value) => {
         window.clearTimeout(timeout);

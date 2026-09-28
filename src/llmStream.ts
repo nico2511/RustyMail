@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { LLM_INVOKE_TIMEOUT_MS } from "./app/core/timeouts";
 
 export const LLM_STREAM_CANCELLED = "llm_cancelled";
 
@@ -84,13 +85,24 @@ export async function runLlmStreamJob(opts: {
   };
   opts.signal?.addEventListener("abort", onAbort);
 
+  const timeoutMessage =
+    "Délai dépassé : le modèle n’a pas répondu. Vérifiez Ollama ou le moteur IA, puis réessayez.";
+  let timer = 0;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = window.setTimeout(() => {
+      void invoke("llm_stream_cancel", { jobId }).catch(() => {});
+      reject(new Error(timeoutMessage));
+    }, LLM_INVOKE_TIMEOUT_MS);
+  });
+
   try {
-    await invoke(opts.command, { ...opts.args, jobId });
+    await Promise.race([invoke(opts.command, { ...opts.args, jobId }), timedOut]);
     if (streamState.error?.cancelled) return "cancelled";
     if (streamState.error?.message) throw new Error(streamState.error.message);
     if (!streamState.done) throw new Error("Flux LLM terminé sans résultat.");
     return streamState.done;
   } finally {
+    window.clearTimeout(timer);
     if (activeStreamJobId === jobId) activeStreamJobId = null;
     opts.signal?.removeEventListener("abort", onAbort);
     for (const u of unlisteners) u();
