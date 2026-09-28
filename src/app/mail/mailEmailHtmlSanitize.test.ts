@@ -37,6 +37,17 @@ describe("sanitizeEmailHtml", () => {
     expect(html).toContain("mail-remote-image-blocked");
   });
 
+  it("laisse une citation repliée ouvrable", () => {
+    const { html } = sanitizeEmailHtml(
+      `<p>Réponse</p><details class="rm-mail-folded-quote"><summary>Citation</summary><p>Ancien message</p></details>`,
+    );
+    expect(html).toContain("Réponse");
+    expect(html).toContain("<details");
+    expect(html).toContain("rm-mail-folded-quote");
+    expect(html).toContain("Ancien message");
+    expect(html).toContain("<summary");
+  });
+
   it("conserve une image png inline", () => {
     const { html } = sanitizeEmailHtml(`<img src="data:image/png;base64,iVBORw0KGgo=" alt="ok"/>`);
     expect(html).toContain("data:image/png;base64,iVBORw0KGgo=");

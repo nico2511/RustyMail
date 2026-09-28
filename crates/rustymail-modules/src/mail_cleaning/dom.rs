@@ -49,6 +49,24 @@ pub fn node_outer_html(node: ego_tree::NodeRef<'_, Node>) -> String {
     }
 }
 
+/// Sérialise le fragment sans envelopper une deuxième fois `<html><body>`.
+pub fn serialize_fragment(doc: &Html) -> String {
+    let root = doc.tree.root();
+    let body = root
+        .descendants()
+        .find(|n| ElementRef::wrap(*n).is_some_and(|el| el.value().name() == "body"));
+    let nodes: Vec<_> = if let Some(body) = body {
+        body.children().collect()
+    } else {
+        root.children().collect()
+    };
+    let mut out = String::new();
+    for node in nodes {
+        out.push_str(&node_outer_html(node));
+    }
+    out
+}
+
 pub fn escape_html_text(raw: &str) -> String {
     let mut s = String::with_capacity(raw.len());
     for c in raw.chars() {

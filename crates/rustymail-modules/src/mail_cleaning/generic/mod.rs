@@ -17,7 +17,7 @@ pub use attrs::strip_presentation_attrs;
 pub use images::is_outlook_noise_img;
 pub use prune::prune_empty_boilerplate;
 
-pub const GENERIC_RULE_SET_VERSION: &str = "10";
+pub const GENERIC_RULE_SET_VERSION: &str = "11";
 
 const REMOVABLE_TAGS: &[&str] = &[
     "script", "noscript", "iframe", "object", "embed", "style", "form", "input", "button",
@@ -29,6 +29,7 @@ pub fn generic_html_clean(html: &str) -> String {
     let html = outlook::strip_mso_conditional_comments(html);
     let mut doc = Html::parse_fragment(&html);
     outlook::clean_outlook_noise(&mut doc);
+    // Citations repliées (details), pas coupées : la réponse reste le corps de la discussion.
     gmail::clean_gmail_noise(&mut doc);
     for tag in REMOVABLE_TAGS {
         let Ok(sel) = Selector::parse(tag) else {

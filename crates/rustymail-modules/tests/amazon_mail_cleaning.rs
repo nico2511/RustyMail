@@ -61,7 +61,7 @@ fn amazon_fixture_drops_tracking_and_legal_footer() {
     let out = clean_html_for_markdown(&reg, &ctx, msg.html_body.as_deref().unwrap());
 
     assert_eq!(out.resolved_provider, ProviderId::Amazon);
-    assert!(out.generic_rule_set_version == "10");
+    assert!(out.generic_rule_set_version == "11");
     assert!(out.provider_rule_set_version == Some("9"));
 
     let low = out.html.to_ascii_lowercase();

@@ -1,77 +1,329 @@
+//! Citations de discussion (Gmail, Apple Mail) : repliées, pas effacées.
+//! Une signature Gmail hors citation rejoint `rm-mail-signature` (masquée à l’affichage).
+
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
-use ego_tree::NodeId;
+use ego_tree::{NodeId, NodeRef};
 use regex::Regex;
-use scraper::{ElementRef, Html, Selector};
+use scraper::{ElementRef, Html, Node, Selector};
 
-static GMAIL_QUOTE_SELECTORS: LazyLock<Vec<Selector>> = LazyLock::new(|| {
-    [
-        ".gmail_quote",
-        ".gmail_quote_container",
-        "blockquote.gmail_quote",
-        ".gmail_signature",
-        ".gmail_extra",
-    ]
-    .iter()
-    .filter_map(|s| Selector::parse(s).ok())
-    .collect()
+use crate::mail_cleaning::dom::{
+    element_visible_mass, escape_html_text, node_outer_html, serialize_fragment, visible_char_count,
+};
+
+static RE_WROTE_LINE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^(?:on\s+.+?\bwrote:|le\s+.+?\ba\s+écrit\s*:)\s*$").expect("wrote line")
 });
 
-static RE_GMAIL_WROTE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)^on\s+.+\bwrote:\s*$").expect("gmail wrote header"));
+static RE_CLASS_ATTR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?i)\sclass\s*=\s*"([^"]*)""#).expect("class attr"));
 
 static RE_TRIMMED: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)show trimmed content").expect("trimmed content"));
 
+const QUOTE_CLASS_TOKENS: &[&str] = &["gmail_quote", "gmail_quote_container"];
+
 pub fn clean_gmail_noise(doc: &mut Html) {
-    remove_gmail_quote_blocks(doc);
-    remove_gmail_wrote_headers(doc);
+    let mut html = serialize_fragment(doc);
+    for _ in 0..24 {
+        let parsed = Html::parse_fragment(&html);
+        let full = serialize_fragment(&parsed);
+        let Some((outer, replacement)) = next_replacement(&parsed) else {
+            break;
+        };
+        let Some(pos) = full.find(&outer) else {
+            break;
+        };
+        let mut updated = String::with_capacity(full.len() - outer.len() + replacement.len());
+        updated.push_str(&full[..pos]);
+        updated.push_str(&replacement);
+        updated.push_str(&full[pos + outer.len()..]);
+        if updated == html {
+            break;
+        }
+        html = updated;
+    }
+    // Une citation qui EST le message (transfert sans réponse) reste lisible :
+    // on retire la classe que le CSS d’affichage masquerait.
+    html = strip_quote_class_attrs(&html);
+    *doc = Html::parse_fragment(&html);
     remove_trimmed_content_nodes(doc);
 }
 
-fn remove_gmail_quote_blocks(doc: &mut Html) {
-    let mut ids = Vec::new();
-    for sel in GMAIL_QUOTE_SELECTORS.iter() {
-        ids.extend(doc.select(sel).map(|e| e.id()));
+fn next_replacement(doc: &Html) -> Option<(String, String)> {
+    quote_replacement(doc).or_else(|| signature_replacement(doc))
+}
+
+fn quote_replacement(doc: &Html) -> Option<(String, String)> {
+    let sel =
+        Selector::parse(".gmail_quote, .gmail_quote_container, .gmail_extra, blockquote").ok()?;
+    for el in doc.select(&sel) {
+        if !is_quote_container(el) || has_quote_ancestor(el) || inside_preserved_region(el) {
+            continue;
+        }
+        if element_visible_mass(el) == 0 {
+            continue;
+        }
+        if let Some(repl) = replacement_for_quote(doc, el) {
+            return Some(repl);
+        }
     }
-    ids.sort_unstable();
-    ids.dedup();
-    super::super::dom::detach_nodes(doc, ids);
+    None
 }
 
-fn remove_gmail_wrote_headers(doc: &mut Html) {
-    let Ok(sel) = Selector::parse("div, p, blockquote, td") else {
-        return;
-    };
-    let ids: Vec<NodeId> = doc
-        .select(&sel)
-        .filter(|el| block_starts_with_gmail_wrote(*el))
-        .map(|el| el.id())
+fn replacement_for_quote(doc: &Html, el: ElementRef<'_>) -> Option<(String, String)> {
+    let parent = el.parent()?;
+    let children: Vec<NodeRef<'_, Node>> = parent.children().collect();
+    let q_idx = children.iter().position(|n| n.id() == el.id())?;
+    let start = prev_pure_wrote_index(&children, q_idx).unwrap_or(q_idx);
+    if outside_mass(doc, &children[start..=q_idx]) < 3 {
+        return None;
+    }
+    let outer: String = children[start..=q_idx]
+        .iter()
+        .map(|n| node_outer_html(*n))
         .collect();
-    super::super::dom::detach_nodes(doc, ids);
+    if outer.is_empty() {
+        return None;
+    }
+    let summary = if start < q_idx {
+        collapse_ws(
+            &ElementRef::wrap(children[start])?
+                .text()
+                .collect::<String>(),
+        )
+    } else {
+        summary_for(el)
+    };
+    let inner: String = el.children().map(node_outer_html).collect();
+    Some((outer, details_html(&summary, &inner)))
 }
 
-fn block_starts_with_gmail_wrote(el: ElementRef<'_>) -> bool {
+fn signature_replacement(doc: &Html) -> Option<(String, String)> {
+    let sel = Selector::parse(".gmail_signature").ok()?;
+    for el in doc.select(&sel) {
+        if inside_preserved_region(el) || has_quote_ancestor(el) {
+            continue;
+        }
+        if element_visible_mass(el) == 0 {
+            continue;
+        }
+        let outer = el.html();
+        if outer.is_empty() {
+            continue;
+        }
+        let inner: String = el.children().map(node_outer_html).collect();
+        let wrapped = format!(r#"<div class="rm-mail-signature">{inner}</div>"#);
+        return Some((outer, wrapped));
+    }
+    None
+}
+
+fn is_quote_container(el: ElementRef<'_>) -> bool {
+    if has_class(el, "gmail_quote") || has_class(el, "gmail_quote_container") {
+        return true;
+    }
+    if has_class(el, "gmail_extra") && quote_signal(el) {
+        return true;
+    }
+    el.value().name() == "blockquote"
+        && el
+            .attr("type")
+            .is_some_and(|t| t.eq_ignore_ascii_case("cite"))
+}
+
+fn quote_signal(el: ElementRef<'_>) -> bool {
+    if el
+        .select(&Selector::parse(".gmail_quote, blockquote").unwrap())
+        .next()
+        .is_some()
+    {
+        return true;
+    }
+    el.text()
+        .collect::<String>()
+        .lines()
+        .any(|line| is_wrote_line(line.trim()))
+}
+
+fn has_quote_ancestor(el: ElementRef<'_>) -> bool {
+    el.ancestors()
+        .filter_map(ElementRef::wrap)
+        .any(is_quote_container)
+}
+
+fn inside_preserved_region(el: ElementRef<'_>) -> bool {
+    el.ancestors()
+        .filter_map(ElementRef::wrap)
+        .any(|a| has_class(a, "rm-mail-folded-quote") || has_class(a, "rm-mail-signature"))
+}
+
+fn has_class(el: ElementRef<'_>, name: &str) -> bool {
+    el.attr("class")
+        .unwrap_or("")
+        .split_whitespace()
+        .any(|c| c == name)
+}
+
+fn prev_pure_wrote_index(children: &[NodeRef<'_, Node>], quote_idx: usize) -> Option<usize> {
+    let mut i = quote_idx;
+    while i > 0 {
+        i -= 1;
+        match children[i].value() {
+            Node::Text(t) if t.trim().is_empty() => continue,
+            Node::Element(_) => {
+                let el = ElementRef::wrap(children[i])?;
+                if is_pure_wrote_element(el) && !is_quote_container(el) {
+                    return Some(i);
+                }
+                return None;
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
+fn is_pure_wrote_element(el: ElementRef<'_>) -> bool {
+    let text = collapse_ws(&el.text().collect::<String>());
+    text.len() < 180 && is_wrote_line(&text)
+}
+
+fn is_wrote_line(text: &str) -> bool {
+    let t = collapse_ws(text);
+    !t.is_empty() && RE_WROTE_LINE.is_match(&t)
+}
+
+/// Texte hors de la citation, sans compter une signature qui sera masquée.
+fn outside_mass(doc: &Html, quoted_nodes: &[NodeRef<'_, Node>]) -> usize {
+    let quoted_ids: HashSet<NodeId> = quoted_nodes.iter().map(|n| n.id()).collect();
+    let mut mass = 0usize;
+    for node in doc.tree.root().descendants() {
+        let Node::Text(text) = node.value() else {
+            continue;
+        };
+        if quoted_ids.contains(&node.id()) || node.ancestors().any(|a| quoted_ids.contains(&a.id()))
+        {
+            continue;
+        }
+        if node
+            .ancestors()
+            .filter_map(ElementRef::wrap)
+            .any(|a| has_class(a, "gmail_signature") || has_class(a, "rm-mail-signature"))
+        {
+            continue;
+        }
+        mass += visible_char_count(text);
+    }
+    mass
+}
+
+fn summary_for(el: ElementRef<'_>) -> String {
     let text = el.text().collect::<String>();
     let first = text
         .lines()
         .map(str::trim)
         .find(|l| !l.is_empty())
         .unwrap_or("");
-    RE_GMAIL_WROTE.is_match(first)
+    if is_wrote_line(first) {
+        truncate_chars(first, 160)
+    } else {
+        "Citation".to_string()
+    }
+}
+
+fn details_html(summary: &str, inner: &str) -> String {
+    let summary = truncate_chars(&collapse_ws(summary), 160);
+    let label = if summary.is_empty() {
+        "Citation".to_string()
+    } else {
+        summary
+    };
+    format!(
+        r#"<details class="rm-mail-folded-quote"><summary>{}</summary>{}</details>"#,
+        escape_html_text(&label),
+        strip_quote_class_attrs(inner)
+    )
+}
+
+fn strip_quote_class_attrs(html: &str) -> String {
+    RE_CLASS_ATTR
+        .replace_all(html, |caps: &regex::Captures| {
+            let kept: Vec<&str> = caps
+                .get(1)
+                .map(|m| m.as_str())
+                .unwrap_or("")
+                .split_whitespace()
+                .filter(|token| !QUOTE_CLASS_TOKENS.contains(token))
+                .collect();
+            if kept.is_empty() {
+                String::new()
+            } else {
+                format!(r#" class="{}""#, kept.join(" "))
+            }
+        })
+        .into_owned()
+}
+
+fn collapse_ws(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn truncate_chars(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let mut out: String = s.chars().take(max).collect();
+    out.push('…');
+    out
 }
 
 fn remove_trimmed_content_nodes(doc: &mut Html) {
     let Ok(sel) = Selector::parse("div, span, p, a") else {
         return;
     };
-    let ids: Vec<NodeId> = doc
+    let ids: Vec<_> = doc
         .select(&sel)
         .filter(|el| {
+            if inside_preserved_region(*el) {
+                return false;
+            }
             let t = el.text().collect::<String>();
-            RE_TRIMMED.is_match(&t) && super::super::dom::visible_char_count(&t) < 80
+            RE_TRIMMED.is_match(&t) && visible_char_count(&t) < 80
         })
         .map(|el| el.id())
         .collect();
     super::super::dom::detach_nodes(doc, ids);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn folds_gmail_quote_and_keeps_the_reply() {
+        let html = r#"<div><p>Réponse courte du fil.</p><div class="gmail_quote"><div>On Mon, 1 Jan 2024 at 10:00, Alice wrote:</div><blockquote class="gmail_quote">Ancien message long dans le fil.</blockquote></div></div>"#;
+        let mut doc = Html::parse_fragment(html);
+        clean_gmail_noise(&mut doc);
+        let out = serialize_fragment(&doc);
+        assert!(out.contains("Réponse courte"));
+        assert!(out.contains("rm-mail-folded-quote"));
+        assert!(out.contains("Ancien message long"));
+        assert!(!out.contains("gmail_quote"));
+        let reply = out.find("Réponse courte").unwrap();
+        let quoted = out.find("Ancien message long").unwrap();
+        assert!(reply < quoted);
+    }
+
+    #[test]
+    fn sole_gmail_quote_stays_readable() {
+        let html = r#"<div class="gmail_quote"><p>Seul contenu du transfert.</p></div>"#;
+        let mut doc = Html::parse_fragment(html);
+        clean_gmail_noise(&mut doc);
+        let out = serialize_fragment(&doc);
+        assert!(out.contains("Seul contenu du transfert"));
+        assert!(!out.contains("rm-mail-folded-quote"));
+        assert!(!out.contains("gmail_quote"));
+    }
 }

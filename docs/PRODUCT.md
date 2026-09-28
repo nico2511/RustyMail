@@ -19,7 +19,7 @@ RustyMail (formerly planned as “RustMaily”) is a **readability-first, local-
 
 | Area | Direction |
 | ---- | --------- |
-| Reading | Thread-oriented view, provider-specific HTML cleaning (Amazon, Deblock, generic), heuristic security signals |
+| Reading | Thread-oriented view. Generic HTML cleaning keeps a person-to-person mail as a discussion (folded quotes, attenuated signatures). Amazon, Deblock and GitHub stay separate digest paths. Heuristic security signals |
 | Writing | Markdown composer, reply/reply-all/forward, dictation, optional AI rewrite |
 | Organization | Tags, facets, archive layouts, organization center with batch actions |
 | Search | Lexical, semantic (MiniLM), hybrid, optional natural-language query via LLM |
