@@ -3506,10 +3506,23 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .thread-reading.thread-reading--reading-layout .thread-reading-head {
-  padding-bottom: 20px;
-  margin-bottom: 4px;
+  padding-top: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 0;
   border-bottom: 1px solid var(--border-weak);
-  background: rgba(0, 0, 0, 0.18);
+  /* Même surface que la lecture : l’ancien voile noir (0.18) faisait une plaque grise au clair. */
+  background: var(--base);
+}
+
+.thread-reading.thread-reading--reading-layout .thread-reading-nav {
+  margin-bottom: 8px;
+}
+
+.thread-reading.thread-reading--reading-layout .thread-reading-stats {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
 }
 
 /* En-tête et titre : toute la largeur de la colonne fil (pas de bande vide latérale). */
@@ -3590,22 +3603,22 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-card {
-  margin-top: 6px;
-  padding: 14px 18px 18px;
-  border-radius: var(--radius-md, 10px);
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  margin-top: 2px;
+  padding: 4px 2px 12px;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .thread-reading.thread-reading--reading-layout .message.has-html .thread-msg-card {
-  padding: 14px 18px 16px;
-  background: rgba(255, 255, 255, 0.035);
+  padding: 2px 2px 10px;
+  background: transparent;
 }
 
 .thread-reading.thread-reading--reading-layout .message.mine .thread-msg-card {
-  background: rgba(78, 88, 100, 0.12);
-  border-color: rgba(78, 88, 100, 0.22);
+  background: transparent;
+  border-color: transparent;
   box-shadow: none;
 }
 
@@ -3614,17 +3627,21 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill,
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .icon-pill,
 .thread-reading.thread-reading--reading-layout .thread-reading-nav-actions > .icon-pill.thread-nav-icon {
   border: 0;
   background: transparent;
   box-shadow: none;
-  opacity: 0.92;
+  color: var(--dim);
+  opacity: 1;
 }
 
 .thread-reading.thread-reading--reading-layout .thread-more-actions .icon-pill:hover,
+.thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .icon-pill:hover,
 .thread-reading.thread-reading--reading-layout .thread-reading-nav-actions > .icon-pill.thread-nav-icon:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  background: var(--hover);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill,
@@ -3632,11 +3649,13 @@ button.thread-tag-chip--search:focus-visible {
   border: 0;
   background: transparent;
   box-shadow: none;
+  color: var(--dim);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill:hover,
 .thread-reading.thread-reading--reading-layout .thread-msg-head-actions .icon-pill-sm:hover {
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  background: var(--hover);
 }
 
 .thread-reading.thread-reading--reading-layout .inbox-seen-toggle--is-unread {
