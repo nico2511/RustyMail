@@ -1,6 +1,8 @@
 /** Organiser V2 — file d’actions avec mémoire (V1 reste accessible séparément). */
 
 import { invoke } from "@tauri-apps/api/core";
+import { LLM_INVOKE_TIMEOUT_MS } from "./app/core/timeouts";
+import { withTimeout } from "./app/lib/tauriCommand";
 import { navRenderTrailHtml } from "./navigation";
 import {
   formatOrgApplyImpact,
@@ -149,13 +151,20 @@ export function orgV2ProposalBatchCleared(proposal: OrgProposal | undefined): bo
   return (proposal.totalCount ?? 0) === 0 && threadN === 0 && mbN === 0;
 }
 
+const ORG_V2_SCAN_TIMEOUT_MESSAGE =
+  "Délai dépassé : l’orientation n’a pas abouti. Vérifiez le moteur IA (Ollama, llama-server ou OpenRouter) puis réessayez.";
+
 export async function orgV2ScanAccount(
   accountId: string,
   includeLlm = false,
 ): Promise<OrgV2ScanReport> {
-  return invoke<OrgV2ScanReport>("org_v2_scan_account_cmd", {
-    payload: { accountId, includeLlm },
-  });
+  return withTimeout(
+    invoke<OrgV2ScanReport>("org_v2_scan_account_cmd", {
+      payload: { accountId, includeLlm },
+    }),
+    LLM_INVOKE_TIMEOUT_MS,
+    ORG_V2_SCAN_TIMEOUT_MESSAGE,
+  );
 }
 
 export async function orgV2RecordDecision(

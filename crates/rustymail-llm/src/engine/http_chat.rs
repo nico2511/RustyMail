@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::error::Error;
 use std::fmt::Display;
+use std::io::Read;
 use std::ops::ControlFlow;
 use std::thread;
 use std::time::Duration;
@@ -30,6 +31,20 @@ struct ChatCompletionRequest<'a> {
     /// Grammaire GBNF (llama-server / llama.cpp) — ignorée par OpenRouter et Ollama.
     #[serde(skip_serializing_if = "Option::is_none")]
     grammar: Option<&'a str>,
+    /// Ollama : forcer une réponse unique. Absent pour OpenRouter / llama-server.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream: Option<bool>,
+    /// Ollama : désactive la chaîne de raisonnement qui peut ne jamais produire de `content`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    think: Option<bool>,
+    /// Ollama : `num_predict` borne la génération même si `max_tokens` est ignoré.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    options: Option<OllamaGenOptions>,
+}
+
+#[derive(Debug, Serialize)]
+struct OllamaGenOptions {
+    num_predict: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +60,9 @@ struct ChatChoice {
 #[derive(Debug, Deserialize)]
 struct ChatMessageOut {
     content: Option<String>,
+    /// Modèles « think » (Ollama) : repli si `content` est vide.
+    #[serde(default)]
+    reasoning: Option<String>,
 }
 
 /// Grammaire effective : `LlmGenParams.grammar_gbnf` prioritaire, sinon `schema_gbnf` du caller.
@@ -63,23 +81,40 @@ pub(crate) fn effective_grammar<'a>(p: &'a LlmGenParams, schema_gbnf: &'a str) -
     }
 }
 
-fn extract_jsonish_text(raw: &str) -> &str {
-    let t = raw.trim();
+fn extract_jsonish_text(raw: &str) -> String {
+    let mut t = raw.trim().trim_start_matches('\u{feff}').to_string();
     if let Some(i) = t.find("```") {
         let after = &t[i + 3..];
-        let after = after.strip_prefix("json").unwrap_or(after).trim_start();
-        if let Some(end) = after.find("```") {
-            return after[..end].trim();
+        let after = after
+            .trim_start()
+            .strip_prefix("json")
+            .or_else(|| after.trim_start().strip_prefix("JSON"))
+            .unwrap_or(after)
+            .trim_start();
+        let inner = if let Some(end) = after.find("```") {
+            after[..end].trim()
+        } else {
+            after.trim()
+        };
+        if inner.contains('{') || inner.contains('[') {
+            t = inner.to_string();
         }
     }
-    if let Some(i) = t.find('{') {
-        if let Some(j) = t.rfind('}') {
-            if j >= i {
-                return &t[i..=j];
+    let t = t.trim();
+    if let Some(rel) = t.find(['{', '[']) {
+        let slice = &t[rel..];
+        let mut stream = serde_json::Deserializer::from_str(slice).into_iter::<serde_json::Value>();
+        if let Some(Ok(value)) = stream.next() {
+            if matches!(
+                value,
+                serde_json::Value::Object(_) | serde_json::Value::Array(_)
+            ) {
+                let end = stream.byte_offset();
+                return slice[..end].to_string();
             }
         }
     }
-    t
+    t.to_string()
 }
 
 /// Variante d’en-têtes / auth pour les backends compatibles chat/completions.
@@ -136,9 +171,21 @@ fn base_url_looks_loopback(base_url: &str) -> bool {
         || lower.contains("0.0.0.0")
 }
 
-fn build_blocking_client(for_loopback: bool) -> Result<reqwest::blocking::Client, LlmError> {
-    // Aligné avec le timeout front `LLM_INVOKE` (~200s) : une requête peut attendre chargement + génération longue.
-    let mut b = reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(195));
+fn build_blocking_client(
+    kind: HttpChatBackendKind,
+    for_loopback: bool,
+) -> Result<reqwest::blocking::Client, LlmError> {
+    // OpenRouter / llama-server : aligné sur le timeout front `LLM_INVOKE` (~200s).
+    // Ollama : borne plus courte pour qu’un chargement ou une génération sans fin s’arrête.
+    let (total, connect) = match kind {
+        HttpChatBackendKind::Ollama => (OLLAMA_REQUEST_TIMEOUT, OLLAMA_CONNECT_TIMEOUT),
+        HttpChatBackendKind::OpenRouter | HttpChatBackendKind::OpenAiCompatible => {
+            (Duration::from_secs(195), Duration::from_secs(10))
+        }
+    };
+    let mut b = reqwest::blocking::Client::builder()
+        .connect_timeout(connect)
+        .timeout(total);
     if for_loopback {
         b = b.no_proxy();
     }
@@ -159,6 +206,213 @@ fn llama_server_model_still_loading(status: StatusCode, body: &str) -> bool {
 
 const MODEL_LOAD_POLL_MS: u64 = 700;
 const MODEL_LOAD_MAX_ATTEMPTS: u32 = 90;
+/// Ollama : quelques essais si le serveur dit « modèle en chargement », puis échec visible.
+const OLLAMA_LOAD_MAX_ATTEMPTS: u32 = 3;
+const OLLAMA_REQUEST_TIMEOUT: Duration = Duration::from_secs(180);
+const OLLAMA_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+
+fn ollama_status_retryable(status: StatusCode, body: &str) -> bool {
+    let b = body.to_ascii_lowercase();
+    if status == StatusCode::NOT_FOUND
+        || b.contains("not found")
+        || b.contains("try pulling")
+        || b.contains("try pull")
+    {
+        return false;
+    }
+    status == StatusCode::SERVICE_UNAVAILABLE || status == StatusCode::TOO_MANY_REQUESTS
+}
+
+fn ollama_status_error(status: StatusCode, body: &str, model: &str) -> LlmError {
+    let b = body.to_ascii_lowercase();
+    if status == StatusCode::NOT_FOUND
+        || b.contains("not found")
+        || b.contains("try pulling")
+        || b.contains("try pull")
+    {
+        return LlmError::Msg(format!(
+            "Ollama : modèle « {model} » introuvable. Vérifiez le nom (`ollama list`) ou téléchargez-le (`ollama pull {model}`)."
+        ));
+    }
+    let snippet: String = body.chars().take(400).collect();
+    LlmError::Msg(format!("Ollama HTTP {status} : {snippet}"))
+}
+
+fn message_visible_text(message: &ChatMessageOut) -> String {
+    let content = message.content.clone().unwrap_or_default();
+    if content.trim().is_empty() {
+        message.reasoning.clone().unwrap_or_default()
+    } else {
+        content
+    }
+}
+
+/// Corps OpenAI unique, ou flux SSE / NDJSON (Ollama qui streame malgré `stream: false`).
+fn completion_text_from_body(body: &str) -> Result<String, LlmError> {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+        if v.get("choices").is_none() {
+            if let Some(msg) = v
+                .pointer("/error/message")
+                .and_then(|m| m.as_str())
+                .filter(|s| !s.trim().is_empty())
+            {
+                return Err(LlmError::Msg(format!("Moteur LLM : {msg}")));
+            }
+        }
+    }
+    if let Ok(parsed) = serde_json::from_str::<ChatCompletionResponse>(body) {
+        let text = parsed
+            .choices
+            .first()
+            .map(message_visible_text_choice)
+            .unwrap_or_default();
+        return Ok(text);
+    }
+    if let Some(text) = assemble_streamed_completion(body) {
+        return Ok(text);
+    }
+    let detail = serde_json::from_str::<serde_json::Value>(body)
+        .err()
+        .map(|e| e.to_string())
+        .unwrap_or_else(|| "corps inattendu".into());
+    Err(LlmError::InvalidJson(format!(
+        "Réponse du moteur illisible ({detail})."
+    )))
+}
+
+fn message_visible_text_choice(choice: &ChatChoice) -> String {
+    message_visible_text(&choice.message)
+}
+
+fn assemble_streamed_completion(body: &str) -> Option<String> {
+    let mut delta_acc = String::new();
+    let mut message_acc = String::new();
+    let mut saw_delta = false;
+    let mut saw_native = false;
+    let mut first_full_message: Option<String> = None;
+    let mut pieces = 0u32;
+    for line in body.lines() {
+        let payload = line.trim();
+        let payload = payload
+            .strip_prefix("data:")
+            .map(str::trim)
+            .unwrap_or(payload);
+        if payload.is_empty() {
+            continue;
+        }
+        if payload == "[DONE]" {
+            break;
+        }
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(payload) else {
+            continue;
+        };
+        pieces += 1;
+        if v.get("done").is_some() {
+            saw_native = true;
+        }
+        if let Some(d) = v
+            .pointer("/choices/0/delta/content")
+            .and_then(|c| c.as_str())
+        {
+            saw_delta = true;
+            delta_acc.push_str(d);
+        }
+        if let Some(m) = v
+            .pointer("/choices/0/message/content")
+            .and_then(|c| c.as_str())
+        {
+            if first_full_message.is_none() && !m.is_empty() {
+                first_full_message = Some(m.to_string());
+            }
+            if saw_native {
+                message_acc.push_str(m);
+            }
+        }
+        if let Some(m) = v.pointer("/message/content").and_then(|c| c.as_str()) {
+            saw_native = true;
+            message_acc.push_str(m);
+        }
+        if v.get("done").and_then(|d| d.as_bool()) == Some(true) {
+            break;
+        }
+    }
+    if pieces == 0 {
+        return None;
+    }
+    if saw_delta {
+        return Some(delta_acc);
+    }
+    if saw_native {
+        return Some(message_acc);
+    }
+    first_full_message
+}
+
+enum SseFeed {
+    Continue,
+    Done,
+}
+
+fn feed_sse_line<E: Display>(
+    kind: HttpChatBackendKind,
+    line: &str,
+    full: &mut String,
+    on_chunk: &mut impl FnMut(&str) -> ControlFlow<Result<(), E>>,
+) -> Result<SseFeed, LlmError> {
+    let line = line.trim();
+    if line.is_empty() {
+        return Ok(SseFeed::Continue);
+    }
+    let payload = if let Some(rest) = line.strip_prefix("data:") {
+        rest.trim()
+    } else if kind == HttpChatBackendKind::Ollama && line.starts_with('{') {
+        line
+    } else {
+        return Ok(SseFeed::Continue);
+    };
+    if payload == "[DONE]" {
+        return Ok(SseFeed::Done);
+    }
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(payload) else {
+        return Ok(SseFeed::Continue);
+    };
+    let delta = v
+        .pointer("/choices/0/delta/content")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    let native = v
+        .pointer("/message/content")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    let piece = if !delta.is_empty() { delta } else { native };
+    if !piece.is_empty() {
+        full.push_str(piece);
+        match on_chunk(piece) {
+            ControlFlow::Continue(()) => {}
+            ControlFlow::Break(Ok(())) => return Ok(SseFeed::Done),
+            ControlFlow::Break(Err(e)) => return Err(LlmError::Msg(e.to_string())),
+        }
+    }
+    let finish = v["choices"][0]["finish_reason"].as_str().unwrap_or("");
+    let native_done = v.get("done").and_then(|d| d.as_bool()) == Some(true);
+    if native_done || (!finish.is_empty() && finish != "null") {
+        return Ok(SseFeed::Done);
+    }
+    Ok(SseFeed::Continue)
+}
+
+fn output_repeats(text: &str) -> bool {
+    let chars: Vec<char> = text.chars().collect();
+    const WINDOW: usize = 64;
+    if chars.len() < WINDOW * 3 {
+        return false;
+    }
+    let n = chars.len();
+    let a = &chars[n - WINDOW..];
+    let b = &chars[n - 2 * WINDOW..n - WINDOW];
+    let c = &chars[n - 3 * WINDOW..n - 2 * WINDOW];
+    a == b && b == c
+}
 
 impl HttpChatEngine {
     fn normalize_base(mut base_url: String) -> Result<String, LlmError> {
@@ -185,7 +439,10 @@ impl HttpChatEngine {
             return Err(LlmError::Msg("OpenRouter: modèle vide.".into()));
         }
         let base_norm = Self::normalize_base(base_url)?;
-        let client = build_blocking_client(base_url_looks_loopback(&base_norm))?;
+        let client = build_blocking_client(
+            HttpChatBackendKind::OpenRouter,
+            base_url_looks_loopback(&base_norm),
+        )?;
         Ok(Self {
             client,
             api_key: api_key.trim().to_string(),
@@ -207,7 +464,10 @@ impl HttpChatEngine {
             return Err(LlmError::Msg("Serveur LLM: modèle vide.".into()));
         }
         let base_norm = Self::normalize_base(base_url)?;
-        let client = build_blocking_client(base_url_looks_loopback(&base_norm))?;
+        let client = build_blocking_client(
+            HttpChatBackendKind::OpenAiCompatible,
+            base_url_looks_loopback(&base_norm),
+        )?;
         Ok(Self {
             client,
             api_key: api_key.trim().to_string(),
@@ -227,7 +487,10 @@ impl HttpChatEngine {
             ));
         }
         let base_norm = Self::normalize_base(base_url)?;
-        let client = build_blocking_client(base_url_looks_loopback(&base_norm))?;
+        let client = build_blocking_client(
+            HttpChatBackendKind::Ollama,
+            base_url_looks_loopback(&base_norm),
+        )?;
         Ok(Self {
             client,
             api_key: String::new(),
@@ -296,10 +559,25 @@ impl HttpChatEngine {
                 None
             },
             grammar,
+            stream: match self.kind {
+                HttpChatBackendKind::Ollama => Some(false),
+                _ => None,
+            },
+            think: match self.kind {
+                HttpChatBackendKind::Ollama => Some(false),
+                _ => None,
+            },
+            options: match self.kind {
+                HttpChatBackendKind::Ollama => Some(OllamaGenOptions {
+                    num_predict: p.max_tokens.max(1),
+                }),
+                _ => None,
+            },
         };
 
+        let attempts = self.max_http_attempts();
         let mut last_loading_hint: Option<String> = None;
-        for attempt in 0..MODEL_LOAD_MAX_ATTEMPTS {
+        for attempt in 0..attempts {
             if attempt > 0 {
                 thread::sleep(Duration::from_millis(MODEL_LOAD_POLL_MS));
             }
@@ -308,19 +586,15 @@ impl HttpChatEngine {
             let resp = self
                 .apply_auth(req)
                 .send()
-                .map_err(|e| map_reqwest_send_err("LLM HTTP", e))?;
+                .map_err(|e| self.map_transport_err("LLM HTTP", e))?;
 
             let status = resp.status();
             if status.is_success() {
                 let t_body = std::time::Instant::now();
-                let parsed: ChatCompletionResponse = resp
-                    .json()
-                    .map_err(|e| LlmError::Msg(format!("LLM JSON: {e}")))?;
-                let text = parsed
-                    .choices
-                    .first()
-                    .and_then(|c| c.message.content.clone())
-                    .unwrap_or_default();
+                let raw_body = resp
+                    .text()
+                    .map_err(|e| self.map_transport_err("LLM HTTP", e))?;
+                let text = completion_text_from_body(&raw_body)?;
                 if std::env::var_os("RUSTYMAIL_AI_PERF").is_some() {
                     let total_ms = t0.elapsed().as_millis();
                     let parse_ms = t_body.elapsed().as_millis();
@@ -335,26 +609,19 @@ impl HttpChatEngine {
             }
 
             let txt = resp.text().unwrap_or_default();
-            let retry = self.kind == HttpChatBackendKind::OpenAiCompatible
-                && llama_server_model_still_loading(status, &txt);
-            if retry {
+            if self.http_status_retry(status, &txt) {
                 last_loading_hint = Some(format!(
-                    "LLM HTTP {status} (chargement modèle, tentative {}/{})",
-                    attempt + 1,
-                    MODEL_LOAD_MAX_ATTEMPTS
+                    "LLM HTTP {status} (chargement modèle, tentative {}/{attempts})",
+                    attempt + 1
                 ));
-                continue;
+                if attempt + 1 < attempts {
+                    continue;
+                }
+                return Err(self.loading_exhausted_err(last_loading_hint.as_deref()));
             }
-            return Err(LlmError::Msg(format!(
-                "LLM HTTP {status}: {}",
-                txt.chars().take(800).collect::<String>()
-            )));
+            return Err(self.http_status_err(status, &txt));
         }
-        Err(LlmError::Msg(format!(
-            "{} — le serveur répond encore 503 pendant le chargement du modèle (VRAM). Augmentez le délai ou attendez la fin du chargement.",
-            last_loading_hint
-                .unwrap_or_else(|| "LLM HTTP 503 (timeout attente chargement)".into())
-        )))
+        Err(self.loading_exhausted_err(last_loading_hint.as_deref()))
     }
 
     pub fn generate_json<T: DeserializeOwned>(
@@ -369,7 +636,12 @@ impl HttpChatEngine {
         );
         let raw = self.generate(&sys, user, p, schema_gbnf)?;
         let slice = extract_jsonish_text(&raw);
-        serde_json::from_str(slice).map_err(|e| LlmError::InvalidJson(e.to_string()))
+        if slice.trim().is_empty() || (!slice.contains('{') && !slice.contains('[')) {
+            return Err(LlmError::InvalidJson(
+                "Réponse du modèle sans JSON exploitable (objet ou tableau attendu).".into(),
+            ));
+        }
+        serde_json::from_str(&slice).map_err(|e| LlmError::InvalidJson(e.to_string()))
     }
 
     pub fn generate_streaming<E: Display>(
@@ -401,10 +673,20 @@ impl HttpChatEngine {
                 obj.insert("top_p".into(), json!(tp));
             }
         }
+        if self.kind == HttpChatBackendKind::Ollama {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("think".into(), json!(false));
+                obj.insert(
+                    "options".into(),
+                    json!({ "num_predict": p.max_tokens.max(1) }),
+                );
+            }
+        }
 
+        let attempts = self.max_http_attempts();
         let mut last_loading_hint: Option<String> = None;
         let mut text_out: Option<String> = None;
-        for attempt in 0..MODEL_LOAD_MAX_ATTEMPTS {
+        for attempt in 0..attempts {
             if attempt > 0 {
                 thread::sleep(Duration::from_millis(MODEL_LOAD_POLL_MS));
             }
@@ -416,62 +698,163 @@ impl HttpChatEngine {
             let resp = self
                 .apply_auth(req)
                 .send()
-                .map_err(|e| map_reqwest_send_err("LLM stream HTTP", e))?;
+                .map_err(|e| self.map_transport_err("LLM stream HTTP", e))?;
 
             let status = resp.status();
             if status.is_success() {
-                let text = resp.text().map_err(|e| LlmError::Msg(e.to_string()))?;
+                let text = self.read_sse_body(resp, &mut on_chunk)?;
                 text_out = Some(text);
                 break;
             }
             let txt = resp.text().unwrap_or_default();
-            let retry = self.kind == HttpChatBackendKind::OpenAiCompatible
-                && llama_server_model_still_loading(status, &txt);
-            if retry {
+            if self.http_status_retry(status, &txt) {
                 last_loading_hint = Some(format!(
-                    "LLM stream {status} (chargement modèle, tentative {}/{})",
-                    attempt + 1,
-                    MODEL_LOAD_MAX_ATTEMPTS
+                    "LLM stream {status} (chargement modèle, tentative {}/{attempts})",
+                    attempt + 1
                 ));
-                continue;
+                if attempt + 1 < attempts {
+                    continue;
+                }
+                return Err(self.loading_exhausted_err(last_loading_hint.as_deref()));
             }
-            return Err(LlmError::Msg(format!(
-                "LLM stream {status}: {}",
-                txt.chars().take(800).collect::<String>()
-            )));
+            return Err(self.http_status_err(status, &txt));
         }
-        let text = text_out.ok_or_else(|| {
-            LlmError::Msg(format!(
-                "{} — timeout attente fin du chargement modèle (503).",
-                last_loading_hint.unwrap_or_else(|| "LLM stream 503".into())
-            ))
-        })?;
+        text_out.ok_or_else(|| self.loading_exhausted_err(last_loading_hint.as_deref()))
+    }
 
-        let mut full = String::new();
-        for line in text.lines() {
-            let line = line.trim();
-            if !line.starts_with("data:") {
-                continue;
+    fn max_http_attempts(&self) -> u32 {
+        match self.kind {
+            HttpChatBackendKind::Ollama => OLLAMA_LOAD_MAX_ATTEMPTS,
+            HttpChatBackendKind::OpenRouter | HttpChatBackendKind::OpenAiCompatible => {
+                MODEL_LOAD_MAX_ATTEMPTS
             }
-            let payload = line.trim_start_matches("data:").trim();
-            if payload == "[DONE]" {
+        }
+    }
+
+    fn http_status_retry(&self, status: StatusCode, body: &str) -> bool {
+        match self.kind {
+            HttpChatBackendKind::OpenAiCompatible => llama_server_model_still_loading(status, body),
+            HttpChatBackendKind::Ollama => ollama_status_retryable(status, body),
+            HttpChatBackendKind::OpenRouter => false,
+        }
+    }
+
+    fn map_transport_err(&self, ctx: &str, e: reqwest::Error) -> LlmError {
+        if e.is_timeout() {
+            let who = match self.kind {
+                HttpChatBackendKind::Ollama => "Ollama",
+                HttpChatBackendKind::OpenRouter => "OpenRouter",
+                HttpChatBackendKind::OpenAiCompatible => "llama-server",
+            };
+            return LlmError::Msg(format!(
+                "{who} : délai dépassé ({ctx}). Le modèle n’a pas fini (chargement ou génération trop longue)."
+            ));
+        }
+        if self.kind == HttpChatBackendKind::Ollama && e.is_connect() {
+            return LlmError::Msg(format!(
+                "Ollama injoignable. Lancez `ollama serve` ou corrigez l’URL. Détail : {e}"
+            ));
+        }
+        map_reqwest_send_err(ctx, e)
+    }
+
+    fn http_status_err(&self, status: StatusCode, body: &str) -> LlmError {
+        if self.kind == HttpChatBackendKind::Ollama {
+            return ollama_status_error(status, body, &self.model);
+        }
+        LlmError::Msg(format!(
+            "LLM HTTP {status}: {}",
+            body.chars().take(800).collect::<String>()
+        ))
+    }
+
+    fn loading_exhausted_err(&self, hint: Option<&str>) -> LlmError {
+        if self.kind == HttpChatBackendKind::Ollama {
+            return LlmError::Msg(
+                "Ollama : le modèle met trop longtemps à se charger. Réessayez dans un instant, ou lancez `ollama run <modèle>` une fois pour le précharger."
+                    .into(),
+            );
+        }
+        LlmError::Msg(format!(
+            "{} — le serveur répond encore 503 pendant le chargement du modèle (VRAM). Augmentez le délai ou attendez la fin du chargement.",
+            hint.unwrap_or("LLM HTTP 503 (timeout attente chargement)")
+        ))
+    }
+
+    fn read_sse_body<E: Display>(
+        &self,
+        mut resp: impl Read,
+        on_chunk: &mut impl FnMut(&str) -> ControlFlow<Result<(), E>>,
+    ) -> Result<String, LlmError> {
+        let mut raw: Vec<u8> = Vec::new();
+        let mut buf = [0u8; 4096];
+        let mut consumed_lines = 0usize;
+        let mut full = String::new();
+        loop {
+            let n = resp.read(&mut buf).map_err(|e| {
+                let msg = e.to_string();
+                let lower = msg.to_ascii_lowercase();
+                if e.kind() == std::io::ErrorKind::TimedOut
+                    || lower.contains("timed out")
+                    || lower.contains("timeout")
+                {
+                    let who = match self.kind {
+                        HttpChatBackendKind::Ollama => "Ollama",
+                        HttpChatBackendKind::OpenRouter => "OpenRouter",
+                        HttpChatBackendKind::OpenAiCompatible => "llama-server",
+                    };
+                    return LlmError::Msg(format!(
+                        "{who} : délai dépassé (flux). Le modèle n’a pas fini (chargement ou génération trop longue)."
+                    ));
+                }
+                LlmError::Msg(format!("Lecture du flux LLM : {e}"))
+            })?;
+            if n == 0 {
+                let text = String::from_utf8_lossy(&raw);
+                let pending = match text.rsplit_once('\n') {
+                    Some((_, rest)) => rest,
+                    None => text.as_ref(),
+                };
+                if !pending.trim().is_empty() {
+                    feed_sse_line(self.kind, pending, &mut full, on_chunk)?;
+                    if self.kind == HttpChatBackendKind::Ollama && output_repeats(&full) {
+                        return Err(LlmError::Msg(
+                            "Ollama : la génération se répète. Arrêt pour éviter une boucle."
+                                .into(),
+                        ));
+                    }
+                }
                 break;
             }
-            let v: serde_json::Value = match serde_json::from_str(payload) {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-            let piece = v["choices"][0]["delta"]["content"].as_str().unwrap_or("");
-            if piece.is_empty() {
-                continue;
-            }
-            full.push_str(piece);
-            match on_chunk(piece) {
-                ControlFlow::Continue(()) => {}
-                ControlFlow::Break(Ok(())) => return Ok(full),
-                ControlFlow::Break(Err(e)) => {
-                    return Err(LlmError::Msg(e.to_string()));
+            raw.extend_from_slice(&buf[..n]);
+            let text = String::from_utf8_lossy(&raw);
+            let lines = text.split_inclusive('\n');
+            let mut seen = 0usize;
+            let mut stopped = false;
+            for line in lines {
+                if !line.ends_with('\n') {
+                    break;
                 }
+                seen += 1;
+                if seen <= consumed_lines {
+                    continue;
+                }
+                consumed_lines = seen;
+                match feed_sse_line(self.kind, line, &mut full, on_chunk)? {
+                    SseFeed::Continue => {}
+                    SseFeed::Done => {
+                        stopped = true;
+                        break;
+                    }
+                }
+                if self.kind == HttpChatBackendKind::Ollama && output_repeats(&full) {
+                    return Err(LlmError::Msg(
+                        "Ollama : la génération se répète. Arrêt pour éviter une boucle.".into(),
+                    ));
+                }
+            }
+            if stopped {
+                break;
             }
         }
         Ok(full)
@@ -548,6 +931,48 @@ mod grammar_tests {
     fn effective_grammar_falls_back_to_schema() {
         let p = LlmGenParams::default();
         assert_eq!(effective_grammar(&p, "from-schema"), Some("from-schema"));
+    }
+
+    #[test]
+    fn ollama_loading_retries_are_bounded_and_skip_missing_model() {
+        use super::ollama_status_retryable;
+        use reqwest::StatusCode;
+        assert!(ollama_status_retryable(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "loading model"
+        ));
+        assert!(!ollama_status_retryable(
+            StatusCode::NOT_FOUND,
+            "model 'x' not found, try pulling it first"
+        ));
+        assert_eq!(super::OLLAMA_LOAD_MAX_ATTEMPTS, 3);
+    }
+
+    #[test]
+    fn streamed_completion_keeps_first_value_not_trailing_chunks() {
+        let body = "{\"choices\":[{\"delta\":{\"content\":\"{\\\"a\\\":1}\"}}]}\n{\"choices\":[{\"delta\":{\"content\":\"ignored\"}}]}\n";
+        let text = super::assemble_streamed_completion(body).expect("deltas");
+        assert_eq!(text, "{\"a\":1}ignored");
+        let single = "{\"choices\":[{\"message\":{\"content\":\"{\\\"diagnosis\\\":\\\"ok\\\"}\"}}]}\n{\"note\":true}\n";
+        let text = super::completion_text_from_body(single).expect("first object fails, assemble");
+        assert!(text.contains("diagnosis"), "{text}");
+        assert!(!text.contains("note"));
+    }
+
+    #[test]
+    fn extract_jsonish_drops_fence_and_trailing_object() {
+        let raw = "```json\n{\"a\":1}\n```\n{\"b\":2}";
+        let slice = super::extract_jsonish_text(raw);
+        let v: serde_json::Value = serde_json::from_str(&slice).expect("json");
+        assert_eq!(v["a"], 1);
+        assert!(v.get("b").is_none());
+    }
+
+    #[test]
+    fn repetition_detector_trips_on_three_identical_windows() {
+        let looping = "x".repeat(64 * 3);
+        assert!(super::output_repeats(&looping));
+        assert!(!super::output_repeats("une réponse normale, sans boucle."));
     }
 
     #[test]

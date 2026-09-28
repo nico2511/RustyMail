@@ -61,7 +61,7 @@ export async function runIdleAiCachePrefetchPass(startGen: number): Promise<void
           toastOnDone: false,
           toastOnCache: false,
         });
-        if (sum.status === "cancelled" || !isIdleAiCachePrefetchGenCurrent(startGen)) break;
+        if (sum.status !== "done" || !isIdleAiCachePrefetchGenCurrent(startGen)) break;
       }
       if (!isIdleAiCachePrefetchGenCurrent(startGen)) {
         ac.abort();
@@ -74,7 +74,7 @@ export async function runIdleAiCachePrefetchPass(startGen: number): Promise<void
       const skipTranslatePrefetch = Boolean(threadLang && threadLang === mother);
       if (!skipTranslatePrefetch && (await threadTranslateCacheMissingForPrefetch(tid, seg))) {
         const tr = await translateThreadCore(tid, ac.signal, { prefetchOnly: true });
-        if (tr.status === "cancelled" || !isIdleAiCachePrefetchGenCurrent(startGen)) break;
+        if (tr.status !== "done" || !isIdleAiCachePrefetchGenCurrent(startGen)) break;
       }
     }
   } catch (e) {
