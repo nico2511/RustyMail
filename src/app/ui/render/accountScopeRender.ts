@@ -81,7 +81,8 @@ export function renderRailAccountScopeHtml(): string {
     ${allCount}
   </button>`;
   const rows = state.accounts.map((account) => railAccountButton(account, scope === account.id)).join("");
-  return `<div class="sidebar-folder-group sidebar-folder-group--accounts">${allBtn}${rows}</div>`;
+  return `<div class="sidebar-section-label sidebar-section-label--in-nav"><span>Comptes</span></div>
+    <div class="sidebar-folder-group sidebar-folder-group--accounts">${allBtn}${rows}</div>`;
 }
 
 function railAccountButton(account: Account, scoped: boolean): string {

@@ -31,8 +31,8 @@ export function renderSidebar(): string {
   const avatarMark = accountMonogram(avatarLabel);
   const imapSection =
     state.accounts.length > 1 && account
-      ? `${accountShortLabel(account)} · IMAP`
-      : "IMAP";
+      ? `${accountShortLabel(account)} · Boîtes`
+      : "Boîtes";
   return `
     <aside class="sidebar" aria-label="Mail navigation">
       <button type="button" class="sidebar-collapse-edge" data-action="toggle-sidebar" aria-label="${railCollapsed ? "Afficher les dossiers" : "Masquer les dossiers"}" title="${railCollapsed ? "Agrandir le volet" : "Réduire le volet"}">
@@ -64,7 +64,8 @@ export function renderSidebar(): string {
         ${renderRailAccountScopeHtml()}
         ${
           isTauriRuntime() && account
-            ? `<div class="sidebar-folder-group sidebar-folder-group--virtual-local">
+            ? `<div class="sidebar-section-label sidebar-section-label--in-nav"><span>Sur cet appareil</span></div>
+            <div class="sidebar-folder-group sidebar-folder-group--virtual-local">
               <button type="button" class="folder-button ${state.selectedMailbox === LOCAL_SAVED_DRAFTS_MAILBOX ? "active" : ""}" data-mailbox="${escapeAttr(LOCAL_SAVED_DRAFTS_MAILBOX)}" title="Sauvés" aria-label="Sauvés — ${state.savedDraftsMailboxCount} brouillon${state.savedDraftsMailboxCount === 1 ? "" : "s"}">
                 <span class="folder-icon">Sv</span>
                 <span class="folder-name">Sauvés</span>

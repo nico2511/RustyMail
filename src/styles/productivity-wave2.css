@@ -953,3 +953,247 @@ body.clarity-dark {
   background: var(--select);
   border-color: color-mix(in srgb, var(--copper) 35%, var(--border));
 }
+
+/* Liste de dossier — rythme, hiérarchie, contraste (charbon / blanc / cuivre). */
+
+.inbox-index .inbox-panel.surface {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.inbox-index .inbox-chip {
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.inbox-index .inbox-chip:hover {
+  background: var(--wash);
+  border-color: transparent;
+  color: var(--text);
+}
+
+.inbox-index .inbox-chip-active {
+  background: var(--wash);
+  border-color: transparent;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.inbox-index .inbox-chip-badge,
+.inbox-index .inbox-chip-active .inbox-chip-badge {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  color: inherit;
+}
+
+.inbox-index .inbox-mail-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.inbox-mail-row .inbox-thread-row-main {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 8px 16px 8px 14px;
+  gap: 0;
+}
+
+.inbox-mail-row .inbox-thread-stack {
+  grid-column: 1;
+  grid-row: 1;
+  gap: 1px;
+}
+
+.inbox-mail-row .inbox-thread-line1 {
+  gap: 8px;
+  min-height: 18px;
+}
+
+.inbox-mail-row .inbox-thread-from {
+  flex: 0 1 auto;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.inbox-mail-row.thread-row--unread .inbox-thread-from {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.inbox-mail-row .inbox-row-flag {
+  flex: none;
+  display: inline-grid;
+  width: 12px;
+  height: 12px;
+  color: var(--dim);
+}
+
+.inbox-mail-row .inbox-row-flag svg {
+  width: 12px;
+  height: 12px;
+}
+
+.inbox-mail-row .inbox-thread-count-hint {
+  flex: none;
+  margin-left: 0;
+  color: var(--dim);
+  font-family: var(--font-sans);
+}
+
+.inbox-mail-row .inbox-thread-count-hint svg {
+  width: 12px;
+  height: 12px;
+}
+
+.inbox-mail-row .inbox-acct {
+  margin-left: auto;
+}
+
+.inbox-mail-row .inbox-thread-time {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.inbox-mail-row .inbox-acct + .inbox-thread-time {
+  margin-left: 10px;
+}
+
+.inbox-mail-row.thread-row--unread .inbox-thread-time {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.inbox-mail-row .inbox-thread-line2 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  font-weight: 480;
+  line-height: 1.35;
+  color: var(--dim);
+}
+
+.inbox-mail-row .inbox-thread-line2 strong {
+  flex: 0 1 auto;
+  max-width: 46%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-serif);
+  font-weight: 480;
+  color: var(--muted);
+}
+
+.inbox-mail-row .inbox-thread-line2:not(:has(.inbox-thread-preview)) strong {
+  max-width: 100%;
+}
+
+.inbox-mail-row.thread-row--unread .inbox-thread-line2 strong {
+  font-weight: 650;
+  color: var(--text);
+}
+
+.inbox-mail-row .inbox-thread-sep {
+  flex: none;
+  color: var(--dim);
+}
+
+.inbox-mail-row .inbox-thread-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  font-weight: 480;
+  color: var(--dim);
+}
+
+.inbox-mail-row .inbox-thread-attach-hint {
+  align-self: center;
+}
+
+.inbox-mail-row .inbox-thread-folder-col {
+  flex: 0 0 108px;
+  max-width: 120px;
+  padding: 0 10px;
+}
+
+.inbox-mail-row .inbox-thread-folder-label,
+.inbox-mail-row .inbox-thread-folder-move {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dim);
+}
+
+.inbox-mail-row .inbox-thread-actions {
+  gap: 2px;
+  padding: 0 8px;
+}
+
+.inbox-mail-row .inbox-thread-actions .action-sep {
+  display: none;
+}
+
+.inbox-mail-row .inbox-thread-actions .icon-pill {
+  width: 26px;
+  height: 26px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.inbox-mail-row .inbox-thread-actions .icon-pill:hover {
+  background: var(--base);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.inbox-mail-row.thread-row--unread {
+  box-shadow: inset 3px 0 0 var(--copper);
+}
+
+.inbox-mail-row:hover {
+  background: var(--hover);
+}
+
+@media (max-width: 760px) {
+  .inbox-mail-row .inbox-thread-row-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inbox-mail-row .inbox-thread-line2 strong {
+    max-width: 100%;
+  }
+
+  .inbox-mail-row .inbox-thread-sep,
+  .inbox-mail-row .inbox-thread-preview {
+    display: none;
+  }
+}
