@@ -122,12 +122,35 @@ fn detach_outlook_inline_quote_headers(doc: &mut Html) {
 }
 
 fn block_looks_like_outlook_inline_quote_header(el: ElementRef<'_>) -> bool {
+    if inside_folded_history(el) {
+        return false;
+    }
     let text = normalize_outlook_quote_probe(&el.text().collect::<String>());
     let mass = visible_char_count(&text);
     if mass == 0 || mass > 5000 {
         return false;
     }
-    RE_OUTLOOK_INLINE_QUOTE.is_match(&text)
+    // Un conteneur qui commence par la réponse (historique plus loin) n’est pas un en-tête.
+    let trimmed = text.trim_start();
+    RE_OUTLOOK_INLINE_QUOTE
+        .find(trimmed)
+        .is_some_and(|m| m.start() == 0)
+}
+
+fn inside_folded_history(el: ElementRef<'_>) -> bool {
+    let class = el.attr("class").unwrap_or("");
+    if class
+        .split_whitespace()
+        .any(|c| c == "rm-mail-folded-quote" || c == "rm-mail-quote-body")
+    {
+        return true;
+    }
+    el.ancestors().filter_map(ElementRef::wrap).any(|a| {
+        a.attr("class")
+            .unwrap_or("")
+            .split_whitespace()
+            .any(|c| c == "rm-mail-folded-quote" || c == "rm-mail-quote-body")
+    })
 }
 
 fn normalize_outlook_quote_probe(s: &str) -> String {
