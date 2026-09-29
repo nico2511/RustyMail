@@ -15,7 +15,7 @@
 //! 1. [`generic::generic_html_clean`] — MSO/VML, citations Gmail/Apple repliées, scripts, trackers
 //! 2. Plugin si détecté (Amazon, Deblock, GitHub) — digest structuré, inchangé
 //! 3. Garde qualité (masse de texte)
-//! 4. [`generic::finalize_html_for_display`] — prune vide, [`signature_html::fold_signature_tail`], attrs, lisibilité
+//! 4. [`generic::finalize_html_for_display`] — prune vide, historique cité replié (`rm-mail-folded-quote`), [`signature_html::fold_signature_tail`], attrs, lisibilité
 //!
 //! Digests tagués `rustymail:amazon-digest` / `rustymail:deblock-digest` / `rustymail:github-digest` : pas de strip agressif en finalize.
 
@@ -26,6 +26,7 @@ mod outlook_conversation;
 mod outlook_forward;
 pub mod pipeline;
 pub mod providers;
+mod quoted_history;
 mod reading_text;
 mod registry;
 pub mod signature_html;

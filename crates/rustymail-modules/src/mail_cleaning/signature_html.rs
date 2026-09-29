@@ -247,6 +247,7 @@ fn is_inside_signature_fold_region(el: ElementRef<'_>) -> bool {
         if let Some(class) = a.value().attr("class") {
             if class.split_whitespace().any(|c| {
                 c == "rm-mail-signature"
+                    || c == "rm-mail-folded-quote"
                     || c == "rm-mail-forward-header"
                     || c == "rm-mail-outlook-quote-header"
             }) {
@@ -441,7 +442,14 @@ fn rebuild_with_signature_wrapper(
     let pos = child_ids.iter().position(|&id| id == split_id)?;
 
     let before = html_from_sibling_range(doc, parent_id, 0, pos);
-    let tail = html_from_sibling_range(doc, parent_id, pos, child_ids.len());
+    // L’historique replié reste un contrôle à part, pas dans la signature masquée.
+    let end = child_ids[pos..]
+        .iter()
+        .position(|&id| node_is_folded_quote(doc, id))
+        .map(|rel| pos + rel)
+        .unwrap_or(child_ids.len());
+    let tail = html_from_sibling_range(doc, parent_id, pos, end);
+    let after = html_from_sibling_range(doc, parent_id, end, child_ids.len());
     if visible_char_count(&tail) < 6 {
         return None;
     }
@@ -450,8 +458,20 @@ fn rebuild_with_signature_wrapper(
     }
 
     Some(format!(
-        r#"{before}<div class="rm-mail-signature">{tail}</div>"#
+        r#"{before}<div class="rm-mail-signature">{tail}</div>{after}"#
     ))
+}
+
+fn node_is_folded_quote(doc: &Html, id: NodeId) -> bool {
+    doc.tree
+        .get(id)
+        .and_then(ElementRef::wrap)
+        .is_some_and(|el| {
+            el.attr("class")
+                .unwrap_or("")
+                .split_whitespace()
+                .any(|c| c == "rm-mail-folded-quote")
+        })
 }
 
 fn html_from_sibling_range(doc: &Html, parent_id: NodeId, start: usize, end: usize) -> String {
@@ -520,6 +540,19 @@ mod tests {
         let out = fold_signature_tail(html);
         assert!(!out.contains("rm-mail-signature"));
         assert!(out.contains(r#"id="Signature""#));
+    }
+
+    #[test]
+    fn does_not_hide_folded_history_inside_the_signature() {
+        let html = r#"<div><p>Pouvez-vous me rappeler svp, c’est bien pour le rendez-vous de jeudi matin.</p><p>Cordialement,</p><table><tr><td><a href="mailto:s@example.com">s@example.com</a></td></tr></table><details class="rm-mail-folded-quote"><summary>Historique</summary><div class="rm-mail-quote-body"><p>Ancien message cité.</p></div></details></div>"#;
+        let out = fold_signature_tail(html);
+        assert!(out.contains("rm-mail-signature"));
+        assert!(out.contains("rm-mail-folded-quote"));
+        let sig_at = out.find("rm-mail-signature").unwrap();
+        let fold_at = out.find("rm-mail-folded-quote").unwrap();
+        assert!(fold_at > sig_at);
+        assert!(out[sig_at..fold_at].contains("</div>"));
+        assert!(out.contains("Ancien message cité"));
     }
 
     #[test]

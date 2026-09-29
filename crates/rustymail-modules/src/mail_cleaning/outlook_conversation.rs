@@ -223,6 +223,8 @@ fn build_report(turns: Vec<Turn>) -> ConversationReport {
         } else {
             String::new()
         };
+        // Tours structurés (enveloppes, intervenants) : lisibles, pas repliés
+        // dans la citation. L’analyse « qui a les infos » reste à part du pli.
         html.push_str(&format!(
             "<section class=\"rm-conversation-turn{}\" data-turn=\"{n}\"{depth_attr}>\n",
             if cited {

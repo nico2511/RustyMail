@@ -5324,6 +5324,64 @@ button.thread-tag-chip--search:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.message-text--clean {
+  white-space: normal;
+}
+
+.message-text--clean .rm-mail-reply {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-text--clean .rm-history-fold {
+  margin-top: 1.6rem;
+  white-space: normal;
+}
+
+.message-text--clean .rm-history-fold > summary {
+  cursor: pointer;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.message-text--clean .rm-history-fold__panel {
+  margin-top: 0.75rem;
+  padding: 12px 16px 8px;
+  border-left: 2px solid color-mix(in srgb, var(--text) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 4.5%, transparent);
+}
+
+.message-text--clean .rm-history-turn + .rm-history-turn {
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, rgba(120, 119, 117, 0.22));
+}
+
+.message-text--clean .rm-history-kicker {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--dim);
+}
+
+.message-text--clean .rm-history-turn__body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 1em;
+  font-weight: inherit;
+  line-height: 1.62;
+  color: var(--text);
+}
+
 .message-text .rm-dimmed-fold {
   margin-top: 12px;
   white-space: normal;

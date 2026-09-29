@@ -241,7 +241,7 @@ fn details_html(summary: &str, inner: &str) -> String {
         summary
     };
     format!(
-        r#"<details class="rm-mail-folded-quote"><summary>{}</summary>{}</details>"#,
+        r#"<details class="rm-mail-folded-quote"><summary>{}</summary><div class="rm-mail-quote-body">{}</div></details>"#,
         escape_html_text(&label),
         strip_quote_class_attrs(inner)
     )

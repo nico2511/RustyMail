@@ -796,6 +796,14 @@ body.clarity-dark {
   line-height: 1.65;
 }
 
+.thread-reading.thread-reading--reading-layout .message-text--clean .rm-history-fold__panel {
+  border-left-color: var(--border);
+}
+
+.thread-reading.thread-reading--reading-layout .message-text--clean .rm-history-turn__body {
+  font-family: var(--font-serif);
+}
+
 .thread-reading.thread-reading--reading-layout .thread-accordion-btn {
   border: 0;
   background: transparent;
