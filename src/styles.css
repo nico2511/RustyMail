@@ -6405,47 +6405,75 @@ button.thread-tag-chip--search:focus-visible {
   border: 1px solid var(--border-weak);
 }
 
-/* Paramètres : groupes lisibles, un seul endroit pour l’IA */
+/* Paramètres : en-tête de catégorie ≠ sous-catégorie (onglet). */
 .settings-nav {
   display: flex;
   flex-shrink: 0;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 16px 28px;
-  margin: 0 max(26px, env(safe-area-inset-right)) var(--space-4) max(26px, env(safe-area-inset-left));
+  align-items: flex-start;
+  gap: 22px 4px;
+  margin: 6px max(26px, env(safe-area-inset-right)) 18px max(26px, env(safe-area-inset-left));
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-sans);
 }
 
 .settings-nav__group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 14px;
   min-width: 0;
+  padding: 0 26px 0 0;
+}
+
+.settings-nav__group + .settings-nav__group {
+  border-left: 1px solid var(--border-strong);
+  padding-left: 26px;
+}
+
+@media (max-width: 720px) {
+  .settings-nav__group,
+  .settings-nav__group + .settings-nav__group {
+    padding-left: 0;
+    padding-right: 0;
+    border-left: 0;
+  }
 }
 
 .settings-nav__label {
   margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  padding: 0 2px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1.2;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--dim);
+  pointer-events: none;
+  user-select: none;
 }
 
 .settings-nav__tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
 }
 
 .settings-tab {
-  padding: 7px 12px;
-  border-radius: var(--radius-btn);
+  padding: 5px 10px;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
-  border: 1px solid transparent;
+  border: 0;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.011em;
+  line-height: 1.25;
 }
 
 .settings-tab:hover {
@@ -6455,9 +6483,9 @@ button.thread-tag-chip--search:focus-visible {
 
 .settings-tab--active {
   color: var(--text);
-  background: var(--surface);
-  border-color: var(--accent);
-  box-shadow: none;
+  background: var(--wash);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--copper);
 }
 
 /* Corps des paramètres : défilement quand l’onglet (ex. IA & dictée) dépasse la fenêtre. */

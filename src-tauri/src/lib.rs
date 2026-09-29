@@ -11,7 +11,9 @@ use rustymail_infrastructure::{
     llama_server_api_key_set, llm_gguf_download_cancel_clear, llm_gguf_download_cancel_request,
     llm_singleton, load_app_prefs, log_attachment_audited, normalized_chat_backend,
     openrouter_api_key_clear, openrouter_api_key_present, openrouter_api_key_set,
-    peek_attachment_identity, persist_allow_invalid_tls_from_ui_checkbox, prefs_path_from_db_dir,
+    load_app_prefs_required, mailbox_delete_block_reason, mailbox_rename_block_reason,
+    migrate_locked_mailboxes_after_rename, peek_attachment_identity,
+    persist_allow_invalid_tls_from_ui_checkbox, prefs_path_from_db_dir, save_app_prefs,
     save_app_prefs_validated, transcribe_and_maybe_translate, AppPrefs, DraftRevisionListItem,
     ImapSyncResult, NewsletterRule, SavedDraftListItem, SavedDraftOpenResult, SemanticReindexStats,
     SyncMailboxesOutcome, PREFIX_RISK_CONFIRM,
@@ -2023,6 +2025,10 @@ async fn rename_imap_mailbox(
         return Err("mailbox: valeur vide.".into());
     }
     let account = resolve_account_from_paths(&paths, account_id)?;
+    let mut prefs = load_app_prefs_required(&paths.prefs_path)?;
+    if let Some(msg) = mailbox_rename_block_reason(&prefs, &account.id.0, from_mailbox.trim()) {
+        return Err(msg);
+    }
     let mut session = rustymail_infrastructure::login_session_for_account(&account).await?;
     rustymail_infrastructure::ops::imap_rename_mailbox(
         &mut session,
@@ -2031,6 +2037,14 @@ async fn rename_imap_mailbox(
     )
     .await?;
     let _ = session.logout().await;
+    if migrate_locked_mailboxes_after_rename(
+        &mut prefs,
+        &account.id.0,
+        from_mailbox.trim(),
+        to_mailbox.trim(),
+    ) {
+        save_app_prefs(&paths.prefs_path, &prefs)?;
+    }
     let (cache, affected) = rustymail_infrastructure::rename_mailbox_subtree_local_cache(
         &paths.db_path,
         &account.id.0,
@@ -2068,6 +2082,10 @@ async fn delete_imap_mailbox(
         return Err("mailbox: valeur vide.".into());
     }
     let account = resolve_account_from_paths(&paths, account_id)?;
+    let prefs = load_app_prefs_required(&paths.prefs_path)?;
+    if let Some(msg) = mailbox_delete_block_reason(&prefs, &account.id.0, mailbox.trim()) {
+        return Err(msg);
+    }
     let mut session = rustymail_infrastructure::login_session_for_account(&account).await?;
     let entries =
         rustymail_infrastructure::ops::list_selectable_mailbox_entries(&mut session).await?;

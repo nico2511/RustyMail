@@ -1,11 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 
+import { renameBlockedReason } from "../../mailboxLock";
 import { currentAccount } from "../core/accountContext";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { openTextPromptModal } from "../modals/promptConfirm";
 import { mailboxPathDelimiter } from "./folderManagerPathUtil";
+import { state } from "../state";
 import { fmSelectMailbox, refreshFolderManagerTree } from "./folderManagerTreeRun";
 import { refreshMailboxesAfterImapChange } from "./orgRefreshMailboxesAfterImap";
 
@@ -51,6 +53,11 @@ export async function fmRenameMailbox(from: string): Promise<void> {
       })
     )?.trim() ?? "";
   if (!to || to === from) return;
+  const blocked = renameBlockedReason(state.folderManager.report?.lockedMailboxes ?? [], from);
+  if (blocked) {
+    toast(blocked);
+    return;
+  }
   try {
     await withTimeout(
       invoke<string>("rename_imap_mailbox", { accountId: acc.id, fromMailbox: from, toMailbox: to }),

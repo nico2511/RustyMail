@@ -1,7 +1,17 @@
 /** Vue Dossiers — arbre personnel interactif. */
 
+const LATCH_CLOSED_SVG = `<svg width="9" height="9" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="6.75" rx="1.2" stroke="currentColor" stroke-width="1.7"/><path d="M5.25 7V5.1a2.75 2.75 0 0 1 5.5 0V7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`;
+const LATCH_OPEN_SVG = `<svg width="9" height="9" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="6.75" rx="1.2" stroke="currentColor" stroke-width="1.7"/><path d="M5.25 7V5.1a2.75 2.75 0 0 1 5.2-1.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`;
+
 import { invoke } from "@tauri-apps/api/core";
 import { navRenderTrailHtml } from "./navigation";
+import {
+  archiveBlockedReason,
+  deleteBlockedReason,
+  isOwnLocked,
+  mailboxCoveredByLock,
+  renameBlockedReason,
+} from "./mailboxLock";
 import {
   buildPersonalMailboxTree,
   commonPrefixSegments,
@@ -128,9 +138,8 @@ export async function deleteMailboxWithContents(
   });
 }
 
-function isLocked(state: FolderManagerViewState, mailbox: string): boolean {
-  const mb = mailbox.trim();
-  return (state.report?.lockedMailboxes ?? []).some((m) => m.trim().toLowerCase() === mb.toLowerCase());
+function lockList(state: FolderManagerViewState): string[] {
+  return state.report?.lockedMailboxes ?? [];
 }
 
 function isAutoArchive(state: FolderManagerViewState, mailbox: string): boolean {
@@ -164,7 +173,12 @@ function renderTreeNode(
   const selected = mb && mb === state.selectedMailbox;
   const open = nodeExpanded(state, node.key, state.selectedMailbox, hasChildren);
   const entry = mb ? entryByMb.get(mb) : undefined;
-  const locked = mb ? isLocked(state, mb) : false;
+  const locks = lockList(state);
+  const ownLocked = mb ? isOwnLocked(locks, mb) : false;
+  const covered = mb ? mailboxCoveredByLock(locks, mb) : false;
+  const deleteReason = mb ? deleteBlockedReason(locks, mb) : null;
+  const archiveReason = mb ? archiveBlockedReason(locks, mb) : null;
+  const renameReason = mb ? renameBlockedReason(locks, mb) : null;
   const auto = mb ? isAutoArchive(state, mb) : false;
   const empty = entry?.isEmpty ?? (entry ? entry.messageCount === 0 : false);
   const busy = mb && state.busyMailbox === mb;
@@ -174,7 +188,7 @@ function renderTreeNode(
   const badges = [
     empty ? `<span class="folder-tree-tag folder-tree-tag--empty">vide</span>` : "",
     auto ? `<span class="folder-tree-tag folder-tree-tag--auto" title="Archivage mémorisé">Auto</span>` : "",
-    locked ? `<span class="folder-tree-tag folder-tree-tag--locked" title="Dossier verrouillé">🔒</span>` : "",
+    covered && !ownLocked ? `<span class="folder-tree-tag" title="Un dossier parent est protégé">Couvert</span>` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -184,18 +198,39 @@ function renderTreeNode(
       `<span class="folder-tree-counts dim">${entry.threadCount} fil${entry.threadCount === 1 ? "" : "s"} · ${entry.messageCount} msg</span>`
     : "";
 
+  const latchWord = ownLocked ? "Protégé" : "Libre";
+  const lockTitle = ownLocked
+    ? "Loquet fermé. Ce dossier et ses sous-dossiers ne se suppriment pas, ne s’archivent pas et ne se déplacent pas. Cliquer pour l’ouvrir."
+    : covered
+      ? "Ce dossier est couvert par un loquet parent. Cliquer pour lui poser aussi son propre loquet."
+      : "Loquet ouvert. Cliquer pour protéger ce dossier et ses sous-dossiers.";
+  const lockControl = mb
+    ? `<button type="button" class="folder-latch${ownLocked ? " is-shut" : ""}" role="switch" aria-checked="${ownLocked ? "true" : "false"}" data-action="fm-toggle-lock" data-mailbox="${escapeAttr(mb)}" data-locked="${ownLocked ? "1" : "0"}" title="${escapeAttr(lockTitle)}" aria-label="${escapeAttr(`${latchWord}. ${lockTitle}`)}">
+        <span class="folder-latch__word">${latchWord}</span>
+        <span class="folder-latch__track" aria-hidden="true"><span class="folder-latch__knob">${ownLocked ? LATCH_CLOSED_SVG : LATCH_OPEN_SVG}</span></span>
+      </button>`
+    : "";
+  const heldAct = (label: string, glyph: string, extra = "") =>
+    `<button type="button" class="icon-pill folder-tree-act is-held ${extra}" disabled title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${glyph}</button>`;
   const actions =
     mb ?
       `<span class="folder-tree-actions">
         <button type="button" class="icon-pill folder-tree-act folder-tree-act--open ${selected ? "is-active" : ""}" data-action="fm-select" data-mailbox="${escapeAttr(mb)}" title="Afficher les mails dans le panneau" aria-label="Afficher les mails de ${escapeAttr(node.label)}">${iconSvg("panel")}</button>
         <button type="button" class="icon-pill folder-tree-act" data-action="fm-sync" data-mailbox="${escapeAttr(mb)}" title="Synchroniser">↻</button>
-        <button type="button" class="icon-pill folder-tree-act" data-action="fm-archive" data-mailbox="${escapeAttr(mb)}" title="Archiver">A</button>
-        <button type="button" class="icon-pill folder-tree-act ${locked ? "is-active" : ""}" data-action="fm-toggle-lock" data-mailbox="${escapeAttr(mb)}" data-locked="${locked ? "1" : "0"}" title="Cadenas">🔒</button>
         ${
-          !locked
-            ? `<button type="button" class="icon-pill folder-tree-act" data-action="fm-delete" data-mailbox="${escapeAttr(mb)}" title="Supprimer">×</button>
-        <span class="folder-tree-drag-handle" draggable="true" data-action="fm-drag-start" data-mailbox="${escapeAttr(mb)}" title="Déplacer">⠿</span>`
-            : ""
+          archiveReason
+            ? heldAct(archiveReason, "A")
+            : `<button type="button" class="icon-pill folder-tree-act" data-action="fm-archive" data-mailbox="${escapeAttr(mb)}" title="Archiver">A</button>`
+        }
+        ${
+          deleteReason
+            ? heldAct(deleteReason, "×", "folder-tree-act--delete")
+            : `<button type="button" class="icon-pill folder-tree-act folder-tree-act--delete" data-action="fm-delete" data-mailbox="${escapeAttr(mb)}" title="Supprimer le dossier">×</button>`
+        }
+        ${
+          renameReason
+            ? `<span class="folder-tree-drag-handle is-held" title="${escapeAttr(renameReason)}" aria-disabled="true">⠿</span>`
+            : `<span class="folder-tree-drag-handle" draggable="true" data-action="fm-drag-start" data-mailbox="${escapeAttr(mb)}" title="Déplacer">⠿</span>`
         }
         <button type="button" class="icon-pill folder-tree-act" data-action="fm-create-child" data-mailbox="${escapeAttr(mb)}" title="Sous-dossier">+</button>
       </span>`
@@ -207,7 +242,7 @@ function renderTreeNode(
     "folder-tree-row",
     selected ? "folder-tree-row--selected" : "",
     empty ? "folder-tree-node--empty" : "",
-    locked ? "folder-tree-node--locked" : "",
+    covered ? "folder-tree-node--locked" : "",
     dropTarget ? "folder-tree-node--drop-target" : "",
     dragging ? "folder-tree-node--dragging" : "",
     busy ? "folder-tree-row--busy" : "",
@@ -220,14 +255,14 @@ function renderTreeNode(
       node.children.map((c) => renderTreeNode(state, c, depth + 1, entryByMb, deps)).join("")
     : "";
 
-  const labelHtml = `<span class="folder-tree-label">${escapeHtml(node.label)}</span>`;
+  const labelHtml = `<span class="folder-tree-label${hasChildren ? " folder-tree-label--branch" : ""}">${escapeHtml(node.label)}</span>`;
 
   const toggleBtn =
     hasChildren
       ? `<button type="button" class="folder-tree-chevron" data-action="fm-toggle-node" data-node-key="${escapeAttr(node.key)}" aria-expanded="${open}">${chev}</button>`
       : `<span class="folder-tree-chevron-spacer"></span>`;
 
-  return `<div class="folder-tree-node" data-node-key="${escapeAttr(node.key)}" style="--fm-depth:${depth}">
+  return `<div class="folder-tree-node${hasChildren ? " folder-tree-node--branch" : ""}" data-node-key="${escapeAttr(node.key)}" style="--fm-depth:${depth}">
     <div class="${rowCls}" ${mb ? `data-drop-mailbox="${escapeAttr(mb)}"` : ""}>
       <div class="folder-tree-main">
         ${toggleBtn}
@@ -237,6 +272,7 @@ function renderTreeNode(
           ${counts}
         </span>
       </div>
+      ${lockControl}
       ${actions}
     </div>
     ${childrenHtml ? `<div class="folder-tree-children">${childrenHtml}</div>` : ""}
@@ -310,15 +346,20 @@ export function renderFolderManagerView(
   const treeHtml =
     tree.length
       ? tree.map((n) => renderTreeNode(state, n, 0, entryByMb, deps)).join("")
-      : `<p class="dim folder-tree-empty">Aucun dossier personnel. Créez-en un avec le bouton ci-dessous.</p>`;
+      : `<p class="dim folder-tree-empty">Aucun dossier personnel. Créez-en un avec « Nouveau dossier ».</p>`;
 
   const sel = state.selectedMailbox;
   const selEntry = sel ? entryByMb.get(sel) : undefined;
+  const selArchiveBlock = sel ? archiveBlockedReason(lockList(state), sel) : null;
   const autoBanner =
     sel && isAutoArchive(state, sel) && selEntry && selEntry.threadCount > 0
       ? `<div class="folder-manager-auto-banner">
           <span>Archivage mémorisé — ${selEntry.threadCount} fil(s) en attente</span>
-          <button type="button" class="ghost-button ghost-button-sm" data-action="fm-archive" data-mailbox="${deps.escapeAttr(sel)}">Archiver maintenant</button>
+          ${
+            selArchiveBlock
+              ? `<button type="button" class="ghost-button ghost-button-sm" disabled title="${deps.escapeAttr(selArchiveBlock)}">Archiver maintenant</button>`
+              : `<button type="button" class="ghost-button ghost-button-sm" data-action="fm-archive" data-mailbox="${deps.escapeAttr(sel)}">Archiver maintenant</button>`
+          }
         </div>`
       : "";
 
@@ -333,7 +374,11 @@ export function renderFolderManagerView(
   const folderHeadActions =
     sel
       ? `<button type="button" class="ghost-button" data-action="fm-sync" data-mailbox="${deps.escapeAttr(sel)}">Sync</button>
-         <button type="button" class="ghost-button" data-action="fm-archive" data-mailbox="${deps.escapeAttr(sel)}">Archiver tout</button>
+         ${
+           selArchiveBlock
+             ? `<button type="button" class="ghost-button" disabled title="${deps.escapeAttr(selArchiveBlock)}">Archiver tout</button>`
+             : `<button type="button" class="ghost-button" data-action="fm-archive" data-mailbox="${deps.escapeAttr(sel)}">Archiver tout</button>`
+         }
          <button type="button" class="ghost-button" data-action="fm-open-inbox" data-mailbox="${deps.escapeAttr(sel)}">Ouvrir en liste</button>`
       : "";
 
@@ -358,6 +403,7 @@ export function renderFolderManagerView(
     </header>
     <div class="folder-manager-split">
       <aside class="folder-manager-tree surface-sm" aria-label="Arbre des dossiers">
+        <p class="folder-latch-legend">Un loquet fermé couvre le dossier et ses sous-dossiers. Un sous-dossier protégé empêche aussi de supprimer le parent. Le cadenas reste sur cet appareil.</p>
         <div class="folder-tree-scroll">${treeHtml}</div>
       </aside>
       <section class="folder-manager-list">
@@ -365,7 +411,7 @@ export function renderFolderManagerView(
         <div class="folder-manager-list-body">${
           sel
             ? `<div class="inbox-index inbox-index--folder-embed">${renderListPanel()}</div>`
-            : `<p class="dim folder-manager-pick">Cliquez sur le bouton panneau (⊞) d’un dossier pour afficher ses mails ici.</p>`
+            : `<p class="dim folder-manager-pick">Choisissez un dossier, puis affichez ses messages.</p>`
         }</div>
       </section>
     </div>
