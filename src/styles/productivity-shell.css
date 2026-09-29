@@ -465,7 +465,7 @@ select {
   min-height: 280px;
   height: 100%;
   overflow: auto;
-  padding: 22px 26px 36px;
+  padding: 0;
   color: var(--text);
   background: transparent;
 }
@@ -476,6 +476,7 @@ select {
   outline: none;
   white-space: pre-wrap;
   overflow-wrap: break-word;
+  padding: calc(var(--space-5) + var(--space-4)) calc(var(--space-5) + var(--space-4)) calc(var(--space-5) + var(--space-5) + var(--space-2));
 }
 
 .composer-mail-shell .compose-tiptap .ProseMirror p.is-editor-empty:first-child::before {
@@ -489,68 +490,107 @@ select {
 
 .composer-mail-shell .compose-tiptap h1,
 .composer-mail-shell .compose-tiptap h2,
-.composer-mail-shell .compose-tiptap h3 {
+.composer-mail-shell .compose-tiptap h3,
+.composer-mail-shell .composer-body > .preview h1,
+.composer-mail-shell .composer-body > .preview h2,
+.composer-mail-shell .composer-body > .preview h3 {
   font-family: var(--font-serif);
   font-weight: 650;
   letter-spacing: -0.02em;
   line-height: 1.25;
-  margin: 0.6em 0 0.3em;
+  margin: 1em 0 0.45em;
 }
 
-.composer-mail-shell .compose-tiptap h1 { font-size: 1.55em; }
-.composer-mail-shell .compose-tiptap h2 { font-size: 1.3em; }
-.composer-mail-shell .compose-tiptap h3 { font-size: 1.12em; }
+.composer-mail-shell .compose-tiptap h1,
+.composer-mail-shell .composer-body > .preview h1 { font-size: 1.55em; }
+.composer-mail-shell .compose-tiptap h2,
+.composer-mail-shell .composer-body > .preview h2 { font-size: 1.3em; }
+.composer-mail-shell .compose-tiptap h3,
+.composer-mail-shell .composer-body > .preview h3 { font-size: 1.12em; }
 
-.composer-mail-shell .compose-tiptap p { margin: 0.35em 0; }
+.composer-mail-shell .compose-tiptap p,
+.composer-mail-shell .composer-body > .preview p { margin: 0.75em 0; }
 
 .composer-mail-shell .compose-tiptap ul,
-.composer-mail-shell .compose-tiptap ol {
-  margin: 0.4em 0;
-  padding-left: 1.35em;
+.composer-mail-shell .compose-tiptap ol,
+.composer-mail-shell .composer-body > .preview ul,
+.composer-mail-shell .composer-body > .preview ol {
+  margin: 0.75em 0;
+  padding-left: 1.6em;
 }
 
-.composer-mail-shell .compose-tiptap a {
+.composer-mail-shell .compose-tiptap li + li,
+.composer-mail-shell .composer-body > .preview li + li {
+  margin-top: 0.3em;
+}
+
+.composer-mail-shell .compose-tiptap a,
+.composer-mail-shell .composer-body > .preview a {
   color: var(--copper);
   text-underline-offset: 2px;
 }
 
-.composer-mail-shell .compose-tiptap blockquote {
-  margin: 0.6em 0;
-  padding-left: 0.9em;
+.composer-mail-shell .compose-tiptap blockquote,
+.composer-mail-shell .composer-body > .preview blockquote {
+  margin: 0.9em 0;
+  padding: 0.35em 0.55em 0.35em 1.15em;
   border-left: 2px solid var(--copper);
   color: var(--text);
 }
 
-.composer-mail-shell .compose-tiptap code {
+.composer-mail-shell .compose-tiptap code,
+.composer-mail-shell .composer-body > .preview code {
   font-family: var(--font-mono);
   font-size: 0.92em;
+  padding: 0.08em 0.35em;
 }
 
-.composer-mail-shell .compose-tiptap pre {
-  margin: 0.6em 0;
-  padding: 10px 12px;
-  border-radius: 8px;
+.composer-mail-shell .compose-tiptap pre,
+.composer-mail-shell .composer-body > .preview pre {
+  margin: 0.9em 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
   background: var(--elevated);
   overflow: auto;
 }
 
-.composer-mail-shell .compose-tiptap img {
+.composer-mail-shell .compose-tiptap pre code,
+.composer-mail-shell .composer-body > .preview pre code {
+  padding: 0;
+}
+
+.composer-mail-shell .compose-tiptap img,
+.composer-mail-shell .composer-body > .preview img {
   max-width: 100%;
   height: auto;
+  margin: 0.75em 0;
   border-radius: 6px;
 }
 
-.composer-mail-shell .compose-tiptap table {
+.composer-mail-shell .compose-tiptap table,
+.composer-mail-shell .composer-body > .preview table {
   border-collapse: collapse;
-  margin: 0.6em 0;
+  margin: 0.9em 0;
   width: 100%;
 }
 
 .composer-mail-shell .compose-tiptap th,
-.composer-mail-shell .compose-tiptap td {
+.composer-mail-shell .compose-tiptap td,
+.composer-mail-shell .composer-body > .preview th,
+.composer-mail-shell .composer-body > .preview td {
   border: 1px solid var(--border);
-  padding: 4px 8px;
+  padding: var(--space-2) var(--space-3);
   vertical-align: top;
+}
+
+.composer-mail-shell .compose-tiptap .ProseMirror > :first-child,
+.composer-mail-shell .composer-body > .preview > :first-child {
+  margin-top: 0;
+}
+
+.composer-mail-shell .compose-tiptap .ProseMirror > :last-child,
+.composer-mail-shell .composer-body > .preview > :last-child {
+  margin-bottom: 0;
 }
 
 .preview,
@@ -564,6 +604,10 @@ select {
 .preview {
   font-size: 17px;
   line-height: 1.62;
+}
+
+.composer-mail-shell .composer-body > .preview {
+  padding: calc(var(--space-5) + var(--space-4)) calc(var(--space-5) + var(--space-4)) calc(var(--space-5) + var(--space-5) + var(--space-2));
 }
 
 .composer-history-pane {

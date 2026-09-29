@@ -1421,7 +1421,7 @@ body.clarity-dark {
   gap: 8px;
   width: 100%;
   min-width: 0;
-  padding: 2px 0 12px;
+  padding: var(--space-2) var(--space-3) var(--space-3);
   border-bottom: 1px solid var(--border);
   font-family: var(--font-sans);
 }
@@ -1443,7 +1443,7 @@ body.clarity-dark {
 
 .compose-toolbar__row--ai {
   gap: 8px 14px;
-  padding: 6px 8px;
+  padding: var(--space-2) var(--space-3);
   border-radius: 8px;
   background: var(--elevated);
   border: 1px solid var(--border-weak);
