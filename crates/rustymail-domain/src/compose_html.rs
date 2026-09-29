@@ -97,8 +97,8 @@ fn read_tag(input: &str) -> Option<TagInfo> {
     if !input.starts_with('<') {
         return None;
     }
-    if input.starts_with("<!--") {
-        let len = if let Some(end) = input[4..].find("-->") {
+    if let Some(stripped) = input.strip_prefix("<!--") {
+        let len = if let Some(end) = stripped.find("-->") {
             4 + end + 3
         } else {
             input.len()
@@ -272,13 +272,13 @@ fn tag_allowed(name: &str) -> bool {
 }
 
 fn attr_allowed(tag: &str, name: &str) -> bool {
-    match (tag, name) {
-        ("a", "href" | "title") => true,
-        ("img", "src" | "alt" | "title" | "width" | "height") => true,
-        ("td" | "th", "colspan" | "rowspan") => true,
-        ("ol", "start") => true,
-        _ => false,
-    }
+    matches!(
+        (tag, name),
+        ("a", "href" | "title")
+            | ("img", "src" | "alt" | "title" | "width" | "height")
+            | ("td" | "th", "colspan" | "rowspan")
+            | ("ol", "start")
+    )
 }
 
 fn safe_url(value: &str, allow_data_image: bool) -> bool {
@@ -411,10 +411,8 @@ fn plain_from_html(html: &str) -> String {
                             out.push_str("\n\n");
                         }
                     }
-                    "li" | "div" => {
-                        if !out.ends_with('\n') {
-                            out.push('\n');
-                        }
+                    "li" | "div" if !out.ends_with('\n') => {
+                        out.push('\n');
                     }
                     _ => {}
                 }
