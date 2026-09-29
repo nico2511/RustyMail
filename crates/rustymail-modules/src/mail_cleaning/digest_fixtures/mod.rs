@@ -5,17 +5,15 @@
 //! Le courrier personne-à-personne ne passe pas ici : pas de fixture, pas de
 //! réécriture. Amazon et GitHub restent des plugins ad hoc.
 //!
-//! Banc d'essai recherche (phase 2, pas d'UI) : [`apply_fixture_yaml`] rejoue
-//! une fixture candidate sur un HTML et un expéditeur, en mémoire.
+//! Banc d'essai (Paramètres) : [`preview_candidate_fixture`] rejoue un YAML
+//! sans l'activer. La lecture locale n'est installée que par un geste explicite.
 
 mod apply;
 mod model;
 
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
-pub use model::FixtureError;
-
-use model::{parse_fixture, DigestFixture};
+pub use model::{parse_fixture, DigestFixture, FixtureError};
 
 const DEBLOCK_FIXTURE_YAML: &str = include_str!("../../../fixtures/digests/deblock.yaml");
 
@@ -68,7 +66,23 @@ pub(crate) fn apply_builtin_id(id: &str, html: &str, sender_email: &str) -> Opti
     apply::apply_fixtures(&selected, html, sender_email)
 }
 
-/// Point d'entrée du harness et du futur banc d'essai.
+/// Aperçu banc d'essai : YAML valide ou non, sans écrire le registre de lecture.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixturePreview {
+    pub applicable: bool,
+    pub html: Option<String>,
+    pub fixture_id: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Résultat d'une fixture explicitement activée pour la lecture.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppliedReading {
+    pub fixture_id: String,
+    pub html: String,
+}
+
+/// Point d'entrée du harness et du banc d'essai.
 ///
 /// `Ok(None)` : le YAML est valide, le mail ne matche pas (repli générique).
 /// `Err` : YAML illisible ou schéma refusé. Aucun appel de modèle.
@@ -85,11 +99,71 @@ pub fn apply_fixture_yaml(
     ))
 }
 
+/// Même aperçu, après le nettoyage générique (comme le chemin de lecture).
+pub fn preview_candidate_fixture(yaml: &str, raw_html: &str, sender_email: &str) -> FixturePreview {
+    let cleaned = super::generic::generic_html_clean(raw_html);
+    match parse_fixture(yaml) {
+        Ok(fixture) => {
+            let id = fixture.id.clone();
+            match apply::apply_fixtures(std::slice::from_ref(&fixture), &cleaned, sender_email) {
+                Some(html) => FixturePreview {
+                    applicable: true,
+                    html: Some(html),
+                    fixture_id: Some(id),
+                    error: None,
+                },
+                None => FixturePreview {
+                    applicable: false,
+                    html: None,
+                    fixture_id: Some(id),
+                    error: None,
+                },
+            }
+        }
+        Err(error) => FixturePreview {
+            applicable: false,
+            html: None,
+            fixture_id: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+/// Fixture locale activée pour la lecture. Vide par défaut.
+/// Accepter une fixture sur le banc n'appelle pas cette fonction.
+static READING_FIXTURE: Mutex<Option<DigestFixture>> = Mutex::new(None);
+
+pub fn set_installed_reading_fixture(fixture: Option<DigestFixture>) {
+    if let Ok(mut slot) = READING_FIXTURE.lock() {
+        *slot = fixture;
+    }
+}
+
+pub fn installed_reading_fixture_id() -> Option<String> {
+    READING_FIXTURE
+        .lock()
+        .ok()
+        .and_then(|slot| slot.as_ref().map(|fixture| fixture.id.clone()))
+}
+
+pub fn apply_installed_reading_fixture(html: &str, sender_email: &str) -> Option<AppliedReading> {
+    let fixture = READING_FIXTURE.lock().ok()?.as_ref().cloned()?;
+    let html = apply::apply_fixtures(std::slice::from_ref(&fixture), html, sender_email)?;
+    Some(AppliedReading {
+        fixture_id: fixture.id,
+        html,
+    })
+}
+
+pub fn builtin_deblock_fixture_yaml() -> &'static str {
+    DEBLOCK_FIXTURE_YAML
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         apply, apply_builtin_id, apply_fixture_yaml, html_has_digest_marker, parse_fixture,
-        DEBLOCK_FIXTURE_YAML,
+        preview_candidate_fixture, set_installed_reading_fixture, DEBLOCK_FIXTURE_YAML,
     };
     use crate::mail_cleaning::{
         clean_html_for_markdown, CleaningInput, ProviderId, ProviderRegistry,
@@ -327,5 +401,70 @@ zones:
             message.contains("sélecteur") || message.contains("refusé"),
             "{message}"
         );
+    }
+
+    struct ClearReading;
+    impl Drop for ClearReading {
+        fn drop(&mut self) {
+            set_installed_reading_fixture(None);
+        }
+    }
+
+    #[test]
+    fn explicit_reading_fixture_applies_only_while_installed() {
+        let _clear = ClearReading;
+        set_installed_reading_fixture(None);
+        let yaml = r#"
+id: bench-bank
+rule_set_version: "1"
+match:
+  sender:
+    domains:
+      - exact: bench-fixture.invalid
+  structure:
+    root: div.f-fallback
+    min_children: 1
+zones:
+  header:
+    action: show
+    presentation: as_is
+    anchors:
+      - selector: h3
+        index: 0
+  body:
+    action: show
+    presentation: as_is
+    anchors:
+      - selector: p
+        index: 0
+  footer:
+    action: hide
+"#;
+        let html = "<div class=\"f-fallback\"><h3>Titre</h3><p>Corps</p><div class=\"warning\">Pied</div></div>";
+        let input = CleaningInput {
+            sender_email: "a@bench-fixture.invalid",
+            subject: "releve",
+            html_preview: Some(html),
+            plain_body: None,
+        };
+        let reg = ProviderRegistry::builtin();
+        let before = clean_html_for_markdown(&reg, &input, html);
+        assert_eq!(before.resolved_provider, ProviderId::Generic);
+        assert!(!html_has_digest_marker(&before.html));
+
+        let preview = preview_candidate_fixture(yaml, html, "a@bench-fixture.invalid");
+        assert!(preview.applicable);
+        assert!(preview.html.unwrap().contains("Titre"));
+        assert!(super::installed_reading_fixture_id().is_none());
+
+        set_installed_reading_fixture(Some(parse_fixture(yaml).expect("yaml")));
+        let enabled = clean_html_for_markdown(&reg, &input, html);
+        assert!(html_has_digest_marker(&enabled.html));
+        assert!(enabled.html.contains("Titre"));
+        assert!(!enabled.html.contains("Pied"));
+
+        set_installed_reading_fixture(None);
+        let after = clean_html_for_markdown(&reg, &input, html);
+        assert!(!html_has_digest_marker(&after.html));
     }
 }

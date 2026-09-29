@@ -74,6 +74,7 @@ Front-end reads via **`invokeAiCacheGet`** (`ipc_bridge.ts`) with dedup and time
 | ------ | ---- | ------ |
 | Status/capabilities | R metadata | OK |
 | Threads/search | R SQLite | Bounded pagination; validated queries |
+| Digest bench (`digest_fixture_preview`, `digest_bench_*`) | R mail HTML, W two local files | YAML ≤ 64 KiB, schema-validated, no code. Accept does not change reading. Enable/disable is a separate command |
 | Drafts | R/W | Follow-up: body/HTML bounds on all draft commands |
 | Send | SMTP, FS | `validate_draft_for_ipc`; send ack backend |
 | Attachments | FS, OS | Sanitized names; CID image-only limits |

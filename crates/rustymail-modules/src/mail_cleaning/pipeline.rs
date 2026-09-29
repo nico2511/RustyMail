@@ -23,6 +23,22 @@ pub fn clean_html_for_markdown(
 ) -> CleanHtmlResult {
     let mut diagnostics = Vec::new();
     let generic_out = generic_html_clean(html);
+    if let Some(applied) =
+        super::digest_fixtures::apply_installed_reading_fixture(&generic_out, input.sender_email)
+    {
+        diagnostics.push(format!(
+            "fixture locale « {} » activée explicitement pour la lecture",
+            applied.fixture_id
+        ));
+        return CleanHtmlResult {
+            html: applied.html,
+            resolved_provider: provider_for_local_fixture(&applied.fixture_id),
+            generic_rule_set_version: generic::GENERIC_RULE_SET_VERSION,
+            provider_rule_set_version: None,
+            diagnostics,
+            conversation_text: None,
+        };
+    }
     let provider = registry.resolve_provider(input);
 
     let finalize = generic::finalize_html_for_display;
@@ -104,6 +120,13 @@ pub fn clean_html_for_markdown(
         provider_rule_set_version: Some(ver),
         diagnostics,
         conversation_text,
+    }
+}
+
+fn provider_for_local_fixture(id: &str) -> ProviderId {
+    match id {
+        "deblock" => ProviderId::Deblock,
+        _ => ProviderId::Generic,
     }
 }
 

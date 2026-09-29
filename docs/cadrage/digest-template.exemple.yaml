@@ -5,9 +5,10 @@
 # Cas Deblock : le plugin try_deblock_digest fait déjà cette découpe.
 # Voir docs/CADRAGE_DIGEST_TEMPLATES.md. Ne pas committer de vrai mail ici.
 #
-# Banc d'essai (cadrage, non branché) : la même fixture se prévisualise
+# Banc d'essai (Paramètres → Banc d'essai) : un YAML du même genre se prévisualise
 # sur de vrais mails trouvés par la recherche actuelle
 # (@domaine, texte sujet/corps, #dossier / mailbox). Pas un second index.
+# Ce fichier-ci reste une esquisse de contrôle, pas la fixture chargée.
 # Le domaine filtre l'entrée dans la liste ; les ancres `structure`
 # décident si la découpe s'applique. Domaine seul = pas de réécriture.
 # Gestes d'aperçu : afficher, masquer, replier, restyler

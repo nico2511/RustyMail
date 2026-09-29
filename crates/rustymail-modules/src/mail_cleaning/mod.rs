@@ -13,9 +13,10 @@
 //! ## Ordre du pipeline HTML ([`clean_html_for_markdown`](pipeline::clean_html_for_markdown))
 //!
 //! 1. [`generic::generic_html_clean`] — MSO/VML, citations Gmail/Apple repliées, scripts, trackers
-//! 2. Plugin si détecté (Amazon, GitHub, fixture Deblock) — digest structuré, inchangé ensuite
-//! 3. Garde qualité (masse de texte)
-//! 4. [`generic::finalize_html_for_display`] — prune vide, historique cité replié (`rm-mail-folded-quote`), [`signature_html::fold_signature_tail`], attrs, lisibilité
+//! 2. Fixture locale seulement si « Activer en lecture » a installé un YAML déjà accepté — sinon cette étape est vide
+//! 3. Plugin si détecté (Amazon, GitHub, fixture Deblock) — digest structuré, inchangé ensuite
+//! 4. Garde qualité (masse de texte)
+//! 5. [`generic::finalize_html_for_display`] — prune vide, historique cité replié (`rm-mail-folded-quote`), [`signature_html::fold_signature_tail`], attrs, lisibilité
 //!
 //! Digests tagués `rustymail:digest` (et, le temps de la bascule, `rustymail:amazon-digest` / `rustymail:deblock-digest` / `rustymail:github-digest`) : pas de strip agressif en finalize.
 //!

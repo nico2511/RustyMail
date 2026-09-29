@@ -1,8 +1,8 @@
 # Cadrage : templates digest + flow fixture IA
 
-Document de cadrage. La phase 1 branche le moteur pour **Deblock seulement** : fixture YAML embarquée, match domaine + structure, zones `show` / `hide` (et `collapse` en repli fermé). L’éditeur de découpe, le banc d’essai sur la recherche, et toute proposition IA ne sont pas branchés. `clean_message` n’appelle pas de modèle.
+Document de cadrage. La phase 1 branche le moteur pour **Deblock seulement** : fixture YAML embarquée, match domaine + structure, zones `show` / `hide` (et `collapse` en repli fermé). La phase 2 branche le banc d’essai sur la recherche actuelle (Paramètres → Banc d’essai). L’éditeur de découpe peint et toute proposition IA ne sont pas branchés. `clean_message` n’appelle pas de modèle.
 
-L’esquisse [`cadrage/digest-template.exemple.yaml`](cadrage/digest-template.exemple.yaml) n’est pas le fichier chargé. La fixture runtime est `crates/rustymail-modules/fixtures/digests/deblock.yaml`. Le harness `apply_fixture_yaml` (même module `digest_fixtures`) rejoue un YAML sur un HTML et un expéditeur : c’est le point d’entrée prévu du banc, sans UI et sans `SearchQuery`.
+L’esquisse [`cadrage/digest-template.exemple.yaml`](cadrage/digest-template.exemple.yaml) n’est pas le fichier chargé. La fixture runtime embarquée est `crates/rustymail-modules/fixtures/digests/deblock.yaml`. Le banc d’essai (Paramètres → Banc d’essai) rejoue un YAML sur les mails trouvés par la recherche lexicale actuelle. Accepter enregistre un verdict. « Activer en lecture » est un second geste, éteint par défaut.
 
 L’état actuel de la lecture reste [`LECTURE_HTML.md`](LECTURE_HTML.md). Ce texte décrit comment **généraliser** le rendu propre des mails transactionnels (le genre Deblock) sans étendre ce rendu au courrier personne-à-personne, et sans faire dépendre l’ouverture d’un mail d’un modèle.
 
@@ -118,7 +118,7 @@ Le détecteur Weak (sujet ou HTML qui contient « deblock ») ne doit pas deveni
 
 ## Banc d’essai fixtures (recherche)
 
-Vertical produit **en parallèle** de l’éditeur de découpe et du moteur de templates. Rien ici n’est branché. L’éditeur pose la fixture candidate (header, body, footer). Le banc la rejoue sur **de vrais mails du corpus** avant qu’elle puisse servir en lecture. Il ne découpe pas à la place de l’éditeur, et il n’écrit pas dans `clean_message`.
+Écran : Paramètres → Banc d’essai. Il réutilise `parseSearchBarDraft` et `search_threads` (`SearchQuery`, mode lexical forcé). Pas de nouvel index. Le YAML candidate se prévisualise sur le HTML du message ouvert. Accepter écrit `digest_bench_accepted.json` et n’installe rien dans `clean_message`. « Activer en lecture » copie cette fixture acceptée vers `digest_bench_reading.yaml` et l’applique ensuite, seulement si le domaine et la structure matchent. « Désactiver la lecture locale » retire ce fichier. Refuser ne désactive pas une lecture déjà allumée.
 
 But : voir, sur la boîte de la personne, si la découpe tient — pas seulement sur les deux HTML fictifs Deblock du dépôt. On y choisit un mail échantillon et des mails de validation.
 
@@ -527,7 +527,7 @@ L’ouverture d’un mail reste : HTML → registre déterministe → DOMPurify.
 
 ### MVP (phase 1 — moteur Deblock)
 
-Livré : schéma (`action: show|hide|collapse`, alias `keep`), fixture `fixtures/digests/deblock.yaml`, application dans `clean_html_builtin`, harness `apply_fixture_yaml`. Pas livré : éditeur de découpe, banc d’essai UI, proposition IA, commande IPC.
+Livré : schéma (`action: show|hide|collapse`, alias `keep`), fixture `fixtures/digests/deblock.yaml`, application dans `clean_html_builtin`, banc d’essai (recherche lexicale, aperçu, accepter / ajuster / refuser, activation de lecture séparée). Pas livré : éditeur de découpe peint, proposition IA.
 
 - Schéma fixture : `zones.header` / `body` / `footer` + `match` expéditeur et ancres. Esquisse déjà dans `docs/cadrage/digest-template.exemple.yaml`.
 - Éditeur de découpe **dédié** (outil local d’abord) : marquer les trois zones sur le reçu Deblock, aperçu de lecture, même découpe montrée sur l’envoi. Pas d’écran dans le composer.
@@ -539,7 +539,7 @@ Critère de fin : les tests reçu et envoi passent via le template, un mail non 
 
 ### Vertical parallèle — banc d’essai
 
-Même horizon que l’éditeur de découpe et le moteur de templates. L’un n’est pas le prérequis de l’autre. Toujours hors de ce document : pas d’écran, pas de branchement sur la recherche.
+Livré dans Paramètres → Banc d’essai. Pas d’écran de peinture des zones : le YAML est le réglage.
 
 - Réutiliser `SearchQuery` et la barre actuelle. Mode lexical par défaut. Filtres utiles : `@domaine`, texte libre (sujet et corps), dossier (`#local:` / `#dossier:` / `mailbox`).
 - Depuis un résultat : ouvrir un candidat, appliquer la fixture (afficher, masquer, replier, restyler), comparer le brut et la lecture coupée, accepter, ajuster ou refuser.

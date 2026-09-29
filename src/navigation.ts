@@ -22,7 +22,8 @@ export type NavSettingsTab =
   | "addressBook"
   | "storage"
   | "shortcuts"
-  | "developer";
+  | "developer"
+  | "digestBench";
 
 export type NavSnapshot = {
   view: AppView;

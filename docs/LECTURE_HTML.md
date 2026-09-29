@@ -39,4 +39,4 @@ Le chrome marketing (préheader caché, barre sociale, pied légal, tableaux de 
 
 Le plugin Rust `try_deblock_digest` est remplacé par `crates/rustymail-modules/fixtures/digests/deblock.yaml`, appliqué dans `clean_html_builtin` quand l’expéditeur et la structure matchent. Les deux HTML `tests/fixtures/deblock/` restent l’oracle. Un expéditeur qui n’est pas Deblock, ou un HTML sans la racine, reste sur le générique — y compris un sujet qui contient « deblock ».
 
-L’éditeur de découpe et le banc d’essai (recherche du corpus) ne sont pas dans l’app. Pour rejouer une fixture sur un HTML : `mail_cleaning::apply_fixture_yaml` (tests Rust). Cadrage : [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md).
+Le banc d’essai est dans Paramètres → Banc d’essai. Il cherche avec la barre lexicale actuelle, compare le brut et la découpe, et peut accepter ou refuser une fixture. Accepter ne change pas l’ouverture des mails. Une activation séparée (« Activer en lecture ») peut installer la fixture acceptée ; elle est éteinte par défaut. Cadrage : [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md).

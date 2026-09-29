@@ -1,3 +1,4 @@
+import { handleDigestBenchAction } from "./digestBenchActions";
 import { tryHandleAccountSetupWire } from "./accountSetupWireActionsRun";
 import { tryHandleComposeEntryWire } from "./composeEntryWireActionsRun";
 import { tryHandleModalsWire } from "./modalsWireActionsRun";
@@ -8,6 +9,7 @@ import { tryHandleSettingsLlamaBinaryWire } from "./settingsLlamaBinaryWireActio
 import { tryHandleSettingsShellWire } from "./settingsShellWireActionsRun";
 
 export async function tryHandleComposeSettings(action: string, element?: HTMLElement): Promise<boolean> {
+  if (await handleDigestBenchAction(action, element)) return true;
   if (await tryHandleModalsWire(action, element)) return true;
   if (await tryHandleComposeEntryWire(action, element)) return true;
   if (await tryHandleSettingsShellWire(action, element)) return true;
