@@ -30,11 +30,19 @@ function message(className: string, avatarText: string): string {
   </article>`;
 }
 
+/** Règles du fil seulement. Le loquet dossier utilise `inset -2px` hors lecture. */
+function threadMessageRules(css: string): string {
+  return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter((match) => /\.message|\.thread-msg|\.thread-reading|\.avatar/.test(match[1] ?? ""))
+    .map((match) => match[0])
+    .join("\n");
+}
+
 describe("fil de lecture aligné d’un seul côté", () => {
   it("n’inverse plus l’avatar ni la carte selon « moi » ou une voie droite", () => {
     const css = [readCss("src/styles.css"), readCss("src/styles/productivity-wave2.css"), readCss("src/styles/productivity-shell.css")].join("\n");
     expect(css).not.toMatch(/\border:\s*2\b/);
-    expect(css).not.toMatch(/inset\s+-/);
+    expect(threadMessageRules(css)).not.toMatch(/inset\s+-/);
     expect(css).toMatch(/\.message\.mine \.avatar\s*\{[^}]*order:\s*0/);
     expect(css).toMatch(/\.thread-reading \.message\.mine \.thread-msg-card\s*\{[^}]*inset\s+3px\s+0\s+0/);
 

@@ -1410,3 +1410,278 @@ body.clarity-dark {
 .inbox-index--folder-embed .thread-row.inbox-thread-row {
   border-bottom-color: var(--border);
 }
+
+/* Compositeur — barre Écrire / Corriger / Transformer.
+   Chrome IBM Plex, filet cuivre sur le ton actif. Le corps du mail reste Literata. */
+
+.compose-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 0 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-sans);
+}
+
+.compose-toolbar__row,
+.compose-toolbar__cluster,
+.compose-toolbar__tools,
+.compose-toolbar__tones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+
+.compose-toolbar__row {
+  gap: 6px 8px;
+  width: 100%;
+}
+
+.compose-toolbar__row--ai {
+  gap: 8px 14px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--elevated);
+  border: 1px solid var(--border-weak);
+}
+
+.compose-toolbar__cluster {
+  gap: 6px 8px;
+}
+
+.compose-toolbar__tools {
+  flex: 1 1 220px;
+  gap: 1px 2px;
+}
+
+.compose-toolbar__label {
+  flex: 0 0 auto;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.compose-toolbar button {
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool {
+  min-width: 0;
+  height: auto;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  box-shadow: none;
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool:hover {
+  background: var(--hover);
+  border-color: transparent;
+  color: var(--text);
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--bold {
+  font-weight: 650;
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--italic {
+  font-style: italic;
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--underline {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--h1 {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--h2 {
+  font-weight: 600;
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.compose-toolbar .md-toolbar-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+.compose-toolbar__tones {
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-weak);
+}
+
+.composer-mail-shell .compose-toolbar .tone-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 6px 10px;
+  min-height: 28px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.composer-mail-shell .compose-toolbar .tone-button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.composer-mail-shell .compose-toolbar .tone-button.active {
+  color: var(--copper);
+  background: var(--accent-dim);
+  border-color: transparent;
+  box-shadow: inset 0 -2px 0 var(--copper);
+}
+
+.compose-toolbar__go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--copper) 40%, var(--border));
+  background: var(--accent-dim);
+  color: var(--copper);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.compose-toolbar__go:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--copper) 16%, var(--surface));
+  color: var(--copper-press);
+}
+
+body.clarity-dark .compose-toolbar__go:hover:not(:disabled) {
+  color: var(--accent-hover);
+}
+
+.compose-toolbar__go--quiet {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+  font-weight: 500;
+}
+
+.compose-toolbar__go--quiet:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hover);
+  border-color: var(--border-strong);
+}
+
+.compose-toolbar__go:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.compose-toolbar__go.is-busy:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.compose-toolbar__go .spinner--tiny {
+  border-top-color: currentColor;
+}
+
+.composer-mail-shell .compose-toolbar .compose-toolbar__dictate {
+  width: auto;
+  height: 32px;
+  margin-left: auto;
+  padding: 0 12px 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.composer-mail-shell .compose-toolbar .compose-toolbar__dictate:hover {
+  color: var(--copper);
+  border-color: color-mix(in srgb, var(--copper) 45%, var(--border));
+  background: var(--accent-dim);
+}
+
+.composer-mail-shell .compose-toolbar .compose-toolbar__dictate.recording {
+  color: var(--sm-danger-fg);
+  border-color: var(--danger);
+  background: var(--sm-danger-surface);
+}
+
+.composer-mail-shell .compose-toolbar .compose-toolbar__dictate.processing {
+  color: var(--muted);
+  cursor: wait;
+}
+
+.composer-mail-shell .compose-toolbar button:focus-visible,
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool:focus-visible,
+.composer-mail-shell .compose-toolbar .tone-button.active:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 0;
+  box-shadow: inset 0 0 0 2px var(--copper);
+}
+
+.composer-mail-shell .compose-correction-panel {
+  margin-top: 10px;
+  border-color: color-mix(in srgb, var(--copper) 28%, var(--border));
+  box-shadow: inset 2px 0 0 var(--copper);
+}
+
+.composer-mail-shell .compose-correction-apply {
+  border-color: color-mix(in srgb, var(--copper) 40%, var(--border));
+  background: var(--accent-dim);
+  color: var(--copper);
+  font-weight: 600;
+}
+
+.composer-mail-shell .compose-correction-apply:hover {
+  background: color-mix(in srgb, var(--copper) 16%, var(--surface));
+  color: var(--copper-press);
+}
+
+@media (max-width: 720px) {
+  .composer-mail-shell .compose-toolbar .compose-toolbar__dictate {
+    margin-left: 0;
+  }
+
+  .compose-toolbar__row--ai {
+    align-items: flex-start;
+  }
+}
