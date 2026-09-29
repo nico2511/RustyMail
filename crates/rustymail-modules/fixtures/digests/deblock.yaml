@@ -1,0 +1,54 @@
+# Fixture embarquée (phase 1). Chargée par mail_cleaning::digest_fixtures.
+# Découpe Deblock : header et body affichés, footer masqué quand il est présent.
+# L'envoi de test n'a pas de div.warning : l'ancre footer est un stop, pas une obligation.
+# Pas de LLM. Amazon et GitHub ne passent pas par ce fichier.
+# Esquisse de cadrage (non chargée) : docs/cadrage/digest-template.exemple.yaml
+
+id: deblock
+rule_set_version: "1"
+# Marqueur historique, le temps de la bascule UI / tests.
+legacy_marker: deblock
+
+match:
+  sender:
+    domains:
+      - exact: deblock.com
+      - suffix: .deblock.com
+  structure:
+    root: div.f-fallback
+    min_children: 3
+
+zones:
+  header:
+    action: show
+    presentation: prominent
+    anchors:
+      - selector: h3
+        index: 0
+        role: title
+      - selector: div
+        class_contains: code
+        role: amount
+  body:
+    action: show
+    presentation: key_value
+    details_heading: Détails
+    anchors:
+      - selector: h3
+        index: 1
+        text_contains_any:
+          - détails
+          - details
+          - "👇"
+    rows:
+      selector: p
+      stop_when:
+        class_contains: warning
+        or_tag: h3
+      label: "b, strong"
+      value: after_br
+  footer:
+    action: hide
+    anchors:
+      - selector: div
+        class_contains: warning

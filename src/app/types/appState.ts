@@ -66,7 +66,8 @@ export type State = {
     | "addressBook"
     | "storage"
     | "shortcuts"
-    | "developer";
+    | "developer"
+    | "digestBench";
   /** Modale de recherche globale (Ctrl+T). */
   searchModalOpen: boolean;
   /** Modale Paramètres → IA (catégorie ouverte). */

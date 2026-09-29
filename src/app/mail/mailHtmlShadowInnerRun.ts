@@ -80,11 +80,13 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
           background:rgba(255,255,255,.035);
         }
         .mail code{background:rgba(255,255,255,.065);padding:3px 7px;border-radius:6px;font-size:12px}
-        .mail article.rm-deblock-digest table,.mail article.rm-amazon-digest table,.mail article.rm-github-digest table{width:100%;border-collapse:collapse;font-size:inherit}
+        .mail article.rm-digest table,.mail article.rm-deblock-digest table,.mail article.rm-amazon-digest table,.mail article.rm-github-digest table{width:100%;border-collapse:collapse;font-size:inherit}
+        .mail article.rm-digest th,.mail article.rm-digest td,
         .mail article.rm-deblock-digest th,.mail article.rm-deblock-digest td,
         .mail article.rm-amazon-digest th,.mail article.rm-amazon-digest td,
         .mail article.rm-github-digest th,.mail article.rm-github-digest td{padding:7px 12px 7px 0;vertical-align:top;text-align:left;line-height:1.45}
-        .mail article.rm-deblock-digest th,.mail article.rm-amazon-digest tbody th,.mail article.rm-github-digest tbody th{font-weight:600;white-space:nowrap;width:1%;color:var(--dim,rgba(238,240,238,.58))}
+        .mail article.rm-digest th,.mail article.rm-deblock-digest th,.mail article.rm-amazon-digest tbody th,.mail article.rm-github-digest tbody th{font-weight:600;white-space:nowrap;width:1%;color:var(--dim,rgba(238,240,238,.58))}
+        .mail article.rm-digest tbody tr:not(:first-child) th,.mail article.rm-digest tbody tr:not(:first-child) td,
         .mail article.rm-deblock-digest tbody tr:not(:first-child) th,.mail article.rm-deblock-digest tbody tr:not(:first-child) td,
         .mail article.rm-amazon-digest tbody tr:not(:first-child) th,.mail article.rm-amazon-digest tbody tr:not(:first-child) td,
         .mail article.rm-github-digest tbody tr:not(:first-child) th,.mail article.rm-github-digest tbody tr:not(:first-child) td{border-top:1px solid rgba(120,119,117,.16)}

@@ -11,6 +11,7 @@ export function hasStructuredHtmlCleaningProvider(message: CleanedMessageView): 
   if (p && p !== "generic") return true;
   const ch = message.cleanedHtmlBody ?? "";
   return (
+    ch.includes("rustymail:digest") ||
     ch.includes("rustymail:amazon-digest") ||
     ch.includes("rustymail:deblock-digest") ||
     ch.includes("rustymail:github-digest")

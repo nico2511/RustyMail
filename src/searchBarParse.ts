@@ -37,8 +37,8 @@ const RX_SCOPE_ACCOUNT_LEGACY = /#(?:all|tout)\b/gi;
 const RX_SENDER_EMAIL = /@([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
 /** Adresse seule sans `@` devant (ex. `noreply@ionos.fr`). */
 const RX_BARE_EMAIL = /\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/gi;
-/** Domaine seul pour filtrer expéditeurs (ex. `ionos.fr`). */
-const RX_DOMAIN_TOKEN = /\b(@?([a-z0-9][a-z0-9.-]*\.[a-z]{2,}))\b/gi;
+/** Domaine préfixé `@` (ex. `@ionos.fr`). Le `\b` ne colle pas à `@`, donc le `@` est dans le motif. */
+const RX_DOMAIN_TOKEN = /@([a-z0-9][a-z0-9.-]*\.[a-z]{2,})\b/gi;
 const RX_RULE_STAR = /#(\*\.[a-z0-9][a-z0-9.-]*)/gi;
 const RX_TAG =
   /#(?:tag:)?(source|kind|entity|state):([^\s#,]+)/gi;
@@ -223,14 +223,11 @@ export function parseSearchBarDraft(draft: string, newsletterRules: NewsletterRu
 
   RX_DOMAIN_TOKEN.lastIndex = 0;
   while ((m = RX_DOMAIN_TOKEN.exec(rest)) !== null) {
-    // Ne transforme pas agressivement tout domaine en expéditeur.
-    // On ne considère un domaine comme expéditeur que si l’utilisateur l’a préfixé par '@' (ex. '@ionos.fr').
-    const rawToken = (m[1] ?? "").trim();
-    const hasAtPrefix = rawToken.startsWith("@");
-    if (!hasAtPrefix) continue;
-    const domain = m[2].trim().toLowerCase();
+    // Un domaine nu (`ionos.fr`) reste du texte. Seul `@ionos.fr` filtre l'expéditeur.
+    const domain = (m[1] ?? "").trim().toLowerCase();
     if (domain && !domain.includes("@")) pushSender(domain);
     rest = rest.replace(m[0], " ");
+    RX_DOMAIN_TOKEN.lastIndex = 0;
   }
 
   out.text = rest.replace(/\s+/g, " ").trim();

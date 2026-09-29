@@ -1,0 +1,86 @@
+# ESQUISSE — non chargée par RustyMail.
+# La fixture runtime est crates/rustymail-modules/fixtures/digests/deblock.yaml
+# (`action: show|hide`, alias `keep`). Ce fichier sert de contrôle au harness.
+# Fixture = zones header / body / footer + matching.
+# Cas Deblock : le plugin try_deblock_digest fait déjà cette découpe.
+# Voir docs/CADRAGE_DIGEST_TEMPLATES.md. Ne pas committer de vrai mail ici.
+#
+# Banc d'essai (Paramètres → Banc d'essai) : un YAML du même genre se prévisualise
+# sur de vrais mails trouvés par la recherche actuelle
+# (@domaine, texte sujet/corps, #dossier / mailbox). Pas un second index.
+# Ce fichier-ci reste une esquisse de contrôle, pas la fixture chargée.
+# Le domaine filtre l'entrée dans la liste ; les ancres `structure`
+# décident si la découpe s'applique. Domaine seul = pas de réécriture.
+# Gestes d'aperçu : afficher, masquer, replier, restyler
+# (`keep` / `presentation` ci-dessous). Deblock : header et body
+# affichés, body en tableau, footer masqué. Pas de zone repliée.
+
+id: deblock
+rule_set_version: "1"
+
+# Quand réappliquer cette découpe à un AUTRE mail.
+match:
+  confidence_required: strong
+  sender_domains:
+    - exact: deblock.com
+    - suffix: .deblock.com
+  structure:
+    # Sans ces ancres, ce n'est pas le même pattern : repli générique.
+    root: div.f-fallback
+    min_children: 3
+
+zones:
+  header:
+    keep: true
+    presentation: prominent
+    # Premier h3 = titre, div.code = montant. Les deux fixtures s'y retrouvent.
+    anchors:
+      - selector: h3
+        index: 0
+      - selector: div
+        class_contains: code
+  body:
+    keep: true
+    presentation: key_value
+    details_heading: Détails
+    anchors:
+      - selector: h3
+        index: 1
+        text_contains_any:
+          - détails
+          - details
+          - "👇"
+    rows:
+      selector: p
+      stop_when:
+        class_contains: warning
+        or_tag: h3
+      label: "b, strong"
+      value: after_br
+  footer:
+    keep: false
+    anchors:
+      - selector: div
+        class_contains: warning
+
+# Contrôle : l'échantillon et un autre mail du même pattern.
+samples:
+  - role: definit_la_decoupe
+    fixture: tests/fixtures/deblock/receive_200eur.html
+  - role: autre_mail_du_pattern
+    fixture: tests/fixtures/deblock/send_200eur.html
+
+# Oracle humain, aligné sur le plugin actuel. Pas une sortie de modèle.
+expect:
+  marker: "rustymail:digest"
+  header_contains:
+    - "200 EUR"
+  body_contains:
+    - IBAN
+  footer_absent:
+    - "Marketing footer"
+
+negative:
+  - sender: ami@example.com
+    subject: "mon virement deblock"
+    expect_provider: generic

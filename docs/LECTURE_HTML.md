@@ -2,7 +2,7 @@
 
 Le mail se lit comme une **discussion**. Le nettoyage générique sert ce mode : retirer le bruit qui gêne l’échange (trackers, styles, citations bruyantes, signatures lourdes), sans réécrire le courrier en carte digest.
 
-Chaîne : HTML MIME → `clean_html_builtin` (générique, puis Amazon / Deblock / GitHub **seulement** si le signal expéditeur est fort) → `CleanedMessageView.cleanedHtmlBody` → ombre DOM + `sanitizeEmailHtml` (DOMPurify et gardes).
+Chaîne : HTML MIME → `clean_html_builtin` (générique, puis Amazon / GitHub si le signal expéditeur est fort, Deblock si le domaine **et** la structure de la fixture tiennent) → `CleanedMessageView.cleanedHtmlBody` → ombre DOM + `sanitizeEmailHtml` (DOMPurify et gardes).
 
 Les images distantes restent bloquées tant que la personne ne demande pas à les charger. Le cœur mail ne dépend pas d’un LLM pour ce nettoyage.
 
@@ -11,7 +11,8 @@ Les images distantes restent bloquées tant que la personne ne demande pas à le
 | Chemin | Rôle |
 | --- | --- |
 | **Générique** (règles v11) | Lecture personne-à-personne. Le corps reste le message. Les citations Gmail et les `blockquote type="cite"` deviennent un `<details class="rm-mail-folded-quote">` fermé : la réponse est devant, l’historique se rouvre. Une citation qui est tout le message reste visible. La signature Gmail rejoint `rm-mail-signature` (masquée, comme les autres queues de signature). |
-| **Plugins Amazon, Deblock, GitHub** | Digests newsletter / notification. Ils ne sont pas étendus au courrier générique. Un mot « unsubscribe » ou « privacy » dans une discussion ne déclenche pas une réécriture. |
+| **Fixture Deblock** | Digest transactionnel. Domaine `deblock.com` et ancres `div.f-fallback` (header / body affichés, footer masqué). Sinon repli générique. Pas d’appel de modèle à l’ouverture. |
+| **Plugins Amazon, GitHub** | Digests ad hoc. Ils ne sont pas étendus au courrier générique, ni réécrits en fixture dans cette phase. |
 
 `cleanedText` (synthèses, traduction, questions sur le fil) suit le corps affiché : le rapport de conversation Outlook quand il existe, sinon le texte du HTML nettoyé **sans** la citation repliée ni la signature masquée. Sans HTML, on garde le texte plain après signature et citations `>`.
 
@@ -33,3 +34,9 @@ Le chrome marketing (préheader caché, barre sociale, pied légal, tableaux de 
 - Un séparateur `-----Original Message-----` sans marqueurs Outlook : le corps cité reste dans le fil. Le rapport Outlook couvre les chaînes De / Envoyé / Objet.
 - Un expéditeur non Amazon dont le HTML ressemble au pied de page Amazon peut encore prendre le passage faible Amazon (strip de tableaux). Les fixtures Amazon fortes ne changent pas.
 - Pas de politique « texte seul par défaut ». La vue d’origine, si elle est ouverte, passe par le même DOMPurify.
+
+## Fixture Deblock (phase 1)
+
+Le plugin Rust `try_deblock_digest` est remplacé par `crates/rustymail-modules/fixtures/digests/deblock.yaml`, appliqué dans `clean_html_builtin` quand l’expéditeur et la structure matchent. Les deux HTML `tests/fixtures/deblock/` restent l’oracle. Un expéditeur qui n’est pas Deblock, ou un HTML sans la racine, reste sur le générique — y compris un sujet qui contient « deblock ».
+
+Le banc d’essai est dans Paramètres → Banc d’essai. Il cherche avec la barre lexicale actuelle, compare le brut et la découpe, et peut accepter ou refuser une fixture. Accepter ne change pas l’ouverture des mails. Une activation séparée (« Activer en lecture ») peut installer la fixture acceptée ; elle est éteinte par défaut. Cadrage : [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md).

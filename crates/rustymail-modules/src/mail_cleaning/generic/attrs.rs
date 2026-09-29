@@ -11,6 +11,8 @@ fn retain_structural_class_attr(value: &str) -> Option<String> {
         .split_whitespace()
         .filter(|c| {
             c.starts_with("rm-mail-")
+                || *c == "rm-digest"
+                || c.starts_with("rm-digest-")
                 || c.starts_with("rm-amazon-")
                 || c.starts_with("rm-deblock-")
                 || c.starts_with("rm-github-")
@@ -57,9 +59,8 @@ pub(crate) fn keep_attr(tag: &str, attr: &str) -> bool {
         return false;
     }
     match a.as_str() {
-        "href" | "src" | "alt" | "title" | "colspan" | "rowspan" | "role" | "aria-label" | "id" => {
-            true
-        }
+        "href" | "src" | "alt" | "title" | "colspan" | "rowspan" | "role" | "aria-label" | "id"
+        | "data-digest-id" => true,
         "width" | "height" => matches!(tag, "img" | "video" | "picture" | "source" | "svg"),
         "style" | "class" | "align" | "valign" | "bgcolor" | "border" | "cellpadding"
         | "cellspacing" | "face" | "color" | "lang" | "dir" => false,

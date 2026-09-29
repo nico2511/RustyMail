@@ -30,7 +30,8 @@
       "addressBook": "Carnet",
       "storage": "Stockage",
       "shortcuts": "Raccourcis",
-      "developer": "Développeur"
+      "developer": "Développeur",
+      "digestBench": "Banc d'essai"
     },
     "general": {
       "languageHeading": "Langue",
