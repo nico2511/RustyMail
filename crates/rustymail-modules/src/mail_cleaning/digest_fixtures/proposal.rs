@@ -584,6 +584,20 @@ zones:
     }
 
     #[test]
+    #[ignore = "docs screenshot harness (CAPTURE_DIGEST_CUT=1)"]
+    fn dump_deblock_cut_preview_for_docs() {
+        let proposal = analyze_html_structure_heuristic(RECEIVE, "support@deblock.com");
+        let yaml = proposal_to_fixture_yaml(&proposal).expect("yaml");
+        let preview = preview_candidate_fixture(&yaml, RECEIVE, "support@deblock.com");
+        eprintln!("DIGEST_CUT_YAML_START");
+        eprintln!("{}", yaml);
+        eprintln!("DIGEST_CUT_YAML_END");
+        eprintln!("DIGEST_CUT_PREVIEW_START");
+        eprintln!("{}", preview.html.expect("applicable"));
+        eprintln!("DIGEST_CUT_PREVIEW_END");
+    }
+
+    #[test]
     fn embedded_deblock_fixture_still_oracle() {
         let fixture = parse_fixture(DEBLOCK_FIXTURE_YAML).expect("deblock");
         let yaml = proposal_to_fixture_yaml(&super::proposal_from_fixture(&fixture)).expect("yaml");
