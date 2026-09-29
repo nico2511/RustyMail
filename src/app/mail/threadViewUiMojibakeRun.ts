@@ -1,4 +1,5 @@
 import type { SummaryResult } from "../types";
+import { isNoiseBullet, salvageSummaryFields, SUMMARY_PARSE_FAILED_FR } from "./threadSummaryFormat";
 
 export function repairUtf8Mojibake(s: string): string {
   const t = s ?? "";
@@ -25,5 +26,19 @@ export function repairSummaryResultStrings(o: SummaryResult): SummaryResult {
 
 export function summaryResultToZenText(o: SummaryResult): string {
   const r = repairSummaryResultStrings(o);
-  return `${r.title}\n\n${r.bullets.map((bullet) => `- ${bullet}`).join("\n")}`;
+  const joined = [r.title, ...r.bullets.map((bullet) => `- ${bullet}`)].join("\n");
+  const salvaged = salvageSummaryFields(joined);
+  if (salvaged && (salvaged.title || salvaged.bullets.length)) {
+    const lines: string[] = [];
+    if (salvaged.title) lines.push(salvaged.title);
+    for (const bullet of salvaged.bullets) lines.push(`- ${bullet}`);
+    return lines.join("\n");
+  }
+  const bullets = r.bullets.map((b) => b.trim()).filter((b) => b && !isNoiseBullet(b));
+  const lines: string[] = [];
+  const title = r.title.trim();
+  if (title && !isNoiseBullet(title)) lines.push(title);
+  if (!bullets.length && r.bullets.some((b) => b.trim())) lines.push(SUMMARY_PARSE_FAILED_FR);
+  for (const bullet of bullets) lines.push(`- ${bullet}`);
+  return lines.join("\n");
 }

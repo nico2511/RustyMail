@@ -17,7 +17,7 @@ pub use attrs::strip_presentation_attrs;
 pub use images::is_outlook_noise_img;
 pub use prune::prune_empty_boilerplate;
 
-pub const GENERIC_RULE_SET_VERSION: &str = "11";
+pub const GENERIC_RULE_SET_VERSION: &str = "12";
 
 const REMOVABLE_TAGS: &[&str] = &[
     "script", "noscript", "iframe", "object", "embed", "style", "form", "input", "button",
@@ -71,7 +71,8 @@ pub fn finalize_html_for_display(html: &str) -> FinalizeResult {
         };
     }
 
-    let forwarded = super::outlook_forward::fold_outlook_forward_noise(&stripped);
+    let with_history = super::quoted_history::fold_quoted_history(&stripped);
+    let forwarded = super::outlook_forward::fold_outlook_forward_noise(&with_history);
     let folded = super::signature_html::fold_signature_tail(&forwarded);
     FinalizeResult {
         html: readability::postprocess_readability(&folded),

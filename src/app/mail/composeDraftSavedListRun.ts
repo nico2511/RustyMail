@@ -15,7 +15,7 @@ export async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }):
   if (!isTauriRuntime()) return false;
   const accountId = currentAccount()?.id?.trim();
   if (!accountId || !state.draftSessionId?.trim() || !state.draft) {
-    toast("Impossible d’enregistrer : session ou compte indisponible.");
+    toast.error("Impossible d’enregistrer : session ou compte indisponible.");
     return false;
   }
   persistDraft();
@@ -34,7 +34,7 @@ export async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }):
     const tid = newId.trim();
     if (tid.length) state.savedDraftRecordId = tid;
     if (!opts?.silentToast) {
-      toast("Enregistré dans « Sauvés ».");
+      toast.success("Enregistré dans « Sauvés ».");
     }
     await requireComposeDraftLocalSaveDeps().refreshSavedDraftsMailboxCount();
     if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
@@ -43,7 +43,7 @@ export async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }):
     render();
     return true;
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
     return false;
   }
 }

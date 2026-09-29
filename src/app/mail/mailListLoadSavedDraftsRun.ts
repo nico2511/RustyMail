@@ -55,7 +55,7 @@ export async function loadSavedDraftsAsThreadList(): Promise<void> {
     }
   } catch (error) {
     console.error("saved_draft_list", error);
-    toast(`Liste des brouillons : ${tauriErrorMessage(error)}`);
+    toast.error(`Liste des brouillons : ${tauriErrorMessage(error)}`);
     state.threads = [];
     state.threadOffset = 0;
     state.hasMoreThreads = false;

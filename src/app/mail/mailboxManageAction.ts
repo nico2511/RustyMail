@@ -1,3 +1,4 @@
+import { deleteBlockedReason, renameBlockedReason } from "../../mailboxLock";
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import { currentAccount } from "../core/accountContext";
 import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
@@ -14,17 +15,32 @@ export async function mailboxManageAction(
   kind: "create" | "rename" | "delete" | "subscribe",
 ): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("Mailbox : disponible seulement dans l’app Tauri.");
+    toast.warning("Mailbox : disponible seulement dans l’app Tauri.");
     return;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return;
   }
   if (kind !== "create" && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast("Les dossiers IMAP ne s’appliquent pas aux brouillons locaux.");
+    toast.warning("Les dossiers IMAP ne s’appliquent pas aux brouillons locaux.");
     return;
+  }
+  const locks = state.folderManager.report?.lockedMailboxes ?? [];
+  if (kind === "rename") {
+    const blocked = renameBlockedReason(locks, state.selectedMailbox || "");
+    if (blocked) {
+      toast(blocked);
+      return;
+    }
+  }
+  if (kind === "delete") {
+    const blocked = deleteBlockedReason(locks, state.selectedMailbox || "");
+    if (blocked) {
+      toast(blocked);
+      return;
+    }
   }
   const d = requireMailboxManageActionDeps();
   try {
@@ -39,7 +55,7 @@ export async function mailboxManageAction(
     render();
   } catch (err) {
     console.error("mailboxManageAction", err);
-    toast(tauriErrorMessage(err));
+    toast.error(tauriErrorMessage(err));
     render();
   }
 }

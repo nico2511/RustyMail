@@ -20,7 +20,12 @@ export function stripOutlookDisplayNoiseFromDoc(doc: Document): void {
   const reQuote = /(?:de\s*:|from\s*:|-----original message-----).*?(?:envoy[ée]\s*:|sent\s*:).*?(?:objet\s*:|subject\s*:)/is;
   const quoteBlocks = [...doc.querySelectorAll<HTMLElement>("div, p, blockquote")]
     .map((el) => ({ el, text: (el.textContent ?? "").replace(/\u00a0/g, " ") }))
-    .filter(({ text }) => text.length > 0 && text.length <= 5000 && reQuote.test(text))
+    .filter(({ el, text }) => {
+      if (el.closest("details.rm-mail-folded-quote, .rm-mail-quote-body, article.rm-conversation-report")) {
+        return false;
+      }
+      return text.length > 0 && text.length <= 5000 && reQuote.test(text);
+    })
     .sort((a, b) => a.text.length - b.text.length);
   for (const { el } of quoteBlocks) {
     if (el.isConnected) el.remove();

@@ -1,3 +1,4 @@
+import { deleteBlockedReason, renameBlockedReason } from "../../../mailboxLock";
 import { mailboxesAllowedForMove, threadMailboxListLabel } from "../../../mailboxKinds";
 import { formatFriendlyThreadListDate } from "../../../threadListDates";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
@@ -242,6 +243,9 @@ export function renderQuoteFoldDialog(): string {
 
 export function renderMailboxManageDialog(): string {
   if (!state.mailboxManageOpen) return "";
+  const locks = state.folderManager.report?.lockedMailboxes ?? [];
+  const renameBlock = renameBlockedReason(locks, state.selectedMailbox || "");
+  const deleteBlock = deleteBlockedReason(locks, state.selectedMailbox || "");
   return `
     <div class="modal-backdrop" data-action="close-mailbox-manage">
       <div class="modal surface-elevated modal-shell-stop-prop" role="dialog" aria-modal="true" aria-label="Mailbox actions">
@@ -251,9 +255,9 @@ export function renderMailboxManageDialog(): string {
         </div>
         <div class="modal-body" style="display:grid;gap:10px">
           <button class="ghost-button" data-action="mb-create">Create mailbox…</button>
-          <button class="ghost-button" data-action="mb-rename">Rename mailbox…</button>
+          <button class="ghost-button" data-action="mb-rename" ${renameBlock ? "disabled" : ""} title="${escapeAttr(renameBlock ?? "")}">Rename mailbox…</button>
           <button class="ghost-button" data-action="mb-subscribe">Subscribe mailbox</button>
-          <button class="ghost-button" data-action="mb-delete" style="color:var(--danger)">Delete mailbox…</button>
+          <button class="ghost-button" data-action="mb-delete" style="color:var(--danger)" ${deleteBlock ? "disabled" : ""} title="${escapeAttr(deleteBlock ?? "")}">Delete mailbox…</button>
           <button class="ghost-button" data-action="open-folder-manager-view">Ouvrir la vue Dossiers…</button>
           <p class="dim" style="font-size:12px;margin:4px 0 0">Current: <strong>${escapeHtml(state.selectedMailbox || "INBOX")}</strong></p>
         </div>

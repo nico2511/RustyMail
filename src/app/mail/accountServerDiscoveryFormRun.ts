@@ -19,7 +19,7 @@ import { state } from "../state";
 export async function discoverMailServersAction(): Promise<void> {
   const emailRaw = inputValue("account-email").trim();
   if (!emailRaw.includes("@")) {
-    toast("Saisissez une adresse e-mail complète avant la détection.");
+    toast.warning("Saisissez une adresse e-mail complète avant la détection.");
     return;
   }
   if (accountFieldTouched.serverFields) {
@@ -43,7 +43,7 @@ export async function discoverMailServersAction(): Promise<void> {
       },
     });
     if (!preset) {
-      toast(
+      toast.warning(
         "Aucun préréglage local pour ce domaine · lancement en application bureau nécessaire pour la détection automatique étendue.",
       );
     }
@@ -51,7 +51,7 @@ export async function discoverMailServersAction(): Promise<void> {
   }
 
   try {
-    toast("Détection des serveurs (ISPDB Mozilla, .well-known, autoconfig, préréglages locaux…)…");
+    toast.info("Détection des serveurs (ISPDB Mozilla, .well-known, autoconfig, préréglages locaux…)…");
     const raw = await withTimeout(
       invoke<DiscoverMailServersResult>("discover_mail_servers", { email: emailRaw }),
       ACCOUNT_INVOKE_TIMEOUT_MS,

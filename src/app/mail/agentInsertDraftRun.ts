@@ -17,6 +17,7 @@ import { draftHasRecipientsExtra } from "./composeDraftRecipients";
 import { startNewDraftSession } from "./composeDraftSession";
 import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
 import { enterComposeView } from "./composeViewWireActions";
+import { introducesLlmMeta, LLM_META_BODY_TOAST } from "./llmMetaGuard";
 import { threadIsAutoMail } from "./threadAutoMail";
 
 export async function agentInsertDraftIntoCompose(extra?: string): Promise<void> {
@@ -24,18 +25,23 @@ export async function agentInsertDraftIntoCompose(extra?: string): Promise<void>
   if (!s?.draft.trim() && !extra?.trim()) return;
   let body = s?.draft?.trim() ?? "";
   if (extra?.trim()) body = appendSchedulingSlotsToDraft(body, extra.trim());
+  const source = (state.selectedThread?.messages ?? []).map((message) => message.cleanedText || "").join("\n");
+  if (introducesLlmMeta(source, body)) {
+    toast.error(LLM_META_BODY_TOAST);
+    return;
+  }
 
   const threadId = (s?.threadId ?? state.selectedThreadId ?? "").trim();
   if (!threadId) {
-    toast("Ouvrez le fil auquel vous répondez, puis réessayez.");
+    toast.warning("Ouvrez le fil auquel vous répondez, puis réessayez.");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Réponse dans le fil : application desktop (Tauri) requise.");
+    toast.warning("Réponse dans le fil : application desktop (Tauri) requise.");
     return;
   }
   if (threadIsAutoMail(state.selectedThread, threadId)) {
-    toast("Réponse indisponible pour ce fil automatique / newsletter.");
+    toast.warning("Réponse indisponible pour ce fil automatique / newsletter.");
     return;
   }
 
@@ -59,6 +65,6 @@ export async function agentInsertDraftIntoCompose(extra?: string): Promise<void>
     scheduleDraftRevisionSave(350);
   } catch (e) {
     console.error("agentInsertDraftIntoCompose prepare_reply", e);
-    toast(`Impossible d’ouvrir la réponse dans le fil : ${tauriErrorMessage(e)}`);
+    toast.error(`Impossible d’ouvrir la réponse dans le fil : ${tauriErrorMessage(e)}`);
   }
 }

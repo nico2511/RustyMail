@@ -14,7 +14,7 @@ import {
 function applyRecommendedWeightsFromRuntimeStatus(): boolean {
   const st = state.llmRuntimeStatus;
   if (!st?.recommendedRepo?.trim()) {
-    toast("Aucune recommandation pour l’instant — essayez « Analyser la mémoire ».");
+    toast.warning("Aucune recommandation pour l’instant — essayez « Analyser la mémoire ».");
     return false;
   }
   state.appPrefs.ai.localLlmHfRepoId = st.recommendedRepo.trim();
@@ -29,14 +29,14 @@ export async function tryHandleSettingsAiRuntimeRecommendedWire(action: string):
     case "llm-apply-recommended-weights": {
       if (!applyRecommendedWeightsFromRuntimeStatus()) return true;
       void persistAiPrefsFromDom({ silent: true, skipRender: true });
-      toast("Modèle recommandé appliqué.");
+      toast.success("Modèle recommandé appliqué.");
       render();
       return true;
     }
     case "llm-setup-recommended": {
       void (async () => {
         if (!isTauriRuntime()) {
-          toast("Configuration recommandée : lancez l’app Tauri.");
+          toast.warning("Configuration recommandée : lancez l’app Tauri.");
           return;
         }
         await refreshLlmRuntimeStatus(true);
@@ -51,11 +51,11 @@ export async function tryHandleSettingsAiRuntimeRecommendedWire(action: string):
         try {
           await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
           return;
         }
         await refreshLlmRuntimeStatus(false);
-        toast("Configuration recommandée appliquée.");
+        toast.success("Configuration recommandée appliquée.");
         render();
       })();
       return true;

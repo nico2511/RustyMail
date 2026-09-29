@@ -23,9 +23,9 @@ export async function fmSyncMailbox(mailbox: string): Promise<void> {
     );
     await refreshFolderManagerTree();
     if (state.folderManager.selectedMailbox === mb) await fmSelectMailbox(mb);
-    toast(`Dossier synchronisé : ${mb}`);
+    toast.success(`Dossier synchronisé : ${mb}`);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     state.folderManager.busyMailbox = null;
     state.folderManager.busyAction = null;

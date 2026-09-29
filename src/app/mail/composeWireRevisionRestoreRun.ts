@@ -36,7 +36,7 @@ export async function restoreDraftRevisionFromWire(revisionId: string): Promise<
       MAIL_ACTION_TIMEOUT_MS,
     );
     if (!restored) {
-      toast("Cette version n’existe plus.");
+      toast.warning("Cette version n’existe plus.");
       return;
     }
     state.draft = restored;
@@ -55,6 +55,6 @@ export async function restoreDraftRevisionFromWire(revisionId: string): Promise<
     scheduleDraftRevisionSave(450);
   } catch (error) {
     console.error("draft_revision_restore", error);
-    toast(`Restauration impossible: ${tauriErrorMessage(error)}`);
+    toast.error(`Restauration impossible: ${tauriErrorMessage(error)}`);
   }
 }

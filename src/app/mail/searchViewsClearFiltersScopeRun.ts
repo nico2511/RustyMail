@@ -10,7 +10,7 @@ export async function tryHandleSearchViewsClearFiltersScopeWire(action: string):
   if (action !== "toggle-search-scope") return false;
   state.searchScope = state.searchScope === "account" ? "mailbox" : "account";
   state.searchMailboxPath = null;
-  toast(
+  toast.info(
     state.searchScope === "account"
       ? "Portée : tout le compte (tous les dossiers)"
       : `Portée : dossier affiché — ${threadMailboxListLabel(state.selectedMailbox || "INBOX").full}`,

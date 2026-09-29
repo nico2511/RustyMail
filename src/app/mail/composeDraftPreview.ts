@@ -3,6 +3,7 @@ import type { DraftPreview } from "../types";
 import { safeInvoke } from "../lib/tauriCommand";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { composeSourcePlainText, isComposeHtmlSource, unwrapComposeHtml } from "./composeHtmlBody";
 
 export type ComposeDraftPreviewDeps = {
   persistDraft: () => void;
@@ -33,20 +34,34 @@ function applyComposerPreviewDom(htmlRaw: string) {
   return true;
 }
 
+/** Aperçu local immédiat (le moteur Tauri le remplace quand il répond). */
+export function fallbackDraftPreview(markdown: string): DraftPreview {
+  if (isComposeHtmlSource(markdown)) {
+    const html = unwrapComposeHtml(markdown);
+    return {
+      textPlain: composeSourcePlainText(markdown),
+      html,
+    };
+  }
+  return {
+    textPlain: markdown,
+    html: `<p>${escapeHtml(markdown).replace(/\n/g, "<br />")}</p>`,
+  };
+}
+
+let previewGeneration = 0;
+
 export async function computePreview() {
+  const generation = ++previewGeneration;
   previewDeps().persistDraft();
   const md = state.composeCanonicalBody || state.draft?.markdownBody || state.composeBody;
-  state.preview = await safeInvoke<DraftPreview>(
-    "preview_draft",
-    { markdownBody: md },
-    {
-      textPlain: md,
-      html: `<p>${escapeHtml(md).replace(/\n/g, "<br />")}</p>`,
-    },
-  );
+  const preview = await safeInvoke<DraftPreview>("preview_draft", { markdownBody: md }, fallbackDraftPreview(md));
+  if (generation !== previewGeneration) return;
+  state.preview = preview;
   if (state.view === "compose" && composePreviewPaneActive() && applyComposerPreviewDom(state.preview?.html ?? "")) {
     return;
   }
+  if (generation !== previewGeneration) return;
   render();
 }
 

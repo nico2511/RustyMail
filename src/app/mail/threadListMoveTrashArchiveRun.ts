@@ -22,16 +22,16 @@ export async function onThreadMove(
 ): Promise<void> {
   if (!threadId.trim()) return;
   if (savedDraftIdFromThreadId(threadId)) {
-    toast("Archive / corbeille : actions IMAP uniquement.");
+    toast.warning("Archive / corbeille : actions IMAP uniquement.");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Déplacer un fil : IMAP requiert l’app Tauri.");
+    toast.warning("Déplacer un fil : IMAP requiert l’app Tauri.");
     return;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return;
   }
   const mailbox = mailboxOverride?.trim() || sourceMailboxForThread(threadId);
@@ -51,6 +51,6 @@ export async function onThreadMove(
   } catch (err) {
     console.error(cmd, err);
     rollbackThreadListChange(threadId, prev);
-    toast(tauriErrorMessage(err));
+    toast.error(tauriErrorMessage(err));
   }
 }

@@ -66,7 +66,7 @@ export function bindComposerDropzone(): void {
     if (!state.draft) return;
     const dropped = extractDroppedPaths(event.dataTransfer);
     if (!dropped.length) {
-      toast(
+      toast.warning(
         "Aucun chemin de fichier local lu. Glissez depuis l’explorateur ou le bureau (mode Tauri ou Electron), pas depuis une page web.",
       );
       return;
@@ -75,7 +75,7 @@ export function bindComposerDropzone(): void {
     state.draft.attachmentPaths = merged;
     const attachmentsField = document.querySelector<HTMLInputElement>("#compose-attachments");
     if (attachmentsField) attachmentsField.value = attachmentPathsJoinedForHiddenField(merged);
-    toast(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
+    toast.success(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
     render();
   };
 

@@ -16,15 +16,15 @@ export function isSenderBatchSummarizeActive(): boolean {
 
 export async function summarizeSenderThreadsLight() {
   if (state.searchSenders.length === 0) {
-    toast("Filtrez d’abord par expéditeur (@ ou recherche NL).");
+    toast.warning("Filtrez d’abord par expéditeur (@ ou recherche NL).");
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")) {
-    toast("Synthèse de fil désactivée dans les préférences IA.");
+    toast.warning("Synthèse de fil désactivée dans les préférences IA.");
     return;
   }
   if (!state.threads.length) {
-    toast("Aucun fil dans la liste filtrée — lancez une recherche.");
+    toast.warning("Aucun fil dans la liste filtrée — lancez une recherche.");
     return;
   }
   const topK = state.threads.slice(0, 5);
@@ -49,7 +49,7 @@ export async function summarizeSenderThreadsLight() {
         render();
         const exists = await fetchOpenThreadOrNotify(tid, { quiet: true });
         if (!exists) {
-          toast(`Fil ignoré (non disponible en local) : ${label}`);
+          toast.warning(`Fil ignoré (non disponible en local) : ${label}`);
           continue;
         }
         if (signal.aborted || queueSignal.aborted) return "cancelled" as const;
@@ -60,7 +60,7 @@ export async function summarizeSenderThreadsLight() {
         if (outcome.status === "cancelled") return "cancelled" as const;
         if (outcome.status === "error") {
           const detail = outcome.errorMessage?.trim();
-          toast(
+          toast.error(
             detail ?
               `Synthèse échouée : ${label} — ${detail}`
             : `Synthèse échouée : ${label}`,
@@ -71,11 +71,11 @@ export async function summarizeSenderThreadsLight() {
       }
       return "done" as const;
     });
-    if (ran === "cancelled") toast("Synthèse batch annulée.");
+    if (ran === "cancelled") toast.warning("Synthèse batch annulée.");
     else if (ran) {
-      if (okCount === 0) toast("Aucune synthèse n’a abouti — vérifiez le moteur IA et la sync des fils.");
+      if (okCount === 0) toast.warning("Aucune synthèse n’a abouti — vérifiez le moteur IA et la sync des fils.");
       else
-        toast(
+        toast.info(
           `${okCount}/${topK.length} synthèse${okCount === 1 ? "" : "s"} — résultat du dernier fil dans le panneau IA (liste inchangée).`,
         );
     }

@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { assistPhaseForSkill, type AssistResult, type AssistSkillId } from "../../assistAgent";
+import { toast } from "../lib/toast";
 import { state } from "../state";
+import { introducesLlmMeta, LLM_META_BODY_TOAST } from "./llmMetaGuard";
 import { agentAssistPhasePayload, mergeAgentRecommendations } from "./agentAssistSessionHelpers";
 import { agentSkillEnabled } from "./threadAiStreamDom";
 
@@ -38,6 +40,7 @@ async function agentInvokeSkillPhase(
   if (!agentSkillEnabled(skill)) return;
   const s = state.agentSession;
   if (!s) return;
+  const previousDraft = s.draft;
   const res = await invoke<AssistResult>(
     "llm_assist_thread_phase",
     agentAssistPhasePayload(s, {
@@ -51,7 +54,15 @@ async function agentInvokeSkillPhase(
   if (res.safetyFlags?.length) {
     s.safetyFlags = [...new Set([...s.safetyFlags, ...res.safetyFlags])];
   }
-  if (res.draftResponse?.trim()) s.draft = res.draftResponse.trim();
+  const toneError = (res.runSteps ?? []).find((step) => step.skill === "tone_adapter" && step.status === "error");
+  const next = res.draftResponse?.trim() ?? "";
+  if (toneError) {
+    toast.error(toneError.message?.trim() || LLM_META_BODY_TOAST);
+  } else if (next && introducesLlmMeta(previousDraft, next)) {
+    toast.error(LLM_META_BODY_TOAST);
+  } else if (next) {
+    s.draft = next;
+  }
   s.plan = res.plan ?? s.plan;
 }
 

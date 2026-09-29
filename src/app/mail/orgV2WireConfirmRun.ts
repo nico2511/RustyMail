@@ -24,7 +24,7 @@ export function tryHandleOrgV2ConfirmWire(action: string): boolean {
       render();
       const trashProposal = state.organizationV2.report?.proposals.find((p: OrgProposal) => p.id === pid);
       if (!trashProposal) {
-        toast("Proposition introuvable — relancez l’analyse.");
+        toast.error("Proposition introuvable — relancez l’analyse.");
         return true;
       }
       void runOrgV2Apply(acc.id, trashProposal, "bulk-trash-org", override ?? undefined);
@@ -44,7 +44,7 @@ export function tryHandleOrgV2ConfirmWire(action: string): boolean {
       render();
       const delMbProposal = state.organizationV2.report?.proposals.find((p: OrgProposal) => p.id === pid);
       if (!delMbProposal) {
-        toast("Proposition introuvable — relancez l’analyse.");
+        toast.error("Proposition introuvable — relancez l’analyse.");
         return true;
       }
       void runOrgV2Apply(acc.id, delMbProposal, undefined, undefined, "delete-mailbox");

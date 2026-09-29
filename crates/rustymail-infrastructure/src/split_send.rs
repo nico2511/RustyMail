@@ -1,5 +1,8 @@
 //! Stat des PJ + exécution d’envois découpés (SMTP + IMAP + SQLite).
 
+use rustymail_domain::compose_html::{
+    compose_body_is_html, compose_html_fragment, COMPOSE_HTML_MARK,
+};
 use rustymail_domain::{plan_split, Draft, DraftId, DraftKind, SplitPlan};
 use tokio::fs;
 
@@ -10,6 +13,20 @@ use crate::{
 
 /// Budget brut par défaut (~18 Mo fichiers → ~25 Mo MIME avec base64 + marge).
 pub const DEFAULT_ATTACHMENT_BUDGET_BYTES: u64 = 18 * 1024 * 1024;
+
+/// Premier lot : libellé + corps. Lots suivants : libellé seul.
+/// Un corps TipTap garde le préfixe HTML pour que l’envoi ne le traite pas en Markdown.
+pub fn split_chunk_body(base_body: &str, part: usize, n: usize, include_body: bool) -> String {
+    let label = format!("Mail {part}/{n}");
+    if !include_body {
+        return format!("**{label}**");
+    }
+    if compose_body_is_html(base_body) {
+        let html = compose_html_fragment(base_body);
+        return format!("{COMPOSE_HTML_MARK}<p><strong>{label}</strong></p>\n{html}");
+    }
+    format!("**{label}**\n\n{}", base_body.trim_end())
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -120,11 +137,7 @@ pub async fn execute_split_send(
 
     for (idx, chunk) in plan.chunks.iter().enumerate() {
         let part = idx + 1;
-        let body = if idx == 0 {
-            format!("**Mail {part}/{n}**\n\n{}", base.markdown_body.trim_end())
-        } else {
-            format!("**Mail {part}/{n}**")
-        };
+        let body = split_chunk_body(&base.markdown_body, part, n, idx == 0);
 
         let (in_reply_to, references, subject) = if idx == 0 {
             (
@@ -240,6 +253,22 @@ fn imap_notice_from_outcome(out: &crate::ImapSentCopyOutcome) -> Option<String> 
         None
     } else {
         Some(parts.join(" "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_chunk_body;
+    use rustymail_domain::compose_html::COMPOSE_HTML_MARK;
+
+    #[test]
+    fn html_chunk_keeps_the_mark_and_the_body() {
+        let body = format!("{COMPOSE_HTML_MARK}<p>Bonjour</p>");
+        let first = split_chunk_body(&body, 1, 2, true);
+        assert!(first.starts_with(COMPOSE_HTML_MARK));
+        assert!(first.contains("<p>Bonjour</p>"));
+        assert!(first.contains("Mail 1/2"));
+        assert_eq!(split_chunk_body(&body, 2, 2, false), "**Mail 2/2**");
     }
 }
 

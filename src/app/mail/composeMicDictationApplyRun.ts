@@ -1,22 +1,11 @@
 import type { MicDictationTarget } from "../types";
 import { state } from "../state";
-import {
-  composePreviewPaneActive,
-  loadComposeMarkdownIntoEditor,
-  schedulePreviewUpdate,
-} from "./composeComposerBridge";
+import { appendComposePlainText } from "./composeBodyEditor";
+import { composePreviewPaneActive, schedulePreviewUpdate } from "./composeComposerBridge";
 
 export function micTargetFromView(explicit?: MicDictationTarget): MicDictationTarget {
   if (explicit) return explicit;
   return state.view === "thread" ? "thread-qa" : "compose";
-}
-
-function dictationBaseTextForTarget(target: MicDictationTarget): string {
-  if (target === "thread-qa") {
-    const ta = document.querySelector<HTMLTextAreaElement>("#thread-qa-input");
-    return ta?.value ?? state.threadQaDraft ?? "";
-  }
-  return state.composeCanonicalBody || state.draft?.markdownBody || state.composeBody || "";
 }
 
 export function applyDictationToTarget(text: string, target: MicDictationTarget): void {
@@ -36,8 +25,6 @@ export function applyDictationToTarget(text: string, target: MicDictationTarget)
     }
     return;
   }
-  const base = dictationBaseTextForTarget("compose").trimEnd();
-  const joiner = base.length ? "\n\n" : "";
-  loadComposeMarkdownIntoEditor(`${base}${joiner}${trimmed}`);
+  appendComposePlainText(trimmed);
   if (composePreviewPaneActive()) schedulePreviewUpdate(0);
 }

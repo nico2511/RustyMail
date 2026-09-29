@@ -7,8 +7,9 @@ use rustymail_domain::{Account, OrgMailboxEntry, OrgMailboxStructure};
 use serde::Serialize;
 
 use crate::app_prefs::{
-    is_mailbox_locked_in_prefs, list_locked_mailboxes_for_account, load_app_prefs,
-    prefs_path_from_db_dir, save_app_prefs, set_mailbox_locked_in_prefs, AppPrefs,
+    list_locked_mailboxes_for_account, load_app_prefs_required, mailbox_archive_block_reason,
+    mailbox_delete_block_reason, prefs_path_from_db_dir, save_app_prefs,
+    set_mailbox_locked_in_prefs, AppPrefs,
 };
 use crate::imap::ops::{
     expunge_after_delete_flags, format_uid_set, imap_delete_mailbox_with_fallback,
@@ -63,8 +64,8 @@ pub struct MailboxTreeReport {
 pub fn list_mailbox_tree(db_path: &Path, account_id: &str) -> Result<MailboxTreeReport, String> {
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
     let (structure, _) = analyze_mailbox_structure(&conn, account_id)?;
-    let prefs_path = prefs_path_from_db_dir(db_path.parent().unwrap_or(db_path));
-    let prefs = load_app_prefs(&prefs_path);
+    let prefs_path = prefs_path_from_db_dir(db_path);
+    let prefs = load_app_prefs_required(&prefs_path)?;
     let locked = list_locked_mailboxes_for_account(&prefs, account_id);
     let auto_archive = list_auto_archive_mailboxes(&conn, account_id)?;
     let entries: Vec<MailboxTreeEntry> = structure
@@ -88,8 +89,8 @@ pub fn set_mailbox_locked(
     mailbox: &str,
     locked: bool,
 ) -> Result<Vec<String>, String> {
-    let prefs_path = prefs_path_from_db_dir(db_path.parent().unwrap_or(db_path));
-    let mut prefs = load_app_prefs(&prefs_path);
+    let prefs_path = prefs_path_from_db_dir(db_path);
+    let mut prefs = load_app_prefs_required(&prefs_path)?;
     set_mailbox_locked_in_prefs(&mut prefs, account_id, mailbox, locked)?;
     save_app_prefs(&prefs_path, &prefs)?;
     Ok(list_locked_mailboxes_for_account(&prefs, account_id))
@@ -116,10 +117,10 @@ pub async fn archive_mailbox_threads(
     if is_archive_like_mailbox(mb) || is_trash_like_mailbox(mb) || is_sent_like_mailbox(mb) {
         return Err("Ce dossier ne peut pas être archivé (archive, corbeille ou envoyés).".into());
     }
-    let prefs_path = prefs_path_from_db_dir(db_path.parent().unwrap_or(db_path));
-    let prefs = load_app_prefs(&prefs_path);
-    if is_mailbox_locked_in_prefs(&prefs, &account.id.0, mb) {
-        return Err("Dossier verrouillé — déverrouillez-le pour archiver.".into());
+    let prefs_path = prefs_path_from_db_dir(db_path);
+    let prefs = load_app_prefs_required(&prefs_path)?;
+    if let Some(msg) = mailbox_archive_block_reason(&prefs, &account.id.0, mb) {
+        return Err(msg);
     }
 
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
@@ -255,8 +256,8 @@ pub async fn delete_imap_mailbox_with_contents(
     if is_protected_mailbox_for_org_delete(logical) {
         return Err("Dossier système protégé — suppression interdite.".into());
     }
-    if is_mailbox_locked_in_prefs(prefs, &account.id.0, logical) {
-        return Err("Dossier verrouillé — déverrouillez-le pour supprimer.".into());
+    if let Some(msg) = mailbox_delete_block_reason(prefs, &account.id.0, logical) {
+        return Err(msg);
     }
 
     let mut session = login_session_for_account(account).await?;

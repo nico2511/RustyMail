@@ -24,7 +24,7 @@ export async function agentPrepareReplyContinueFromClarification(): Promise<bool
       await agentRunConsistency(signal);
       await agentRefreshPlanFromDraft();
     } catch (e) {
-      if (!isLlmCancelledError(e)) toast(tauriErrorMessage(e));
+      if (!isLlmCancelledError(e)) toast.error(tauriErrorMessage(e));
     } finally {
       if (state.agentSession) state.agentSession.busy = false;
       render();

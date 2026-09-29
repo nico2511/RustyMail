@@ -69,7 +69,11 @@ export function frenchUpdateError(error: unknown): string {
 
 function publish(next: DesktopUpdatePhase, opts?: { toast?: string }): void {
   phase = next;
-  if (opts?.toast) toast(opts.toast);
+  if (opts?.toast) {
+    if (next.kind === "error") toast.error(opts.toast);
+    else if (next.kind === "uptodate" || next.kind === "ready") toast.success(opts.toast);
+    else toast.info(opts.toast);
+  }
   if (state.view === "settings" && state.settingsTab === "general") render();
 }
 
@@ -107,7 +111,16 @@ export async function checkForDesktopUpdate(opts?: { quiet?: boolean }): Promise
     const notes = (update.body ?? "").trim();
     publish({ kind: "available", version: update.version, notes });
     if (opts?.quiet) {
-      toast(`Mise à jour ${update.version} disponible. Paramètres → Général pour l’installer.`);
+      toast.info(`Mise à jour ${update.version} disponible. Paramètres → Général pour l’installer.`, {
+        action: {
+          label: "Ouvrir",
+          onClick: () => {
+            state.view = "settings";
+            state.settingsTab = "general";
+            render();
+          },
+        },
+      });
       if (state.view === "settings" && state.settingsTab === "general") render();
     }
   } catch (error) {

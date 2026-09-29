@@ -1,18 +1,13 @@
-// @ts-nocheck — DOM wiring; tighten types incrementally.
-import {
-  scheduleDraftRevisionSave,
-  schedulePreviewUpdate,
-  setComposeFromTextareaValue,
-} from "./composeComposerBridge";
+import { destroyComposeBodyEditor, mountComposeBodyEditor } from "./composeBodyEditor";
 
 export function wireEventsDomComposeBodyInput(signal: AbortSignal): void {
-  document.querySelector<HTMLTextAreaElement>("#compose-body")?.addEventListener(
-    "input",
-    (event) => {
-      setComposeFromTextareaValue((event.currentTarget as HTMLTextAreaElement).value);
-      schedulePreviewUpdate();
-      scheduleDraftRevisionSave();
-    },
-    { signal },
-  );
+  const host = document.querySelector<HTMLElement>("#compose-body");
+  if (!host) {
+    destroyComposeBodyEditor();
+    return;
+  }
+  mountComposeBodyEditor(host);
+  signal.addEventListener("abort", () => {
+    destroyComposeBodyEditor();
+  });
 }

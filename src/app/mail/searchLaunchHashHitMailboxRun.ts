@@ -9,7 +9,7 @@ import { applySearchBarIfCriteriaAndRender } from "./searchLaunchHashHitRefreshR
 
 export async function tryApplyHashHitMailboxOrAccount(hit: InboxFilterHit): Promise<boolean> {
   if (hit.id.startsWith("mailbox:")) {
-    toast(`Dossier : ${state.searchMailboxPath}`);
+    toast.info(`Dossier : ${state.searchMailboxPath}`);
     await applySearchBarIfCriteriaAndRender();
     return true;
   }
@@ -18,7 +18,7 @@ export async function tryApplyHashHitMailboxOrAccount(hit: InboxFilterHit): Prom
     state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: id }, [], BOOT_INVOKE_TIMEOUT_MS);
     ensureValidSelectedMailbox();
     const acc = state.accounts.find((a) => a.id === id);
-    toast(`Compte : ${acc?.email ?? id}`);
+    toast.info(`Compte : ${acc?.email ?? id}`);
     void requireSearchLaunchDeps().refreshSearchTagCatalog();
     await applySearchBarIfCriteriaAndRender();
     return true;

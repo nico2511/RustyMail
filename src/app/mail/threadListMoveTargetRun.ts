@@ -20,16 +20,16 @@ export async function onThreadMoveTo(threadId: string, destMailbox: string): Pro
   const dest = String(destMailbox ?? "").trim();
   if (!tid || !dest) return;
   if (savedDraftIdFromThreadId(tid)) {
-    toast("Déplacer : disponible pour les mails IMAP, pas pour les brouillons sauvegardés.");
+    toast.warning("Déplacer : disponible pour les mails IMAP, pas pour les brouillons sauvegardés.");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Déplacer un fil : IMAP requiert l’app Tauri.");
+    toast.warning("Déplacer un fil : IMAP requiert l’app Tauri.");
     return;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return;
   }
   const source = sourceMailboxForThread(tid);
@@ -56,7 +56,7 @@ export async function onThreadMoveTo(threadId: string, destMailbox: string): Pro
   } catch (err) {
     console.error("move_thread_mailbox", err);
     rollbackThreadListChange(tid, prev);
-    toast(tauriErrorMessage(err));
+    toast.error(tauriErrorMessage(err));
   }
 }
 

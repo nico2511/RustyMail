@@ -2783,25 +2783,76 @@ textarea {
   min-width: 0;
 }
 
+/* Pastilles TYPE / SOURCE / ÉTAT (modale « Tags du fil »).
+   Texte = --text (charbon en clair, clair en sombre) sur un fond teinté opaque,
+   pour rester lisible sur le fond clair de la modale comme en thème sombre. */
 .thread-tag-chip {
-  font-size: 10px;
+  --tag-chip-bg: var(--surface-elevated);
+  --tag-chip-border: var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
   padding: 4px 8px;
   border-radius: var(--radius-btn);
-  background: rgba(78, 88, 100, 0.12);
-  border: 1px solid rgba(78, 88, 100, 0.22);
-  color: rgba(220, 230, 218, 0.9);
+  background: var(--tag-chip-bg);
+  border: 1px solid var(--tag-chip-border);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.thread-tag-chip--kind {
+  --tag-chip-bg: #f7eee8;
+  --tag-chip-border: #e0bba8;
+}
+
+.thread-tag-chip--source {
+  --tag-chip-bg: #e7eef6;
+  --tag-chip-border: #c5d4e4;
+}
+
+.thread-tag-chip--state {
+  --tag-chip-bg: #e6f0e7;
+  --tag-chip-border: #c2d6c4;
+}
+
+.thread-tag-chip--entity {
+  --tag-chip-bg: #f3e8ef;
+  --tag-chip-border: #dcc4d2;
+}
+
+body.clarity-dark .thread-tag-chip--kind {
+  --tag-chip-bg: #4a342c;
+  --tag-chip-border: #c48464;
+}
+
+body.clarity-dark .thread-tag-chip--source {
+  --tag-chip-bg: #2c3a4a;
+  --tag-chip-border: #8aa4be;
+}
+
+body.clarity-dark .thread-tag-chip--state {
+  --tag-chip-bg: #2c3c30;
+  --tag-chip-border: #8aab86;
+}
+
+body.clarity-dark .thread-tag-chip--entity {
+  --tag-chip-bg: #3e303a;
+  --tag-chip-border: #b08aa0;
 }
 
 button.thread-tag-chip {
-  font: inherit;
   cursor: pointer;
+  text-align: left;
 }
 
 button.thread-tag-chip--search:hover,
 button.thread-tag-chip--search:focus-visible {
-  background: rgba(78, 88, 100, 0.22);
-  border-color: rgba(140, 160, 135, 0.45);
-  outline: none;
+  background: color-mix(in srgb, var(--text) 10%, var(--tag-chip-bg));
+  border-color: color-mix(in srgb, var(--text) 32%, var(--tag-chip-border));
+  color: var(--text);
 }
 
 .thread-more-actions {
@@ -2931,37 +2982,44 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .thread-reading .message {
-  align-items: flex-end;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
-.thread-reading .message.mine {
-  justify-content: flex-end;
-}
-
-.thread-reading .message.mine .message-stack {
-  margin-left: auto;
-}
-
-/* Voie droite (arbre / alternance) : même alignement que « moi », carte toujours en style tiers. */
+/* Fil mail : une seule colonne à gauche. « Moi », la racine et les anciennes
+   voies (lane-right / other-right) gardent la même structure — pas de miroir. */
+.thread-reading .message.mine,
 .thread-reading .message.thread-msg--other-right,
-.thread-reading .message.thread-msg--lane-right {
-  justify-content: flex-end;
+.thread-reading .message.thread-msg--lane-right,
+.thread-reading .message.thread-msg--root,
+.thread-reading .message.thread-msg--solo {
+  justify-content: flex-start;
 }
 
+.thread-reading .message.mine .message-stack,
 .thread-reading .message.thread-msg--other-right .message-stack,
-.thread-reading .message.thread-msg--lane-right .message-stack {
-  margin-left: auto;
+.thread-reading .message.thread-msg--lane-right .message-stack,
+.thread-reading .message.thread-msg--root .message-stack {
+  margin-left: 0;
+  margin-right: 0;
 }
 
+.thread-reading .message.mine .avatar,
+.thread-reading .message.mine .thread-msg-avatar,
+.thread-reading .message.mine .avatar-spacer,
 .thread-reading .message.thread-msg--other-right .thread-msg-avatar,
 .thread-reading .message.thread-msg--other-right .avatar-spacer,
 .thread-reading .message.thread-msg--lane-right .thread-msg-avatar,
 .thread-reading .message.thread-msg--lane-right .avatar-spacer {
-  order: 2;
+  order: 0;
+}
+
+.thread-reading .message.mine .message-meta {
+  justify-content: flex-start;
 }
 
 .thread-reading .message.has-html .message-stack {
-  /* Voies type chat : ~3/4 de la largeur du fil (pas plein écran). */
+  /* Hors layout lecture plein écran : largeur de carte, toujours à gauche. */
   max-width: min(75%, 112ch);
   width: min(75%, 112ch);
 }
@@ -2973,9 +3031,9 @@ button.thread-tag-chip--search:focus-visible {
   max-width: min(75%, 112ch);
 }
 
-/* Arbre : le premier message est la "racine" au centre. */
+/* Premier message : même côté que les suivants. */
 .thread-reading .message.thread-msg--root {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .thread-reading .message.thread-msg--root .message-stack {
@@ -2985,9 +3043,9 @@ button.thread-tag-chip--search:focus-visible {
   max-width: min(75%, 112ch);
 }
 
-/* Fil avec un seul mail : centré et large (~3/4). */
+/* Fil avec un seul mail : même côté, un peu plus large (newsletter). */
 .thread-reading .message.thread-msg--solo {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .thread-reading .message.thread-msg--solo .message-stack {
@@ -3010,7 +3068,8 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .thread-reading .message.mine .thread-msg-card {
-  box-shadow: inset -2px 0 0 rgba(0, 0, 0, 0.06);
+  /* Même côté que les autres : barre à gauche, teinte un peu plus marquée. */
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 48%, transparent);
 }
 
 /* Bandeau désabonnement — au-dessus du corps HTML, pas enfoui dans le footer newsletter */
@@ -3204,16 +3263,18 @@ button.thread-tag-chip--search:focus-visible {
   height: 15px;
 }
 
-/* Première apparition d’un participant (ordre chronologique du fil). */
+/* Ajout ou retrait de la boucle, entre deux messages du fil. */
 .thread-timeline-note {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   margin: 8px 0 4px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: var(--radius-btn, 8px);
-  background: rgba(120, 140, 180, 0.07);
-  border: 1px solid rgba(173, 188, 216, 0.14);
+  background: var(--elevated);
+  border: 1px solid var(--border-strong);
+  border-left-width: 3px;
+  color: var(--text);
   max-width: min(94%, 128ch);
   margin-left: auto;
   margin-right: auto;
@@ -3223,9 +3284,8 @@ button.thread-tag-chip--search:focus-visible {
 
 .thread-timeline-note__glyph {
   flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--dim);
-  opacity: 0.85;
+  margin-top: 1px;
+  color: var(--muted);
 }
 
 .thread-timeline-note__glyph svg {
@@ -3237,71 +3297,45 @@ button.thread-tag-chip--search:focus-visible {
 .thread-timeline-note__text-wrap {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
   min-width: 0;
   font-size: 12px;
   line-height: 1.45;
 }
 
+.thread-timeline-note__block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .thread-timeline-note__kicker {
+  color: var(--muted);
   font-size: 11px;
-  letter-spacing: 0.02em;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.thread-timeline-note__kicker--add {
+  color: var(--success);
+}
+
+.thread-timeline-note__kicker--rem {
+  color: var(--danger);
 }
 
 .thread-timeline-note__who {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text);
+  word-break: break-word;
 }
 
 .thread-timeline-note__addr {
   font-weight: 400;
-  font-size: 11px;
-}
-
-/* Diff To/Cc vs message précédent (jamais sur le 1er message chronologique du fil). */
-.thread-reading .thread-recipient-diff {
-  align-self: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-  align-items: flex-start;
-  margin: 6px 0 4px;
-  padding: 8px 12px;
-  border-radius: var(--radius-btn, 8px);
-  background: rgba(100, 110, 140, 0.06);
-  border: 1px solid rgba(173, 188, 216, 0.12);
-  max-width: min(94%, 128ch);
-  margin-left: auto;
-  margin-right: auto;
-  box-sizing: border-box;
   font-size: 12px;
-  line-height: 1.45;
-}
-
-.thread-reading .thread-recipient-diff__col {
-  min-width: 0;
-  flex: 1 1 140px;
-}
-
-.thread-reading .thread-recipient-diff__tag {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.thread-reading .thread-recipient-diff__col--add .thread-recipient-diff__tag {
-  color: rgba(110, 170, 130, 0.95);
-}
-
-.thread-reading .thread-recipient-diff__col--rem .thread-recipient-diff__tag {
-  color: rgba(200, 130, 110, 0.95);
-}
-
-.thread-reading .thread-recipient-diff__list {
-  word-break: break-word;
+  color: var(--muted);
 }
 
 /* Traduction LLM affichée dans la carte message. */
@@ -3581,11 +3615,18 @@ button.thread-tag-chip--search:focus-visible {
   margin-right: 0;
 }
 
+.thread-reading.thread-reading--reading-layout .message.mine .avatar,
+.thread-reading.thread-reading--reading-layout .message.mine .thread-msg-avatar,
+.thread-reading.thread-reading--reading-layout .message.mine .avatar-spacer,
 .thread-reading.thread-reading--reading-layout .message.thread-msg--other-right .thread-msg-avatar,
 .thread-reading.thread-reading--reading-layout .message.thread-msg--other-right .avatar-spacer,
 .thread-reading.thread-reading--reading-layout .message.thread-msg--lane-right .thread-msg-avatar,
 .thread-reading.thread-reading--reading-layout .message.thread-msg--lane-right .avatar-spacer {
   order: 0;
+}
+
+.thread-reading.thread-reading--reading-layout .message.mine .message-meta {
+  justify-content: flex-start;
 }
 
 .thread-reading.thread-reading--reading-layout .message-stack,
@@ -4076,18 +4117,6 @@ button.thread-tag-chip--search:focus-visible {
   border-top: 1px solid var(--border-weak);
   border-radius: 0;
   background: rgba(0, 0, 0, 0.12);
-}
-
-.thread-reading .thread-msg.thread-msg--other-right.thread-msg--head .mail-security-panel,
-.thread-reading .thread-msg.thread-msg--lane-right.thread-msg--head .mail-security-panel {
-  right: auto;
-  left: 0;
-}
-
-.thread-reading .thread-msg.thread-msg--other-right .mail-security-pop--compact .mail-security-panel,
-.thread-reading .thread-msg.thread-msg--lane-right .mail-security-pop--compact .mail-security-panel {
-  right: auto;
-  left: 0;
 }
 
 .thread-attach-card {
@@ -5224,7 +5253,7 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .message.mine {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 @keyframes msg-in {
@@ -5262,15 +5291,16 @@ button.thread-tag-chip--search:focus-visible {
 }
 
 .message.mine .message-stack {
-  margin-left: auto;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .message.mine .avatar {
-  order: 2;
+  order: 0;
 }
 
 .message.mine .message-meta {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .message-time {
@@ -5292,6 +5322,64 @@ button.thread-tag-chip--search:focus-visible {
   line-height: 1.55;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+.message-text--clean {
+  white-space: normal;
+}
+
+.message-text--clean .rm-mail-reply {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-text--clean .rm-history-fold {
+  margin-top: 1.6rem;
+  white-space: normal;
+}
+
+.message-text--clean .rm-history-fold > summary {
+  cursor: pointer;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.message-text--clean .rm-history-fold__panel {
+  margin-top: 0.75rem;
+  padding: 12px 16px 8px;
+  border-left: 2px solid color-mix(in srgb, var(--text) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 4.5%, transparent);
+}
+
+.message-text--clean .rm-history-turn + .rm-history-turn {
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, rgba(120, 119, 117, 0.22));
+}
+
+.message-text--clean .rm-history-kicker {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--dim);
+}
+
+.message-text--clean .rm-history-turn__body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 1em;
+  font-weight: inherit;
+  line-height: 1.62;
+  color: var(--text);
 }
 
 .message-text .rm-dimmed-fold {
@@ -5938,7 +6026,8 @@ button.thread-tag-chip--search:focus-visible {
   display: none !important;
 }
 
-.composer-body textarea {
+.composer-body textarea,
+.composer-body .compose-tiptap {
   width: 100%;
   height: 100%;
   padding: 26px;
@@ -6239,19 +6328,112 @@ button.thread-tag-chip--search:focus-visible {
 
 .toast-box {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
   z-index: 10000;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
 }
 
 .toast {
-  max-width: 360px;
+  --toast-tone: var(--accent);
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 22px;
+  column-gap: 10px;
+  align-items: start;
+  width: 100%;
+  margin: 0;
+  padding: 10px 8px 10px 12px;
   border-radius: var(--radius-md);
-  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--toast-tone) 28%, var(--border-strong));
+  background: color-mix(in srgb, var(--toast-tone) 8%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--toast-tone), var(--shadow-panel);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  animation: toast-in var(--t-med) var(--ease-out) both;
+}
+
+.toast--info {
+  --toast-tone: var(--accent);
+}
+
+.toast--success {
+  --toast-tone: var(--success);
+}
+
+.toast--warning {
+  --toast-tone: var(--warn);
+}
+
+.toast--error {
+  --toast-tone: var(--danger);
+}
+
+.toast--out {
+  pointer-events: none;
+  animation: toast-out 160ms ease-in both;
+}
+
+.toast__icon {
+  display: flex;
+  margin-top: 1px;
+  color: var(--toast-tone);
+}
+
+.toast__main {
+  min-width: 0;
+}
+
+.toast__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.toast__action {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
   font-size: 12px;
-  animation: toast-in 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  text-align: left;
+}
+
+.toast__action:hover {
+  color: var(--accent-hover);
+}
+
+.toast__close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -2px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.toast__close:hover {
+  background: var(--hover);
+  color: var(--text);
 }
 
 /* Simple modal (Move/Mailbox manage) */
@@ -6317,47 +6499,75 @@ button.thread-tag-chip--search:focus-visible {
   border: 1px solid var(--border-weak);
 }
 
-/* Paramètres : groupes lisibles, un seul endroit pour l’IA */
+/* Paramètres : en-tête de catégorie ≠ sous-catégorie (onglet). */
 .settings-nav {
   display: flex;
   flex-shrink: 0;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 16px 28px;
-  margin: 0 max(26px, env(safe-area-inset-right)) var(--space-4) max(26px, env(safe-area-inset-left));
+  align-items: flex-start;
+  gap: 22px 4px;
+  margin: 6px max(26px, env(safe-area-inset-right)) 18px max(26px, env(safe-area-inset-left));
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-sans);
 }
 
 .settings-nav__group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 14px;
   min-width: 0;
+  padding: 0 26px 0 0;
+}
+
+.settings-nav__group + .settings-nav__group {
+  border-left: 1px solid var(--border-strong);
+  padding-left: 26px;
+}
+
+@media (max-width: 720px) {
+  .settings-nav__group,
+  .settings-nav__group + .settings-nav__group {
+    padding-left: 0;
+    padding-right: 0;
+    border-left: 0;
+  }
 }
 
 .settings-nav__label {
   margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  padding: 0 2px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1.2;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--dim);
+  pointer-events: none;
+  user-select: none;
 }
 
 .settings-nav__tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
 }
 
 .settings-tab {
-  padding: 7px 12px;
-  border-radius: var(--radius-btn);
+  padding: 5px 10px;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
-  border: 1px solid transparent;
+  border: 0;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.011em;
+  line-height: 1.25;
 }
 
 .settings-tab:hover {
@@ -6367,9 +6577,9 @@ button.thread-tag-chip--search:focus-visible {
 
 .settings-tab--active {
   color: var(--text);
-  background: var(--surface);
-  border-color: var(--accent);
-  box-shadow: none;
+  background: var(--wash);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--copper);
 }
 
 /* Corps des paramètres : défilement quand l’onglet (ex. IA & dictée) dépasse la fenêtre. */
@@ -7777,11 +7987,22 @@ button.thread-tag-chip--search:focus-visible {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateX(24px);
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 

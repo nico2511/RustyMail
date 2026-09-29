@@ -2,6 +2,8 @@ import { render } from "../dispatch";
 import { state } from "../state";
 import { toast } from "../lib/toast";
 import { sendQuickReply } from "./composeSendQuickReply";
+import { prependComposePlainText } from "./composeBodyEditor";
+import { introducesLlmMeta, LLM_META_BODY_TOAST } from "./llmMetaGuard";
 import { computePreview } from "./composeComposerBridge";
 import { prepareReply } from "./composeThreadReply";
 
@@ -19,15 +21,16 @@ export async function tryHandleThreadLlmQuickReplyWire(action: string, element?:
         const idx = Number(qrRaw);
         const s = state.quickReplySuggestions[idx];
         if (!s?.text) return true;
+        const source = (state.selectedThread?.messages ?? []).map((message) => message.cleanedText || "").join("\n");
+        if (introducesLlmMeta(source, s.text)) {
+          toast.error(LLM_META_BODY_TOAST);
+          return true;
+        }
         state.composeGrammarSuggestions = null;
         await prepareReply();
-        const add = `${s.text.trim()}\n\n`;
-        state.composeBody = `${add}${state.composeBody}`;
-        state.composeCanonicalBody = state.composeBody;
-        const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-        if (ta) ta.value = state.composeBody;
+        prependComposePlainText(s.text.trim());
         void computePreview();
-        toast("Texte inséré dans le compositeur.");
+        toast.success("Texte inséré dans le compositeur.");
         render();
       } else {
         await prepareReply();

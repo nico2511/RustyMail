@@ -35,10 +35,10 @@ export async function tryHandleAddressBookSidebarCrudWire(
           });
           setAddressBookEditEmail(null);
           await refreshAddressBookList();
-          toast("Contact enregistré.");
+          toast.success("Contact enregistré.");
           render();
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -51,10 +51,10 @@ export async function tryHandleAddressBookSidebarCrudWire(
         try {
           await invoke<boolean>("delete_manual_contact_cmd", { accountId: acc.id, email });
           await refreshAddressBookList();
-          toast("Contact supprimé.");
+          toast.success("Contact supprimé.");
           render();
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -78,7 +78,7 @@ export async function tryHandleAddressBookSidebarCrudWire(
           await refreshAddressBookList();
           render();
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       })();
       return true;

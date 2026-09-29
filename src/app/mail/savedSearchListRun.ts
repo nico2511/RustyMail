@@ -39,7 +39,7 @@ export async function markActiveSavedSearchSeen(options?: { toast?: boolean }): 
   const accountId = currentAccount()?.id?.trim();
   const sid = state.activeSavedSearchId;
   if (!accountId || !sid) {
-    if (options?.toast !== false) toast("Aucune vue active à marquer.");
+    if (options?.toast !== false) toast.warning("Aucune vue active à marquer.");
     return false;
   }
   if (state.savedSearchMarkingSeenId === sid) return false;
@@ -53,13 +53,13 @@ export async function markActiveSavedSearchSeen(options?: { toast?: boolean }): 
     await refreshSavedSearches(true);
     const row = state.savedSearches.find((s) => s.id === sid);
     if (row && (row.newCount ?? 0) > 0) patchSavedSearchNewCount(sid, 0, updated.lastSeenAt ?? undefined);
-    if (options?.toast) toast("Vue marquée à jour.");
+    if (options?.toast) toast.success("Vue marquée à jour.");
     render();
     return true;
   } catch (e) {
     await refreshSavedSearches(true);
     render();
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
     return false;
   } finally {
     state.savedSearchMarkingSeenId = null;

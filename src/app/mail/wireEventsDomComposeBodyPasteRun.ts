@@ -6,7 +6,9 @@ import {
 } from "./composeComposerBridge";
 
 export function wireEventsDomComposeBodyPaste(signal: AbortSignal): void {
-  document.querySelector<HTMLTextAreaElement>("#compose-body")?.addEventListener(
+  const host = document.querySelector("#compose-body");
+  if (!(host instanceof HTMLTextAreaElement)) return;
+  host.addEventListener(
     "paste",
     (event) => {
       const e = event as ClipboardEvent;

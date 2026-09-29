@@ -30,9 +30,9 @@ export async function tryHandleThreadViewUiAiWire(action: string): Promise<boole
       void (async () => {
         try {
           await persistAiFeaturePrefs();
-          toast("Toutes les fonctionnalités IA activées.");
+          toast.success("Toutes les fonctionnalités IA activées.");
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
         render();
       })();
@@ -43,9 +43,9 @@ export async function tryHandleThreadViewUiAiWire(action: string): Promise<boole
       void (async () => {
         try {
           await persistAiFeaturePrefs();
-          toast("Toutes les fonctionnalités IA désactivées.");
+          toast.warning("Toutes les fonctionnalités IA désactivées.");
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
         render();
       })();

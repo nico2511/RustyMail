@@ -1,8 +1,10 @@
 import { isAiFeatureEnabled } from "../../../aiFeatures";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
-import { toneLabelsFr, tones } from "../../core/composeTone";
 import { iconSvg } from "../../lib/iconSvg";
+import { renderComposeToolbar } from "./composeToolbarRender";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
+import { composeSourcePlainText } from "../../mail/composeHtmlBody";
+import { grammarOccurrenceCount, retainGrammarSuggestionsInText } from "../../mail/composeGrammarReplace";
 import { state } from "../../state";
 import type { Draft, MicDictationTarget } from "../../types";
 import { renderDeps } from "./renderDeps";
@@ -132,25 +134,35 @@ export function renderComposer() {
      <div class="field-row"><label class="compose-field-label">Cci</label><div id="compose-bcc-host" class="compose-recipients-host compose-to-cell"></div></div>`
     : "";
 
+  const correctionPlain = composeSourcePlainText(state.composeCanonicalBody || state.composeBody || "");
+  const correctionSuggestions = retainGrammarSuggestionsInText(state.composeGrammarSuggestions, correctionPlain);
+  if ((state.composeGrammarSuggestions?.length ?? 0) !== correctionSuggestions.length) {
+    state.composeGrammarSuggestions = correctionSuggestions.length ? correctionSuggestions : null;
+  }
   const correctionPanelHtml =
-    state.composeGrammarSuggestions?.length ?
+    correctionSuggestions.length ?
       `<aside class="compose-correction-panel surface-sm" role="complementary" aria-label="Correction de texte">
         <div class="compose-correction-panel__head">
           <strong>Correction de texte</strong>
           <button type="button" class="ghost-button compose-correction-dismiss" data-action="compose-grammar-dismiss">Fermer</button>
         </div>
         <ul class="compose-correction-list" role="list">
-          ${state.composeGrammarSuggestions
-            .map(
-              (g, i) => `
+          ${correctionSuggestions
+            .map((g, i) => {
+              const occurrences = grammarOccurrenceCount(state.composeBody, state.composeCanonicalBody, g);
+              const applyTitle =
+                occurrences > 1
+                  ? `Remplacer la première des ${occurrences} occurrences`
+                  : "Remplacer cette occurrence dans le texte";
+              return `
             <li class="compose-correction-item" role="listitem">
               <div class="compose-correction-item__main">
                 <p class="compose-correction-reason dim">${escapeHtml(g.reason)}</p>
                 <p class="compose-correction-diff"><span class="compose-correction-del">${escapeHtml(g.original)}</span> → <strong>${escapeHtml(g.replacement)}</strong></p>
               </div>
-              <button type="button" class="ghost-button compose-correction-apply" data-action="compose-grammar-apply" data-grammar-i="${i}">Appliquer</button>
-            </li>`
-            )
+              <button type="button" class="ghost-button compose-correction-apply" data-action="compose-grammar-apply" data-grammar-i="${i}" title="${escapeAttr(applyTitle)}">Appliquer</button>
+            </li>`;
+            })
             .join("")}
         </ul>
       </aside>`
@@ -161,7 +173,7 @@ export function renderComposer() {
       <header class="compose-fs-header">
         <div class="compose-fs-hintbar">
           <p class="compose-fs-layout-hint dim" aria-hidden="true">
-            Markdown · <span class="kbd">M</span> basculer la vue du compositeur
+            Éditeur · <span class="kbd">M</span> basculer la vue du compositeur
           </p>
         </div>
         <div class="compose-fs-header-row">
@@ -227,113 +239,25 @@ export function renderComposer() {
             </div>
             <input id="compose-attachments" value="${escapeAttr(renderDeps().attachmentPathsJoinedForHiddenField(attachments))}" style="display:none" />
           </div>
-          <div class="composer-advanced composer-advanced--footnote">
-            <button
-              type="button"
-              class="composer-advanced-micro"
-              data-action="toggle-compose-advanced"
-              aria-expanded="${state.composeAdvancedOpen}"
-            >
-              <span class="composer-advanced-chevron" aria-hidden="true">${state.composeAdvancedOpen ? "▾" : "▸"}</span>
-              <span>${state.composeAdvancedOpen ? "Masquer les options techniques" : "Options techniques"}</span>
-              <span class="composer-advanced-micro-hint dim">multipart HTML</span>
-            </button>
-            ${
-              state.composeAdvancedOpen
-                ? `<div class="composer-advanced-body composer-advanced-body--footnote">
-                    <div class="field-row field-row--tight-top field-row--advanced">
-                      <label for="compose-send-html" class="dim">HTML</label>
-                      <label class="composer-checkbox-inline">
-                        <input id="compose-send-html" type="checkbox" ${draft?.sendHtml ? "checked" : ""} />
-                        <span class="dim composer-checkbox-help">Envoyer en multipart (texte brut + HTML)</span>
-                      </label>
-                    </div>
-                  </div>`
-                : ""
-            }
-          </div>
         </div>
       <div class="compose-editor-sheet">
-        <div class="compose-secondary-toolbar">
-          <div
-            class="compose-toolbar-voice"
-            title="Dictée : Whisper transcrit l’audio. Les boutons Style déterminent le ton si « Réécrire avec le style » est activé dans IA → Dictée (réécriture LLM après dictée)."
-          >
-            <span class="composer-toolbar-caption dim">Dictée</span>
-            <div class="tone-inline tone-inline--voice">
-              <span class="composer-toolbar-caption dim composer-toolbar-caption--sub">Style</span>
-              ${tones
-                .map(
-                  (tone) =>
-                    `<button type="button" class="tone-button ${tone === state.tone ? "active" : ""}" data-tone="${tone}" title="Style par défaut pour Réécriture IA (${toneLabelsFr[tone]})">${escapeHtml(toneLabelsFr[tone])}</button>`
-                )
-                .join("")}
-            </div>
-            <div class="compose-mic-cluster">
-              <button
-                class="mic-button ${state.micState}"
-                type="button"
-                data-action="mic"
-                title="${escapeAttr(renderDeps().composeMicButtonTitle())}"
-                aria-label="${escapeAttr(renderDeps().micAriaLabel("compose"))}"
-                aria-pressed="${state.micState === "recording"}"
-              >
-                <span class="mic-button__ico" aria-hidden="true">${iconSvg("mic")}</span>
-              </button>
-            </div>
-          </div>
-          <div class="md-toolbar md-toolbar-rich" role="toolbar" aria-label="Mise en forme Markdown">
-            <button type="button" class="ghost-button md-button" data-md="bold" title="Gras (Ctrl+B)">Gras</button>
-            <button type="button" class="ghost-button md-button" data-md="italic" title="Italique (Ctrl+I)">Italique</button>
-            <button type="button" class="ghost-button md-button md-button-underline" data-md="underline" title="Souligné (Ctrl+U)">Soul.</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-md="h1" title="Titre 1 (#)">Titre 1</button>
-            <button type="button" class="ghost-button md-button" data-md="h2" title="Titre 2 (##)">Titre 2</button>
-            <button type="button" class="ghost-button md-button" data-md="h3" title="Titre 3 (###)">Titre 3</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-md="ul" title="Liste à puces">Puces</button>
-            <button type="button" class="ghost-button md-button" data-md="ol" title="Liste numérotée">Num.</button>
-            <button type="button" class="ghost-button md-button" data-md="link" title="Lien (Ctrl+K)">Lien</button>
-            <button type="button" class="ghost-button md-button" data-md="image" title="Image (URL Markdown)">Image</button>
-            <button type="button" class="ghost-button md-button" data-md="table" title="Tableau Markdown">Tableau</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-md="code" title="Code">&lt;&gt;</button>
-            <button type="button" class="ghost-button md-button" data-md="quote" title="Citation">Citation</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-md="undo" title="Annuler">Annuler</button>
-            <button type="button" class="ghost-button md-button" data-md="redo" title="Refaire">Refaire</button>
-          </div>
-          <div class="compose-llm-strip dim" role="group" aria-label="Brouillon · réécriture IA" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:11px">
-            <span>Réécriture ·</span>
-            <button
-              type="button"
-              class="ghost-button md-button"
-              data-action="compose-ai-rewrite-selected-tone"
-              title="Réécrire tout le texte avec le style choisi à gauche (Dictée · Réécriture)"
-            >
-              Style sélectionné
-            </button>
-            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Formal" title="Ton formel (LLM)">Formel</button>
-            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Casual" title="Ton décontracté">Décontracté</button>
-            <button type="button" class="ghost-button md-button" data-action="compose-ai-rewrite" data-rewrite-style="Concise" title="Concis">Concis</button>
-            <span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-action="compose-ai-grammar" title="Orthographe & formulation (LLM)">Correction</button>
-            ${
-              isAiFeatureEnabled(state.appPrefs.ai, "featureQuickReplyComposeEnabled")
-                ? `<span class="md-toolbar-sep" aria-hidden="true"></span>
-            <button type="button" class="ghost-button md-button" data-action="llm-quick-replies-compose" title="Suggestions de réponses (sans fil ouvert)">Réponses rapides</button>`
-                : ""
-            }
-          </div>
-        </div>
+        ${renderComposeToolbar({
+          tone: state.tone,
+          llmJobLabel: state.llmJobLabel,
+          micState: state.micState,
+          micTitle: renderDeps().composeMicButtonTitle(),
+          micAria: renderDeps().micAriaLabel("compose"),
+          rewriteEnabled: isAiFeatureEnabled(state.appPrefs.ai, "featureComposeRewriteEnabled"),
+          grammarEnabled: isAiFeatureEnabled(state.appPrefs.ai, "featureComposeGrammarEnabled"),
+          quickRepliesEnabled: isAiFeatureEnabled(state.appPrefs.ai, "featureQuickReplyComposeEnabled"),
+        })}
         ${correctionPanelHtml}
         <div class="composer-body composer-body--${isHistorique ? "historique" : layout}">
-          <textarea
+          <div
             id="compose-body"
-            class="${textareaOffscreen ? "composer-source-offscreen" : ""}"
-            placeholder="Rédiger en Markdown…"
-            ${textareaOffscreen ? 'tabindex="-1" aria-hidden="true"' : ""}
-          >${escapeHtml(state.composeBody)}</textarea>
+            class="compose-tiptap${textareaOffscreen ? " composer-source-offscreen" : ""}"
+            data-compose-editor="tiptap"
+          ></div>
           ${isHistorique ? renderComposerHistoriquePane() : showPreviewPane ? `<div class="preview">${state.preview?.html ?? ""}</div>` : ""}
           <div class="drop-hint" aria-hidden="true">
             <strong>Déposez des fichiers dans cette fenêtre</strong>

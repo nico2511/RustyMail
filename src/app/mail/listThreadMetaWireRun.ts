@@ -16,7 +16,7 @@ export async function tryHandleListThreadMetaWire(action: string, element?: HTML
       const accountId = state.selectedAccountId?.trim() || "";
       if (!tid || !accountId) return true;
       if (!isTauriRuntime()) {
-        toast("Recalcul des tags : disponible dans l’app Tauri.");
+        toast.warning("Recalcul des tags : disponible dans l’app Tauri.");
         return true;
       }
       void (async () => {
@@ -27,11 +27,11 @@ export async function tryHandleListThreadMetaWire(action: string, element?: HTML
             }),
             MAIL_ACTION_TIMEOUT_MS,
           );
-          toast(n > 0 ? "Tags mis à jour." : "Tags déjà à jour.");
+          toast.success(n > 0 ? "Tags mis à jour." : "Tags déjà à jour.");
           await openThread(tid, { skipHistory: true, preserveAi: true });
         } catch (err) {
           console.error("org_retag_threads_cmd", err);
-          toast(tauriErrorMessage(err));
+          toast.error(tauriErrorMessage(err));
         }
       })();
       return true;

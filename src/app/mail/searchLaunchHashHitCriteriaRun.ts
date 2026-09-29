@@ -10,7 +10,7 @@ export async function tryApplyHashHitTagOrScope(hit: InboxFilterHit): Promise<bo
     const body = hit.id.slice(4);
     const sep = body.indexOf("\0");
     if (sep >= 0) {
-      toast(`Tag : ${body.slice(0, sep)}:${body.slice(sep + 1)}`);
+      toast.info(`Tag : ${body.slice(0, sep)}:${body.slice(sep + 1)}`);
       await applySearchBarIfCriteriaAndRender();
     } else {
       render();
@@ -18,7 +18,7 @@ export async function tryApplyHashHitTagOrScope(hit: InboxFilterHit): Promise<bo
     return true;
   }
   if (hit.id.startsWith("scope:")) {
-    toast(
+    toast.info(
       state.searchScope === "account"
         ? "Portée : tout le compte (tous dossiers synchronisés)"
         : `Portée : ${threadMailboxListLabel(state.selectedMailbox || "INBOX").full}`,

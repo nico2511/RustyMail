@@ -9,17 +9,17 @@ import { micPermissionErrorMessage, requestMicStream } from "./micStreamAccess";
 
 export async function runSettingsDictationMicTest(): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("Test micro : lancez l’app Tauri.");
+    toast.warning("Test micro : lancez l’app Tauri.");
     return;
   }
-  toast("Test micro : enregistrement 3s…");
+  toast.info("Test micro : enregistrement 3s…");
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
   const chunks: Blob[] = [];
   try {
     stream = await requestMicStream();
     if (!stream) {
-      toast("Micro inaccessible.");
+      toast.error("Micro inaccessible.");
       return;
     }
     const mimeOpt =
@@ -43,7 +43,7 @@ export async function runSettingsDictationMicTest(): Promise<void> {
     recorder = null;
     const wavBytes = await mediaBlobToWav16kMonoPcm16(blob);
     const audioWavBase64 = bytesToBase64(wavBytes);
-    toast("Test micro : transcription…");
+    toast.info("Test micro : transcription…");
     const res = await withTimeout(
       invoke<{
         durationS: number;
@@ -63,14 +63,15 @@ export async function runSettingsDictationMicTest(): Promise<void> {
             : res.error.message
               ? res.error.message
               : "Échec transcription.";
-      toast(`Test micro : ${msg}`);
+      if (/échou|impossible|erreur/i.test(msg)) toast.error(`Test micro : ${msg}`);
+      else toast.warning(`Test micro : ${msg}`);
     } else {
-      toast(
+      toast.success(
         `Test micro OK (${res.durationS.toFixed(2)}s, RMS=${res.rms.toFixed(4)}, ${Math.round(res.elapsedMs)}ms) : ${String(res.text ?? "").slice(0, 140)}`,
       );
     }
   } catch (e) {
-    toast(`Test micro : ${micPermissionErrorMessage(e)}`);
+    toast.error(`Test micro : ${micPermissionErrorMessage(e)}`);
   } finally {
     try {
       recorder?.stop();

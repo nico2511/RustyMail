@@ -1,6 +1,9 @@
 pub mod ai;
 
 use pulldown_cmark::{html, CowStr, Event, Options, Parser};
+use rustymail_domain::compose_html::{
+    compose_body_is_html, compose_html_fragment, compose_html_to_plain, sanitize_compose_html,
+};
 /// Découpage pure (tailles connues) — utilisé après `stat_attachments` côté infrastructure / Tauri.
 pub use rustymail_domain::split_send::{
     plan_split as plan_attachment_split, SplitChunk, SplitError, SplitPlan,
@@ -448,6 +451,12 @@ impl AppCore {
     }
 
     pub fn preview_draft(&self, markdown_body: String) -> DraftPreview {
+        if compose_body_is_html(&markdown_body) {
+            return DraftPreview {
+                text_plain: compose_html_to_plain(&markdown_body),
+                html: sanitize_compose_html(compose_html_fragment(&markdown_body)),
+            };
+        }
         // pulldown-cmark (0.10) ne propose pas un flag stable "hard line breaks".
         // Pour que les retours à la ligne saisis dans l’éditeur apparaissent en <br> dans l’HTML,
         // on force les "hard breaks" Markdown en ajoutant deux espaces en fin de ligne.
@@ -611,6 +620,40 @@ pub fn message(
         is_pinned: false,
         authentication_results: None,
         return_path: None,
+    }
+}
+
+#[cfg(test)]
+mod compose_html_preview_tests {
+    use super::*;
+    use rustymail_domain::compose_html::COMPOSE_HTML_MARK;
+
+    #[test]
+    fn preview_keeps_tiptap_html() {
+        let core = AppCore::new(vec![]);
+        let body = format!("{COMPOSE_HTML_MARK}<p>Bonjour <strong>monde</strong></p>");
+        let preview = core.preview_draft(body);
+        assert!(preview.html.contains("<strong>monde</strong>"));
+        assert!(preview.text_plain.contains("Bonjour"));
+        assert!(!preview.html.contains("&lt;strong&gt;"));
+        assert!(!preview.text_plain.contains('<'));
+    }
+
+    #[test]
+    fn preview_strips_script_from_tiptap_html() {
+        let core = AppCore::new(vec![]);
+        let body = format!("{COMPOSE_HTML_MARK}<script>alert(1)</script><p>OK</p>");
+        let preview = core.preview_draft(body);
+        assert!(!preview.html.to_ascii_lowercase().contains("script"));
+        assert!(preview.html.contains("OK"));
+        assert!(!preview.text_plain.contains("alert"));
+    }
+
+    #[test]
+    fn preview_markdown_still_renders() {
+        let core = AppCore::new(vec![]);
+        let preview = core.preview_draft("**gras**".into());
+        assert!(preview.html.contains("<strong>gras</strong>"));
     }
 }
 

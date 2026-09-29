@@ -39,6 +39,6 @@ export async function openExternalFromMailHref(href: string): Promise<void> {
     }
   } catch (e) {
     console.error("openExternalFromMailHref", e);
-    toast(`Impossible d'ouvrir le lien : ${tauriErrorMessage(e)}`);
+    toast.error(`Impossible d'ouvrir le lien : ${tauriErrorMessage(e)}`);
   }
 }

@@ -61,7 +61,7 @@ export async function loadMailView(append: boolean = false) {
       const detail = tauriErrorMessage(error);
       console.error("list_threads", error);
       state.mailListError = `Impossible de charger les conversations : ${detail}`;
-      toast(state.mailListError);
+      toast.error(state.mailListError);
       if (append) return;
       state.threads = [];
       state.threadOffset = 0;

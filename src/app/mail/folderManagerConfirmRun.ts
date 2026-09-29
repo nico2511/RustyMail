@@ -20,10 +20,10 @@ export async function fmConfirmArchiveMailbox(): Promise<void> {
     state.folderManager.pendingArchiveMailbox = null;
     await refreshFolderManagerTree();
     if (state.folderManager.selectedMailbox === mb) await fmSelectMailbox(mb);
-    if (out.errors.length) toast(`Archivage partiel : ${out.errors[0]}`);
-    else toast(`${out.archived} conversation(s) archivée(s).`);
+    if (out.errors.length) toast.warning(`Archivage partiel : ${out.errors[0]}`);
+    else toast.success(`${out.archived} conversation(s) archivée(s).`);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     state.folderManager.archiveProgress = null;
     render();
@@ -50,10 +50,10 @@ export async function fmConfirmDeleteMailbox(): Promise<void> {
       state.folderManager.selectedMailbox = null;
       state.threads = [];
     }
-    if (out.errors.length) toast(`Suppression partielle : ${out.errors[0]}`);
-    else toast(`${out.deletedMailboxes} dossier(s) supprimé(s).`);
+    if (out.errors.length) toast.warning(`Suppression partielle : ${out.errors[0]}`);
+    else toast.success(`${out.deletedMailboxes} dossier(s) supprimé(s).`);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     state.folderManager.busyMailbox = null;
     state.folderManager.busyAction = null;

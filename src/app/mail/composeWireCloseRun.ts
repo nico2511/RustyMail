@@ -16,7 +16,7 @@ export async function saveAndCloseComposeFromWire(): Promise<void> {
   render();
   const ok = await saveDraftToSavedListNow({ silentToast: true });
   if (ok) {
-    toast("Conservé dans « Sauvés », compositeur fermé.");
+    toast.success("Conservé dans « Sauvés », compositeur fermé.");
     clearDraftSession();
     await leaveComposeViewAfterClose();
   }

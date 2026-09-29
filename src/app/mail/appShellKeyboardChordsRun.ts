@@ -37,11 +37,11 @@ export function handleAppShellKeyboardChords(event: KeyboardEvent): boolean {
   if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key === "F5") {
     event.preventDefault();
     if (!isTauriRuntime()) {
-      toast("Sync IMAP : disponible dans l’app Tauri.");
+      toast.warning("Sync IMAP : disponible dans l’app Tauri.");
       return true;
     }
     if (state.syncInProgress) {
-      toast("Synchronisation déjà en cours.");
+      toast.info("Synchronisation déjà en cours.");
       return true;
     }
     void syncInbox({ background: state.view === "thread" });

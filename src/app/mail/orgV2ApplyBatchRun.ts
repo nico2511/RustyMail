@@ -49,7 +49,7 @@ export async function runOrgV2Apply(
     );
     await finalizeOrgV2ApplyOutcome(accountId, proposal, proposalId, merged, cancelled);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     state.organizationV2.applying = false;
     state.organizationV2.applyCancelRequested = false;

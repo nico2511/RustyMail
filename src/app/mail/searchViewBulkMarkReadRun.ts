@@ -22,7 +22,7 @@ export async function bulkMarkReadSearchViewThreads(): Promise<void> {
   });
   const unreadTargets = visible.filter((t) => t.unread);
   const { done, errors } = await invokeBulkMarkReadSearchViewThreads(account.id, unreadTargets);
-  if (errors.length) toast(`Marquage partiel : ${errors[0]}`);
+  if (errors.length) toast.warning(`Marquage partiel : ${errors[0]}`);
   else toast(done ? `${done} conversation(s) marquée(s) lue(s).` : "Aucun fil non lu dans la sélection.");
   render();
 }

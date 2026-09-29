@@ -15,7 +15,7 @@ export async function confirmThenRunOrgApply(
 ): Promise<void> {
   const proposal = state.organization.report?.proposals.find((p) => p.id === proposalId);
   if (!proposal) {
-    toast("Proposition introuvable — relancez l’analyse du compte.");
+    toast.error("Proposition introuvable — relancez l’analyse du compte.");
     return;
   }
   if (proposal.applicable === false) return;

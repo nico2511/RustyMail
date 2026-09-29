@@ -33,7 +33,7 @@ export async function tryHandleThreadLlmAiUiWire(action: string, element?: HTMLE
       return true;
     case "llm-cancel-job":
       cancelLlmQueueJob();
-      toast("Annulation demandée…");
+      toast.info("Annulation demandée…");
       return true;
     case "llm-qa-thread":
       void llmQaThreadUi();

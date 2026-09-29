@@ -16,7 +16,7 @@ export async function bootDeferredLlmStatusAndPrefetch(): Promise<void> {
       const st = await withTimeout(invoke<LlmRuntimeStatus>("llm_status", {}), BOOT_INVOKE_TIMEOUT_MS);
       state.llmRuntimeStatus = st;
       if (!st.llmGateOpen && !state.appPrefs.ai.aiCloudLlmFallback) {
-        toast(t("toast.aiOfflineLexical"));
+        toast.warning(t("toast.aiOfflineLexical"));
       }
     } catch {
       /* statut optionnel */

@@ -21,10 +21,10 @@ export async function deleteSavedSearchView(id: string): Promise<void> {
   try {
     await deleteSavedSearchCmd(accountId, id);
     if (state.activeSavedSearchId === id) state.activeSavedSearchId = null;
-    toast("Vue supprimée.");
+    toast.success("Vue supprimée.");
     await refreshSavedSearches(true);
     render();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

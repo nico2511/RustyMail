@@ -30,7 +30,7 @@ export function prepareSyncInboxOrNotify(options?: SyncInboxOptions): SyncInboxP
   const syncAllFolders = syncAllAccountMailboxesRequested(options);
 
   if (syncAllFolders && state.settingsSelectedAccountId === "new") {
-    toast("Enregistrez d’abord le compte avant de synchroniser tous les dossiers.");
+    toast.warning("Enregistrez d’abord le compte avant de synchroniser tous les dossiers.");
     return null;
   }
 
@@ -46,7 +46,7 @@ export function prepareSyncInboxOrNotify(options?: SyncInboxOptions): SyncInboxP
   }
 
   if (!syncAllFolders && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast("Pas de synchronisation IMAP pour les brouillons locaux.");
+    toast.warning("Pas de synchronisation IMAP pour les brouillons locaux.");
     return null;
   }
 

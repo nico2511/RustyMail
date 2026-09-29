@@ -25,7 +25,7 @@ export async function runNlSearchCommitFromBar(opts: {
     if (signal.aborted) return;
     applyNlSearchResultToState(phrase, sq);
     if (nlSearchCriteriaEmpty()) {
-      toast(NL_SEARCH_NO_CRITERIA_TOAST);
+      toast.warning(NL_SEARCH_NO_CRITERIA_TOAST);
       return;
     }
     await searchThreads();
@@ -41,7 +41,7 @@ export async function runNlSearchCommitFromBar(opts: {
         : effectiveSearchMailboxPath()
           ? " (dossier précis)"
           : "";
-    toast(`Recherche NL : ${bits.join(" · ")}${scope}.`);
+    toast.info(`Recherche NL : ${bits.join(" · ")}${scope}.`);
     recordSearchCommittedActivity();
   });
   if (!ran) return;

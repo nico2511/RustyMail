@@ -21,7 +21,7 @@ export function scrollToThreadMessage(messageId: string): void {
   const msgs = sortDesc(thread.messages);
   const idx = msgs.findIndex((m) => m.messageId === messageId.trim());
   if (idx < 0) {
-    toast("Message introuvable dans ce fil.");
+    toast.error("Message introuvable dans ce fil.");
     return;
   }
   const anchorId = threadMessageAnchorId(messageId, idx);
@@ -31,6 +31,6 @@ export function scrollToThreadMessage(messageId: string): void {
     el.classList.add("thread-msg--evidence-flash");
     window.setTimeout(() => el.classList.remove("thread-msg--evidence-flash"), 2400);
   } else {
-    toast("Message introuvable dans la vue.");
+    toast.error("Message introuvable dans la vue.");
   }
 }
