@@ -1,4 +1,5 @@
 // @ts-nocheck — DOM wiring; tighten types incrementally.
+import { wireEventsDomDigestBench } from "./wireEventsDomDigestBenchRun";
 import { wireEventsDomSettingsAi } from "./wireEventsDomSettingsAiRun";
 import { wireEventsDomContactsAgent } from "./wireEventsDomContactsAgentRun";
 import { wireEventsDomInboxThread } from "./wireEventsDomInboxThreadRun";
@@ -6,6 +7,7 @@ import { wireEventsDomComposeSearchAccount } from "./wireEventsDomComposeSearchA
 import { wireEventsDomThreadQaInput } from "./wireEventsDomThreadQaRun";
 
 export function wireEventsDomDomains(composeSig: AbortSignal): void {
+  wireEventsDomDigestBench(composeSig);
   wireEventsDomThreadQaInput(composeSig);
   wireEventsDomSettingsAi(composeSig);
   wireEventsDomContactsAgent(composeSig);

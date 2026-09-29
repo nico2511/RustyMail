@@ -1,11 +1,14 @@
-# ESQUISSE — non chargée par RustyMail.
+# ESQUISSE — pas la fixture de lecture.
+# La fixture runtime est crates/rustymail-modules/fixtures/digests/deblock.yaml
+# (`action: show|hide|collapse`, alias `keep`). Ce fichier sert de contrôle au harness.
 # Fixture = zones header / body / footer + matching.
-# Cas Deblock : le plugin try_deblock_digest fait déjà cette découpe.
+# Cas Deblock : DeblockCleaner délègue à la fixture embarquée.
 # Voir docs/CADRAGE_DIGEST_TEMPLATES.md. Ne pas committer de vrai mail ici.
 #
-# Banc d'essai (cadrage, non branché) : la même fixture se prévisualise
-# sur de vrais mails trouvés par la recherche actuelle
+# Banc d'essai (Paramètres → Banc d'essai, livré) : un YAML du même genre
+# se prévisualise sur de vrais mails trouvés par la recherche actuelle
 # (@domaine, texte sujet/corps, #dossier / mailbox). Pas un second index.
+# Ce fichier-ci reste une esquisse de contrôle, pas la fixture chargée.
 # Le domaine filtre l'entrée dans la liste ; les ancres `structure`
 # décident si la découpe s'applique. Domaine seul = pas de réécriture.
 # Gestes d'aperçu : afficher, masquer, replier, restyler

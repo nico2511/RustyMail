@@ -12,6 +12,8 @@ import { loadMailView, loadMailboxUnread } from "./mailListView";
 import { loadNewsletterRules } from "./newsletterRulesLoad";
 import { refreshAddressBookList } from "./addressBookWireActions";
 import { syncAiEngineSettingsTabFromPrefs } from "./settingsLlmRuntime";
+import { refreshDigestBenchStatus } from "./digestBenchActions";
+import { captureDigestBenchDom } from "./digestBenchState";
 import {
   ensureValidSelectedMailbox,
   openSettingsView,
@@ -53,7 +55,8 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
         tab === "addressBook" ||
         tab === "storage" ||
         tab === "shortcuts" ||
-        tab === "developer"
+        tab === "developer" ||
+        tab === "digestBench"
       ) {
         if (state.view !== "settings") {
           state.view = "settings";
@@ -66,6 +69,9 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
           accountFieldTouched.serverFields = false;
           state.accountServersPanelOpen = state.settingsSelectedAccountId !== "new";
         }
+        if (state.settingsTab === "digestBench" && tab !== "digestBench") {
+          captureDigestBenchDom();
+        }
         state.settingsTab = tab;
         if (tab === "ai") syncAiEngineSettingsTabFromPrefs();
         render();
@@ -73,6 +79,7 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
         if (tab === "ai") void refreshSemanticEmbeddingCounts();
         if (tab === "addressBook") void refreshAddressBookList().then(() => render());
         if (tab === "storage") void refreshSettingsPathsFromBackend();
+        if (tab === "digestBench") void refreshDigestBenchStatus().then(() => render());
       }
       return true;
     }

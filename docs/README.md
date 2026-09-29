@@ -37,7 +37,7 @@ English documentation for the RustyMail desktop mail client. Start at the [repos
 | [RELEASE.md](RELEASE.md) | GitHub Actions, tagging, updater Windows, local `tauri:build` |
 | [ORGANISER_V2.md](ORGANISER_V2.md) | État des mécaniques Organiser v2 |
 | [LECTURE_HTML.md](LECTURE_HTML.md) | État du nettoyage HTML à la lecture |
-| [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md) | Cadrage (FR) : éditeur de découpe header/body/footer, templates de lecture — pas implémenté |
+| [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md) | Cadrage (FR) : découpe header/body/footer. Phase 1 (fixture Deblock) et banc d’essai livrés ; éditeur peint non livré |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Layout, tests, PR expectations |
 
 ## Assets

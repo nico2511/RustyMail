@@ -1,10 +1,12 @@
 # Cadrage : templates digest + flow fixture IA
 
-Document de cadrage uniquement. Rien ici n’est branché au runtime. L’esquisse YAML dans [`cadrage/digest-template.exemple.yaml`](cadrage/digest-template.exemple.yaml) n’est pas lue par l’application.
+Document de cadrage. La phase 1 branche le moteur pour **Deblock seulement** : fixture YAML embarquée, match domaine + structure, zones `show` / `hide` (et `collapse` en repli fermé). La phase 2 branche le banc d’essai sur la recherche actuelle (Paramètres → Banc d’essai). L’éditeur de découpe peint et toute proposition IA ne sont pas branchés. `clean_message` n’appelle pas de modèle.
+
+L’esquisse [`cadrage/digest-template.exemple.yaml`](cadrage/digest-template.exemple.yaml) n’est pas le fichier chargé. La fixture runtime embarquée est `crates/rustymail-modules/fixtures/digests/deblock.yaml`. Le banc d’essai (Paramètres → Banc d’essai) rejoue un YAML sur les mails trouvés par la recherche lexicale actuelle. Accepter enregistre un verdict. « Activer en lecture » est un second geste, éteint par défaut.
 
 L’état actuel de la lecture reste [`LECTURE_HTML.md`](LECTURE_HTML.md). Ce texte décrit comment **généraliser** le rendu propre des mails transactionnels (le genre Deblock) sans étendre ce rendu au courrier personne-à-personne, et sans faire dépendre l’ouverture d’un mail d’un modèle.
 
-Un vertical parallèle est le **banc d’essai fixtures** : rejouer une fixture candidate sur de vrais mails du corpus, trouvés par la **recherche déjà en place**, avant de l’activer en lecture. Pas un nouvel index. Le détail est dans la section « Banc d’essai fixtures (recherche) ».
+Un vertical parallèle, **livré**, est le **banc d’essai fixtures** (Paramètres → Banc d’essai) : rejouer une fixture candidate sur de vrais mails du corpus, trouvés par la **recherche déjà en place**, avant de l’activer en lecture. Pas un nouvel index. Le détail est dans la section « Banc d’essai fixtures (recherche) ».
 
 ## Intention
 
@@ -50,7 +52,7 @@ Une fixture n’est pas seulement un HTML anonymisé. C’est la découpe plus l
 | `zones.body` | La substance (lignes de détail). Affichée comme corps du template. |
 | `zones.footer` | Pied marketing, avertissement, mentions. **Identifié pour être écarté** de la lecture propre. |
 
-L’esquisse Deblock est [`cadrage/digest-template.exemple.yaml`](cadrage/digest-template.exemple.yaml). Elle n’est pas chargée par l’application.
+L’esquisse Deblock est [`cadrage/digest-template.exemple.yaml`](cadrage/digest-template.exemple.yaml). Elle sert de contrôle au harness. La fixture de lecture est `crates/rustymail-modules/fixtures/digests/deblock.yaml` (`action: show|hide|collapse`, alias `keep`).
 
 Deux niveaux, pour ne pas confondre la découpe et la mise en page :
 
@@ -86,7 +88,7 @@ Le second volet sert de contrôle : le template n’est pas « ce mail-ci », il
 
 ### Application en lecture
 
-Quand un mail arrive sur le chemin actuel (`clean_html_builtin` → `cleanedHtmlBody`) :
+Chemin actuel (`clean_html_builtin` → `cleanedHtmlBody`). Pour Deblock, c’est la phase 1. Une fixture locale activée est essayée avant les plugins ; sans elle, le registre embarqué s’applique :
 
 1. Chercher un template dont le domaine d’expéditeur matche (Strong).
 2. Vérifier les ancres de structure sur ce mail, pas sur l’échantillon.
@@ -98,7 +100,7 @@ La vue propre existante (`threadViewUiCleanModeRun.ts`) affiche déjà ce HTML. 
 
 ### Lien avec le plugin Deblock
 
-`try_deblock_digest` dans `providers/deblock.rs` **est** cette découpe, compilée en dur. Les deux fixtures du dépôt sont déjà deux mails du même pattern.
+La découpe n’est plus écrite en dur dans `providers/deblock.rs`. `DeblockCleaner` délègue à `fixtures/digests/deblock.yaml`. Les deux HTML du dépôt restent deux mails du même pattern.
 
 | Zone | Dans `receive_200eur.html` / `send_200eur.html` | Ce que le plugin en fait |
 | ---- | ----------------------------------------------- | ------------------------ |
@@ -106,17 +108,17 @@ La vue propre existante (`threadViewUiCleanModeRun.ts`) affiche déjà ce HTML. 
 | Body | `h3` « Détails » puis les `<p><b>…</b><br>…` | `<table>` libellé / valeur, jusqu’au stop |
 | Footer | `div.warning` (et ce qui suivrait) | Non copié. Le test reçu vérifie l’absence de « Marketing footer » |
 
-`DeblockDetector` porte le matching expéditeur (`deblock.com`). La structure est implicite : si `div.f-fallback` n’a pas cette forme, `CleanError::NoDigest` et le pipeline revient au générique. C’est la règle « même pattern ou rien » que le template doit garder.
+`DeblockDetector` porte le matching expéditeur (`deblock.com`, lu sur la fixture). La structure est dans le YAML : si `div.f-fallback` n’a pas cette forme, `CleanError::NoDigest` et le pipeline revient au générique. C’est la règle « même pattern ou rien ».
 
-Tant que le moteur déclaratif n’existe pas, **le plugin reste l’application runtime** de ce template. Le critère d’une future bascule : les deux fixtures produisent le même digest qu’aujourd’hui, et un expéditeur non Deblock n’est pas réécrit. Les plugins Amazon et GitHub ne sont pas exprimés comme un simple header/body/footer ; ils restent à côté (section 2).
+Phase 1 : `DeblockCleaner` délègue à la fixture embarquée. Les deux HTML de test produisent le même digest (header, lignes, pied absent), et un expéditeur non Deblock n’est pas réécrit — y compris un signal faible (sujet ou HTML). Les plugins Amazon et GitHub ne sont pas exprimés comme un simple header/body/footer ; ils restent à côté (section 2).
 
-Le détecteur Weak (sujet ou HTML qui contient « deblock ») ne doit pas devenir la façon dont un template s’applique aux « autres mails ». L’autre mail du pattern se reconnaît au domaine **et** aux ancres, comme le reçu et l’envoi.
+Un Weak (sujet ou HTML qui contient « deblock ») peut encore sélectionner le provider. Il ne réécrit pas : l’autre mail du pattern se reconnaît au domaine **et** aux ancres, comme le reçu et l’envoi.
 
 ---
 
 ## Banc d’essai fixtures (recherche)
 
-Vertical produit **en parallèle** de l’éditeur de découpe et du moteur de templates. Rien ici n’est branché. L’éditeur pose la fixture candidate (header, body, footer). Le banc la rejoue sur **de vrais mails du corpus** avant qu’elle puisse servir en lecture. Il ne découpe pas à la place de l’éditeur, et il n’écrit pas dans `clean_message`.
+Écran livré : Paramètres → Banc d’essai, en parallèle de l’éditeur de découpe (celui-là n’est pas peint : le YAML est le réglage). Le banc réutilise `parseSearchBarDraft` et `search_threads` (`SearchQuery`, mode lexical forcé). Pas de nouvel index. Le YAML candidate se prévisualise sur le HTML du message ouvert. Accepter écrit `digest_bench_accepted.json` à côté des préférences et n’installe rien dans `clean_message`. « Activer en lecture » copie cette fixture acceptée vers `digest_bench_reading.yaml` ; elle passe alors avant les plugins, seulement si le domaine et la structure matchent. « Désactiver la lecture locale » retire ce fichier. Refuser ne désactive pas une lecture déjà allumée. Défaut : pas de fichier de lecture, la phase 1 (Deblock embarqué) est inchangée.
 
 But : voir, sur la boîte de la personne, si la découpe tient — pas seulement sur les deux HTML fictifs Deblock du dépôt. On y choisit un mail échantillon et des mails de validation.
 
@@ -178,7 +180,7 @@ Gestes sur une zone, le temps de cet aperçu. Ils décrivent la fixture ; ils n�
 | ----- | ----- | ----------------------- |
 | Afficher | La zone entre dans la lecture coupée | Header et body (`keep: true`) |
 | Masquer | La zone est identifiée puis écartée | Footer (`keep: false`) |
-| Replier | La zone reste dans le mail, fermée tant qu’on ne l’ouvre pas | Pas utilisé |
+| Replier | La zone reste dans le mail, fermée (`<details>`) | Pas utilisé. Le moteur sait le faire ; Deblock masque le pied |
 | Restyler | La mise en forme change, pas le périmètre | Body `presentation: key_value` (table) |
 
 Replier n’est pas un quatrième moteur, et ce n’est pas le repli des citations du courrier personne-à-personne. C’est un geste d’aperçu sur une zone déjà délimitée. Deblock n’en a pas besoin : le pied se masque.
@@ -235,7 +237,9 @@ Traits (`mail_cleaning/traits.rs`) :
 
 ### Deblock — le modèle à généraliser
 
-Fichiers : `providers/deblock.rs`, fixtures `tests/fixtures/deblock/`, tests `tests/deblock_mail_cleaning.rs`. Version de règles : `"1"`.
+Fichiers : `fixtures/digests/deblock.yaml` (découpe chargée en phase 1), `providers/deblock.rs` (détection, puis délégation), HTML `tests/fixtures/deblock/`, tests `deblock_mail_cleaning.rs` et `digest_fixtures`. Version de règles : `"1"`.
+
+Le signal faible (HTML ou sujet) peut encore sélectionner le provider. La réécriture, elle, exige le domaine. Sans lui, `NoDigest` et le générique.
 
 **Détection**
 
@@ -257,14 +261,17 @@ Racine `div.f-fallback`, au moins trois enfants :
 **Rendu**
 
 ```html
+<!-- rustymail:digest id="deblock" -->
 <!-- rustymail:deblock-digest -->
-<article class="rm-deblock-digest">
+<article class="rm-digest rm-deblock-digest" data-digest-id="deblock">
   <h2>…titre…</h2>
   <p><strong>…montant…</strong></p>
   <h3>Détails</h3>
   <table>…th/td…</table>
 </article>
 ```
+
+Le marqueur `rustymail:deblock-digest` et la classe `rm-deblock-digest` restent le temps de la bascule. Le préfixe `rustymail:digest` et `.rm-digest` sont le contrat nouveau.
 
 Les fixtures sont **fictives** (commentaire en tête de fichier, IBAN masqué `FR00 **** …`). Pas de script de génération : le HTML est écrit à la main. Deux cas : réception (`receive_200eur.html`) et envoi (`send_200eur.html`, lignes en plus).
 
@@ -379,20 +386,21 @@ crates/rustymail-modules/fixtures/digests/<id>.yaml
 
 Chaque template a un `id` stable (`deblock`), un `rule_set_version`, un bloc `match` (expéditeur + structure) et un bloc `zones` (header, body, footer). La mise en forme du body (`key_value` pour Deblock) est un champ de la zone body, pas un second modèle. Pas de code dans le YAML : sélecteurs CSS limités, index, stop sur une classe.
 
-Le registre runtime fusionne :
+Le registre runtime, aujourd’hui :
 
-1. plugins ad hoc compilés (Amazon, GitHub, et Deblock **tant qu’il n’est pas basculé**) ;
-2. templates déclaratifs embarqués, dont la sortie doit pouvoir remplacer `DeblockCleaner` sans changer les tests.
+1. fixture locale `digest_bench_reading.yaml` si « Activer en lecture » l’a installée (elle passe avant les plugins, seulement si domaine et structure matchent ; absente par défaut) ;
+2. plugins ad hoc compilés (Amazon, GitHub) ;
+3. Deblock : `DeblockCleaner` délègue à `fixtures/digests/deblock.yaml`.
 
 `ProviderId` / `HtmlCleaningProviderKind` ne grandissent plus d’une variante par marque. Côté domaine, un id texte borné (`digest:<id>` ou champ `htmlCleaningTemplateId`) évite un enum et un union TS à chaque expéditeur. Les trois valeurs actuelles restent lisibles le temps de la migration (serde déjà en camelCase, `github` renommé à part).
 
 Un template issu de l’éditeur et **commité** (fixtures du dépôt) est le chemin contributeur, celui qui généralise Deblock sans IPC nouvelle.
 
-Un template **local à l’app**, créé dans l’éditeur intégré et appliqué aux autres mails de la boîte, est le même schéma mais une surface plus tardive : fichier borné, schéma validé, pas de code, activation explicite. Ce n’est pas un brouillon du composer, et la WebView ne doit pas pouvoir y écrire une règle libre ([`IPC_SECURITY.md`](IPC_SECURITY.md)). Défaut : seul le registre embarqué s’applique.
+Un template **local à l’app** existe déjà comme fichier de lecture du banc (`digest_bench_reading.yaml`, à côté des préférences) : schéma validé, pas de code, activation explicite, défaut absent. Ce n’est pas un brouillon du composer. L’éditeur peint qui l’écrirait n’est pas livré. La WebView ne doit pas pouvoir y écrire une règle libre ([`IPC_SECURITY.md`](IPC_SECURITY.md)). Sans ce fichier, seul le registre embarqué s’applique.
 
 ### Matching
 
-Politique proposée, plus stricte que le code actuel :
+Politique du moteur Deblock (phase 1). Amazon Weak reste le défaut du plugin actuel, pas de ce chemin :
 
 | Règle | MVP |
 | ----- | --- |
@@ -434,7 +442,7 @@ La garde de masse, la signature, Outlook et la vue propre testent le préfixe `r
 | Amazon strip | Comportement historique, pas un digest ; à ne pas « templater » tel quel |
 | GitHub | URL PR/issue, bruit de notification, titre pris dans le sujet |
 
-Deblock est le premier candidat au template par zones : reçu et envoi sont déjà deux mails du même pattern, et le plugin fait la découpe. On le retire du Rust le jour où le rendu déclaratif égale ces tests. GitHub peut suivre si un second expéditeur « notification + lien » partage ses zones ; sinon le plugin reste. Amazon (commande, grille, strip) ne se résume pas à trois zones stables.
+Deblock est le premier template par zones, et c’est celui qui est chargé : reçu et envoi passent par le YAML. La détection reste dans `providers/deblock.rs` ; la découpe n’y est plus écrite en dur. GitHub peut suivre si un second expéditeur « notification + lien » partage ses zones ; sinon le plugin reste. Amazon (commande, grille, strip) ne se résume pas à trois zones stables.
 
 Kinds de rendu **plus tard**, seulement s’ils apparaissent deux fois : `paragraphs_and_action` (proche GitHub), `line_items` (proche commande Amazon). Pas une grammaire libre.
 
@@ -445,7 +453,7 @@ Kinds de rendu **plus tard**, seulement s’ils apparaissent deux fois : `paragr
 | `Providerr_mockup/*.eml` | Non (déjà gitignoré) | Échantillon personnel |
 | Boîte synchronisée, via `SearchQuery` | Non | Candidats du banc d’essai (échantillon + validation) |
 | `tests/fixtures/<id>/*_anonymized.html` ou `.txt` | Oui | Entrée de test |
-| `fixtures/digests/<id>.yaml` | Oui | Template : zones header/body/footer + `match` (quand le moteur existera) |
+| `fixtures/digests/deblock.yaml` | Oui | Fixture de lecture Deblock, chargée par `include_str!` |
 | Sortie HTML du digest | Non (recalculée par le test) | Oracle = assertions sur titre, lignes, absence du pied |
 
 Les fixtures Deblock actuelles restent les oracles : l’échantillon (reçu) définit la découpe, l’envoi vérifie qu’elle s’applique à l’autre mail du pattern. On ne les régénère pas depuis un vrai compte.
@@ -477,18 +485,18 @@ L’IA ne fabrique pas la lecture. Elle peut **pré-marquer** header, body et fo
 
 Le skill qui appelle le modèle est un aide de l’éditeur (`.cursor/skills/…` ou `tools/`, à créer avec l’implémentation), pas un `AssistSkill` de `ai_assist_thread`. Ces skills-là tournent sur un fil déjà ouvert. Les mélanger enverrait le corps vers le modèle à chaque nouveau pattern et couplerait la lecture à l’IA.
 
-Aucun de ces pas n’ajoute de commande `invoke` tant que l’éditeur n’est pas dans l’app. Le jour où l’écran de découpe est dans Tauri, ce sont des commandes **nouvelles**, à part de l’envoi et des brouillons : taille bornée, schéma de zones, pas de HTML brut réinjecté, confirmation avant qu’un template local s’applique à d’autres messages ([`IPC_SECURITY.md`](IPC_SECURITY.md)).
+Le banc a ses commandes (`digest_bench_status`, `digest_bench_accept`, `digest_bench_reject`, `digest_bench_enable_reading`, `digest_bench_disable_reading`) : YAML borné, aperçu sans écrire la lecture, activation séparée. L’éditeur peint n’en ajoute pas. Le jour où l’écran de découpe est dans Tauri, ce sont d’autres commandes, à part de l’envoi et des brouillons : taille bornée, schéma de zones, pas de HTML brut réinjecté ([`IPC_SECURITY.md`](IPC_SECURITY.md)).
 
 ### Où ça vit
 
 | Lieu | Rôle | Appelle un modèle à la lecture ? |
 | ---- | ---- | -------------------------------- |
-| Éditeur de découpe (outil dédié, puis écran app distinct du composer) | Marquer les zones, prévisualiser, valider | Non : seulement pour la proposition, si la personne le demande |
-| Banc d’essai (recherche lexicale actuelle) | Ouvrir des mails réels, comparer brut et découpe, accepter / ajuster / refuser | Non. Pas de balayage de la boîte par un modèle |
-| Repo, YAML + fixtures HTML | Pattern embarqué (Deblock d’abord) | Non |
-| `clean_message` / `DeblockCleaner` aujourd’hui | Applique la découpe | Non |
+| Éditeur de découpe peint (pas livré ; distinct du composer) | Marquer les zones, prévisualiser, valider | Non : seulement pour une proposition, si elle existe un jour |
+| Banc d’essai, Paramètres (livré) | Recherche lexicale, comparer brut et découpe, accepter / refuser, activer la lecture à part | Non. Pas de balayage de la boîte par un modèle |
+| `fixtures/digests/deblock.yaml` | Pattern embarqué Deblock, chargé | Non |
+| `clean_message` / `DeblockCleaner` | Délègue à la fixture si le domaine et la structure matchent | Non |
 | `ai_assist_skills`, llama-server, OpenRouter | Résumé, réponse, organiser | Déjà, sur d’autres fonctions. Pas sur ce template |
-| Dossier de données | Template local, plus tard, défaut inactif | Non |
+| `digest_bench_reading.yaml` à côté des préférences | Lecture locale, défaut absent | Non |
 
 L’ouverture d’un mail reste : HTML → registre déterministe → DOMPurify. Si le modèle est absent, éteint, ou faux, les digests déjà validés ne changent pas.
 
@@ -518,28 +526,31 @@ L’ouverture d’un mail reste : HTML → registre déterministe → DOMPurify.
 
 ## 4. Roadmap
 
-### MVP (premier chantier d’implémentation, pas celui-ci)
+### Phase 1 — moteur Deblock
 
-- Schéma fixture : `zones.header` / `body` / `footer` + `match` expéditeur et ancres. Esquisse déjà dans `docs/cadrage/digest-template.exemple.yaml`.
-- Éditeur de découpe **dédié** (outil local d’abord) : marquer les trois zones sur le reçu Deblock, aperçu de lecture, même découpe montrée sur l’envoi. Pas d’écran dans le composer.
-- Moteur de lecture : ce YAML reproduit `try_deblock_digest` (header en tête, body en table, footer absent), marqueur `rustymail:digest`, classe `rm-digest`. Les trois marqueurs historiques restent le temps de la bascule.
-- Échec d’ancre → générique. Amazon et GitHub restent des plugins, inchangés.
-- Proposition IA : contrat JSON de zones, hors CI, hors `clean_message`. Pas de nouvelle commande IPC tant que l’éditeur n’est pas dans l’app.
+Livré :
 
-Critère de fin : les tests reçu et envoi passent via le template, un mail non Deblock n’est pas réécrit, `clean_message` ne référence pas `rustymail-llm`.
+- Schéma : `zones` + `match`, `action: show|hide|collapse` (`keep` reste un alias). Fichier chargé : `fixtures/digests/deblock.yaml`. L’esquisse `docs/cadrage/digest-template.exemple.yaml` est un contrôle de harness, pas la fixture de lecture.
+- Moteur : `DeblockCleaner` applique cette fixture (header en tête, body en table, footer absent), marqueurs `rustymail:digest` et `rustymail:deblock-digest`, classes `rm-digest` et `rm-deblock-digest`.
+- Échec d’ancre ou domaine absent → générique, y compris un sujet ou un HTML qui évoque Deblock. Amazon et GitHub restent des plugins.
+- `clean_message` n’appelle pas de modèle.
 
-### Vertical parallèle — banc d’essai
+Pas livré : l’éditeur de découpe peint, et toute proposition IA de zones.
 
-Même horizon que l’éditeur de découpe et le moteur de templates. L’un n’est pas le prérequis de l’autre. Toujours hors de ce document : pas d’écran, pas de branchement sur la recherche.
+Critère tenu : les tests reçu et envoi passent via le template, un mail non Deblock n’est pas réécrit, `clean_message` ne référence pas `rustymail-llm`.
 
-- Réutiliser `SearchQuery` et la barre actuelle. Mode lexical par défaut. Filtres utiles : `@domaine`, texte libre (sujet et corps), dossier (`#local:` / `#dossier:` / `mailbox`).
-- Depuis un résultat : ouvrir un candidat, appliquer la fixture (afficher, masquer, replier, restyler), comparer le brut et la lecture coupée, accepter, ajuster ou refuser.
-- Accepter ne lance pas la réécriture en lecture. Le match reste domaine Strong + ancres de structure.
-- Pas de nouvel index. Pas d’appel modèle sur la liste. Deblock reste le premier candidat de fixture ; Amazon et GitHub restent ad hoc.
+### Phase 2 — banc d’essai
+
+Livré dans Paramètres → Banc d’essai. Pas d’écran de peinture des zones : le YAML est le réglage.
+
+- `SearchQuery` et la barre actuelle, mode lexical forcé. Filtres : `@domaine`, texte libre (sujet et corps), dossier (`#local:` / `#dossier:` / `#archive`).
+- Depuis un résultat : ouvrir un candidat, appliquer la fixture (afficher, masquer, replier, restyler), comparer le brut et la lecture coupée.
+- Accepter écrit `digest_bench_accepted.json` et ne lance pas la réécriture. « Activer en lecture » installe la fixture acceptée. Le match reste domaine + ancres de structure.
+- Pas de nouvel index. Pas d’appel modèle sur la liste. Deblock reste la fixture embarquée ; Amazon et GitHub restent ad hoc.
 
 ### Plus tard
 
-- Écran de découpe dans l’app, à côté de la lecture, jamais à la place du composer. Template local borné, activation explicite, défaut off.
+- Écran de découpe peint, à côté de la lecture, jamais à la place du composer. Le fichier local de lecture existe déjà via le banc ; il ne remplace pas cet écran.
 - Deuxième expéditeur seulement si ses mails se décrivent par les trois zones (sinon un plugin, pas un faux template).
 - GitHub en zones si un second expéditeur « notification + lien » apparaît.
 - Amazon : resserrer le Weak du strip ; ne pas forcer header/body/footer sur la commande tant que le plain quoted-printable reste la source utile.
@@ -573,5 +584,7 @@ Même horizon que l’éditeur de découpe et le moteur de templates. L’un n�
 | Contrats LLM | `docs/LLM_CONTRACTS.md` |
 | Sécurité | `docs/SECURITY.md`, `docs/IPC_SECURITY.md` |
 | Composer (à ne pas réutiliser) | `src/app/ui/render/composerRender.ts`, classe `compose-fullscreen-active` |
-| Esquisse de fixture (zones) | `docs/cadrage/digest-template.exemple.yaml` |
-| Recherche (banc d’essai) | `crates/rustymail-domain/src/search.rs` (`SearchQuery`), `crates/rustymail-infrastructure/src/semantic_search.rs`, `src/searchBarParse.ts`, `src/searchQueryBuild.ts`, `src/app/ui/render/searchRender.ts` |
+| Esquisse de fixture (contrôle harness) | `docs/cadrage/digest-template.exemple.yaml` |
+| Fixture Deblock chargée | `crates/rustymail-modules/fixtures/digests/deblock.yaml`, `mail_cleaning/digest_fixtures/` |
+| Banc d’essai | `src-tauri/src/digest_bench.rs`, `src/app/ui/render/digestBenchRender.ts`, `src/digestBenchQuery.ts` |
+| Recherche (banc d’essai) | `crates/rustymail-domain/src/search.rs` (`SearchQuery`), `crates/rustymail-infrastructure/src/semantic_search.rs`, `src/searchBarParse.ts`, `src/searchQueryBuild.ts` |

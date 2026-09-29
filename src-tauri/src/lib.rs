@@ -20,6 +20,7 @@ use rustymail_infrastructure::{
 };
 mod activity_commands;
 mod address_commands;
+mod digest_bench;
 mod folder_commands;
 mod imap_push;
 mod ipc_guard;
@@ -2195,6 +2196,7 @@ pub fn run() {
                 models_dir,
                 llm_models_dir,
             });
+            digest_bench::load_reading_fixture_from_prefs(&prefs_boot);
             imap_push::start_imap_push(app.handle(), db_arc.clone());
             imap_push::refresh_imap_push_accounts_db(app.handle(), db_arc.as_path());
             webview_microphone::install_webview_microphone_access(app.handle());
@@ -2386,7 +2388,13 @@ pub fn run() {
             activity_commands::activity_card_calibration_stats_cmd,
             list_newsletter_rules,
             add_newsletter_rule,
-            remove_newsletter_rule
+            remove_newsletter_rule,
+            digest_bench::digest_bench_status,
+            digest_bench::digest_fixture_preview,
+            digest_bench::digest_bench_accept,
+            digest_bench::digest_bench_reject,
+            digest_bench::digest_bench_enable_reading,
+            digest_bench::digest_bench_disable_reading
         ])
         .build(tauri::generate_context!())
         .expect("failed to build RustyMail")

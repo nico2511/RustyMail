@@ -47,6 +47,23 @@ describe("parseSearchBarDraft", () => {
     expect(parseSearchBarDraft("x #security:50", noRules).text).toBe("x");
   });
 
+  it("prend @domaine comme expéditeur et laisse un domaine nu dans le texte", () => {
+    const prefixed = parseSearchBarDraft("@deblock.com reçu #dossier:INBOX", noRules);
+    expect(prefixed.senders).toEqual(["deblock.com"]);
+    expect(prefixed.mailboxPath).toBe("INBOX");
+    expect(prefixed.text).toBe("reçu");
+
+    const bare = parseSearchBarDraft("deblock.com reçu", noRules);
+    expect(bare.senders).toEqual([]);
+    expect(bare.text).toContain("deblock.com");
+
+    expect(parseSearchBarDraft("pat@deblock.com", noRules).senders).toEqual(["pat@deblock.com"]);
+    expect(parseSearchBarDraft("@a.example @b.example", noRules).senders).toEqual([
+      "a.example",
+      "b.example",
+    ]);
+  });
+
   it("parse #archive en mailboxPrefix Archive", () => {
     const p = parseSearchBarDraft("facture #archive", noRules);
     expect(p.mailboxPrefix).toBe("Archive");

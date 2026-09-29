@@ -30,7 +30,8 @@
       "addressBook": "Address book",
       "storage": "Storage",
       "shortcuts": "Shortcuts",
-      "developer": "Developer"
+      "developer": "Developer",
+      "digestBench": "Fixture bench"
     },
     "general": {
       "languageHeading": "Language",
