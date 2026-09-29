@@ -48,7 +48,7 @@ export async function restoreThreadSelectionAfterReload(options: {
     } catch (error) {
       if (mode === "sync") {
         console.error("open_thread after sync", error);
-        toast(`Impossible d’ouvrir le fil : ${tauriErrorMessage(error)}`);
+        toast.error(`Impossible d’ouvrir le fil : ${tauriErrorMessage(error)}`);
       }
       state.selectedThread = undefined;
     }

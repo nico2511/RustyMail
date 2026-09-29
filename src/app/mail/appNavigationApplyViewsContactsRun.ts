@@ -24,7 +24,7 @@ export async function applyNavSnapshotContactsViews(snap: NavSnapshot, d: AppNav
         try {
           await loadContactsList(acc.id, { reset: true, query: snap.contactsListQuery });
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       }
       render();

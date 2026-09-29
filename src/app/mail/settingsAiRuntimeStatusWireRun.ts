@@ -13,7 +13,7 @@ export async function tryHandleSettingsAiRuntimeStatusWire(action: string): Prom
       return true;
     case "ai-test-connection": {
       if (!isTauriRuntime()) {
-        toast("Le test de connexion se fait dans l’application bureau.");
+        toast.warning("Le test de connexion se fait dans l’application bureau.");
         return true;
       }
       void (async () => {
@@ -28,14 +28,14 @@ export async function tryHandleSettingsAiRuntimeStatusWire(action: string): Prom
     case "refresh-llm-runtime-status": {
       void refreshLlmRuntimeStatus(false).then(() => {
         render();
-        toast("Statut LLM actualisé.");
+        toast.info("Statut LLM actualisé.");
       });
       return true;
     }
     case "refresh-llm-hardware-rescan": {
       void refreshLlmRuntimeStatus(true).then(() => {
         render();
-        toast("Mémoire de l’ordinateur : nouvelle analyse effectuée.");
+        toast.success("Mémoire de l’ordinateur : nouvelle analyse effectuée.");
       });
       return true;
     }

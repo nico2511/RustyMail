@@ -6,7 +6,7 @@ import { refreshLlmRuntimeStatus } from "./settingsLlmRuntime";
 
 export async function requireTauriForSecretSave(): Promise<boolean> {
   if (!isTauriRuntime()) {
-    toast("Enregistrement : lancez l’app Tauri.");
+    toast.warning("Enregistrement : lancez l’app Tauri.");
     return false;
   }
   return true;
@@ -14,7 +14,7 @@ export async function requireTauriForSecretSave(): Promise<boolean> {
 
 export async function requireTauriForSecretClear(): Promise<boolean> {
   if (!isTauriRuntime()) {
-    toast("Lancez l’app Tauri.");
+    toast.warning("Lancez l’app Tauri.");
     return false;
   }
   return true;

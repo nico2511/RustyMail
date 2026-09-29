@@ -38,7 +38,7 @@ export async function summarizeThreadCore(
     try {
       const o = repairSummaryResultStrings(JSON.parse(cached) as SummaryResult);
       if (applyThreadAiOutputIfLive(threadId, summaryResultToZenText(o))) {
-        if (toastOnCache) toast("Synthèse (cache locale).");
+        if (toastOnCache) toast.info("Synthèse (cache locale).");
         if (!prefetchOnly) render();
         return { status: "done" };
       }
@@ -63,20 +63,20 @@ export async function summarizeThreadCore(
   } catch (error) {
     if (signal.aborted || isLlmCancelledError(error)) {
       if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
-      if (toastOnDone) toast("Synthèse annulée.");
+      if (toastOnDone) toast.warning("Synthèse annulée.");
       if (!prefetchOnly) render();
       return { status: "cancelled" };
     }
     const msg = tauriErrorMessage(error);
     console.error("summarizeThreadCore", error);
     if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
-    if (toastOnDone) toast(`Synthèse échouée : ${msg}`);
+    if (toastOnDone) toast.error(`Synthèse échouée : ${msg}`);
     if (!prefetchOnly) render();
     return fail(msg);
   }
   if (done === "cancelled") {
     if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
-    if (toastOnDone) toast("Synthèse annulée.");
+    if (toastOnDone) toast.warning("Synthèse annulée.");
     if (!prefetchOnly) render();
     return { status: "cancelled" };
   }
@@ -91,11 +91,11 @@ export async function summarizeThreadCore(
   } else {
     const msg = "réponse vide du modèle";
     if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
-    if (toastOnDone) toast("Synthèse terminée sans contenu exploitable.");
+    if (toastOnDone) toast.warning("Synthèse terminée sans contenu exploitable.");
     if (!prefetchOnly) render();
     return fail(msg);
   }
-  if (toastOnDone) toast("Synthèse terminée.");
+  if (toastOnDone) toast.success("Synthèse terminée.");
   if (!prefetchOnly) render();
   return { status: "done" };
 }

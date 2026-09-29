@@ -32,7 +32,7 @@ export function removeAttachment(path: string): void {
 export function clearAttachments(): void {
   if (!state.draft) return;
   state.draft.attachmentPaths = [];
-  toast("Pièces jointes supprimées.");
+  toast.success("Pièces jointes supprimées.");
   render();
   attachmentDeps().scheduleDraftRevisionSave(250);
 }

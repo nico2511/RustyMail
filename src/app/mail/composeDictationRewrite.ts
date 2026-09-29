@@ -21,7 +21,7 @@ export async function rewriteDictatedSegmentWithTone(raw: string): Promise<strin
     const out = (res.text ?? "").trim();
     return out.length ? out : raw;
   } catch {
-    toast(
+    toast.warning(
       "Réécriture du texte dicté indisponible (porte LLM fermée ou erreur réseau) — transcription brute conservée.",
     );
     return raw;

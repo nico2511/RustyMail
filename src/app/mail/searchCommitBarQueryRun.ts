@@ -52,8 +52,8 @@ export function toastSearchBarResult(): void {
       state.searchScope === "mailbox"
         ? " Essayez #compte dans la barre si les messages sont dans un autre dossier."
         : "";
-    toast(`Aucun résultat (${hint})${scope}.${scopeHint}`);
-  } else toast(`${n} conversation${n === 1 ? "" : "s"} · ${hint}${scope}.`);
+    toast.warning(`Aucun résultat (${hint})${scope}.${scopeHint}`);
+  } else toast.info(`${n} conversation${n === 1 ? "" : "s"} · ${hint}${scope}.`);
 }
 
 export async function applySearchBarQuery(): Promise<void> {

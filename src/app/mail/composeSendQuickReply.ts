@@ -15,12 +15,12 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
   const quickInput = document.querySelector<HTMLInputElement>("[data-quick-reply]");
   const body = quickInput?.value.trim() ?? "";
   if (!body) {
-    toast("Le quick reply est vide.");
+    toast.warning("Le quick reply est vide.");
     return;
   }
   const threadId = currentThreadIdForReply();
   if (!threadId) {
-    toast("Aucun fil sélectionné.");
+    toast.warning("Aucun fil sélectionné.");
     return;
   }
   const command = kind === "reply" ? "prepare_reply" : "prepare_reply_all";
@@ -32,7 +32,7 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
     );
   } catch (error) {
     console.error(`Tauri command failed: ${command}`, error);
-    toast(`Impossible de préparer la réponse: ${tauriErrorMessage(error)}`);
+    toast.error(`Impossible de préparer la réponse: ${tauriErrorMessage(error)}`);
     return;
   }
   draft.markdownBody = `${body}\n`;
@@ -45,7 +45,7 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
       }),
       MAIL_ACTION_TIMEOUT_MS,
     );
-    toast(kind === "reply" ? "Réponse envoyée." : "Réponse à tous envoyée.");
+    toast.success(kind === "reply" ? "Réponse envoyée." : "Réponse à tous envoyée.");
     toastSendDraftImapNotice(sendOutcome);
     if (quickInput) quickInput.value = "";
     await loadMailView(false);
@@ -58,6 +58,6 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
     render();
   } catch (error) {
     console.error("send_draft (quick reply)", error);
-    toast(`Envoi échoué: ${tauriErrorMessage(error)}`);
+    toast.error(`Envoi échoué: ${tauriErrorMessage(error)}`);
   }
 }

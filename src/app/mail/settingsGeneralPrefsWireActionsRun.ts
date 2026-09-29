@@ -17,16 +17,16 @@ export async function tryHandleSettingsGeneralPrefsWire(action: string, _element
         const sel = document.querySelector<HTMLSelectElement>("#default-account-prompt-select");
         const id = (sel?.value ?? "").trim();
         if (!id) {
-          toast("Choisissez un compte.");
+          toast.warning("Choisissez un compte.");
           return;
         }
         try {
           await persistDefaultAccountId(id);
           await switchActiveAccount(id);
-          toast("Compte par défaut enregistré.");
+          toast.success("Compte par défaut enregistré.");
           render();
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -50,7 +50,7 @@ export async function tryHandleSettingsGeneralPrefsWire(action: string, _element
       void installDesktopUpdate();
       return true;
     case "desktop-update-relaunch":
-      void relaunchDesktopApp().catch((error) => toast(tauriErrorMessage(error)));
+      void relaunchDesktopApp().catch((error) => toast.error(tauriErrorMessage(error)));
       return true;
     default:
       return false;

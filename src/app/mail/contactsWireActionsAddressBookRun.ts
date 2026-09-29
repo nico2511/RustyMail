@@ -9,7 +9,7 @@ export async function tryHandleContactsAddressBookWire(action: string): Promise<
     case "address-book-export-vcard": {
       const acc = currentAccount();
       if (!acc?.id) {
-        toast("Sélectionnez un compte.");
+        toast.warning("Sélectionnez un compte.");
         return true;
       }
       void (async () => {
@@ -17,7 +17,7 @@ export async function tryHandleContactsAddressBookWire(action: string): Promise<
           const path = await invoke<string>("export_address_contacts_vcard_cmd", {
             accountId: acc.id,
           });
-          toast(`Carnet exporté : ${path}`);
+          toast.success(`Carnet exporté : ${path}`);
         } catch (e) {
           const msg = tauriErrorMessage(e);
           if (!msg.toLowerCase().includes("annul")) toast(msg);
@@ -28,7 +28,7 @@ export async function tryHandleContactsAddressBookWire(action: string): Promise<
     case "address-book-import-vcard": {
       const acc = currentAccount();
       if (!acc?.id) {
-        toast("Sélectionnez un compte.");
+        toast.warning("Sélectionnez un compte.");
         return true;
       }
       void (async () => {

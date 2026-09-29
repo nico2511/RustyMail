@@ -26,7 +26,7 @@ export async function maybePromptSplitSendPlan(draftOutbound: Draft): Promise<bo
   } catch (error) {
     console.error("plan_split_send", error);
     state.composeMessage = "";
-    toast(tauriErrorMessage(error));
+    toast.error(tauriErrorMessage(error));
     render();
     return true;
   }

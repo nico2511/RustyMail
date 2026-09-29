@@ -19,7 +19,7 @@ export function tryHandleFolderManagerTreeWire(action: string, element?: HTMLEle
           if (state.folderManager.report) state.folderManager.report.lockedMailboxes = list;
           render();
         })
-        .catch((e: unknown) => toast(tauriErrorMessage(e)));
+        .catch((e: unknown) => toast.error(tauriErrorMessage(e)));
       return true;
     }
     case "fm-toggle-node": {

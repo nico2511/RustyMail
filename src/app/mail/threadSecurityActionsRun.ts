@@ -21,10 +21,10 @@ export async function addNewsletterRuleFromSenderEmail(email: string): Promise<v
   try {
     await withTimeout(invoke("add_newsletter_rule", { input: email }), MAIL_ACTION_TIMEOUT_MS);
     await loadNewsletterRules();
-    toast(t("toast.newsletterRuleAdded"));
+    toast.success(t("toast.newsletterRuleAdded"));
     render();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
@@ -37,7 +37,7 @@ export async function moveThreadToJunkFromSecurityAction(
   if (!tid || !isTauriRuntime()) return;
   const spam = state.mailboxes.find((m: string) => mailboxKind(m) === "spam");
   if (!spam) {
-    toast(t("toast.junkFolderMissing"));
+    toast.error(t("toast.junkFolderMissing"));
     return;
   }
   const account = currentAccount();
@@ -53,7 +53,7 @@ export async function moveThreadToJunkFromSecurityAction(
       }),
       MAIL_ACTION_TIMEOUT_MS,
     );
-    toast(t("toast.movedToJunk"));
+    toast.success(t("toast.movedToJunk"));
     state.threads = state.threads.filter((threadRow: ThreadListItem) => String(threadRow.id) !== tid);
     if (state.selectedThreadId === tid) {
       state.selectedThreadId = undefined;
@@ -64,13 +64,13 @@ export async function moveThreadToJunkFromSecurityAction(
     render();
   } catch (e) {
     clearThreadsRecentlyRemoved([tid]);
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
 export function appendSecurityFilterToSearchDraft(): void {
   state.searchDraft = ((state.searchDraft || "") + " #security:50").trim();
   state.searchModalOpen = true;
-  toast("Filtre #security:50 ajouté — lancez la recherche.");
+  toast.success("Filtre #security:50 ajouté — lancez la recherche.");
   render();
 }

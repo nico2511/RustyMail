@@ -16,7 +16,7 @@ export async function finishOAuthNewAccountAfterLogin(
   displayName: string,
 ): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("OAuth2 : lancez l’application bureau Tauri.");
+    toast.warning("OAuth2 : lancez l’application bureau Tauri.");
     return;
   }
 

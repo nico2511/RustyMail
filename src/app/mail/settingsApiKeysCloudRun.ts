@@ -14,7 +14,7 @@ export async function saveCloudApiKeysFromDom(): Promise<void> {
   const inp = document.querySelector<HTMLInputElement>("#prefs-cloud-api-key");
   const secret = inp?.value?.trim() ?? "";
   if (!secret) {
-    toast("Collez une clé API avant d’enregistrer.");
+    toast.warning("Collez une clé API avant d’enregistrer.");
     return;
   }
   try {
@@ -23,10 +23,10 @@ export async function saveCloudApiKeysFromDom(): Promise<void> {
     state.openrouterApiKeySet = true;
     state.dictationApiKeySet = true;
     if (inp) inp.value = "";
-    toast("Clé cloud enregistrée (OpenRouter + dictée).");
+    toast.success("Clé cloud enregistrée (OpenRouter + dictée).");
     refreshEnginesModalIfOpen();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
@@ -37,9 +37,9 @@ export async function clearCloudApiKeys(): Promise<void> {
     await withTimeout(invoke("clear_dictation_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
     state.openrouterApiKeySet = false;
     state.dictationApiKeySet = false;
-    toast("Clé cloud supprimée.");
+    toast.success("Clé cloud supprimée.");
     refreshEnginesModalIfOpen();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

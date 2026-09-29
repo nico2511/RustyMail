@@ -26,7 +26,7 @@ export function tryHandleOrgV2ScanUndoWire(action: string): boolean {
         .catch((e: unknown) => {
           state.organizationV2.scanning = false;
           state.organizationV2.applyMessage = "";
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
           render();
         });
       return true;
@@ -47,7 +47,7 @@ export function tryHandleOrgV2ScanUndoWire(action: string): boolean {
         .catch((e: unknown) => {
           state.organizationV2.applying = false;
           state.organizationV2.applyMessage = "";
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
           render();
         });
       return true;

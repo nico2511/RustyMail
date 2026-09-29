@@ -18,7 +18,7 @@ export async function loadAccountsFromBackend(options?: LoadAccountsFromBackendO
     state.accounts = [];
     state.accountsLoadError =
       "Mode navigateur : pas de comptes ni de mails persistants. Lancez l’app bureau avec npm run tauri:dev.";
-    if (!options?.silent) toast(state.accountsLoadError);
+    if (!options?.silent) toast.warning(state.accountsLoadError);
     return false;
   }
   try {
@@ -38,7 +38,7 @@ export async function loadAccountsFromBackend(options?: LoadAccountsFromBackendO
     state.accounts = [];
     state.accountsLoadError = tauriErrorMessage(error);
     if (!options?.silent) {
-      toast(`Impossible de charger les comptes : ${state.accountsLoadError}`);
+      toast.error(`Impossible de charger les comptes : ${state.accountsLoadError}`);
     }
     return false;
   }

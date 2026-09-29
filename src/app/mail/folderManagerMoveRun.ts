@@ -17,7 +17,7 @@ export async function fmMoveFolder(from: string, newParent: string): Promise<voi
   if (!acc?.id) return;
   if (from.trim().toLowerCase() === newParent.trim().toLowerCase()) return;
   if (isDescendantMailboxPath(from, newParent)) {
-    toast("Impossible de déplacer un dossier dans l’un de ses descendants.");
+    toast.error("Impossible de déplacer un dossier dans l’un de ses descendants.");
     return;
   }
   const to = reparentMailboxPath(from, newParent);
@@ -38,9 +38,9 @@ export async function fmMoveFolder(from: string, newParent: string): Promise<voi
     await refreshMailboxesAfterImapChange();
     await refreshFolderManagerTree();
     await fmSelectMailbox(to);
-    toast(`Dossier déplacé : ${to}`);
+    toast.success(`Dossier déplacé : ${to}`);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     state.folderManager.busyMailbox = null;
     state.folderManager.busyAction = null;

@@ -19,7 +19,7 @@ export async function refreshOrganizationReport(): Promise<void> {
     const llmMsg = report.llmStatus?.message?.trim();
     if (llmMsg) toast(llmMsg);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     if (state.view === "organization") render();
   }
@@ -36,7 +36,7 @@ export async function refreshOrganizationV2Report(): Promise<void> {
     state.organizationV2.report = report;
     state.organizationV2.applyMessage = orgV2ScanStatusLine(report);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     if (state.view === "organizationV2") render();
   }

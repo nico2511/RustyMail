@@ -12,17 +12,17 @@ export async function saveOpenrouterApiKeyFromDom(): Promise<void> {
   const inp = document.querySelector<HTMLInputElement>("#prefs-openrouter-api-key");
   const secret = inp?.value?.trim() ?? "";
   if (!secret) {
-    toast("Collez une clé OpenRouter avant d’enregistrer.");
+    toast.warning("Collez une clé OpenRouter avant d’enregistrer.");
     return;
   }
   try {
     await withTimeout(invoke("set_openrouter_api_key", { secret }), MAIL_ACTION_TIMEOUT_MS);
     state.openrouterApiKeySet = true;
     if (inp) inp.value = "";
-    toast("Clé OpenRouter enregistrée dans le trousseau.");
+    toast.success("Clé OpenRouter enregistrée dans le trousseau.");
     void refreshLlmRuntimeStatus(false).then(() => render());
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
   render();
 }
@@ -32,10 +32,10 @@ export async function clearOpenrouterApiKey(): Promise<void> {
   try {
     await withTimeout(invoke("clear_openrouter_api_key", {}), MAIL_ACTION_TIMEOUT_MS);
     state.openrouterApiKeySet = false;
-    toast("Clé OpenRouter supprimée du trousseau.");
+    toast.success("Clé OpenRouter supprimée du trousseau.");
     void refreshLlmRuntimeStatus(false).then(() => render());
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
   render();
 }

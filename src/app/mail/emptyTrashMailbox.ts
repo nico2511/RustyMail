@@ -27,21 +27,21 @@ function trashDeps(): EmptyTrashMailboxDeps {
 
 export async function onEmptyTrashMailbox(): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("Vider la corbeille : disponible dans l’app Tauri.");
+    toast.warning("Vider la corbeille : disponible dans l’app Tauri.");
     return;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return;
   }
   const mailbox = state.selectedMailbox || "";
   if (mailboxKind(mailbox) !== "trash") {
-    toast("Ouvrez d’abord le dossier corbeille.");
+    toast.warning("Ouvrez d’abord le dossier corbeille.");
     return;
   }
   if (state.threads.length === 0) {
-    toast("La corbeille est déjà vide.");
+    toast.warning("La corbeille est déjà vide.");
     return;
   }
   const ok = await openConfirmModal({
@@ -69,7 +69,7 @@ export async function onEmptyTrashMailbox(): Promise<void> {
     render();
   } catch (err) {
     console.error("empty_trash_mailbox_cmd", err);
-    toast(tauriErrorMessage(err));
+    toast.error(tauriErrorMessage(err));
     render();
   }
 }

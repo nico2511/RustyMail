@@ -26,13 +26,13 @@ export async function handleContactsToggleFavorite(element?: HTMLElement): Promi
     await loadContactDetail(acc.id, email);
     render();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
 export async function handleContactsLlmProfile(element?: HTMLElement): Promise<void> {
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureContactProfileEnabled")) {
-    toast("Activez « Profil IA contact » dans les réglages IA.");
+    toast.warning("Activez « Profil IA contact » dans les réglages IA.");
     return;
   }
   const acc = currentAccount();
@@ -40,7 +40,7 @@ export async function handleContactsLlmProfile(element?: HTMLElement): Promise<v
   if (!acc?.id || !email) return;
   await loadContactProfile(acc.id!, email);
   render();
-  toast("Profil IA chargé.");
+  toast.success("Profil IA chargé.");
 }
 
 export function handleContactsSearchDomain(element?: HTMLElement): void {

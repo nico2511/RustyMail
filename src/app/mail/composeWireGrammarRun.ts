@@ -65,7 +65,7 @@ function forgetSuggestionIfExhausted(index: number, suggestion: GrammarReplaceIn
 
 function finishApplied(index: number, suggestion: GrammarReplaceInput, occurrences: number): void {
   forgetSuggestionIfExhausted(index, suggestion);
-  toast(occurrences > 1 ? TOAST_APPLIED_FIRST : TOAST_APPLIED);
+  toast.success(occurrences > 1 ? TOAST_APPLIED_FIRST : TOAST_APPLIED);
   paintComposeEditor();
   void computePreview();
 }

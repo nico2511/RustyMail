@@ -22,7 +22,7 @@ export async function tryHandleListThreadMoveActionsWire(action: string): Promis
       const acc = currentAccount();
       if (!tid || !acc?.id) return true;
       if (!isTauriRuntime()) {
-        toast("Désarchivage : disponible dans l’app Tauri.");
+        toast.warning("Désarchivage : disponible dans l’app Tauri.");
         return true;
       }
       void (async () => {
@@ -35,7 +35,7 @@ export async function tryHandleListThreadMoveActionsWire(action: string): Promis
           await openThread(tid, { skipHistory: true, preserveAi: true });
           render();
         } catch (err) {
-          toast(tauriErrorMessage(err));
+          toast.error(tauriErrorMessage(err));
         }
       })();
       return true;

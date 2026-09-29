@@ -19,7 +19,7 @@ export async function persistAiPrefsFromDom(opts?: {
   skipDomCapture?: boolean;
 }): Promise<void> {
   if (!isTauriRuntime()) {
-    if (!opts?.silent) toast("Enregistrement : lancez l’app Tauri.");
+    if (!opts?.silent) toast.warning("Enregistrement : lancez l’app Tauri.");
     return;
   }
   if (!opts?.skipDomCapture) {
@@ -41,9 +41,9 @@ export async function persistAiPrefsFromDom(opts?: {
       /* ignore reload failures */
     }
     applyAppearanceFromPrefs(state.appPrefs.general);
-    if (!opts?.silent) toast("Réglages IA enregistrés.");
+    if (!opts?.silent) toast.success("Réglages IA enregistrés.");
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
   if (!opts?.skipRender) render();
 }

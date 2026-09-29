@@ -8,15 +8,15 @@ export async function tryHandleSettingsAiPrefetchWhisperWire(action: string): Pr
   if (action !== "prefetch-whisper-models") return false;
   void (async () => {
     if (!isTauriRuntime()) {
-      toast("Téléchargement GGML : lancez l’app Tauri.");
+      toast.warning("Téléchargement GGML : lancez l’app Tauri.");
       return;
     }
-    toast("Téléchargement du GGML Whisper (HF) selon tes réglages…");
+    toast.info("Téléchargement du GGML Whisper (HF) selon tes réglages…");
     try {
       const msg = await withTimeout(invoke<string>("prefetch_whisper_dictation_model", {}), 900_000);
       toast(msg);
     } catch (e) {
-      toast(tauriErrorMessage(e));
+      toast.error(tauriErrorMessage(e));
     }
     render();
   })();

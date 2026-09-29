@@ -15,19 +15,19 @@ export async function tryHandleAddressBookSidebarSyncWire(action: string): Promi
       void (async () => {
         const acc = currentAccount();
         if (!acc?.id || !isTauriRuntime()) {
-          toast("Réindexation : compte ou Tauri requis.");
+          toast.warning("Réindexation : compte ou Tauri requis.");
           return;
         }
         try {
           const res = await invoke<{ messagesProcessed: number }>("reindex_address_contacts_cmd", {
             accountId: acc.id,
           });
-          toast(`Carnet réindexé (${res?.messagesProcessed ?? 0} messages traités).`);
+          toast.success(`Carnet réindexé (${res?.messagesProcessed ?? 0} messages traités).`);
           await refreshAddressBookList();
           await loadAddressBookSidebarCount();
           render();
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       })();
       return true;

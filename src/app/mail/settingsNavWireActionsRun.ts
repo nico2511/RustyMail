@@ -37,7 +37,7 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
         ensureValidSelectedMailbox();
         await loadMailView(false);
         await loadMailboxUnread();
-        toast(`Compte chargé : ${currentAccount()?.email ?? ""}`);
+        toast.info(`Compte chargé : ${currentAccount()?.email ?? ""}`);
       }
       render();
       return true;

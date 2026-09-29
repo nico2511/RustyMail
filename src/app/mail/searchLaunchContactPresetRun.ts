@@ -43,7 +43,7 @@ export async function launchDomainMailSearch(domain: string): Promise<void> {
   if (!dom) return;
   const acc = currentAccount();
   if (!acc?.id || !isTauriRuntime()) {
-    toast("Recherche domaine : compte ou Tauri requis.");
+    toast.warning("Recherche domaine : compte ou Tauri requis.");
     return;
   }
   try {
@@ -53,7 +53,7 @@ export async function launchDomainMailSearch(domain: string): Promise<void> {
     });
     const emails = (senders ?? []).map((s) => s.trim().toLowerCase()).filter((s) => s.includes("@"));
     if (!emails.length) {
-      toast(`Aucun expéditeur local pour @${dom}.`);
+      toast.warning(`Aucun expéditeur local pour @${dom}.`);
       return;
     }
     navReset();
@@ -75,6 +75,6 @@ export async function launchDomainMailSearch(domain: string): Promise<void> {
     render();
     void searchThreads();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

@@ -28,7 +28,7 @@ export async function onOrgDeleteMailboxOne(mailbox: string, mailboxRefId: strin
   if (!acc?.id) return;
   const proposal = findEmptyMailboxesProposal();
   if (!proposal) {
-    toast("Proposition introuvable — relancez l’analyse.");
+    toast.error("Proposition introuvable — relancez l’analyse.");
     return;
   }
   const useV2 = Boolean(state.organizationV2.report?.proposals.some((p) => p.id === "empty-mailboxes"));

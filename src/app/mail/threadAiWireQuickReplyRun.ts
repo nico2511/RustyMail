@@ -16,18 +16,18 @@ import { threadIsAutoMail } from "./threadAutoMail";
 export async function llmQuickRepliesThreadUi() {
   const threadId = state.selectedThreadId?.trim();
   if (!threadId) {
-    toast("Ouvre un fil.");
+    toast.warning("Ouvre un fil.");
     return;
   }
   if (threadIsAutoMail(state.selectedThread, threadId)) {
-    toast("Réponses rapides désactivées pour les messages automatiques / newsletters.");
+    toast.warning("Réponses rapides désactivées pour les messages automatiques / newsletters.");
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureQuickReplyThreadEnabled")) {
-    toast("Réponses rapides (fil) désactivées — activez-les dans Paramètres IA ou le panneau « IA ».");
+    toast.warning("Réponses rapides (fil) désactivées — activez-les dans Paramètres IA ou le panneau « IA ».");
     return;
   }
-  if (!isTauriRuntime()) return void toast("Réponses rapides : Tauri requis.");
+  if (!isTauriRuntime()) return void toast.warning("Réponses rapides : Tauri requis.");
   const ran = await withLlmQueue("Réponses rapides", async (signal) => {
     if (signal.aborted) return;
     state.aiOpen = true;
@@ -43,7 +43,7 @@ export async function llmQuickRepliesThreadUi() {
     if (signal.aborted) return;
     state.quickReplySuggestions = res.suggestions ?? [];
     state.aiThreadScope = String(threadId);
-    toast("Réponses rapides prêtes.");
+    toast.success("Réponses rapides prêtes.");
     render();
   });
   if (ran === null) return;
@@ -51,14 +51,14 @@ export async function llmQuickRepliesThreadUi() {
 
 export async function llmQuickRepliesComposeUi() {
   if (state.view !== "compose") {
-    toast("Ouvre le compositeur pour les réponses rapides.");
+    toast.warning("Ouvre le compositeur pour les réponses rapides.");
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureQuickReplyComposeEnabled")) {
-    toast("Réponses rapides (compositeur) désactivées — activez-les dans Paramètres IA.");
+    toast.warning("Réponses rapides (compositeur) désactivées — activez-les dans Paramètres IA.");
     return;
   }
-  if (!isTauriRuntime()) return void toast("Réponses rapides : Tauri requis.");
+  if (!isTauriRuntime()) return void toast.warning("Réponses rapides : Tauri requis.");
   const ran = await withLlmQueue(COMPOSE_REPLIES_JOB, async (signal) => {
     if (signal.aborted) return;
     try {
@@ -69,16 +69,16 @@ export async function llmQuickRepliesComposeUi() {
       if (signal.aborted) return;
       const first = res.suggestions?.[0]?.text?.trim();
       if (!first) {
-        toast("Aucune suggestion.");
+        toast.warning("Aucune suggestion.");
         return;
       }
       prependComposePlainText(first);
       void computePreview();
-      toast("Suggestion insérée — modifiez avant envoi.");
+      toast.success("Suggestion insérée — modifiez avant envoi.");
       render();
     } catch (e) {
       if (signal.aborted) return;
-      toast(tauriErrorMessage(e));
+      toast.error(tauriErrorMessage(e));
     }
   });
   if (ran === null) return;

@@ -14,7 +14,7 @@ export async function withLlmQueue<T>(
   fn: (signal: AbortSignal) => Promise<T>,
 ): Promise<T | null> {
   if (state.llmJobLabel) {
-    toast(`IA occupée (${state.llmJobLabel}). Annulez ou attendez la fin.`);
+    toast.warning(`IA occupée (${state.llmJobLabel}). Annulez ou attendez la fin.`);
     return null;
   }
   abortIdleAiCachePrefetchInFlight();

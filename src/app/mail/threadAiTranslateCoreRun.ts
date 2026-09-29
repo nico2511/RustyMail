@@ -39,7 +39,7 @@ export async function translateThreadCore(
       if (o.translatedText) {
         if (applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(o.translatedText))) {
           if (!prefetchOnly) {
-            toast("Traduction (cache locale).");
+            toast.info("Traduction (cache locale).");
             render();
           }
         }
@@ -69,19 +69,19 @@ export async function translateThreadCore(
   } catch (error) {
     if (signal.aborted || isLlmCancelledError(error)) {
       if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
-      if (!prefetchOnly) toast("Traduction annulée.");
+      if (!prefetchOnly) toast.warning("Traduction annulée.");
       if (!prefetchOnly) render();
       return { status: "cancelled" };
     }
     const msg = tauriErrorMessage(error);
-    if (!prefetchOnly) toast(`Traduction échouée : ${msg}`);
+    if (!prefetchOnly) toast.error(`Traduction échouée : ${msg}`);
     console.warn("translateThreadCore", error);
     if (!prefetchOnly) render();
     return fail(msg);
   }
   if (done === "cancelled") {
     if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
-    if (!prefetchOnly) toast("Traduction annulée.");
+    if (!prefetchOnly) toast.warning("Traduction annulée.");
     if (!prefetchOnly) render();
     return { status: "cancelled" };
   }
@@ -90,7 +90,7 @@ export async function translateThreadCore(
     done.displayText?.trim() ||
     "";
   if (tx) applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(tx));
-  if (!prefetchOnly) toast("Traduction terminée.");
+  if (!prefetchOnly) toast.success("Traduction terminée.");
   if (!prefetchOnly) render();
   return { status: "done" };
 }

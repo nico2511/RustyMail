@@ -46,6 +46,6 @@ export async function persistEngineCheckboxToggle(message: string): Promise<void
       render();
     }
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
