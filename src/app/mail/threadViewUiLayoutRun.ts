@@ -1,5 +1,5 @@
 import type { CleanedMessageView } from "../types";
-import { isOwnSender, normalizeThreadSenderLabel } from "./threadViewUiParticipantsRun";
+import { isOwnSender } from "./threadViewUiParticipantsRun";
 import { sortMessagesByReceivedAscending } from "./threadMessageSort";
 
 export function threadTreeLaneRight(
@@ -9,25 +9,8 @@ export function threadTreeLaneRight(
   const ascending = sortMessagesByReceivedAscending(thread.messages);
   const rootId = ascending[0]?.messageId ?? "";
   const isRoot = Boolean(rootId) && message.messageId === rootId;
-  if (isRoot) return { isRoot: true, laneRight: false };
-  if (isOwnSender(message.sender)) return { isRoot: false, laneRight: true };
-
-  const lanes = new Map<string, boolean>();
-  let nextRight = false; // 1er expéditeur rencontré (hors root, hors moi) => gauche
-  for (const m of ascending.slice(1)) {
-    if (m.messageId === rootId) continue;
-    const key = normalizeThreadSenderLabel(m.sender);
-    if (!key) continue;
-    if (isOwnSender(m.sender)) {
-      lanes.set(key, true);
-      continue;
-    }
-    if (lanes.has(key)) continue;
-    lanes.set(key, nextRight);
-    nextRight = !nextRight;
-  }
-  const k = normalizeThreadSenderLabel(message.sender);
-  return { isRoot: false, laneRight: lanes.get(k) ?? false };
+  // Alignement unique du fil : plus de voie droite selon l’expéditeur ou « moi ».
+  return { isRoot, laneRight: false };
 }
 
 export function senderAccentVars(sender: string): string {

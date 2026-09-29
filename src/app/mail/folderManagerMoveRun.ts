@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
+import { renameBlockedReason } from "../../mailboxLock";
 import { isDescendantMailboxPath } from "../../mailboxTree";
 import { render } from "../dispatch";
 import { currentAccount } from "../core/accountContext";
@@ -21,6 +22,11 @@ export async function fmMoveFolder(from: string, newParent: string): Promise<voi
   }
   const to = reparentMailboxPath(from, newParent);
   if (to.toLowerCase() === from.trim().toLowerCase()) return;
+  const blocked = renameBlockedReason(state.folderManager.report?.lockedMailboxes ?? [], from);
+  if (blocked) {
+    toast(blocked);
+    return;
+  }
   state.folderManager.busyMailbox = from;
   state.folderManager.busyAction = "move";
   render();

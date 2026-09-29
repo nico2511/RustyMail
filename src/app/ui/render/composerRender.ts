@@ -3,6 +3,7 @@ import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { iconSvg } from "../../lib/iconSvg";
 import { renderComposeToolbar } from "./composeToolbarRender";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
+import { grammarOccurrenceCount } from "../../mail/composeGrammarReplace";
 import { state } from "../../state";
 import type { Draft, MicDictationTarget } from "../../types";
 import { renderDeps } from "./renderDeps";
@@ -141,16 +142,21 @@ export function renderComposer() {
         </div>
         <ul class="compose-correction-list" role="list">
           ${state.composeGrammarSuggestions
-            .map(
-              (g, i) => `
+            .map((g, i) => {
+              const occurrences = grammarOccurrenceCount(state.composeBody, state.composeCanonicalBody, g);
+              const applyTitle =
+                occurrences > 1
+                  ? `Remplacer la première des ${occurrences} occurrences`
+                  : "Remplacer cette occurrence dans le texte";
+              return `
             <li class="compose-correction-item" role="listitem">
               <div class="compose-correction-item__main">
                 <p class="compose-correction-reason dim">${escapeHtml(g.reason)}</p>
                 <p class="compose-correction-diff"><span class="compose-correction-del">${escapeHtml(g.original)}</span> → <strong>${escapeHtml(g.replacement)}</strong></p>
               </div>
-              <button type="button" class="ghost-button compose-correction-apply" data-action="compose-grammar-apply" data-grammar-i="${i}">Appliquer</button>
-            </li>`
-            )
+              <button type="button" class="ghost-button compose-correction-apply" data-action="compose-grammar-apply" data-grammar-i="${i}" title="${escapeAttr(applyTitle)}">Appliquer</button>
+            </li>`;
+            })
             .join("")}
         </ul>
       </aside>`

@@ -44,7 +44,7 @@ fn outlook_fixture_keeps_body_strips_mso_and_quote_noise() {
     let out = clean_html_for_markdown(&reg, &ctx, html);
 
     assert_eq!(out.resolved_provider, ProviderId::Generic);
-    assert_eq!(out.generic_rule_set_version, "11");
+    assert_eq!(out.generic_rule_set_version, "12");
     let low = out.html.to_ascii_lowercase();
     assert!(low.contains("message principal outlook"));
     assert!(!low.contains("[if mso]"));
@@ -103,10 +103,18 @@ fn outlook_forward_chain_builds_conversation_report() {
     let reg = ProviderRegistry::builtin();
     let out = clean_html_for_markdown(&reg, &ctx, html);
 
-    assert_eq!(out.generic_rule_set_version, "11");
+    assert_eq!(out.generic_rule_set_version, "12");
     assert!(out.html.contains("rm-conversation-report"));
+    assert!(out.html.contains("rm-conversation-turn--cited"));
+    assert!(
+        !out.html.contains("rm-mail-folded-quote"),
+        "le rapport intervenants reste lisible, hors du pli de citation"
+    );
     assert!(out.html.contains("Message transféré"));
     assert!(out.html.contains("brief logistique"));
+    let reply_at = out.html.find("Message transféré").unwrap();
+    let cited_at = out.html.find("brief logistique").unwrap();
+    assert!(reply_at < cited_at);
     assert!(out.html.contains("Alice"));
     assert!(!out.html.contains("Signature"));
     assert!(!out.html.contains("divRplyFwdMsg"));
@@ -183,6 +191,50 @@ fn cleaned_text_follows_visible_reply_not_plain_noise_or_folded_quote() {
     let html_out = view.cleaned_html_body.expect("html");
     assert!(html_out.contains("rm-mail-folded-quote"));
     assert!(html_out.contains("Ancien message long"));
+}
+
+#[test]
+fn plain_outlook_history_stays_behind_a_fold_not_a_digest() {
+    let html = r#"<div>
+<p>Bonjour Mr LECHOPIER,</p>
+<p>Pouvez-vous me rappeler svp</p>
+<p>Merci</p>
+<p>Cordialement</p>
+<p>De : Nicolas Lechopier</p>
+<p>Envoyé : mercredi 16 septembre 2026 11:44</p>
+<p>À : secretariat@drcourty.fr</p>
+<p>Objet : RE: Demande de rendez-vous</p>
+<p>Bonjour,</p>
+<p>Merci pour votre retour.</p>
+<p>Le 14 septembre 2026 13:21:22 GMT+02:00, Nicolas Lechopier a écrit :</p>
+<p>Voici le document demandé.</p>
+</div>"#;
+    let mut msg = generic_message(html.to_string());
+    msg.plain_body = "\
+Bonjour Mr LECHOPIER,\n\nPouvez-vous me rappeler svp\n\nMerci\nCordialement\n\n\
+De : Nicolas Lechopier\nEnvoyé : mercredi 16 septembre 2026 11:44\n\
+À : secretariat@drcourty.fr\nObjet : RE: Demande de rendez-vous\n\n\
+Voici le document demandé.\n"
+        .into();
+    let view = clean_message(&msg);
+    assert!(view.cleaned_text.contains("Pouvez-vous me rappeler"));
+    assert!(!view.cleaned_text.contains("document demandé"));
+    let html_out = view.cleaned_html_body.expect("html");
+    assert!(
+        html_out.contains("rm-mail-folded-quote"),
+        "html sans pli: {html_out}"
+    );
+    assert!(html_out.contains("document demandé"));
+    assert!(!html_out.contains("rustymail:amazon-digest"));
+    assert!(!html_out.contains("rm-amazon-digest"));
+    assert!(!html_out.contains("rm-deblock-digest"));
+    assert!(!html_out.contains("rm-github-digest"));
+    let fold_at = html_out.find("rm-mail-folded-quote").unwrap();
+    assert!(html_out.find("Pouvez-vous me rappeler").unwrap() < fold_at);
+    if let Some(sig_at) = html_out.find("rm-mail-signature") {
+        assert!(fold_at > sig_at);
+        assert!(html_out[sig_at..fold_at].contains("</div>"));
+    }
 }
 
 #[test]

@@ -611,6 +611,7 @@ body.clarity-dark {
 .thread-reading.thread-reading--reading-layout .message.mine .thread-msg-card {
   background: var(--select);
   border-color: color-mix(in srgb, var(--copper) 28%, var(--border));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--copper) 62%, transparent);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-fold-preview {
@@ -795,6 +796,14 @@ body.clarity-dark {
   line-height: 1.65;
 }
 
+.thread-reading.thread-reading--reading-layout .message-text--clean .rm-history-fold__panel {
+  border-left-color: var(--border);
+}
+
+.thread-reading.thread-reading--reading-layout .message-text--clean .rm-history-turn__body {
+  font-family: var(--font-serif);
+}
+
 .thread-reading.thread-reading--reading-layout .thread-accordion-btn {
   border: 0;
   background: transparent;
@@ -952,6 +961,454 @@ body.clarity-dark {
 .ai-panel:not(.ai-panel--digest-slot) .ai-action.surface-sm:hover {
   background: var(--select);
   border-color: color-mix(in srgb, var(--copper) 35%, var(--border));
+}
+
+/* Dossiers personnels — arbre + lecture du dossier choisi. */
+
+.folder-manager-page {
+  gap: 12px;
+  padding: 14px 20px 16px;
+  background: var(--base);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.folder-manager-head h1 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.folder-manager-head p {
+  margin: 4px 0 0;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.folder-manager-head .ghost-button {
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.folder-manager-head .ghost-button:hover {
+  color: var(--text);
+  background: var(--wash);
+  border-color: transparent;
+}
+
+.folder-manager-head .primary-button {
+  padding: 7px 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.folder-manager-tree.surface-sm {
+  background: var(--base);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  border-radius: 8px;
+}
+
+.folder-manager-page .folder-tree-scroll {
+  padding: 8px 8px 12px;
+}
+
+.folder-manager-page .folder-tree-main {
+  padding-left: 2px;
+}
+
+.folder-manager-page .folder-tree-children {
+  margin: 0 0 2px 15px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.folder-manager-page .folder-tree-row {
+  min-height: 32px;
+  margin: 0;
+  padding: 2px 6px 2px 2px;
+  border-color: transparent;
+  border-radius: 6px;
+}
+
+.folder-manager-page .folder-tree-row:hover {
+  background: var(--hover);
+  border-color: transparent;
+}
+
+.folder-manager-page .folder-tree-row:focus-within {
+  background: var(--hover);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.folder-manager-page .folder-tree-row--selected,
+.folder-manager-page .folder-tree-row--selected:hover,
+.folder-manager-page .folder-tree-row--selected:focus-within {
+  background: var(--select);
+  border-color: transparent;
+  box-shadow: inset 2px 0 0 var(--copper);
+}
+
+.folder-manager-page .folder-tree-label {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.folder-manager-page .folder-tree-label--branch {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.folder-manager-page .folder-tree-row--selected .folder-tree-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.folder-manager-page .folder-tree-counts {
+  margin-left: auto;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+}
+
+.folder-manager-page .folder-tree-tag {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.folder-manager-page .folder-tree-row.folder-tree-node--empty,
+.folder-manager-page .folder-tree-row.folder-tree-node--empty:hover,
+.folder-manager-page .folder-tree-row.folder-tree-node--locked,
+.folder-manager-page .folder-tree-row.folder-tree-node--locked:hover {
+  border-style: solid;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.folder-manager-page .folder-tree-row.folder-tree-node--empty .folder-tree-label {
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.folder-manager-page .folder-tree-row--selected.folder-tree-node--empty,
+.folder-manager-page .folder-tree-row--selected.folder-tree-node--locked,
+.folder-manager-page .folder-tree-row--selected.folder-tree-node--empty:hover,
+.folder-manager-page .folder-tree-row--selected.folder-tree-node--locked:hover {
+  background: var(--select);
+  box-shadow: inset 2px 0 0 var(--copper);
+}
+
+.folder-manager-page .folder-tree-node--drop-target .folder-tree-row {
+  background: var(--select);
+  border-color: transparent;
+  box-shadow: inset 2px 0 0 var(--copper);
+}
+
+.folder-manager-page .folder-tree-chevron {
+  width: 22px;
+  height: 22px;
+  color: var(--dim);
+  opacity: 0.8;
+}
+
+.folder-manager-page .folder-tree-chevron:hover {
+  background: transparent;
+  color: var(--text);
+  opacity: 1;
+}
+
+.folder-manager-page .folder-latch-legend {
+  margin: 0;
+  padding: 10px 12px 2px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dim);
+}
+
+.folder-manager-page .folder-latch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 28px;
+  margin-left: 6px;
+  padding: 0 3px 0 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.folder-manager-page .folder-latch__word {
+  min-width: 58px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: right;
+  color: var(--dim);
+}
+
+.folder-manager-page .folder-latch__track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--rail);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.folder-manager-page .folder-latch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--rail);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  transition: transform 220ms cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.folder-manager-page .folder-latch__knob svg {
+  display: block;
+}
+
+.folder-manager-page .folder-latch.is-shut .folder-latch__word {
+  color: var(--copper);
+}
+
+.folder-manager-page .folder-latch.is-shut .folder-latch__track {
+  background: var(--copper);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.28),
+    0 0 0 3px var(--select);
+}
+
+.folder-manager-page .folder-latch.is-shut .folder-latch__knob {
+  transform: translateX(18px);
+  color: var(--copper);
+}
+
+.folder-manager-page .folder-latch:hover .folder-latch__knob,
+.folder-manager-page .folder-latch:focus-visible .folder-latch__knob {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    0 0 0 3px rgba(196, 73, 29, 0.18);
+}
+
+.folder-manager-page .folder-latch:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+}
+
+.folder-manager-page .folder-tree-row.folder-tree-node--locked {
+  background: var(--select);
+}
+
+.folder-manager-page .folder-tree-row.folder-tree-node--locked::before {
+  content: "";
+  width: 9px;
+  height: 16px;
+  margin-right: 2px;
+  border-radius: 2px 1px 1px 2px;
+  background:
+    linear-gradient(var(--base), var(--base)) 3px 6px / 3px 4px no-repeat,
+    var(--copper);
+  box-shadow:
+    inset -2px 0 0 rgba(0, 0, 0, 0.22),
+    1px 1px 0 rgba(163, 60, 24, 0.45);
+  flex: none;
+}
+
+.folder-manager-page .folder-tree-row.folder-tree-node--locked .folder-tree-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folder-manager-page .folder-latch__knob {
+    transition: none;
+  }
+}
+
+.folder-manager-page .folder-tree-actions {
+  opacity: 1;
+  gap: 0;
+}
+
+.folder-manager-page .folder-tree-act:not(.folder-tree-act--open):not(.is-held),
+.folder-manager-page .folder-tree-drag-handle:not(.is-held) {
+  opacity: 0;
+}
+
+.folder-manager-page .folder-tree-act.is-held,
+.folder-manager-page .folder-tree-drag-handle.is-held {
+  position: relative;
+  opacity: 1;
+  color: var(--dim);
+  cursor: not-allowed;
+}
+
+.folder-manager-page .folder-tree-act.is-held::after,
+.folder-manager-page .folder-tree-drag-handle.is-held::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 50%;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--copper);
+  transform: rotate(-28deg);
+  pointer-events: none;
+}
+
+.folder-manager-page .folder-tree-row:hover .folder-tree-act,
+.folder-manager-page .folder-tree-row:focus-within .folder-tree-act,
+.folder-manager-page .folder-tree-row:hover .folder-tree-drag-handle,
+.folder-manager-page .folder-tree-row:focus-within .folder-tree-drag-handle,
+.folder-manager-page .folder-tree-row--selected .folder-tree-act,
+.folder-manager-page .folder-tree-row--selected .folder-tree-drag-handle {
+  opacity: 1;
+}
+
+.folder-manager-page .folder-tree-act {
+  width: 24px;
+  height: 24px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.folder-manager-page .folder-tree-act:hover {
+  border-color: var(--border);
+  background: var(--base);
+  color: var(--text);
+}
+
+.folder-manager-page .folder-tree-act--open.is-active,
+.folder-manager-page .folder-tree-act.is-active {
+  color: var(--copper);
+  border-color: transparent;
+  background: transparent;
+}
+
+.folder-manager-page .folder-tree-act--delete:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.folder-manager-pick,
+.folder-tree-empty {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.folder-manager-auto-banner {
+  background: var(--select);
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+@media (hover: none) {
+  .folder-manager-page .folder-tree-act,
+  .folder-manager-page .folder-tree-drag-handle {
+    opacity: 1;
+  }
+}
+
+/* Lecture des messages du dossier perso — pas la liste inbox. */
+
+.inbox-index--folder-embed .inbox-panel.surface {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.inbox-index--folder-embed .inbox-thread-avatar {
+  display: none;
+}
+
+.inbox-index--folder-embed .inbox-thread-row-main {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 8px 12px;
+  gap: 2px 0;
+}
+
+.inbox-index--folder-embed .inbox-thread-stack {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.inbox-index--folder-embed .inbox-thread-from,
+.inbox-index--folder-embed .inbox-thread-time,
+.inbox-index--folder-embed .inbox-thread-date-label,
+.inbox-index--folder-embed .inbox-thread-folder-label,
+.inbox-index--folder-embed .inbox-thread-folder-move {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.inbox-index--folder-embed .inbox-thread-subject,
+.inbox-index--folder-embed .inbox-thread-subject strong,
+.inbox-index--folder-embed .inbox-thread-preview,
+.inbox-index--folder-embed .thread-preview {
+  font-family: var(--font-serif);
+}
+
+.inbox-index--folder-embed .inbox-thread-subject strong {
+  font-weight: 480;
+}
+
+.inbox-index--folder-embed .thread-row--unread .inbox-thread-subject strong {
+  font-weight: 650;
+}
+
+.inbox-index--folder-embed .inbox-thread-date-col,
+.inbox-index--folder-embed .inbox-thread-folder-col {
+  border-left-color: var(--border-weak);
+}
+
+.inbox-index--folder-embed .thread-row.inbox-thread-row {
+  border-bottom-color: var(--border);
 }
 
 /* Compositeur — barre Écrire / Corriger / Transformer.

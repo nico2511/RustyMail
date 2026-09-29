@@ -72,7 +72,15 @@ export async function composeAiGrammar(): Promise<void> {
     if (signal.aborted) return;
     try {
       const res = await withTimeout(
-        invoke<{ suggestions: Array<{ reason: string; replacement: string; original: string }> }>(
+        invoke<{
+          suggestions: Array<{
+            reason: string;
+            replacement: string;
+            original: string;
+            offset?: number;
+            length?: number;
+          }>;
+        }>(
           "llm_grammar_compose",
           { text: src },
         ),

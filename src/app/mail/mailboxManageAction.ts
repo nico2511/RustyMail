@@ -1,3 +1,4 @@
+import { deleteBlockedReason, renameBlockedReason } from "../../mailboxLock";
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import { currentAccount } from "../core/accountContext";
 import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
@@ -25,6 +26,21 @@ export async function mailboxManageAction(
   if (kind !== "create" && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
     toast("Les dossiers IMAP ne s’appliquent pas aux brouillons locaux.");
     return;
+  }
+  const locks = state.folderManager.report?.lockedMailboxes ?? [];
+  if (kind === "rename") {
+    const blocked = renameBlockedReason(locks, state.selectedMailbox || "");
+    if (blocked) {
+      toast(blocked);
+      return;
+    }
+  }
+  if (kind === "delete") {
+    const blocked = deleteBlockedReason(locks, state.selectedMailbox || "");
+    if (blocked) {
+      toast(blocked);
+      return;
+    }
   }
   const d = requireMailboxManageActionDeps();
   try {

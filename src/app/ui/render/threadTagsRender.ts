@@ -10,14 +10,22 @@ import { state } from "../../state";
 import type { Tag } from "../../types";
 import { renderDeps } from "./renderDeps";
 
+function threadTagChipTone(family: Tag["family"]): "kind" | "source" | "state" | "entity" {
+  if (family === "Source") return "source";
+  if (family === "State") return "state";
+  if (family === "Entity") return "entity";
+  return "kind";
+}
+
 export function renderThreadTagChip(tag: Tag): string {
   const label = formatTag(tag);
+  const tone = threadTagChipTone(tag.family);
   const draft = tagToSearchDraft(tag);
   if (!draft) {
-    return `<span class="thread-tag-chip">${escapeHtml(label)}</span>`;
+    return `<span class="thread-tag-chip thread-tag-chip--${tone}">${escapeHtml(label)}</span>`;
   }
   const fam = String(tag.family).toLowerCase();
-  return `<button type="button" class="thread-tag-chip thread-tag-chip--search" data-action="search-from-tag" data-tag-family="${escapeAttr(fam)}" data-tag-value="${escapeAttr(tag.value)}" title="Rechercher · ${escapeAttr(label)}">${escapeHtml(label)}</button>`;
+  return `<button type="button" class="thread-tag-chip thread-tag-chip--${tone} thread-tag-chip--search" data-action="search-from-tag" data-tag-family="${escapeAttr(fam)}" data-tag-value="${escapeAttr(tag.value)}" title="Rechercher · ${escapeAttr(label)}">${escapeHtml(label)}</button>`;
 }
 
 export function renderThreadTagsChipsHtml(tags: Tag[]): string {

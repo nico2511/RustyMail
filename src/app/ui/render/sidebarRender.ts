@@ -93,11 +93,14 @@ export function renderSidebar(): string {
             .join("")}
         </div>
 
-        <button type="button" class="folder-button ${state.view === "folderManager" ? "active" : ""}" data-action="open-folder-manager-view" title="Dossiers" aria-label="Dossiers">
-          <span class="folder-icon">Ar</span>
-          <span class="folder-name">Dossiers</span>
-          ${personalCount ? `<span class="folder-count">${personalCount}</span>` : ""}
-        </button>
+        <div class="sidebar-personal-entry">
+          <div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">Personnels</span></div>
+          <button type="button" class="folder-button folder-button--personal ${state.view === "folderManager" ? "active" : ""}" data-action="open-folder-manager-view" title="Dossiers personnels" aria-label="Dossiers personnels">
+            <span class="folder-icon">Ar</span>
+            <span class="folder-name">Dossiers</span>
+            ${personalCount ? `<span class="folder-count">${personalCount}</span>` : ""}
+          </button>
+        </div>
       </nav>
       ${
         isTauriRuntime() && account

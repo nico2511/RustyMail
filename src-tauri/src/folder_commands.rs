@@ -2,7 +2,7 @@
 
 use rustymail_infrastructure::{
     archive_mailbox_threads, delete_imap_mailbox_with_contents, list_mailbox_tree, load_accounts,
-    load_app_prefs, prefs_path_from_db_dir, rename_mailbox_subtree_local_cache,
+    load_app_prefs_required, rename_mailbox_subtree_local_cache,
     retag_threads_in_mailboxes, set_mailbox_locked, ArchiveMailboxThreadsOutcome,
     DeleteMailboxWithContentsOutcome, MailboxTreeReport,
 };
@@ -74,8 +74,9 @@ pub async fn set_mailbox_locked_cmd(
 ) -> Result<Vec<String>, String> {
     ipc_guard::validate_account_id(&payload.account_id)?;
     ipc_guard::validate_mailbox(&payload.mailbox)?;
+    let account = resolve_account(&paths, &payload.account_id)?;
     let db_path = paths.db_path.clone();
-    let account_id = payload.account_id.clone();
+    let account_id = account.id.0.clone();
     let mailbox = payload.mailbox.clone();
     let locked = payload.locked;
     tauri::async_runtime::spawn_blocking(move || {
@@ -111,8 +112,7 @@ pub async fn delete_imap_mailbox_with_contents_cmd(
     ipc_guard::validate_mailbox(&payload.mailbox)?;
     ipc_guard::validate_delete_mailbox_with_contents_ack(payload.destructive_ack.as_deref())?;
     let account = resolve_account(&paths, &payload.account_id)?;
-    let prefs_path = prefs_path_from_db_dir(paths.db_path.parent().unwrap_or(&paths.db_path));
-    let prefs = load_app_prefs(&prefs_path);
+    let prefs = load_app_prefs_required(&paths.prefs_path)?;
     delete_imap_mailbox_with_contents(&paths.db_path, &account, payload.mailbox.trim(), &prefs)
         .await
 }

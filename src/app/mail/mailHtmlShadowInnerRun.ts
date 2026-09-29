@@ -107,9 +107,14 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-conversation-report .rm-conversation-body br{display:block;content:"";margin-bottom:0.45em}
         .mail table{max-width:100%;width:100%;border-collapse:collapse}
         .mail blockquote{padding:8px 12px;border-left:2px solid rgba(232,228,223,.12);background:rgba(255,255,255,.02);border-radius:10px}
-        .mail details.rm-mail-folded-quote{margin:10px 0 0}
-        .mail details.rm-mail-folded-quote > summary{cursor:pointer;font-size:12px;color:var(--dim,rgba(238,240,238,.62))}
-        .mail details.rm-mail-folded-quote[open]{margin-top:12px}
+        .mail.mail--clean{line-height:1.65}
+        .mail details.rm-mail-folded-quote{margin:1.45rem 0 0}
+        .mail details.rm-mail-folded-quote > summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;line-height:1.4;text-transform:uppercase;color:var(--dim,rgba(238,240,238,.62))}
+        .mail details.rm-mail-folded-quote[open] > summary{margin-bottom:0.7rem}
+        .mail details.rm-mail-folded-quote > .rm-mail-quote-body{margin:0;padding:12px 14px 4px;border-radius:12px;border:1px solid rgba(120,119,117,.2);background:rgba(120,119,117,.07);color:var(--text);font-size:inherit;line-height:1.62}
+        .mail details.rm-mail-folded-quote > .rm-mail-quote-body :is(p, div, blockquote){margin:0 0 0.7em}
+        .mail details.rm-mail-folded-quote > .rm-mail-quote-body .rm-mail-quote-kicker{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:12.5px;font-weight:500;line-height:1.4;color:var(--dim,rgba(238,240,238,.72));margin:0 0 2px}
+        .mail details.rm-mail-folded-quote > .rm-mail-quote-body .rm-mail-quote-kicker + :not(.rm-mail-quote-kicker){margin-top:0.55em}
         .mail :is(.gmail_quote, .gmail_quote_container, blockquote.gmail_quote){display:none !important}
         .mail details.rm-mail-folded-quote :is(.gmail_quote, .gmail_quote_container, blockquote.gmail_quote){display:block !important}
         .mail .rm-mail-signature{display:none !important}

@@ -3,7 +3,24 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::Path;
+use unicode_normalization::UnicodeNormalization;
+
+use crate::imap::ops::mailbox_logical_path_key;
+
+pub const LOCK_DELETE_MSG: &str = "Dossier verrouillé — déverrouillez-le pour supprimer.";
+pub const LOCK_DELETE_CHILD_MSG: &str =
+    "Un sous-dossier est verrouillé — déverrouillez-le avant de supprimer ce dossier.";
+pub const LOCK_ARCHIVE_MSG: &str = "Dossier verrouillé — déverrouillez-le pour archiver.";
+pub const LOCK_RENAME_MSG: &str =
+    "Dossier verrouillé — déverrouillez-le pour le renommer ou le déplacer.";
+pub const LOCK_RENAME_PARENT_MSG: &str =
+    "Dossier couvert par un loquet parent — déverrouillez le parent pour le renommer ou le déplacer.";
+pub const LOCK_PREFS_UNREADABLE: &str =
+    "Préférences illisibles — opération annulée pour ne pas ignorer un cadenas.";
+pub const LOCK_PREFS_INVALID: &str =
+    "Préférences invalides — opération annulée pour ne pas ignorer un cadenas.";
 
 pub use rustymail_domain::{AutoArchiveRule, OrgKeywordRule};
 
@@ -74,7 +91,10 @@ pub struct GeneralPrefs {
     pub contrast_plus: bool,
     #[serde(default)]
     pub accent_lavender: bool,
-    /// Dossiers verrouillés par compte (vue Dossiers — pas de drag/delete/rename).
+    /// Dossiers verrouillés par compte (préférence locale, même `app_prefs.json`).
+    /// Un loquet couvre le dossier et ses descendants : pas de suppression, d’archivage
+    /// ni de renommage. Un descendant verrouillé empêche de supprimer l’ancêtre.
+    /// Le renommage d’un dossier libre réécrit les clés des descendants verrouillés.
     #[serde(default)]
     pub locked_mailboxes_by_account: HashMap<String, Vec<String>>,
 }
@@ -188,6 +208,172 @@ pub fn set_mailbox_locked_in_prefs(
         entry.retain(|m| !m.eq_ignore_ascii_case(mb));
     }
     Ok(())
+}
+
+fn logical_segments_preserve_case(name: &str) -> Vec<String> {
+    let normalized: String = name.nfc().collect();
+    let mut segs: Vec<String> = normalized
+        .split(|c| c == '/' || c == '.')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    if segs
+        .first()
+        .is_some_and(|s| s.eq_ignore_ascii_case("inbox"))
+    {
+        segs.remove(0);
+    }
+    segs
+}
+
+fn keys_equal(a: &[String], b: &[String]) -> bool {
+    !a.is_empty() && a == b
+}
+
+fn is_strict_prefix(prefix: &[String], full: &[String]) -> bool {
+    !prefix.is_empty() && prefix.len() < full.len() && full.starts_with(prefix)
+}
+
+fn lock_keys<'a>(prefs: &'a AppPrefs, account_id: &str) -> Vec<Vec<String>> {
+    list_locked_mailboxes_for_account(prefs, account_id)
+        .into_iter()
+        .map(|name| mailbox_logical_path_key(&name))
+        .filter(|key| !key.is_empty())
+        .collect()
+}
+
+/// Le dossier, ou un ancêtre, est verrouillé.
+pub fn mailbox_covered_by_lock(prefs: &AppPrefs, account_id: &str, mailbox: &str) -> bool {
+    let mb = mailbox_logical_path_key(mailbox);
+    if mb.is_empty() {
+        return false;
+    }
+    lock_keys(prefs, account_id)
+        .into_iter()
+        .any(|lock| keys_equal(&lock, &mb) || is_strict_prefix(&lock, &mb))
+}
+
+/// Un descendant (pas le dossier lui-même) est verrouillé.
+pub fn mailbox_has_locked_descendant(prefs: &AppPrefs, account_id: &str, mailbox: &str) -> bool {
+    let mb = mailbox_logical_path_key(mailbox);
+    if mb.is_empty() {
+        return false;
+    }
+    lock_keys(prefs, account_id)
+        .into_iter()
+        .any(|lock| is_strict_prefix(&mb, &lock))
+}
+
+pub fn mailbox_delete_block_reason(
+    prefs: &AppPrefs,
+    account_id: &str,
+    mailbox: &str,
+) -> Option<String> {
+    if mailbox_covered_by_lock(prefs, account_id, mailbox) {
+        return Some(LOCK_DELETE_MSG.to_string());
+    }
+    if mailbox_has_locked_descendant(prefs, account_id, mailbox) {
+        return Some(LOCK_DELETE_CHILD_MSG.to_string());
+    }
+    None
+}
+
+pub fn mailbox_archive_block_reason(
+    prefs: &AppPrefs,
+    account_id: &str,
+    mailbox: &str,
+) -> Option<String> {
+    if mailbox_covered_by_lock(prefs, account_id, mailbox) {
+        Some(LOCK_ARCHIVE_MSG.to_string())
+    } else {
+        None
+    }
+}
+
+pub fn mailbox_rename_block_reason(
+    prefs: &AppPrefs,
+    account_id: &str,
+    mailbox: &str,
+) -> Option<String> {
+    let mb = mailbox_logical_path_key(mailbox);
+    if mb.is_empty() {
+        return None;
+    }
+    let keys = lock_keys(prefs, account_id);
+    if keys.iter().any(|lock| keys_equal(lock, &mb)) {
+        return Some(LOCK_RENAME_MSG.to_string());
+    }
+    if keys.iter().any(|lock| is_strict_prefix(lock, &mb)) {
+        return Some(LOCK_RENAME_PARENT_MSG.to_string());
+    }
+    None
+}
+
+fn rewrite_lock_name(from: &str, to: &str, locked: &str) -> Option<String> {
+    let from_key = mailbox_logical_path_key(from);
+    let locked_key = mailbox_logical_path_key(locked);
+    if from_key.is_empty() || locked_key.len() < from_key.len() {
+        return None;
+    }
+    if locked_key[..from_key.len()] != from_key[..] {
+        return None;
+    }
+    if locked_key.len() == from_key.len() {
+        return Some(to.trim().to_string());
+    }
+    let segs = logical_segments_preserve_case(locked);
+    if segs.len() != locked_key.len() {
+        return None;
+    }
+    let suffix = segs[from_key.len()..].to_vec();
+    let mut out = logical_segments_preserve_case(to);
+    out.extend(suffix);
+    let delim = if locked.contains('/') || to.contains('/') {
+        '/'
+    } else {
+        '.'
+    };
+    Some(out.join(&delim.to_string()))
+}
+
+/// Après un RENAME autorisé : les clés sous `from` suivent `to`.
+/// Les clés hors du préfixe restent. Retourne vrai si la liste a changé.
+pub fn migrate_locked_mailboxes_after_rename(
+    prefs: &mut AppPrefs,
+    account_id: &str,
+    from_mailbox: &str,
+    to_mailbox: &str,
+) -> bool {
+    let aid = account_id.trim();
+    let from = from_mailbox.trim();
+    let to = to_mailbox.trim();
+    if aid.is_empty() || from.is_empty() || to.is_empty() {
+        return false;
+    }
+    let Some(entry) = prefs.general.locked_mailboxes_by_account.get_mut(aid) else {
+        return false;
+    };
+    let mut changed = false;
+    for name in entry.iter_mut() {
+        if let Some(next) = rewrite_lock_name(from, to, name) {
+            if next != *name {
+                *name = next;
+                changed = true;
+            }
+        }
+    }
+    let mut seen: Vec<String> = Vec::new();
+    let before = entry.len();
+    entry.retain(|name| {
+        if seen.iter().any(|s| s.eq_ignore_ascii_case(name)) {
+            false
+        } else {
+            seen.push(name.clone());
+            true
+        }
+    });
+    changed || entry.len() != before
 }
 
 /// Aligne la langue des brouillons IA sur la langue mère.
@@ -637,13 +823,24 @@ pub fn prefs_path_from_db_dir(db_path: &Path) -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from(APP_PREFS_FILE))
 }
 
-pub fn load_app_prefs(prefs_path: &Path) -> AppPrefs {
+/// Fichier absent : préférences par défaut (aucun cadenas).
+/// Fichier illisible ou JSON invalide : erreur, pour ne pas traiter un cadenas comme absent.
+pub fn load_app_prefs_required(prefs_path: &Path) -> Result<AppPrefs, String> {
     let raw = match fs::read_to_string(prefs_path) {
         Ok(s) => s,
-        Err(_) => return AppPrefs::default(),
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(AppPrefs::default()),
+        Err(e) => return Err(format!("{LOCK_PREFS_UNREADABLE} ({e})")),
     };
-    let mut prefs: AppPrefs = serde_json::from_str(&raw).unwrap_or_else(|_| AppPrefs::default());
+    let prefs: AppPrefs =
+        serde_json::from_str(&raw).map_err(|e| format!("{LOCK_PREFS_INVALID} ({e})"))?;
+    Ok(finalize_loaded_prefs(prefs))
+}
 
+pub fn load_app_prefs(prefs_path: &Path) -> AppPrefs {
+    load_app_prefs_required(prefs_path).unwrap_or_else(|_| AppPrefs::default())
+}
+
+fn finalize_loaded_prefs(mut prefs: AppPrefs) -> AppPrefs {
     match prefs.ai.dictation_backend.trim() {
         "onnx" => prefs.ai.dictation_backend = "whisper_cpp".into(),
         _ => {}
@@ -691,4 +888,142 @@ pub fn save_app_prefs(prefs_path: &Path, prefs: &AppPrefs) -> Result<(), String>
     }
     let json = serde_json::to_string_pretty(prefs).map_err(|e| e.to_string())?;
     fs::write(prefs_path, json).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod mailbox_lock_tests {
+    use super::*;
+
+    fn prefs_with(locks: &[&str]) -> AppPrefs {
+        let mut prefs = AppPrefs::default();
+        for lock in locks {
+            set_mailbox_locked_in_prefs(&mut prefs, "a@exemple.fr", lock, true).unwrap();
+        }
+        prefs
+    }
+
+    #[test]
+    fn delete_blocks_self_ancestor_and_descendant() {
+        let prefs = prefs_with(&["Clients/Atelier"]);
+        assert_eq!(
+            mailbox_delete_block_reason(&prefs, "a@exemple.fr", "Clients/Atelier").as_deref(),
+            Some(LOCK_DELETE_MSG)
+        );
+        assert_eq!(
+            mailbox_delete_block_reason(&prefs, "a@exemple.fr", "clients/atelier/2024").as_deref(),
+            Some(LOCK_DELETE_MSG)
+        );
+        assert_eq!(
+            mailbox_delete_block_reason(&prefs, "a@exemple.fr", "Clients").as_deref(),
+            Some(LOCK_DELETE_CHILD_MSG)
+        );
+        assert_eq!(
+            mailbox_delete_block_reason(&prefs, "a@exemple.fr", "Notes"),
+            None
+        );
+        assert_eq!(
+            mailbox_delete_block_reason(&prefs, "autre@exemple.fr", "Clients/Atelier"),
+            None
+        );
+        assert!(is_mailbox_locked_in_prefs(
+            &prefs,
+            "a@exemple.fr",
+            "clients/atelier"
+        ));
+    }
+
+    #[test]
+    fn inbox_prefix_and_dot_delimiter_match_the_same_folder() {
+        let prefs = prefs_with(&["INBOX.Clients.Atelier"]);
+        assert!(mailbox_covered_by_lock(
+            &prefs,
+            "a@exemple.fr",
+            "Clients/Atelier"
+        ));
+        assert_eq!(
+            mailbox_archive_block_reason(&prefs, "a@exemple.fr", "Clients/Atelier/Facture")
+                .as_deref(),
+            Some(LOCK_ARCHIVE_MSG)
+        );
+        assert_eq!(
+            mailbox_archive_block_reason(&prefs, "a@exemple.fr", "Clients"),
+            None
+        );
+    }
+
+    #[test]
+    fn rename_blocks_self_and_ancestor_but_not_a_locked_child() {
+        let prefs = prefs_with(&["Clients", "Notes/Perso"]);
+        assert_eq!(
+            mailbox_rename_block_reason(&prefs, "a@exemple.fr", "Clients").as_deref(),
+            Some(LOCK_RENAME_MSG)
+        );
+        assert_eq!(
+            mailbox_rename_block_reason(&prefs, "a@exemple.fr", "Clients/Atelier").as_deref(),
+            Some(LOCK_RENAME_PARENT_MSG)
+        );
+        assert_eq!(
+            mailbox_rename_block_reason(&prefs, "a@exemple.fr", "Notes"),
+            None
+        );
+    }
+
+    #[test]
+    fn rename_migrates_descendant_keys_and_leaves_the_rest() {
+        let mut prefs = prefs_with(&["Clients/Atelier", "Notes"]);
+        assert!(migrate_locked_mailboxes_after_rename(
+            &mut prefs,
+            "a@exemple.fr",
+            "Clients",
+            "Projets/Clients"
+        ));
+        let locks = list_locked_mailboxes_for_account(&prefs, "a@exemple.fr");
+        assert_eq!(
+            locks,
+            vec!["Projets/Clients/Atelier".to_string(), "Notes".to_string(),]
+        );
+        assert_eq!(
+            mailbox_rename_block_reason(&prefs, "a@exemple.fr", "Projets/Clients/Atelier")
+                .as_deref(),
+            Some(LOCK_RENAME_MSG)
+        );
+    }
+
+    #[test]
+    fn rename_keeps_dot_delimiter_when_the_tree_uses_dots() {
+        let mut prefs = prefs_with(&["Clients.Atelier"]);
+        assert!(migrate_locked_mailboxes_after_rename(
+            &mut prefs,
+            "a@exemple.fr",
+            "Clients",
+            "Archives"
+        ));
+        assert_eq!(
+            list_locked_mailboxes_for_account(&prefs, "a@exemple.fr"),
+            vec!["Archives.Atelier".to_string()]
+        );
+    }
+
+    #[test]
+    fn required_prefs_load_fails_closed_on_bad_json_and_open_on_missing_file() {
+        let dir = std::env::temp_dir().join(format!("rustymail-lock-prefs-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let missing = dir.join("absent.json");
+        assert!(load_app_prefs_required(&missing)
+            .unwrap()
+            .general
+            .locked_mailboxes_by_account
+            .is_empty());
+
+        let bad = dir.join("bad.json");
+        fs::write(&bad, "{").unwrap();
+        let err = load_app_prefs_required(&bad).unwrap_err();
+        assert!(err.starts_with(LOCK_PREFS_INVALID), "{err}");
+        assert!(load_app_prefs(&bad)
+            .general
+            .locked_mailboxes_by_account
+            .is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
