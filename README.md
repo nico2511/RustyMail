@@ -1,6 +1,24 @@
 # RustyMail
 
-RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI features (summaries, translation, dictation, semantic search) run on-device or via HTTP to OpenRouter / llama-server — never required for core mail.
+RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI (summaries, rewrite, translation, grammar, dictation, semantic search) runs on-device or over HTTP to OpenRouter / llama-server — never required for core mail.
+
+**0.3.2** includes a **TipTap** compose body, **toasts** (info, success, warning, error, with duration and dismiss), and **conversational reading** for person-to-person threads (folded quotes, signatures set aside). Newsletter and provider digests stay on their own path (Amazon, Deblock, GitHub). Digest templates and a fixture bench are **phase 1 framing** in [#26](https://github.com/nico2511/RustyMail/pull/26) — not wired into this build.
+
+## Screenshots
+
+UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.2 build (compose in the app uses TipTap, not the mockup’s markdown field).
+
+**Inbox** — unified list, charcoal rail, account labels.
+
+![Inbox UI preview: unified mailbox, charcoal rail, account labels](docs/screenshots/inbox.png)
+
+**Thread reading** — messages fold; the latest reply stays open.
+
+![Thread reading UI preview: folded messages and an open reply](docs/screenshots/thread.png)
+
+**Compose** — writing with the folder rail collapsed.
+
+![Compose UI preview: reply draft with the rail collapsed](docs/screenshots/compose.png)
 
 ## Quick start
 
@@ -40,7 +58,7 @@ Full index: **[docs/README.md](docs/README.md)**
 | IPC / Tauri commands | [docs/IPC_SECURITY.md](docs/IPC_SECURITY.md) |
 | Feature matrix | [docs/CAPABILITIES.md](docs/CAPABILITIES.md) |
 | Product vision | [docs/PRODUCT.md](docs/PRODUCT.md) |
-| UI design | [docs/DESIGN.md](docs/DESIGN.md) — productivity direction; wave 1 shell is in `src/` (charcoal, white, copper). Multi-account hues and the thread accordion stay mockup-only |
+| UI design | [docs/DESIGN.md](docs/DESIGN.md) — productivity direction. Wave 1+2 shell is in the app: charcoal, white, copper, rail, multi-account pills, thread accordion |
 | Releases & CI | [docs/RELEASE.md](docs/RELEASE.md) |
 | Contributing | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
 
