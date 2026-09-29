@@ -10128,3 +10128,17 @@ button.thread-tag-chip--search:focus-visible {
 .digest-bench__pane-body table { width: 100%; border-collapse: collapse; }
 .digest-bench__pane-body th, .digest-bench__pane-body td { padding: 6px 10px 6px 0; vertical-align: top; text-align: left; }
 .digest-bench__thread-title { margin: 12px 0 0; font-size: 13px; }
+
+.digest-cut__layout { margin-top: 12px; }
+.digest-cut__preview { display: grid; gap: 10px; }
+.digest-cut__zones { display: grid; gap: 10px; margin-top: 12px; }
+.digest-cut__zone {
+  border: 1px solid rgba(120, 119, 117, 0.22);
+  border-radius: 10px;
+  padding: 10px;
+}
+.digest-cut__zone-title { margin: 0 0 4px; font-size: 13px; }
+.digest-cut__zone-anchors { margin: 0 0 6px; font-size: 12px; }
+.digest-cut__zone-rationale { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
+.digest-cut__zone-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.digest-cut__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
