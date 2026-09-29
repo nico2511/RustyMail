@@ -42,6 +42,7 @@ export async function openSavedDraftById(savedDraftId: string): Promise<void> {
     state.draftSessionId = res.sessionId;
     state.savedDraftRecordId = res.savedDraftId;
     state.draft = res.draft;
+    state.draft.sendHtml = true;
     state.composeCcBccOpen = draftHasRecipientsExtra(res.draft);
     state.composeAdvancedOpen = false;
     state.composeLayout = "historique";

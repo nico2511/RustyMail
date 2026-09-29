@@ -6,7 +6,9 @@ use std::convert::Infallible;
 use std::ops::ControlFlow;
 use std::sync::atomic::AtomicBool;
 
-use crate::ai_llm_contracts::{validate_translation_llm_shape, TRANSLATION_PLAIN_JSON_GBNF};
+use crate::ai_llm_contracts::{
+    introduces_llm_meta, validate_translation_llm_shape, TRANSLATION_PLAIN_JSON_GBNF,
+};
 use crate::ai_llm_util::{
     budget_report, cancelled_llm_err, gen_params_json_echo_for_prompt, parse_model_json,
     stream_chunk_or_cancel, truncate_chars, untrusted_mail_for_engine,
@@ -84,21 +86,16 @@ fn translation_from_raw(
     target_lang: &str,
     text: &str,
 ) -> Result<TranslationResult, LlmError> {
-    let dto: TranslationLlmDto = parse_model_json(raw).map_err(|e| match e {
-        LlmError::InvalidJson(msg)
-            if msg.contains("EOF") && msg.contains("string") =>
-        {
-            LlmError::Msg(format!(
-                "Traduction : réponse JSON tronquée par le modèle (souvent pas assez de tokens de sortie). Essayez un mail plus court ou augmentez la fenêtre côté llama-server. Détail : {msg}"
-            ))
-        }
-        other => other,
-    })?;
+    let dto: TranslationLlmDto = parse_model_json(raw)?;
+    let translated_raw = dto.translated_text.trim().to_string();
     validate_translation_llm_shape(
-        dto.translated_text.trim(),
+        &translated_raw,
         &dto.preserved_entity_ids,
         dto.detected_source_lang.as_deref(),
     )?;
+    if introduces_llm_meta(text, &translated_raw) {
+        return Err(LlmError::InvalidJson("meta-leak".into()));
+    }
     let n_ctx_hint = engine.n_ctx();
     let src = normalize_detected_source_lang(dto.detected_source_lang, source_lang);
 
@@ -106,7 +103,7 @@ fn translation_from_raw(
         source_message_id: source_message_id.to_string(),
         source_lang: src,
         target_lang: target_lang.to_string(),
-        translated_text: strip_css_boilerplate_lines(dto.translated_text.trim()),
+        translated_text: strip_css_boilerplate_lines(&translated_raw),
         preserved_entity_ids: dto.preserved_entity_ids,
         budget: budget_report(
             n_ctx_hint,
@@ -119,6 +116,36 @@ fn translation_from_raw(
     })
 }
 
+const TRANSLATION_META_ERR: &str =
+    "Traduction refusée : le modèle a renvoyé une consigne au lieu du message traduit.";
+const TRANSLATION_PARSE_ERR: &str =
+    "Traduction impossible : la réponse du modèle n’était pas un JSON exploitable.";
+
+fn translation_user(
+    engine: &LlmEngine,
+    body: &str,
+    source_lang: &str,
+    target_lang: &str,
+) -> String {
+    format!(
+        "Langue cible ISO 639-1 : {target_lang}\nLangue source indiquée (auto si inconnu): {source_lang}\nTraduis uniquement le message entre les délimiteurs. translatedText = cette traduction, sans consigne ni mention de JSON.\n{}",
+        untrusted_mail_for_engine(engine, "mail-translation", body),
+    )
+}
+
+fn map_translation_retry_err(err: LlmError) -> LlmError {
+    match err {
+        LlmError::InvalidJson(msg) if msg.contains("meta") => {
+            LlmError::Msg(TRANSLATION_META_ERR.into())
+        }
+        LlmError::InvalidJson(msg) if msg.contains("EOF") => LlmError::Msg(format!(
+            "Traduction impossible : la réponse du modèle est restée incomplète. Essayez un mail plus court. Détail : {msg}"
+        )),
+        LlmError::InvalidJson(_) => LlmError::Msg(TRANSLATION_PARSE_ERR.into()),
+        other => other,
+    }
+}
+
 /// Traduit `text` vers `target_lang` (code court, ex. `fr`).
 pub fn translate_plain_with_llm(
     engine: &mut LlmEngine,
@@ -128,11 +155,8 @@ pub fn translate_plain_with_llm(
     target_lang: &str,
 ) -> Result<TranslationResult, LlmError> {
     let body = strip_css_boilerplate_lines(truncate_chars(text, 32_768).as_str());
-    let user = format!(
-        "Langue cible ISO 639-1 : {target_lang}\nLangue source indiquée (auto si inconnu): {source_lang}\n{}",
-        untrusted_mail_for_engine(engine, "mail-translation", &body),
-    );
     let system = system_translation(target_lang);
+    let user = translation_user(engine, &body, source_lang, target_lang);
 
     let params = translation_gen_params(engine, system.as_str(), &user, &body);
     let raw = engine.generate_with_schema(
@@ -141,7 +165,7 @@ pub fn translate_plain_with_llm(
         &params,
         TRANSLATION_PLAIN_JSON_GBNF,
     )?;
-    translation_from_raw(
+    match translation_from_raw(
         &raw,
         engine,
         system.as_str(),
@@ -150,7 +174,28 @@ pub fn translate_plain_with_llm(
         source_lang,
         target_lang,
         text,
-    )
+    ) {
+        Ok(res) => Ok(res),
+        Err(LlmError::InvalidJson(_)) => {
+            let user_retry = format!(
+                "{user}\n\nRetry: one JSON object only. translatedText is the translation of the message and nothing else."
+            );
+            let params = translation_gen_params(engine, system.as_str(), &user_retry, &body);
+            let raw = engine.generate(system.as_str(), &user_retry, &params)?;
+            translation_from_raw(
+                &raw,
+                engine,
+                system.as_str(),
+                &user_retry,
+                source_message_id,
+                source_lang,
+                target_lang,
+                text,
+            )
+            .map_err(map_translation_retry_err)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Traduction avec fragments streamés (même JSON final que [`translate_plain_with_llm`]).
@@ -164,11 +209,8 @@ pub fn translate_plain_with_llm_streaming(
     mut on_chunk: impl FnMut(&str),
 ) -> Result<TranslationResult, LlmError> {
     let body = strip_css_boilerplate_lines(truncate_chars(text, 32_768).as_str());
-    let user = format!(
-        "Langue cible ISO 639-1 : {target_lang}\nLangue source indiquée (auto si inconnu): {source_lang}\n{}",
-        untrusted_mail_for_engine(engine, "mail-translation", &body),
-    );
     let system = system_translation(target_lang);
+    let user = translation_user(engine, &body, source_lang, target_lang);
     let params = translation_gen_params(engine, system.as_str(), &user, &body);
     let raw = engine.generate_streaming_with_schema(
         system.as_str(),
@@ -182,7 +224,7 @@ pub fn translate_plain_with_llm_streaming(
     if let Some(e) = cancelled_llm_err(cancelled) {
         return Err(e);
     }
-    translation_from_raw(
+    match translation_from_raw(
         &raw,
         engine,
         system.as_str(),
@@ -191,7 +233,31 @@ pub fn translate_plain_with_llm_streaming(
         source_lang,
         target_lang,
         text,
-    )
+    ) {
+        Ok(res) => Ok(res),
+        Err(LlmError::InvalidJson(_)) => {
+            if let Some(e) = cancelled_llm_err(cancelled) {
+                return Err(e);
+            }
+            let user_retry = format!(
+                "{user}\n\nRetry: one JSON object only. translatedText is the translation of the message and nothing else."
+            );
+            let params = translation_gen_params(engine, system.as_str(), &user_retry, &body);
+            let raw = engine.generate(system.as_str(), &user_retry, &params)?;
+            translation_from_raw(
+                &raw,
+                engine,
+                system.as_str(),
+                &user_retry,
+                source_message_id,
+                source_lang,
+                target_lang,
+                text,
+            )
+            .map_err(map_translation_retry_err)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub fn translation_stub_result(

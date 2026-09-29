@@ -233,31 +233,6 @@ export function renderComposer() {
             </div>
             <input id="compose-attachments" value="${escapeAttr(renderDeps().attachmentPathsJoinedForHiddenField(attachments))}" style="display:none" />
           </div>
-          <div class="composer-advanced composer-advanced--footnote">
-            <button
-              type="button"
-              class="composer-advanced-micro"
-              data-action="toggle-compose-advanced"
-              aria-expanded="${state.composeAdvancedOpen}"
-            >
-              <span class="composer-advanced-chevron" aria-hidden="true">${state.composeAdvancedOpen ? "▾" : "▸"}</span>
-              <span>${state.composeAdvancedOpen ? "Masquer les options techniques" : "Options techniques"}</span>
-              <span class="composer-advanced-micro-hint dim">multipart HTML</span>
-            </button>
-            ${
-              state.composeAdvancedOpen
-                ? `<div class="composer-advanced-body composer-advanced-body--footnote">
-                    <div class="field-row field-row--tight-top field-row--advanced">
-                      <label for="compose-send-html" class="dim">HTML</label>
-                      <label class="composer-checkbox-inline">
-                        <input id="compose-send-html" type="checkbox" ${draft?.sendHtml ? "checked" : ""} />
-                        <span class="dim composer-checkbox-help">Envoyer en multipart (texte brut + HTML)</span>
-                      </label>
-                    </div>
-                  </div>`
-                : ""
-            }
-          </div>
         </div>
       <div class="compose-editor-sheet">
         ${renderComposeToolbar({

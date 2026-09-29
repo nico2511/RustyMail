@@ -11,9 +11,6 @@ export function persistDraft(): void {
     shell?.querySelector<HTMLInputElement>("#compose-subject")?.value ??
     document.querySelector<HTMLInputElement>("#compose-subject")?.value ??
     state.draft.subject;
-  const sendHtmlEl =
-    shell?.querySelector<HTMLInputElement>("#compose-send-html") ??
-    document.querySelector<HTMLInputElement>("#compose-send-html");
-  if (sendHtmlEl) state.draft.sendHtml = sendHtmlEl.checked;
+  state.draft.sendHtml = true;
   applyComposeRecipientsFromDom(state.draft);
 }

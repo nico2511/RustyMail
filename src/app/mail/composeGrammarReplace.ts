@@ -161,6 +161,58 @@ export function findGrammarSpans(source: string, suggestion: GrammarReplaceInput
   return offsetSpan(source, suggestion);
 }
 
+function contentTokens(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .map((token) => token.replace(/'/g, ""))
+    .filter((token) => token.length >= 2);
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const prev = new Array<number>(b.length + 1);
+  const cur = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(cur[j - 1]! + 1, prev[j]! + 1, prev[j - 1]! + cost);
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = cur[j]!;
+  }
+  return prev[b.length]!;
+}
+
+function tokensSimilar(a: string, b: string): boolean {
+  if (a === b) return true;
+  return levenshtein(a, b) <= Math.max(2, Math.floor(a.length / 3));
+}
+
+/**
+ * Vrai si le remplacement est surtout l’extrait d’origine avec un mot de contenu en moins.
+ * Une reformulation (« salu moi c'est nicolas » → « Bonjour, je m'appelle Nicolas ») reste autorisée.
+ */
+export function replacementDropsWords(original: string, replacement: string): boolean {
+  const orig = contentTokens(original);
+  const repl = contentTokens(replacement);
+  if (!repl.length) return orig.some((token) => token.length >= 4);
+  const missing = orig.some(
+    (token) => token.length >= 4 && !repl.some((next) => tokensSimilar(token, next)),
+  );
+  if (!missing) return false;
+  const preserved = repl.filter((token) => orig.some((prev) => tokensSimilar(token, prev))).length;
+  const coverage = preserved / repl.length;
+  return coverage >= 0.75 && repl.length < orig.length;
+}
+
+export function grammarTextsMatch(a: string, b: string): boolean {
+  return foldForMatch(a).text.trim() === foldForMatch(b).text.trim();
+}
+
 export function countGrammarOccurrences(source: string, suggestion: GrammarReplaceInput): number {
   return findGrammarSpans(source, suggestion).length;
 }

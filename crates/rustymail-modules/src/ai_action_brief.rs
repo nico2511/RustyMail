@@ -4,9 +4,10 @@ use std::collections::HashSet;
 
 use serde::Deserialize;
 
+use crate::ai_llm_contracts::contains_llm_meta;
 use crate::ai_llm_util::{
-    budget_report, gen_params_json_for_prompt, parse_model_json, truncate_chars,
-    user_text_for_engine,
+    budget_report, gen_params_json_for_prompt, output_room_after_prompt, parse_model_json,
+    truncate_chars, user_text_for_engine,
 };
 use rustymail_domain::{
     ActionBriefAmbiguity, ActionBriefChange, ActionBriefDecision, ActionBriefEvidenceLink,
@@ -18,72 +19,88 @@ use rustymail_llm::{LlmEngine, LlmError};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefEvidenceDto {
+    #[serde(default, alias = "thread_id", alias = "fil_id", alias = "filId")]
     thread_id: String,
-    #[serde(default)]
+    #[serde(default, alias = "message_ids")]
     message_ids: Vec<String>,
     #[serde(default)]
     label: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum FlexEvidence {
+    Obj(BriefEvidenceDto),
+    Id(String),
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefChangeDto {
+    #[serde(default)]
     id: String,
+    #[serde(default)]
     summary: String,
-    #[serde(default)]
+    #[serde(default, alias = "since_last_brief")]
     since_last_brief: bool,
-    #[serde(default)]
-    evidence_links: Vec<BriefEvidenceDto>,
+    #[serde(default, alias = "evidence_links")]
+    evidence_links: Vec<FlexEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefDecisionDto {
+    #[serde(default)]
     rank: u32,
+    #[serde(default)]
     title: String,
     #[serde(default)]
     impact: String,
-    #[serde(default)]
+    #[serde(default, alias = "options_hint")]
     options_hint: Vec<String>,
-    #[serde(default)]
-    evidence_links: Vec<BriefEvidenceDto>,
+    #[serde(default, alias = "evidence_links")]
+    evidence_links: Vec<FlexEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefActionDto {
+    #[serde(default)]
     rank: u32,
+    #[serde(default)]
     action: String,
-    #[serde(default)]
+    #[serde(default, alias = "suggested_owner")]
     suggested_owner: String,
-    #[serde(default)]
+    #[serde(default, alias = "suggested_due")]
     suggested_due: Option<String>,
     #[serde(default)]
     priority: String,
-    #[serde(default)]
-    evidence_links: Vec<BriefEvidenceDto>,
+    #[serde(default, alias = "evidence_links")]
+    evidence_links: Vec<FlexEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefRiskDto {
+    #[serde(default)]
     label: String,
     #[serde(default)]
     severity: String,
     #[serde(default)]
     detail: String,
-    #[serde(default)]
-    evidence_links: Vec<BriefEvidenceDto>,
+    #[serde(default, alias = "evidence_links")]
+    evidence_links: Vec<FlexEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefAmbiguityDto {
+    #[serde(default)]
     question: String,
-    #[serde(default)]
+    #[serde(default, alias = "why_it_matters")]
     why_it_matters: String,
-    #[serde(default)]
-    evidence_links: Vec<BriefEvidenceDto>,
+    #[serde(default, alias = "evidence_links")]
+    evidence_links: Vec<FlexEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,20 +110,57 @@ struct LlmBriefDto {
     changes: Vec<BriefChangeDto>,
     #[serde(default)]
     decisions: Vec<BriefDecisionDto>,
-    #[serde(default)]
+    #[serde(default, alias = "recommended_actions")]
     recommended_actions: Vec<BriefActionDto>,
     #[serde(default)]
     risks: Vec<BriefRiskDto>,
     #[serde(default)]
     ambiguities: Vec<BriefAmbiguityDto>,
-    #[serde(default)]
-    evidence_links: Vec<BriefEvidenceDto>,
+    #[serde(default, alias = "evidence_links")]
+    evidence_links: Vec<FlexEvidence>,
     #[serde(default)]
     confidence: f64,
-    #[serde(default)]
+    #[serde(default, alias = "priority_bucket")]
     priority_bucket: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "verification_recommended")]
     verification_recommended: bool,
+}
+
+fn flex_evidence(items: Vec<FlexEvidence>) -> Vec<BriefEvidenceDto> {
+    items
+        .into_iter()
+        .filter_map(|e| match e {
+            FlexEvidence::Obj(d) => {
+                let thread_id = d.thread_id.trim().to_string();
+                if thread_id.is_empty() {
+                    None
+                } else {
+                    Some(BriefEvidenceDto {
+                        thread_id,
+                        message_ids: d.message_ids,
+                        label: d.label,
+                    })
+                }
+            }
+            FlexEvidence::Id(id) => {
+                let thread_id = id.trim().to_string();
+                if thread_id.is_empty() {
+                    None
+                } else {
+                    Some(BriefEvidenceDto {
+                        thread_id,
+                        message_ids: Vec::new(),
+                        label: None,
+                    })
+                }
+            }
+        })
+        .collect()
+}
+
+fn brief_text_ok(s: &str) -> bool {
+    let t = s.trim();
+    !t.is_empty() && !contains_llm_meta(t)
 }
 
 fn ev_from(d: BriefEvidenceDto) -> ActionBriefEvidenceLink {
@@ -145,13 +199,19 @@ fn dto_to_result(
     let changes: Vec<ActionBriefChange> = dto
         .changes
         .into_iter()
-        .map(|c| {
-            let ev = filter_evidence_vec(c.evidence_links, allowed_threads);
-            if ev.is_empty() && !c.summary.trim().is_empty() {
+        .filter(|c| brief_text_ok(&c.summary))
+        .enumerate()
+        .map(|(i, c)| {
+            let ev = filter_evidence_vec(flex_evidence(c.evidence_links), allowed_threads);
+            if ev.is_empty() {
                 verification = true;
             }
             ActionBriefChange {
-                id: c.id,
+                id: if c.id.trim().is_empty() {
+                    format!("c{}", i + 1)
+                } else {
+                    c.id
+                },
                 summary: c.summary,
                 since_last_brief: c.since_last_brief,
                 evidence_links: ev,
@@ -162,8 +222,9 @@ fn dto_to_result(
     let decisions: Vec<ActionBriefDecision> = dto
         .decisions
         .into_iter()
+        .filter(|d| brief_text_ok(&d.title))
         .map(|d| {
-            let ev = filter_evidence_vec(d.evidence_links, allowed_threads);
+            let ev = filter_evidence_vec(flex_evidence(d.evidence_links), allowed_threads);
             if ev.is_empty() {
                 verification = true;
             }
@@ -180,8 +241,9 @@ fn dto_to_result(
     let recommended_actions: Vec<ActionBriefRecommendedAction> = dto
         .recommended_actions
         .into_iter()
+        .filter(|a| brief_text_ok(&a.action))
         .map(|a| {
-            let ev = filter_evidence_vec(a.evidence_links, allowed_threads);
+            let ev = filter_evidence_vec(flex_evidence(a.evidence_links), allowed_threads);
             if ev.is_empty() {
                 verification = true;
             }
@@ -199,8 +261,9 @@ fn dto_to_result(
     let risks: Vec<ActionBriefRisk> = dto
         .risks
         .into_iter()
+        .filter(|r| brief_text_ok(&r.label))
         .map(|r| {
-            let ev = filter_evidence_vec(r.evidence_links, allowed_threads);
+            let ev = filter_evidence_vec(flex_evidence(r.evidence_links), allowed_threads);
             if ev.is_empty() {
                 verification = true;
             }
@@ -216,8 +279,9 @@ fn dto_to_result(
     let ambiguities: Vec<ActionBriefAmbiguity> = dto
         .ambiguities
         .into_iter()
+        .filter(|a| brief_text_ok(&a.question))
         .map(|a| {
-            let ev = filter_evidence_vec(a.evidence_links, allowed_threads);
+            let ev = filter_evidence_vec(flex_evidence(a.evidence_links), allowed_threads);
             ActionBriefAmbiguity {
                 question: a.question,
                 why_it_matters: a.why_it_matters,
@@ -226,7 +290,7 @@ fn dto_to_result(
         })
         .collect();
 
-    let evidence_links = filter_evidence_vec(dto.evidence_links, allowed_threads);
+    let evidence_links = filter_evidence_vec(flex_evidence(dto.evidence_links), allowed_threads);
 
     let priority_bucket = parse_priority_bucket(dto.priority_bucket.as_deref(), &decisions, &risks);
 
@@ -391,10 +455,86 @@ pub fn parse_action_brief_mode_request(raw: Option<&str>) -> ActionBriefModeRequ
 
 fn max_tokens_for_mode(mode: ActionBriefMode) -> u32 {
     match mode {
-        ActionBriefMode::Quick => 2_000,
-        ActionBriefMode::Decision => 3_800,
-        ActionBriefMode::Deep => 4_096,
+        ActionBriefMode::Quick => 1_400,
+        ActionBriefMode::Decision => 2_000,
+        ActionBriefMode::Deep => 2_600,
     }
+}
+
+fn min_brief_output_tokens(mode: ActionBriefMode) -> u32 {
+    match mode {
+        ActionBriefMode::Quick => 900,
+        ActionBriefMode::Decision => 1_200,
+        ActionBriefMode::Deep => 1_600,
+    }
+}
+
+/// Coupe le snapshot sur des lignes entières pour laisser de la place à la sortie JSON.
+fn clip_snapshot_lines(snapshot: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    if snapshot.chars().count() <= max_chars {
+        return snapshot.to_string();
+    }
+    let mut out = String::new();
+    for line in snapshot.split_inclusive('\n') {
+        let next = out.chars().count() + line.chars().count();
+        if next > max_chars && !out.is_empty() {
+            break;
+        }
+        out.push_str(line);
+        if out.chars().count() >= max_chars {
+            break;
+        }
+    }
+    out.trim_end().to_string()
+}
+
+const BRIEF_CTX_ERR: &str = "Brief d’action impossible : la fenêtre de contexte ne laisse pas assez de place pour un JSON complet. Passez en mode Quick ou augmentez le contexte du modèle.";
+const BRIEF_PARSE_ERR: &str = "Brief d’action impossible : la réponse du modèle est restée incomplète ou mal formée. Réessayez en mode Quick.";
+
+/// Réduit le snapshot tant que le prompt mange toute la fenêtre (sinon max_tokens tombe à 1 et le JSON est coupé).
+fn fit_brief_user(
+    engine: &LlmEngine,
+    system: &str,
+    mode: ActionBriefMode,
+    account_id: &str,
+    mailbox: &str,
+    snapshot: &str,
+) -> Result<(String, bool), LlmError> {
+    let target = min_brief_output_tokens(mode);
+    let original_chars = snapshot.chars().count();
+    let mut snap = snapshot.to_string();
+    for _ in 0..12 {
+        let user = user_text_for_engine(engine, &user_prompt(mode, account_id, mailbox, &snap));
+        let room = output_room_after_prompt(engine, system, &user, 64);
+        let clipped = snap.chars().count() < original_chars;
+        if room >= target {
+            return Ok((user, clipped));
+        }
+        let n = snap.chars().count();
+        if n <= 400 {
+            if room >= 256 {
+                return Ok((user, clipped));
+            }
+            return Err(LlmError::Msg(BRIEF_CTX_ERR.into()));
+        }
+        let next = (n * 2 / 3).max(400);
+        snap = clip_snapshot_lines(&snap, next);
+    }
+    Err(LlmError::Msg(BRIEF_CTX_ERR.into()))
+}
+
+fn dto_has_signal(dto: &LlmBriefDto) -> bool {
+    dto.changes.iter().any(|c| brief_text_ok(&c.summary))
+        || dto.decisions.iter().any(|d| brief_text_ok(&d.title))
+        || dto
+            .recommended_actions
+            .iter()
+            .any(|a| brief_text_ok(&a.action))
+        || dto.risks.iter().any(|r| brief_text_ok(&r.label))
+        || dto.ambiguities.iter().any(|a| brief_text_ok(&a.question))
 }
 
 fn system_prompt(_mode: ActionBriefMode, output_language: &str) -> String {
@@ -421,9 +561,12 @@ fn generate_brief_dto(
     let raw = engine.generate(
         system,
         user,
-        &gen_params_json_for_prompt(engine, system, user, 512, max_tokens_for_mode(mode)),
+        &gen_params_json_for_prompt(engine, system, user, 384, max_tokens_for_mode(mode)),
     )?;
     let dto: LlmBriefDto = parse_model_json(&raw)?;
+    if !dto_has_signal(&dto) {
+        return Err(LlmError::InvalidJson("brief vide".into()));
+    }
     Ok((dto, raw))
 }
 
@@ -447,29 +590,60 @@ pub fn action_brief_with_llm(
     let input_truncated = mailbox_snapshot.chars().count() > 88_000;
 
     let system = system_prompt(mode, output_language);
-    let user = user_text_for_engine(engine, &user_prompt(mode, account_id, mailbox, &snapshot));
-    let (dto, raw) = match generate_brief_dto(engine, system.as_str(), &user, mode) {
-        Ok(pair) => pair,
-        Err(LlmError::InvalidJson(_)) => {
-            let user_retry = format!(
-                "{user}\n\nRappel : JSON compact et **complet** (toutes les accolades fermées). Réduis le nombre d’éléments si nécessaire."
-            );
-            generate_brief_dto(engine, system.as_str(), &user_retry, mode)?
-        }
-        Err(e) => return Err(e),
-    };
+    let (user, fitted_clip) = fit_brief_user(
+        engine,
+        system.as_str(),
+        mode,
+        account_id,
+        mailbox,
+        &snapshot,
+    )?;
+    let (dto, raw, effective_mode, user_used, clipped) =
+        match generate_brief_dto(engine, system.as_str(), &user, mode) {
+            Ok((dto, raw)) => (dto, raw, mode, user, fitted_clip),
+            Err(LlmError::InvalidJson(_)) => {
+                let short = clip_snapshot_lines(&snapshot, 2_400);
+                let (user_retry, retry_clip) = fit_brief_user(
+                    engine,
+                    system.as_str(),
+                    ActionBriefMode::Quick,
+                    account_id,
+                    mailbox,
+                    &short,
+                )?;
+                match generate_brief_dto(
+                    engine,
+                    system.as_str(),
+                    &user_retry,
+                    ActionBriefMode::Quick,
+                ) {
+                    Ok((dto, raw)) => (
+                        dto,
+                        raw,
+                        ActionBriefMode::Quick,
+                        user_retry,
+                        fitted_clip || retry_clip,
+                    ),
+                    Err(LlmError::InvalidJson(_)) => {
+                        return Err(LlmError::Msg(BRIEF_PARSE_ERR.into()));
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+            Err(e) => return Err(e),
+        };
 
     Ok(dto_to_result(
         dto,
         account_id,
         mailbox,
-        mode,
+        effective_mode,
         &allowed,
         engine,
         system.as_str(),
-        &user,
+        &user_used,
         &raw,
-        input_truncated,
+        input_truncated || clipped,
     ))
 }
 
@@ -530,5 +704,47 @@ mod brief_context_tests {
     fn resolve_quick_always_quick() {
         let (mode, _) = resolve_action_brief_execution(32_768, ActionBriefModeRequest::Quick);
         assert_eq!(mode, ActionBriefMode::Quick);
+    }
+
+    #[test]
+    fn brief_dto_accepts_snake_case_evidence() {
+        let raw = r#"{"changes":[{"id":"c1","summary":"Facture à valider","since_last_brief":true,"evidence_links":["thread-1"]}],"recommended_actions":[{"rank":1,"action":"Répondre","suggested_owner":"moi","priority":"P1","evidence_links":[{"thread_id":"thread-1","message_ids":[]}]}],"confidence":0.4,"priority_bucket":"Important"}"#;
+        let dto: LlmBriefDto = parse_model_json(raw).expect("snake");
+        assert!(dto_has_signal(&dto));
+        assert!(dto.changes[0].since_last_brief);
+        assert_eq!(dto.recommended_actions[0].suggested_owner, "moi");
+    }
+
+    #[test]
+    fn fit_brief_user_leaves_output_room_on_small_ctx() {
+        let mut engine = rustymail_llm::LlmEngine::open_ai_compatible(
+            "http://127.0.0.1:8080/v1".into(),
+            "test".into(),
+            String::new(),
+        )
+        .expect("engine");
+        engine.set_n_ctx_probe(8192);
+        let mut snapshot = String::new();
+        for i in 0..40 {
+            snapshot.push_str(&format!(
+                "fil_id=thread-{i} | unread=true | messages=3 | last=2026-09-01 | followed=false | pinned=false | newsletter=false | attachments=1 | Sujet {i}\n Aperçu assez long pour remplir la fenêtre de contexte du modèle local et provoquer une sortie JSON tronquée si on ne coupe pas.\n"
+            ));
+        }
+        let system = system_prompt(ActionBriefMode::Deep, "fr");
+        let (user, clipped) = fit_brief_user(
+            &engine,
+            system.as_str(),
+            ActionBriefMode::Deep,
+            "acc",
+            "INBOX",
+            &snapshot,
+        )
+        .expect("fit");
+        assert!(clipped, "snapshot should be reduced to fit n_ctx");
+        let room = output_room_after_prompt(&engine, system.as_str(), &user, 64);
+        assert!(
+            room >= 256,
+            "output room collapsed ({room}); brief JSON cannot be completed"
+        );
     }
 }

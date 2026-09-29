@@ -9,7 +9,14 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { readComposePlainText, replaceComposeWithModelText } from "./composeBodyEditor";
+import { grammarOccurrenceCount, replacementDropsWords } from "./composeGrammarReplace";
 import { computePreview } from "./composeComposerBridge";
+import {
+  containsLlmMeta,
+  introducesLlmMeta,
+  LLM_META_GRAMMAR_TOAST,
+  LLM_META_REWRITE_TOAST,
+} from "./llmMetaGuard";
 import { withLlmQueue } from "./llmJobQueue";
 
 export async function composeAiRewrite(styleRaw: string): Promise<void> {
@@ -37,7 +44,12 @@ export async function composeAiRewrite(styleRaw: string): Promise<void> {
         LLM_INVOKE_TIMEOUT_MS,
       );
       if (signal.aborted) return;
-      replaceComposeWithModelText(res.text ?? src);
+      const rewritten = (res.text ?? "").trim();
+      if (!rewritten || introducesLlmMeta(src, rewritten)) {
+        toast.error(LLM_META_REWRITE_TOAST);
+        return;
+      }
+      replaceComposeWithModelText(rewritten);
       toast.success(`Texte réécrit (${styleLabel}).`);
       render();
       void computePreview();
@@ -83,13 +95,34 @@ export async function composeAiGrammar(): Promise<void> {
         LLM_INVOKE_TIMEOUT_MS,
       );
       if (signal.aborted) return;
-      const n = res.suggestions?.length ?? 0;
-      state.composeGrammarSuggestions = res.suggestions ?? [];
-      toast(
-        n
-          ? `${n} suggestion(s) — voir le panneau Correction entre la barre d’outils et le texte.`
-          : "Aucune suggestion.",
+      const incoming = res.suggestions ?? [];
+      const sawMeta = incoming.some(
+        (g) => containsLlmMeta(g.original) || containsLlmMeta(g.replacement) || containsLlmMeta(g.reason),
       );
+      const usable = incoming.filter((g) => {
+        const original = g.original?.trim() ?? "";
+        const replacement = g.replacement?.trim() ?? "";
+        if (!original || !replacement || original.replace(/\s+/g, " ") === replacement.replace(/\s+/g, " ")) {
+          return false;
+        }
+        if (containsLlmMeta(original) || containsLlmMeta(replacement) || containsLlmMeta(g.reason ?? "")) {
+          return false;
+        }
+        if (replacementDropsWords(original, replacement)) return false;
+        return grammarOccurrenceCount(src, src, g) > 0;
+      });
+      if (sawMeta && usable.length === 0) {
+        state.composeGrammarSuggestions = null;
+        toast.error(LLM_META_GRAMMAR_TOAST);
+      } else {
+        const n = usable.length;
+        state.composeGrammarSuggestions = usable;
+        toast(
+          n
+            ? `${n} suggestion(s) — voir le panneau Correction entre la barre d’outils et le texte.`
+            : "Aucune suggestion.",
+        );
+      }
     } catch (e) {
       state.composeGrammarSuggestions = null;
       toast.error(tauriErrorMessage(e));

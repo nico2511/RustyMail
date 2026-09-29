@@ -17,6 +17,8 @@ import {
   applyGrammarReplacement,
   countGrammarOccurrences,
   findGrammarSpans,
+  grammarTextsMatch,
+  replacementDropsWords,
   type GrammarReplaceInput,
 } from "./composeGrammarReplace";
 
@@ -77,6 +79,10 @@ function finishApplied(index: number, suggestion: GrammarReplaceInput, occurrenc
 export function applyComposeGrammarSuggestionAtIndex(index: number): void {
   const suggestion = suggestionAt(index);
   if (!suggestion) return;
+  if (replacementDropsWords(suggestion.original, suggestion.replacement ?? "")) {
+    toast.warning("Cette suggestion retirerait du texte — elle n’a pas été appliquée.");
+    return;
+  }
 
   const editor = getComposeBodyEditor();
   if (editor) {
@@ -90,6 +96,8 @@ export function applyComposeGrammarSuggestionAtIndex(index: number): void {
         .command(({ tr, state: docState }) => {
           const mapped = mapComposePlainSpanToDoc(docState.doc, first);
           if (!mapped) return false;
+          const slice = docState.doc.textBetween(mapped.from, mapped.to, "\n");
+          if (!grammarTextsMatch(slice, suggestion.original)) return false;
           tr.insertText(suggestion.replacement ?? "", mapped.from, mapped.to);
           return true;
         })

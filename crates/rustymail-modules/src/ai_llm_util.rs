@@ -377,12 +377,55 @@ pub(crate) fn extract_json_candidate(raw: &str) -> String {
     t.to_string()
 }
 
+/// Échappe les contrôles bruts (saut de ligne, tab) à l’intérieur des chaînes JSON.
+/// Les modèles les émettent souvent dans `translatedText` / `text`, ce qui fait échouer `serde_json`.
+pub(crate) fn escape_controls_inside_json_strings(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut in_string = false;
+    let mut escape = false;
+    for c in s.chars() {
+        if in_string {
+            if escape {
+                escape = false;
+                out.push(c);
+                continue;
+            }
+            if c == '\\' {
+                escape = true;
+                out.push(c);
+                continue;
+            }
+            if c == '"' {
+                in_string = false;
+                out.push(c);
+                continue;
+            }
+            match c {
+                '\n' => out.push_str("\\n"),
+                '\r' => out.push_str("\\r"),
+                '\t' => out.push_str("\\t"),
+                c if c.is_control() => {
+                    out.push_str(&format!("\\u{:04x}", u32::from(c)));
+                }
+                c => out.push(c),
+            }
+            continue;
+        }
+        if c == '"' {
+            in_string = true;
+        }
+        out.push(c);
+    }
+    out
+}
+
 pub(crate) fn normalize_json_loose(s: &str) -> String {
     let mut t = s.replace('\u{00a0}', " ");
     t = t.replace('“', "\"");
     t = t.replace('”', "\"");
     t = t.replace('‘', "'");
     t = t.replace('’', "'");
+    t = escape_controls_inside_json_strings(&t);
     while t.contains(",}") {
         t = t.replace(",}", "}");
     }
@@ -390,6 +433,38 @@ pub(crate) fn normalize_json_loose(s: &str) -> String {
         t = t.replace(",]", "]");
     }
     t
+}
+
+/// Dernière virgule hors chaîne, à une profondeur > 0 (séparateur de champ ou d’élément).
+fn last_value_comma(s: &str) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut in_string = false;
+    let mut escape = false;
+    let mut last: Option<usize> = None;
+    for (i, c) in s.char_indices() {
+        if in_string {
+            if escape {
+                escape = false;
+                continue;
+            }
+            if c == '\\' {
+                escape = true;
+                continue;
+            }
+            if c == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match c {
+            '"' => in_string = true,
+            '{' | '[' => depth += 1,
+            '}' | ']' => depth -= 1,
+            ',' if depth > 0 => last = Some(i),
+            _ => {}
+        }
+    }
+    last
 }
 
 /// Ferme chaînes / tableaux / objets ouverts (sortie LLM coupée par max_tokens).
@@ -437,23 +512,18 @@ pub(crate) fn close_truncated_json(s: &str) -> String {
     out
 }
 
-/// Retire les éléments de tableau/objet incomplets en queue (JSON coupé par max_tokens).
+/// Retire les éléments incomplets en queue, y compris le JSON indenté (`",\\n    {"`).
 fn repair_truncated_json_drop_tail(s: &str) -> Option<String> {
-    let mut base = close_truncated_json(s);
-    for _ in 0..32 {
-        if serde_json::from_str::<serde_json::Value>(&base).is_ok() {
-            return Some(base);
+    let mut base = s.trim().to_string();
+    for _ in 0..48 {
+        let closed = close_truncated_json(&base);
+        if serde_json::from_str::<serde_json::Value>(&closed).is_ok() {
+            return Some(closed);
         }
-        let trimmed = base.trim_end();
-        if let Some(pos) = trimmed.rfind(",{") {
-            base = close_truncated_json(&trimmed[..pos]);
-            continue;
-        }
-        if let Some(pos) = trimmed.rfind(",[") {
-            base = close_truncated_json(&trimmed[..pos]);
-            continue;
-        }
-        break;
+        let Some(pos) = last_value_comma(&base) else {
+            break;
+        };
+        base = base[..pos].to_string();
     }
     None
 }
@@ -587,7 +657,31 @@ mod tests {
         let partial = r#"{"facts":[{"kind":"request","text":"Devis","messageIds":[]},{"kind":"deadline","tex"#;
         let v: serde_json::Value =
             parse_json_with_optional_repair(partial).expect("facts json repaired");
-        assert_eq!(v["facts"].as_array().map(|a| a.len()), Some(1));
+        let facts = v["facts"].as_array().expect("facts");
+        assert!(!facts.is_empty());
+        assert_eq!(facts[0]["text"], "Devis");
+        assert!(facts.iter().all(|fact| {
+            fact.as_object()
+                .map(|o| !o.contains_key("tex"))
+                .unwrap_or(false)
+        }));
+    }
+
+    #[test]
+    fn parse_escapes_raw_newline_inside_string() {
+        let raw = "{\"text\":\"ligne1\nligne2\"}";
+        let v: serde_json::Value = parse_model_json(raw).expect("newline in string");
+        assert_eq!(v["text"], "ligne1\nligne2");
+    }
+
+    #[test]
+    fn repair_pretty_printed_truncated_brief() {
+        let partial = "{\n  \"changes\": [\n    {\"id\": \"1\", \"summary\": \"ok\"},\n    {\"id\": \"2\", \"summary\":";
+        let v: serde_json::Value =
+            parse_json_with_optional_repair(partial).expect("pretty brief repaired");
+        let changes = v["changes"].as_array().expect("changes");
+        assert!(!changes.is_empty());
+        assert_eq!(changes[0]["summary"], "ok");
     }
 
     #[test]

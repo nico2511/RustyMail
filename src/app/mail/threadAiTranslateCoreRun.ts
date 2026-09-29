@@ -11,6 +11,11 @@ import { aiCacheKeySegment } from "./aiCacheKeySegment";
 import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 import { applyThreadAiOutputIfLive, paintThreadAiSummaryDom } from "./threadAiStreamDom";
 import { repairUtf8Mojibake } from "./threadViewUiHelpers";
+import { introducesLlmMeta, LLM_META_TRANSLATION_TOAST } from "./llmMetaGuard";
+
+function threadSourceText(): string {
+  return (state.selectedThread?.messages ?? []).map((message) => message.cleanedText || "").join("\n");
+}
 
 export async function translateThreadCore(
   threadId: string,
@@ -36,7 +41,7 @@ export async function translateThreadCore(
   if (cached && !signal.aborted) {
     try {
       const o = JSON.parse(cached) as LlmTranslationResult;
-      if (o.translatedText) {
+      if (o.translatedText && !introducesLlmMeta(threadSourceText(), o.translatedText)) {
         if (applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(o.translatedText))) {
           if (!prefetchOnly) {
             toast.info("Traduction (cache locale).");
@@ -58,7 +63,7 @@ export async function translateThreadCore(
         signal,
         onChunk: (acc) => {
           const preview = extractPartialJsonStringField(acc, "translatedText");
-          if (!preview) return;
+          if (!preview || introducesLlmMeta(threadSourceText(), preview)) return;
           if (applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(preview))) {
             paintThreadAiSummaryDom(repairUtf8Mojibake(preview));
           }
@@ -74,6 +79,7 @@ export async function translateThreadCore(
       return { status: "cancelled" };
     }
     const msg = tauriErrorMessage(error);
+    if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
     if (!prefetchOnly) toast.error(`Traduction échouée : ${msg}`);
     console.warn("translateThreadCore", error);
     if (!prefetchOnly) render();
@@ -89,6 +95,12 @@ export async function translateThreadCore(
     done.translation?.translatedText?.trim() ||
     done.displayText?.trim() ||
     "";
+  if (tx && introducesLlmMeta(threadSourceText(), tx)) {
+    if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
+    if (!prefetchOnly) toast.error(LLM_META_TRANSLATION_TOAST);
+    if (!prefetchOnly) render();
+    return fail(LLM_META_TRANSLATION_TOAST);
+  }
   if (tx) applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(tx));
   if (!prefetchOnly) toast.success("Traduction terminée.");
   if (!prefetchOnly) render();

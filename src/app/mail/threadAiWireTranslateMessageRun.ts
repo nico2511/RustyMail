@@ -12,6 +12,7 @@ import type { LlmTranslationResult } from "../types";
 import { aiCacheKeySegment } from "./aiCacheKeySegment";
 import { shouldOfferPerMessageTranslate } from "./threadLangGuess";
 import { repairUtf8Mojibake } from "./threadViewUiHelpers";
+import { introducesLlmMeta, LLM_META_TRANSLATION_TOAST } from "./llmMetaGuard";
 
 export async function llmTranslateMessageUi(messageId: string, forceRefresh = false) {
   const threadId = state.selectedThreadId?.trim();
@@ -51,7 +52,7 @@ export async function llmTranslateMessageUi(messageId: string, forceRefresh = fa
       try {
         const o = JSON.parse(cached) as LlmTranslationResult;
         const tx = o.translatedText?.trim();
-        if (tx) {
+        if (tx && !introducesLlmMeta(msg?.cleanedText ?? "", tx)) {
           state.messageTranslations[mapKey] = repairUtf8Mojibake(tx);
           toast.info("Traduction du message (cache locale).");
           return;
@@ -65,6 +66,10 @@ export async function llmTranslateMessageUi(messageId: string, forceRefresh = fa
       LLM_INVOKE_TIMEOUT_MS,
     );
     const tx = res.translatedText?.trim();
+    if (tx && introducesLlmMeta(msg?.cleanedText ?? "", tx)) {
+      toast.error(LLM_META_TRANSLATION_TOAST);
+      return;
+    }
     if (tx) state.messageTranslations[mapKey] = repairUtf8Mojibake(tx);
     toast.success("Message traduit.");
   } catch (e) {
