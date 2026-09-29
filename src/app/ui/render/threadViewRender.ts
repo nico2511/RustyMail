@@ -12,6 +12,7 @@ import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
 import { messageAccordionOpen, threadMessageFoldPreview } from "../../mail/threadAccordion";
 import { canonicalEmailForNlMatch } from "../../mail/searchAccountResolve";
+import { renderThreadLoopChangeNote } from "../../mail/threadViewUiRecipientPresenceRun";
 import { firstMatchingNewsletterRule, newsletterEmailListed } from "../../mail/newsletterRulesMatch";
 import type {
   CleanedMessageView,
@@ -20,7 +21,6 @@ import type {
   MessageViewMode,
   Tag,
   ThreadParticipantLink,
-  ThreadRecipientPresenceEvents,
 } from "../../types";
 import { renderDimmedBlocksFold } from "../../mail/dimmedBlocksFold";
 import { unsubscribeHrefScore } from "../../mail/mailUnsubscribeLinks";
@@ -120,45 +120,6 @@ function renderThreadMsgHeadActions(
   return `<div class="thread-msg-head-actions" role="group" aria-label="Actions sur ce message">${aiBar}${secBar}${utilBar}${opsBar}</div>`;
 }
 
-function renderThreadParticipantFirstBadge(message: CleanedMessageView, firstIds: Set<string>): string {
-  if (!firstIds.has(message.messageId)) return "";
-  const acc = renderDeps().currentAccount();
-  const ownEmailLower = acc?.email?.trim().toLowerCase() ?? "";
-  const senderEmailLower = (message.senderEmail ?? "").trim().toLowerCase();
-  if (ownEmailLower && senderEmailLower && ownEmailLower === senderEmailLower) return "";
-  if (renderDeps().isOwnSender(message.sender)) return "";
-  const canon = canonicalEmailForNlMatch(message.senderEmail ?? "");
-  const sender = escapeHtml(message.sender);
-  const emailBit = canon ? ` <span class="dim thread-timeline-note__addr">(${escapeHtml(canon)})</span>` : "";
-  return `<div class="thread-timeline-note" role="note">
-    <span class="thread-timeline-note__glyph" aria-hidden="true">${iconSvg("thread")}</span>
-    <span class="thread-timeline-note__text-wrap">
-      <span class="dim thread-timeline-note__kicker">Première apparition dans le fil</span>
-      <span class="thread-timeline-note__who"><strong>${sender}</strong>${emailBit}</span>
-    </span>
-  </div>`;
-}
-
-function renderThreadRecipientPresenceNote(events: ThreadRecipientPresenceEvents | undefined): string {
-  if (!events || (!events.added.length && !events.removed.length)) return "";
-  const line = (r: { name?: string | null; email: string }) => {
-    const em = escapeHtml(r.email.trim());
-    const nm = r.name?.trim();
-    return nm ? `<strong>${escapeHtml(nm)}</strong> <span class="dim">&lt;${em}&gt;</span>` : `<strong>${em}</strong>`;
-  };
-  const added = events.added.length
-    ? `<div class="thread-recipient-diff__col thread-recipient-diff__col--add"><span class="dim thread-recipient-diff__tag">+ To/Cc</span><span class="thread-recipient-diff__list">${events.added
-        .map(line)
-        .join(", ")}</span></div>`
-    : "";
-  const removed = events.removed.length
-    ? `<div class="thread-recipient-diff__col thread-recipient-diff__col--rem"><span class="dim thread-recipient-diff__tag">− To/Cc</span><span class="thread-recipient-diff__list">${events.removed
-        .map(line)
-        .join(", ")}</span></div>`
-    : "";
-  return `<div class="thread-recipient-diff surface-sm" role="note" aria-label="Évolution des destinataires dans le fil">${removed}${added}</div>`;
-}
-
 function renderMessageInlineTranslation(message: CleanedMessageView, targetLang: string, offerTranslationUi: boolean): string {
   if (!isTauriRuntime()) return "";
   if (!offerTranslationUi) {
@@ -230,7 +191,6 @@ export function renderThread() {
     : "Tags du fil — kind, source, domaine…";
   const replyTarget = escapeHtml(renderDeps().threadQuickReplyTargetName(msgs));
   const translationTargetLang = state.appPrefs.general.motherLanguage?.trim() || "fr";
-  const firstParticipantIds = renderDeps().threadParticipantFirstMessageIds(thread.messages);
   const recipientEventsById = renderDeps().threadRecipientPresenceEventsByMessageId(thread.messages);
   const zenOut = renderDeps().threadAiSummaryShownInZen() ? (state.aiOutput?.trim() ?? "") : "";
   const blockReply = renderDeps().threadIsAutoMail(thread);
@@ -357,11 +317,9 @@ export function renderThread() {
               Boolean(message.isNewsletter) || newsletterEmailListed(seSenderRaw);
             const suppressAutoEnvelope = renderDeps().threadSuppressAutoEnvelopeMeta(thread, message, nlListedHere);
             const nlRuleRow = renderThreadNlRuleButton(seSenderRaw, nlListedHere);
-            const participantFirst =
-              suppressAutoEnvelope ? "" : renderThreadParticipantFirstBadge(message, firstParticipantIds);
-            const recipientPresenceHtml = suppressAutoEnvelope
+            const loopChangeHtml = suppressAutoEnvelope
               ? ""
-              : renderThreadRecipientPresenceNote(recipientEventsById.get(message.messageId));
+              : renderThreadLoopChangeNote(recipientEventsById.get(message.messageId), iconSvg("thread"));
             const offerMsgTranslate = renderDeps().shouldOfferPerMessageTranslate(message, translationTargetLang, thread.tags);
             const inlineTr = renderMessageInlineTranslation(message, translationTargetLang, offerMsgTranslate);
             const htmlForDisplay = showsHtmlBubble ? renderDeps().messageHtmlForDisplay(message, eff) : null;
@@ -385,8 +343,7 @@ export function renderThread() {
             const foldLabel = msgOpen ? "Replier ce message" : "Développer ce message";
             return `
               ${daySeparator}
-              ${participantFirst}
-              ${recipientPresenceHtml}
+              ${loopChangeHtml}
               <a class="thread-msg-anchor" name="${escapeAttr(anchorName)}" id="${escapeAttr(anchorId)}" aria-hidden="true"></a>
               <article class="message thread-msg ${msgOpen ? "thread-msg--open" : "thread-msg--folded"} ${unreadMark ? "thread-msg--unread" : ""} ${isMine ? "mine" : ""} ${isRoot ? "thread-msg--root" : ""} ${isSolo ? "thread-msg--solo" : ""} ${showsHtmlBubble ? "has-html" : ""} ${showMeta ? "thread-msg--head" : "compact"}" style="${accentVars}">
                 ${showAvatar ? `<span class="avatar thread-msg-avatar">${initials(message.sender)}</span>` : `<span class="avatar avatar-spacer" aria-hidden="true"></span>`}
