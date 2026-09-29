@@ -2,6 +2,15 @@
 # Fixture = zones header / body / footer + matching.
 # Cas Deblock : le plugin try_deblock_digest fait déjà cette découpe.
 # Voir docs/CADRAGE_DIGEST_TEMPLATES.md. Ne pas committer de vrai mail ici.
+#
+# Banc d'essai (cadrage, non branché) : la même fixture se prévisualise
+# sur de vrais mails trouvés par la recherche actuelle
+# (@domaine, texte sujet/corps, #dossier / mailbox). Pas un second index.
+# Le domaine filtre l'entrée dans la liste ; les ancres `structure`
+# décident si la découpe s'applique. Domaine seul = pas de réécriture.
+# Gestes d'aperçu : afficher, masquer, replier, restyler
+# (`keep` / `presentation` ci-dessous). Deblock : header et body
+# affichés, body en tableau, footer masqué. Pas de zone repliée.
 
 id: deblock
 rule_set_version: "1"

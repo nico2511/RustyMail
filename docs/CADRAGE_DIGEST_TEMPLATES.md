@@ -4,13 +4,15 @@ Document de cadrage uniquement. Rien ici n’est branché au runtime. L’esquis
 
 L’état actuel de la lecture reste [`LECTURE_HTML.md`](LECTURE_HTML.md). Ce texte décrit comment **généraliser** le rendu propre des mails transactionnels (le genre Deblock) sans étendre ce rendu au courrier personne-à-personne, et sans faire dépendre l’ouverture d’un mail d’un modèle.
 
+Un vertical parallèle est le **banc d’essai fixtures** : rejouer une fixture candidate sur de vrais mails du corpus, trouvés par la **recherche déjà en place**, avant de l’activer en lecture. Pas un nouvel index. Le détail est dans la section « Banc d’essai fixtures (recherche) ».
+
 ## Intention
 
 Les mails Deblock se lisent bien : titre, montant, tableau de détails, pied marketing ignoré. Amazon et GitHub ont déjà un traitement du même esprit, chacun écrit à la main en Rust. L’objectif est que **d’autres expéditeurs** (banque, livraison, facture, notification) puissent obtenir ce genre de lecture, sans un plugin Rust par marque.
 
 Le flow qui porte cette généralisation est un **éditeur de découpe**, outil dédié, distinct du composer d’écriture (`composerRender`, écran `compose-fullscreen-active`). Sur un mail échantillon on identifie trois zones — **header**, **body**, **footer**. L’outil en propose un **template de lecture**. Ce template s’applique ensuite aux **autres mails du même pattern** (même expéditeur, même structure), pas seulement à l’échantillon.
 
-L’IA peut proposer la découpe dans cet éditeur. Elle n’est pas sur le chemin qui ouvre un mail. Une fois le template validé, la lecture est déterministe.
+L’IA peut proposer la découpe dans cet éditeur. Elle n’est pas sur le chemin qui ouvre un mail. Une fois le template validé, la lecture est déterministe. Le banc d’essai est la revue humaine à l’échelle de la boîte : il ne tranche pas par un modèle, et il ne remplace pas l’éditeur.
 
 Frontière déjà écrite dans le code, à conserver : les digests ne sont pas un modèle à étendre aux fils de discussion. Le générique (citations repliées, signature masquée) reste le chemin personne-à-personne.
 
@@ -23,9 +25,13 @@ Frontière déjà écrite dans le code, à conserver : les digests ne sont pas u
   3. poser le matching (expéditeur + ancres de structure)
   4. prévisualiser le template de lecture
   5. le confronter à un second mail du même pattern
-  6. valider → fixture (zones + matching)
+  6. fixture candidate (zones + matching)
         │
-        ▼
+        ├─ banc d’essai (recherche actuelle, corpus réel)
+        │     filtrer → ouvrir → aperçu découpe
+        │     accepter / ajuster / refuser
+        │
+        ▼  activation explicite, plus tard
 lecture d’un autre mail
   match expéditeur + structure ?
     oui → même découpe : header et body affichés, footer ôté
@@ -38,7 +44,7 @@ Une fixture n’est pas seulement un HTML anonymisé. C’est la découpe plus l
 
 | Bloc | Rôle |
 | ---- | ---- |
-| `match.sender` | Domaine exact ou suffixe. Seul signal qui autorise la réécriture. |
+| `match.sender` | Domaine exact ou suffixe. Seul signal qui autorise d’envisager la réécriture. Pas suffisant seul. |
 | `match.structure` | Ancres qui doivent être présentes (racine, début de zone). Sans elles, ce mail n’est pas « le même pattern », on ne force pas le template. |
 | `zones.header` | Ce qui identifie le mail (titre, montant). Affiché en tête de la lecture. |
 | `zones.body` | La substance (lignes de détail). Affichée comme corps du template. |
@@ -105,6 +111,85 @@ La vue propre existante (`threadViewUiCleanModeRun.ts`) affiche déjà ce HTML. 
 Tant que le moteur déclaratif n’existe pas, **le plugin reste l’application runtime** de ce template. Le critère d’une future bascule : les deux fixtures produisent le même digest qu’aujourd’hui, et un expéditeur non Deblock n’est pas réécrit. Les plugins Amazon et GitHub ne sont pas exprimés comme un simple header/body/footer ; ils restent à côté (section 2).
 
 Le détecteur Weak (sujet ou HTML qui contient « deblock ») ne doit pas devenir la façon dont un template s’applique aux « autres mails ». L’autre mail du pattern se reconnaît au domaine **et** aux ancres, comme le reçu et l’envoi.
+
+---
+
+## Banc d’essai fixtures (recherche)
+
+Vertical produit **en parallèle** de l’éditeur de découpe et du moteur de templates. Rien ici n’est branché. L’éditeur pose la fixture candidate (header, body, footer). Le banc la rejoue sur **de vrais mails du corpus** avant qu’elle puisse servir en lecture. Il ne découpe pas à la place de l’éditeur, et il n’écrit pas dans `clean_message`.
+
+But : voir, sur la boîte de la personne, si la découpe tient — pas seulement sur les deux HTML fictifs Deblock du dépôt. On y choisit un mail échantillon et des mails de validation.
+
+### Recherche existante, pas un nouvel index
+
+On réutilise la recherche déjà livrée. Pas de second moteur, pas d’index dédié aux fixtures, pas d’embedding exigé par ce flux.
+
+| Déjà en place | Rôle sur le banc |
+| ------------- | ---------------- |
+| Barre et écran (`src/searchBarParse.ts`, `src/app/ui/render/searchRender.ts`) | Choisir les candidats |
+| `SearchQuery` (`crates/rustymail-domain/src/search.rs`) | Le même payload |
+| Lexical FTS5, repli LIKE (`crates/rustymail-infrastructure/src/semantic_search.rs`) | Mode par défaut du banc |
+| `@domaine` ou une adresse | Filtre expéditeur : LIKE sur l’adresse, le nom, To, Cc, Reply-To |
+| Texte libre | Sujet **et** corps. Il n’y a pas d’opérateur `subject:` séparé |
+| `#local:` / `#dossier:` / `#archive`, champ `mailbox` | Dossier |
+| Compte, tags, dates, `#last:Nd`, pièce jointe | Resserrer la liste |
+
+Le mode lexical suffit. Sémantique et hybride sont déjà des valeurs de `SearchMode` sur la même requête ; le banc ne les exige pas et n’ajoute pas de mode.
+
+La recherche **rassemble** des candidats. Elle ne décide pas qu’une fixture s’applique. `@deblock.com` peut ramener un fil où le domaine n’est qu’en copie : ce fil entre dans la liste, il ne reçoit pas la découpe pour autant.
+
+### Même match qu’en lecture
+
+| Étape | Signal | Suffisant seul ? |
+| ----- | ------ | ---------------- |
+| Entrée dans la liste | Domaine d’expéditeur, plus sujet, dossier, etc. via la recherche | Non. Filtre de découverte |
+| Application de la fixture | Domaine Strong **et** ancres de structure (`match.structure`, ancres de zones) | Les deux. Le domaine seul ne réécrit pas |
+
+C’est le modèle du runtime : pas de digest au sujet seul, pas de digest au domaine sans la structure du pattern. Le banc n’affiche la lecture coupée comme applicable que si ces ancres tiennent sur **ce** mail. Les autres restent en aperçu générique : c’est le résultat attendu, pas un échec de la recherche.
+
+### Déroulé
+
+```text
+recherche actuelle (mode lexical)
+  @domaine  +  texte (sujet et corps)  +  dossier
+        │
+        ▼
+liste de vrais mails du compte
+  un message = échantillon (définit ou porte la découpe)
+  d’autres = validation
+        │
+        ▼
+ouvrir un candidat
+  appliquer la fixture candidate
+    header / body / footer
+    afficher · masquer · replier · restyler
+        │
+        ▼
+comparer
+  côte à côte, ou bascule brut ↔ lecture coupée
+        │
+        ▼
+accepter · ajuster · refuser
+```
+
+Gestes sur une zone, le temps de cet aperçu. Ils décrivent la fixture ; ils n’ajoutent pas un pipeline.
+
+| Geste | Effet | Dans l’esquisse Deblock |
+| ----- | ----- | ----------------------- |
+| Afficher | La zone entre dans la lecture coupée | Header et body (`keep: true`) |
+| Masquer | La zone est identifiée puis écartée | Footer (`keep: false`) |
+| Replier | La zone reste dans le mail, fermée tant qu’on ne l’ouvre pas | Pas utilisé |
+| Restyler | La mise en forme change, pas le périmètre | Body `presentation: key_value` (table) |
+
+Replier n’est pas un quatrième moteur, et ce n’est pas le repli des citations du courrier personne-à-personne. C’est un geste d’aperçu sur une zone déjà délimitée. Deblock n’en a pas besoin : le pied se masque.
+
+L’échantillon et les mails de validation sortent de cette liste. Les fixtures reçue et envoyée du dépôt restent les oracles versionnés. Le banc les confronte au corpus réel **avant** toute activation. Ces mails réels ne sont pas commités : la recherche lit la boîte déjà synchronisée ; `Providerr_mockup/` reste le tiroir local si l’on part d’un `.eml`.
+
+Accepter veut dire que la personne juge la fixture tenable sur les mails ouverts. Ça n’allume pas `clean_message`. L’activation en lecture reste un pas explicite, ultérieur, le même que pour un template local (défaut inactif). Ajuster renvoie les frontières à l’éditeur de découpe. Refuser laisse le runtime tel quel.
+
+L’IA peut proposer la découpe dans l’éditeur, sur un échantillon choisi. Le banc ne la rappelle pas pour accepter, ajuster ou refuser, et il ne balaie pas la boîte avec un modèle. Une fois la fixture activée, la lecture reste déterministe.
+
+Le banc n’est pas le composer : pas de rédaction, pas de brouillon, pas d’envoi. Un mail sans domaine déclaré et sans ancres reste sur le chemin générique.
 
 ---
 
@@ -274,14 +359,15 @@ Il faut toucher, au minimum : `ProviderId`, `HtmlCleaningProviderKind` (+ serde)
 L’éditeur produit une fixture. La lecture la consomme. Ce sont deux moments.
 
 ```text
-éditeur de découpe                lecture (clean_message)
-  marquer header/body/footer        match domaine + ancres
-  valider le template        →      header + body affichés, footer ôté
-                                    sinon générique
-                                    sinon plugin ad hoc (Amazon, GitHub)
+éditeur de découpe          banc d’essai (recherche actuelle)     lecture (clean_message)
+  marquer header/body/footer   vrais mails : domaine, sujet, dossier   match domaine + ancres
+  fixture candidate      →     afficher / masquer / replier / restyler  header + body, footer ôté
+                               accepter / ajuster / refuser             sinon générique
+                               n’active pas la lecture                  sinon plugin ad hoc
+                                                                        (Amazon, GitHub)
 ```
 
-L’IA, si on l’utilise, ne travaille que dans l’éditeur (proposition de zones). `clean_message` ne l’appelle pas.
+L’IA, si on l’utilise, ne travaille que dans l’éditeur (proposition de zones). Le banc est une revue humaine. `clean_message` n’appelle pas le modèle.
 
 ### Registry de templates
 
@@ -357,6 +443,7 @@ Kinds de rendu **plus tard**, seulement s’ils apparaissent deux fois : `paragr
 | Artefact | Git | Rôle |
 | -------- | --- | ---- |
 | `Providerr_mockup/*.eml` | Non (déjà gitignoré) | Échantillon personnel |
+| Boîte synchronisée, via `SearchQuery` | Non | Candidats du banc d’essai (échantillon + validation) |
 | `tests/fixtures/<id>/*_anonymized.html` ou `.txt` | Oui | Entrée de test |
 | `fixtures/digests/<id>.yaml` | Oui | Template : zones header/body/footer + `match` (quand le moteur existera) |
 | Sortie HTML du digest | Non (recalculée par le test) | Oracle = assertions sur titre, lignes, absence du pied |
@@ -384,7 +471,7 @@ L’IA ne fabrique pas la lecture. Elle peut **pré-marquer** header, body et fo
 1. **Échantillon dans l’éditeur.** Pas dans le composer. Source locale : `.eml` dans `Providerr_mockup/` (gitignoré), comme `tools/contributor-mail-samples.md`.
 2. **Proposition de découpe.** Contrat JSON fixe : trois zones, ancres, domaine candidat, ce qui est écarté. Le corps du mail est des **données** (`untrusted_mail_content_block`, cf. [`LLM_CONTRACTS.md`](LLM_CONTRACTS.md)), jamais des instructions. La sortie peint des zones ; elle n’écrit pas le registre.
 3. **Marquage humain.** Obligatoire. On déplace les frontières, on refuse un footer trop court (la substance partirait avec le pied) ou un header trop large. On refuse un match au sujet seul.
-4. **Contrôle sur un autre mail.** Second message du même pattern, dans le même outil. Pour Deblock : le reçu définit, l’envoi vérifie. Si les ancres ne tiennent pas, le template n’est pas validé.
+4. **Contrôle sur un autre mail.** Second message du même pattern, dans le même outil. Pour Deblock : le reçu définit, l’envoi vérifie. Si les ancres ne tiennent pas, le template n’est pas validé. À l’échelle de la boîte, ce contrôle est le banc d’essai : plusieurs mails réels via la recherche actuelle, même match (domaine + ancres), sans nouvel index.
 5. **Fixture.** HTML anonymisé sous `tests/fixtures/<id>/` et YAML `zones` + `match`. Le script Amazon (`build_amazon_fixture.py`) reste le précédent d’anonymisation : manuel, pas en CI.
 6. **Tests.** `cargo test -p rustymail-modules` : les deux mails Deblock donnent le digest actuel (header, lignes, pied absent), un expéditeur ailleurs reste `Generic`.
 
@@ -397,6 +484,7 @@ Aucun de ces pas n’ajoute de commande `invoke` tant que l’éditeur n’est p
 | Lieu | Rôle | Appelle un modèle à la lecture ? |
 | ---- | ---- | -------------------------------- |
 | Éditeur de découpe (outil dédié, puis écran app distinct du composer) | Marquer les zones, prévisualiser, valider | Non : seulement pour la proposition, si la personne le demande |
+| Banc d’essai (recherche lexicale actuelle) | Ouvrir des mails réels, comparer brut et découpe, accepter / ajuster / refuser | Non. Pas de balayage de la boîte par un modèle |
 | Repo, YAML + fixtures HTML | Pattern embarqué (Deblock d’abord) | Non |
 | `clean_message` / `DeblockCleaner` aujourd’hui | Applique la découpe | Non |
 | `ai_assist_skills`, llama-server, OpenRouter | Résumé, réponse, organiser | Déjà, sur d’autres fonctions. Pas sur ce template |
@@ -420,7 +508,11 @@ L’ouverture d’un mail reste : HTML → registre déterministe → DOMPurify.
 
 **Surface affichée.** Le digest est du HTML construit par nous à partir des zones, puis repasse dans DOMPurify. Continuer d’échapper les textes et de filtrer les URL. Coller le HTML brut du header ou du body dans les autres mails recopierait trackers et pieds. Le digest ne réactive pas les images distantes (Amazon les laisse déjà de côté).
 
-**Mauvais footer.** Une zone footer trop gourmande masque la substance sur tous les mails du pattern. Parade : le second mail dans l’éditeur, et les tests qui exigent la présence des lignes de détail.
+**Mauvais footer.** Une zone footer trop gourmande masque la substance sur tous les mails du pattern. Parade : le second mail dans l’éditeur, le banc sur d’autres mails du corpus, et les tests qui exigent la présence des lignes de détail.
+
+**Corpus réel sur le banc.** La liste vient de la boîte synchronisée (IBAN, noms, jetons). Parade : aucun de ces messages dans git ; accepter n’écrit pas le registre ; pas d’envoi de la liste au modèle pour valider en masse. L’échantillon qui irait à un modèle local reste celui de l’éditeur, choisi, pas la boîte entière.
+
+**Filtre de recherche pris pour un match.** Le LIKE `@domaine` (adresse, nom, To, Cc, Reply-To) est plus large que le Strong du runtime. Parade : ancres de structure obligatoires avant de présenter la lecture coupée comme applicable. Un domaine seul laisse le mail en générique dans l’aperçu.
 
 ---
 
@@ -435,6 +527,15 @@ L’ouverture d’un mail reste : HTML → registre déterministe → DOMPurify.
 - Proposition IA : contrat JSON de zones, hors CI, hors `clean_message`. Pas de nouvelle commande IPC tant que l’éditeur n’est pas dans l’app.
 
 Critère de fin : les tests reçu et envoi passent via le template, un mail non Deblock n’est pas réécrit, `clean_message` ne référence pas `rustymail-llm`.
+
+### Vertical parallèle — banc d’essai
+
+Même horizon que l’éditeur de découpe et le moteur de templates. L’un n’est pas le prérequis de l’autre. Toujours hors de ce document : pas d’écran, pas de branchement sur la recherche.
+
+- Réutiliser `SearchQuery` et la barre actuelle. Mode lexical par défaut. Filtres utiles : `@domaine`, texte libre (sujet et corps), dossier (`#local:` / `#dossier:` / `mailbox`).
+- Depuis un résultat : ouvrir un candidat, appliquer la fixture (afficher, masquer, replier, restyler), comparer le brut et la lecture coupée, accepter, ajuster ou refuser.
+- Accepter ne lance pas la réécriture en lecture. Le match reste domaine Strong + ancres de structure.
+- Pas de nouvel index. Pas d’appel modèle sur la liste. Deblock reste le premier candidat de fixture ; Amazon et GitHub restent ad hoc.
 
 ### Plus tard
 
@@ -473,3 +574,4 @@ Critère de fin : les tests reçu et envoi passent via le template, un mail non 
 | Sécurité | `docs/SECURITY.md`, `docs/IPC_SECURITY.md` |
 | Composer (à ne pas réutiliser) | `src/app/ui/render/composerRender.ts`, classe `compose-fullscreen-active` |
 | Esquisse de fixture (zones) | `docs/cadrage/digest-template.exemple.yaml` |
+| Recherche (banc d’essai) | `crates/rustymail-domain/src/search.rs` (`SearchQuery`), `crates/rustymail-infrastructure/src/semantic_search.rs`, `src/searchBarParse.ts`, `src/searchQueryBuild.ts`, `src/app/ui/render/searchRender.ts` |
