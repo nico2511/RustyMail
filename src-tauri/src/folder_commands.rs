@@ -2,9 +2,9 @@
 
 use rustymail_infrastructure::{
     archive_mailbox_threads, delete_imap_mailbox_with_contents, list_mailbox_tree, load_accounts,
-    load_app_prefs_required, rename_mailbox_subtree_local_cache,
-    retag_threads_in_mailboxes, set_mailbox_locked, ArchiveMailboxThreadsOutcome,
-    DeleteMailboxWithContentsOutcome, MailboxTreeReport,
+    load_app_prefs_required, rename_mailbox_subtree_local_cache, retag_threads_in_mailboxes,
+    set_mailbox_locked, ArchiveMailboxThreadsOutcome, DeleteMailboxWithContentsOutcome,
+    MailboxTreeReport,
 };
 use tauri::State;
 
