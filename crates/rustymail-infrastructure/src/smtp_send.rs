@@ -6,6 +6,9 @@ use lettre::Tokio1Executor;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message};
 use pulldown_cmark::{html, Options, Parser};
 
+use rustymail_domain::compose_html::{
+    compose_body_is_html, compose_html_fragment, compose_html_to_plain, sanitize_compose_html,
+};
 use rustymail_domain::{Account, Draft, MailAuthKind, SecurityMode};
 
 use crate::get_account_password;
@@ -70,7 +73,18 @@ async fn build_transport(account: &Account) -> Result<AsyncSmtpTransport<Tokio1E
 }
 
 pub fn markdown_body_to_html(markdown: &str) -> String {
+    if compose_body_is_html(markdown) {
+        return sanitize_compose_html(compose_html_fragment(markdown));
+    }
     markdown_to_html(markdown)
+}
+
+fn outbound_plain_body(markdown: &str) -> String {
+    if compose_body_is_html(markdown) {
+        compose_html_to_plain(markdown)
+    } else {
+        strip_data_image_markdown(markdown)
+    }
 }
 
 fn markdown_to_html(markdown: &str) -> String {
@@ -283,8 +297,8 @@ pub async fn send_draft_via_smtp(
     msg_builder = msg_builder.message_id(Some(message_id.clone()));
 
     let body_part = if draft.send_html {
-        let html = markdown_to_html(&draft.markdown_body);
-        let plain_stripped = strip_data_image_markdown(&draft.markdown_body);
+        let html = markdown_body_to_html(&draft.markdown_body);
+        let plain_stripped = outbound_plain_body(&draft.markdown_body);
         let plain_part = SinglePart::builder()
             .header(ContentType::TEXT_PLAIN)
             .body(plain_stripped);
@@ -297,7 +311,7 @@ pub async fn send_draft_via_smtp(
     } else {
         let plain_part = SinglePart::builder()
             .header(ContentType::TEXT_PLAIN)
-            .body(draft.markdown_body.clone());
+            .body(outbound_plain_body(&draft.markdown_body));
         MultiPart::mixed().singlepart(plain_part)
     };
     let message = if draft.attachment_paths.is_empty() {
@@ -351,4 +365,19 @@ pub async fn send_draft_via_smtp(
     eprintln!("[RustyMail] SMTP reply: {} {}", code.to_string(), first);
 
     Ok(DraftSendOutcome { message_id, rfc822 })
+}
+
+#[cfg(test)]
+mod compose_html_send_tests {
+    use super::markdown_body_to_html;
+    use rustymail_domain::compose_html::COMPOSE_HTML_MARK;
+
+    #[test]
+    fn tiptap_html_is_not_passed_through_markdown() {
+        let html = markdown_body_to_html(&format!(
+            "{COMPOSE_HTML_MARK}<p><em>ciao</em></p>"
+        ));
+        assert!(html.contains("<em>ciao</em>"));
+        assert!(!html.contains("&lt;em&gt;"));
+    }
 }

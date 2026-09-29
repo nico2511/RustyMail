@@ -1488,10 +1488,16 @@ body.clarity-dark {
   box-shadow: none;
 }
 
-.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool:hover {
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool:hover,
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.is-active {
   background: var(--hover);
   border-color: transparent;
   color: var(--text);
+}
+
+.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.is-active {
+  color: var(--copper);
+  background: var(--accent-dim);
 }
 
 .composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--bold {

@@ -8,6 +8,7 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { prependComposePlainText } from "./composeBodyEditor";
 import { computePreview } from "./composeComposerBridge";
 import { withLlmQueue } from "./llmJobQueue";
 import { threadIsAutoMail } from "./threadAutoMail";
@@ -71,11 +72,7 @@ export async function llmQuickRepliesComposeUi() {
         toast("Aucune suggestion.");
         return;
       }
-      const add = `${first}\n\n`;
-      state.composeBody = `${add}${state.composeBody}`;
-      state.composeCanonicalBody = state.composeBody;
-      const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-      if (ta) ta.value = state.composeBody;
+      prependComposePlainText(first);
       void computePreview();
       toast("Suggestion insérée — modifiez avant envoi.");
       render();

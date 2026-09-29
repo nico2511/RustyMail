@@ -2,6 +2,12 @@ import { render } from "../dispatch";
 import { toast } from "../lib/toast";
 import { state } from "../state";
 import {
+  getComposeBodyEditor,
+  mapComposePlainSpanToDoc,
+  readComposePlainText,
+  syncComposeEditorFromState,
+} from "./composeBodyEditor";
+import {
   computePreview,
   loadComposeMarkdownIntoEditor,
   setComposeFromTextareaValue,
@@ -10,9 +16,9 @@ import { fallbackDraftPreview } from "./composeDraftPreview";
 import {
   applyGrammarReplacement,
   countGrammarOccurrences,
+  findGrammarSpans,
   type GrammarReplaceInput,
 } from "./composeGrammarReplace";
-import { markdownPushToolbarUndoSnapshot } from "./composeMarkdownEditorState";
 
 const TOAST_APPLIED = "Remplacement appliqué.";
 const TOAST_APPLIED_FIRST = "Remplacement appliqué (première occurrence).";
@@ -24,64 +30,87 @@ function suggestionAt(index: number): (GrammarReplaceInput & { reason?: string }
   return g;
 }
 
-function syncComposeTextarea(): void {
-  const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  if (ta && ta.value !== state.composeBody) ta.value = state.composeBody;
-}
-
 /**
- * Écrit l’éditeur puis le repeint.
- * `render()` recrée le textarea : on réassigne `.value` ensuite, y compris au frame
- * suivant, pour que la vue SPLIT ne reste pas sur l’ancien contenu.
+ * Met à jour l’aperçu puis repeint.
+ * `render()` recrée le point de montage TipTap : le contenu vient de l’état,
+ * y compris au frame suivant, pour que les deux volets SPLIT restent alignés.
  */
 function paintComposeEditor(): void {
   const markdown = state.composeCanonicalBody || state.composeBody;
   state.preview = fallbackDraftPreview(markdown);
-  const expected = state.composeBody;
-  syncComposeTextarea();
+  const expected = state.composeCanonicalBody;
+  syncComposeEditorFromState();
   render();
-  syncComposeTextarea();
+  syncComposeEditorFromState();
   window.requestAnimationFrame(() => {
-    if (state.composeBody !== expected) return;
-    syncComposeTextarea();
+    if (state.composeCanonicalBody !== expected) return;
+    syncComposeEditorFromState();
   });
 }
 
 function forgetSuggestionIfExhausted(index: number, suggestion: GrammarReplaceInput): void {
-  const inDisplay = countGrammarOccurrences(state.composeBody, suggestion);
-  const inCanonical =
-    state.composeCanonicalBody !== state.composeBody
-      ? countGrammarOccurrences(state.composeCanonicalBody, suggestion)
-      : 0;
-  if (inDisplay + inCanonical > 0) return;
+  const editor = getComposeBodyEditor();
+  const remaining = editor
+    ? countGrammarOccurrences(readComposePlainText(), suggestion)
+    : countGrammarOccurrences(state.composeBody, suggestion) +
+      (state.composeCanonicalBody !== state.composeBody
+        ? countGrammarOccurrences(state.composeCanonicalBody, suggestion)
+        : 0);
+  if (remaining > 0) return;
   const list = state.composeGrammarSuggestions;
   if (!list) return;
   const next = list.filter((_, i) => i !== index);
   state.composeGrammarSuggestions = next.length ? next : null;
 }
 
+function finishApplied(index: number, suggestion: GrammarReplaceInput, occurrences: number): void {
+  forgetSuggestionIfExhausted(index, suggestion);
+  toast(occurrences > 1 ? TOAST_APPLIED_FIRST : TOAST_APPLIED);
+  paintComposeEditor();
+  void computePreview();
+}
+
 /**
  * Applique la suggestion `index` sur le corps du compositeur.
- * Une seule occurrence (la première) est remplacée ; le toast le dit seulement si le texte a changé.
+ * Une seule occurrence (la première du texte visible) est remplacée.
  */
 export function applyComposeGrammarSuggestionAtIndex(index: number): void {
   const suggestion = suggestionAt(index);
   if (!suggestion) return;
 
-  const textarea = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  const display = textarea?.value ?? state.composeBody;
-  const canonical = state.composeCanonicalBody || state.draft?.markdownBody || display;
+  const editor = getComposeBodyEditor();
+  if (editor) {
+    const plain = readComposePlainText();
+    const spans = findGrammarSpans(plain, suggestion);
+    if (spans.length) {
+      const first = spans[0]!;
+      const applied = editor
+        .chain()
+        .focus()
+        .command(({ tr, state: docState }) => {
+          const mapped = mapComposePlainSpanToDoc(docState.doc, first);
+          if (!mapped) return false;
+          tr.insertText(suggestion.replacement ?? "", mapped.from, mapped.to);
+          return true;
+        })
+        .run();
+      if (applied) {
+        finishApplied(index, suggestion, spans.length);
+        return;
+      }
+    }
+  }
 
+  const display = state.composeBody;
+  const canonical = state.composeCanonicalBody || state.draft?.markdownBody || display;
   const onDisplay = applyGrammarReplacement(display, suggestion);
   let occurrences = 0;
   if (onDisplay.replaced > 0 && onDisplay.text !== display) {
-    markdownPushToolbarUndoSnapshot(display);
     setComposeFromTextareaValue(onDisplay.text);
     occurrences = onDisplay.occurrences;
   } else if (canonical !== display) {
     const onCanonical = applyGrammarReplacement(canonical, suggestion);
     if (onCanonical.replaced > 0 && onCanonical.text !== canonical) {
-      markdownPushToolbarUndoSnapshot(display);
       loadComposeMarkdownIntoEditor(onCanonical.text);
       occurrences = onCanonical.occurrences;
     }
@@ -92,8 +121,5 @@ export function applyComposeGrammarSuggestionAtIndex(index: number): void {
     return;
   }
 
-  forgetSuggestionIfExhausted(index, suggestion);
-  toast(occurrences > 1 ? TOAST_APPLIED_FIRST : TOAST_APPLIED);
-  paintComposeEditor();
-  void computePreview();
+  finishApplied(index, suggestion, occurrences);
 }

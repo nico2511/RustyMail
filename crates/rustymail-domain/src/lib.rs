@@ -1,4 +1,5 @@
 pub mod account;
+pub mod compose_html;
 pub mod action_brief;
 pub mod activity;
 pub mod ai_assist;
@@ -24,6 +25,7 @@ pub mod translation;
 pub mod writing;
 
 pub use account::*;
+pub use compose_html::*;
 pub use action_brief::*;
 pub use activity::*;
 pub use ai_assist::*;

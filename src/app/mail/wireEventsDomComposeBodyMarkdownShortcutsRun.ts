@@ -2,7 +2,9 @@
 import { applyMarkdownAction } from "./composeComposerBridge";
 
 export function wireEventsDomComposeBodyMarkdownShortcuts(signal: AbortSignal): void {
-  document.querySelector<HTMLTextAreaElement>("#compose-body")?.addEventListener(
+  const host = document.querySelector("#compose-body");
+  if (!(host instanceof HTMLTextAreaElement)) return;
+  host.addEventListener(
     "keydown",
     (event) => {
       const evk = event as KeyboardEvent;

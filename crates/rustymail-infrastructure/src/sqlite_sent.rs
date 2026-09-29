@@ -1,6 +1,7 @@
 //! Copie locale d’un message sortant après envoi SMTP pour l’affichage dans le fil (en attendant une synchro « Envoyés » IMAP).
 
 use rusqlite::{params, OptionalExtension};
+use rustymail_domain::compose_html::compose_body_plain;
 use rustymail_domain::{Draft, EmailAddress, Tag};
 use std::path::Path;
 
@@ -213,7 +214,7 @@ pub fn sqlite_record_sent_message_copy(
     let position = max_position + 1;
 
     let received_at = outbound_received_at_stamp();
-    let body_plain = draft.markdown_body.trim().to_string();
+    let body_plain = compose_body_plain(&draft.markdown_body).trim().to_string();
     let body_html = if draft.send_html {
         Some(markdown_body_to_html(&draft.markdown_body))
     } else {
@@ -396,7 +397,7 @@ pub fn sqlite_record_sent_starting_thread(
         uuid::Uuid::new_v4().simple()
     );
     let received_at = outbound_received_at_stamp();
-    let body_plain = draft.markdown_body.trim().to_string();
+    let body_plain = compose_body_plain(&draft.markdown_body).trim().to_string();
     let body_html = if draft.send_html {
         Some(markdown_body_to_html(&draft.markdown_body))
     } else {

@@ -1,13 +1,12 @@
-import { setComposeFromTextareaValue } from "./composeMarkdownEditor";
+import { flushComposeEditorToState } from "./composeBodyEditor";
 import { applyComposeRecipientsFromDom } from "./composeRecipientChipsWire";
 import { state } from "../state";
 
 export function persistDraft(): void {
   if (!state.draft) return;
   const shell = document.querySelector(".composer-mail-shell");
-  const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  if (ta) setComposeFromTextareaValue(ta.value);
-  state.draft.markdownBody = state.composeCanonicalBody;
+  flushComposeEditorToState();
+  state.draft.markdownBody = state.composeCanonicalBody || state.composeBody;
   state.draft.subject =
     shell?.querySelector<HTMLInputElement>("#compose-subject")?.value ??
     document.querySelector<HTMLInputElement>("#compose-subject")?.value ??

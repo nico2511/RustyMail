@@ -6,8 +6,7 @@ import type { Tone } from "../../types";
 
 /**
  * Commandes stables du compositeur.
- * L’éditeur actuel est un textarea Markdown (`data-md`, `data-action`).
- * Une migration TipTap peut lier les mêmes id sans redessiner cette barre :
+ * TipTap les exécute sans redessiner cette barre :
  * `md:*`, `ai:grammar`, `ai:rewrite`, `ai:shorten`, `ai:replies`, `dictate`.
  */
 export type ComposeMdCommand = {
@@ -24,16 +23,16 @@ export const COMPOSE_MD_GROUPS: readonly (readonly ComposeMdCommand[])[] = [
     { id: "underline", label: "Souligné", title: "Souligné (Ctrl+U)", className: "compose-tool--underline" },
   ],
   [
-    { id: "h1", label: "Titre 1", title: "Titre 1 (#)", className: "compose-tool--h1" },
-    { id: "h2", label: "Titre 2", title: "Titre 2 (##)", className: "compose-tool--h2" },
-    { id: "h3", label: "Titre 3", title: "Titre 3 (###)", className: "compose-tool--h3" },
+    { id: "h1", label: "Titre 1", title: "Titre 1", className: "compose-tool--h1" },
+    { id: "h2", label: "Titre 2", title: "Titre 2", className: "compose-tool--h2" },
+    { id: "h3", label: "Titre 3", title: "Titre 3", className: "compose-tool--h3" },
   ],
   [
     { id: "ul", label: "Puces", title: "Liste à puces", className: "" },
     { id: "ol", label: "Numéros", title: "Liste numérotée", className: "" },
     { id: "link", label: "Lien", title: "Lien (Ctrl+K)", className: "" },
-    { id: "image", label: "Image", title: "Image (URL Markdown)", className: "" },
-    { id: "table", label: "Tableau", title: "Tableau Markdown", className: "" },
+    { id: "image", label: "Image", title: "Image", className: "" },
+    { id: "table", label: "Tableau", title: "Tableau", className: "" },
   ],
   [
     { id: "code", label: "Code", title: "Code", className: "compose-tool--code" },
