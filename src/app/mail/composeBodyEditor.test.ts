@@ -133,6 +133,30 @@ describe("éditeur TipTap du compositeur", () => {
     expect(document.querySelector('[data-compose-cmd="dictate"]')).toBeTruthy();
   });
 
+  it("marque le niveau de titre actif et le rebascule au paragraphe", async () => {
+    document.body.innerHTML = `${renderComposeToolbar(toolbarProps)}<div id="compose-body"></div>`;
+    mountComposeBodyEditor(document.querySelector<HTMLElement>("#compose-body")!);
+    const editor = getComposeBodyEditor();
+    editor?.commands.setContent("<p>bonjour</p>", false);
+    editor?.commands.setTextSelection(2);
+    const h1 = document.querySelector<HTMLButtonElement>('[data-md="h1"]');
+    const h2 = document.querySelector<HTMLButtonElement>('[data-md="h2"]');
+    expect(h1?.closest(".compose-heading-group")).toBe(h2?.closest(".compose-heading-group"));
+    await applyMarkdownAction("h1");
+    expect(readComposeEditorHtml()).toMatch(/<h1>bonjour<\/h1>/);
+    expect(h1?.classList.contains("is-active")).toBe(true);
+    expect(h1?.getAttribute("aria-pressed")).toBe("true");
+    expect(h2?.getAttribute("aria-pressed")).toBe("false");
+    await applyMarkdownAction("h2");
+    expect(readComposeEditorHtml()).toMatch(/<h2>bonjour<\/h2>/);
+    expect(h1?.classList.contains("is-active")).toBe(false);
+    expect(h2?.getAttribute("aria-pressed")).toBe("true");
+    await applyMarkdownAction("h2");
+    expect(readComposeEditorHtml()).toMatch(/<p>bonjour<\/p>/);
+    expect(h2?.classList.contains("is-active")).toBe(false);
+    expect(h2?.getAttribute("aria-pressed")).toBe("false");
+  });
+
   it("applique la première correction dans le document", () => {
     mount("aa puis aa");
     state.composeGrammarSuggestions = [{ reason: "x", original: "aa", replacement: "bb" }];

@@ -1513,14 +1513,43 @@ body.clarity-dark {
   text-underline-offset: 3px;
 }
 
-.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--h1 {
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+.composer-mail-shell .compose-toolbar .compose-heading-group {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 2px;
+  margin: 0 1px;
+  border-radius: 8px;
+  border: 1px solid var(--border-weak);
+  background: var(--surface);
 }
 
-.composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--h2 {
+.composer-mail-shell .compose-toolbar .compose-heading-group__name {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px 0 7px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.composer-mail-shell .compose-toolbar .compose-heading-group .compose-tool.compose-heading-group__level {
+  min-width: 22px;
+  min-height: 0;
+  padding: 0 7px;
+  border-radius: 5px;
+  font-size: 12.5px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-mail-shell .compose-toolbar .compose-heading-group .compose-tool.compose-heading-group__level.is-active {
+  box-shadow: inset 0 -2px 0 var(--copper);
 }
 
 .composer-mail-shell .compose-toolbar .ghost-button.md-button.compose-tool.compose-tool--code {
