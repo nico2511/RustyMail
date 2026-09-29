@@ -18,7 +18,7 @@ export const MAIL_ACTION_TIMEOUT_MS = 90_000;
 
 export const LLM_INVOKE_TIMEOUT_MS = 200_000;
 
-export const AI_CACHE_PROMPT_REVISION = 6;
+export const AI_CACHE_PROMPT_REVISION = 8;
 
 export const MAILBOX_DIGEST_DEBOUNCE_MS = 2400;
 

@@ -313,7 +313,7 @@ pub(crate) fn open_thread_domain(
 }
 
 /// Révision des prompts / formats JSON — **bump** quand le comportement des features cachées change.
-pub const AI_CACHE_PROMPT_REVISION: u32 = 6;
+pub const AI_CACHE_PROMPT_REVISION: u32 = 8;
 
 fn sanitize_cache_seg(s: &str) -> String {
     s.chars()

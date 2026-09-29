@@ -25,10 +25,6 @@ export async function tryHandleComposeEditorLayoutWire(action: string, element?:
       }
       return true;
     }
-    case "toggle-compose-advanced":
-      state.composeAdvancedOpen = !state.composeAdvancedOpen;
-      render();
-      return true;
     case "toggle-compose-cc-bcc": {
       if (draftHasRecipientsExtra(state.draft)) return true;
       state.composeCcBccOpen = !state.composeCcBccOpen;

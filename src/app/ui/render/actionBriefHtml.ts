@@ -18,6 +18,9 @@ export function renderActionBriefHtml(b: ActionBriefResult): string {
   const confPct = Math.max(0, Math.min(100, Math.round(Number(b.confidence ?? 0) * 100)));
   const bucket = escapeHtml(String(b.priorityBucket ?? "—"));
   const mode = escapeHtml(String(b.mode ?? ""));
+  const partial = b.outputPartial
+    ? `<p class="thread-zen-par dim" role="status">Brief partiel — la réponse JSON du modèle était incomplète.</p>`
+    : "";
   const verif = b.verificationRecommended
     ? `<p class="thread-zen-par dim" role="status">Vérification recommandée</p>`
     : "";
@@ -95,6 +98,7 @@ export function renderActionBriefHtml(b: ActionBriefResult): string {
 
   const inner = `
     <p class="thread-zen-par dim inbox-brief-meta">Confiance ${confPct}% · priorité <strong>${bucket}</strong>${mode ? ` · mode ${mode}` : ""}</p>
+    ${partial}
     ${verif}
     ${sec("Ce qui change", changesBody)}
     ${sec("Décisions", decisionsBody)}

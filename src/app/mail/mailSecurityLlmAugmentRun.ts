@@ -9,6 +9,17 @@ import { defaultMailSecuritySignals } from "./mailSecurityDefaultsRun";
 const securityLlmAugmentBusy: Record<string, boolean> = {};
 const securityLlmAugmentCache: Record<string, MailSecuritySignals> = {};
 const securityLlmAugmentFailed: Record<string, boolean> = {};
+let securityAugmentRenderQueued = false;
+
+function scheduleSecurityAugmentRender(): void {
+  if (securityAugmentRenderQueued) return;
+  securityAugmentRenderQueued = true;
+  requestAnimationFrame(() => {
+    securityAugmentRenderQueued = false;
+    if (state.view !== "thread") return;
+    render();
+  });
+}
 
 export function activeSecurityLlmAugmentCount(): number {
   let n = 0;
@@ -62,15 +73,12 @@ export function scheduleSecurityLlmAugment(message: CleanedMessageView): void {
         payload: base,
       });
       securityLlmAugmentCache[mid] = augmented;
-      if (state.view === "thread" && state.selectedThread?.messages?.some((m) => m.messageId === mid)) {
-        render();
-      }
     } catch {
       securityLlmAugmentFailed[mid] = true;
     } finally {
       delete securityLlmAugmentBusy[mid];
       if (state.view === "thread" && state.selectedThread?.messages?.some((m) => m.messageId === mid)) {
-        render();
+        scheduleSecurityAugmentRender();
       }
     }
   })();

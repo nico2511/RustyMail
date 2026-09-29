@@ -1,8 +1,9 @@
-import { render } from "../dispatch";
 import { state } from "../state";
+import { clearComposeGrammarUi } from "./composeGrammarPanelSync";
 import { requireComposeCloseFlowDeps } from "./composeCloseFlowContext";
 
 export function clearDraftSession(): void {
+  clearComposeGrammarUi();
   const d = requireComposeCloseFlowDeps();
   state.draftSessionId = null;
   state.savedDraftRecordId = null;

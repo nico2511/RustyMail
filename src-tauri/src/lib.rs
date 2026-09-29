@@ -887,6 +887,8 @@ async fn send_draft(
 ) -> Result<SendDraftOutcome, String> {
     ipc_guard::validate_send_draft_ack(send_ack.as_deref())?;
     ipc_guard::validate_draft_for_ipc(&draft)?;
+    let mut draft = draft;
+    draft.send_html = true;
     let to_preview: String = draft
         .to
         .first()
@@ -995,6 +997,8 @@ async fn execute_split_send_cmd(
 ) -> Result<SplitSendResult, String> {
     ipc_guard::validate_send_draft_ack(send_ack.as_deref())?;
     ipc_guard::validate_draft_for_ipc(&draft)?;
+    let mut draft = draft;
+    draft.send_html = true;
     {
         let core = core.lock().map_err(|_| "core lock poisoned".to_string())?;
         core.send_draft(draft.clone()).map_err(|e| e.to_string())?;

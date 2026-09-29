@@ -120,6 +120,9 @@ pub struct ActionBriefResult {
     pub priority_bucket: ActionBriefPriorityBucket,
     #[serde(default)]
     pub verification_recommended: bool,
+    /// Vrai quand le JSON du modèle a été réparé (réponse tronquée). Le brief n’est pas complet.
+    #[serde(default)]
+    pub output_partial: bool,
     #[serde(default)]
     pub executed_skills: Vec<String>,
     #[serde(default)]

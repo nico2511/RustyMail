@@ -4,6 +4,7 @@ import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import { LLM_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { render } from "../dispatch";
 import { isTauriRuntime } from "../lib/tauriRuntime";
+import { toast } from "../lib/toast";
 import { state } from "../state";
 import type { ActionBriefResult } from "../types";
 import {
@@ -61,6 +62,11 @@ export async function fetchMailboxDigestRefresh(): Promise<void> {
     state.mailboxActionBrief = brief;
     state.mailboxBriefBannerHtml = "";
     state.mailboxDigestKey = key;
+    if (brief.outputPartial) {
+      toast.warning(
+        "Brief partiel : la réponse du modèle était incomplète. Les éléments manquants ne sont pas affichés.",
+      );
+    }
   } catch (error) {
     if (!isMailboxDigestRequestCurrent(gen)) return;
     const detail = tauriErrorMessage(error).replace(/\s+/g, " ").trim().slice(0, 400);
@@ -74,6 +80,9 @@ export async function fetchMailboxDigestRefresh(): Promise<void> {
       ? buildMailboxBriefGateBannerHtml()
       : buildMailboxBriefErrorBannerHtml(detail);
     state.mailboxDigestKey = key;
+    if (!gateLike) {
+      toast.error(detail || "Brief d’action impossible : la réponse du modèle n’a pas pu être lue.");
+    }
     console.warn("llm_inbox_digest", error);
   } finally {
     if (isMailboxDigestRequestCurrent(gen)) {

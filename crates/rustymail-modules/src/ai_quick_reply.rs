@@ -1,6 +1,8 @@
 use serde::Deserialize;
 
-use crate::ai_llm_contracts::validate_quick_replies_shape;
+use crate::ai_llm_contracts::{
+    introduces_llm_meta, validate_quick_replies_shape, MAIL_BODY_META_ERR,
+};
 use crate::ai_llm_util::{
     budget_report, gen_params_json_for_prompt, parse_model_json, truncate_chars,
     untrusted_mail_for_engine,
@@ -52,6 +54,19 @@ pub fn quick_replies_with_llm(
         })
         .filter(|s| !s.text.is_empty())
         .collect();
+
+    let mut saw_meta = false;
+    suggestions.retain(|s| {
+        if introduces_llm_meta(&ctx, &s.text) {
+            saw_meta = true;
+            false
+        } else {
+            true
+        }
+    });
+    if suggestions.is_empty() && saw_meta {
+        return Err(LlmError::Msg(MAIL_BODY_META_ERR.into()));
+    }
 
     if suggestions.len() > 4 {
         suggestions.truncate(4);

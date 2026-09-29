@@ -3,7 +3,8 @@ import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { iconSvg } from "../../lib/iconSvg";
 import { renderComposeToolbar } from "./composeToolbarRender";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
-import { grammarOccurrenceCount } from "../../mail/composeGrammarReplace";
+import { composeSourcePlainText } from "../../mail/composeHtmlBody";
+import { grammarOccurrenceCount, retainGrammarSuggestionsInText } from "../../mail/composeGrammarReplace";
 import { state } from "../../state";
 import type { Draft, MicDictationTarget } from "../../types";
 import { renderDeps } from "./renderDeps";
@@ -133,15 +134,20 @@ export function renderComposer() {
      <div class="field-row"><label class="compose-field-label">Cci</label><div id="compose-bcc-host" class="compose-recipients-host compose-to-cell"></div></div>`
     : "";
 
+  const correctionPlain = composeSourcePlainText(state.composeCanonicalBody || state.composeBody || "");
+  const correctionSuggestions = retainGrammarSuggestionsInText(state.composeGrammarSuggestions, correctionPlain);
+  if ((state.composeGrammarSuggestions?.length ?? 0) !== correctionSuggestions.length) {
+    state.composeGrammarSuggestions = correctionSuggestions.length ? correctionSuggestions : null;
+  }
   const correctionPanelHtml =
-    state.composeGrammarSuggestions?.length ?
+    correctionSuggestions.length ?
       `<aside class="compose-correction-panel surface-sm" role="complementary" aria-label="Correction de texte">
         <div class="compose-correction-panel__head">
           <strong>Correction de texte</strong>
           <button type="button" class="ghost-button compose-correction-dismiss" data-action="compose-grammar-dismiss">Fermer</button>
         </div>
         <ul class="compose-correction-list" role="list">
-          ${state.composeGrammarSuggestions
+          ${correctionSuggestions
             .map((g, i) => {
               const occurrences = grammarOccurrenceCount(state.composeBody, state.composeCanonicalBody, g);
               const applyTitle =
@@ -232,31 +238,6 @@ export function renderComposer() {
               </div>
             </div>
             <input id="compose-attachments" value="${escapeAttr(renderDeps().attachmentPathsJoinedForHiddenField(attachments))}" style="display:none" />
-          </div>
-          <div class="composer-advanced composer-advanced--footnote">
-            <button
-              type="button"
-              class="composer-advanced-micro"
-              data-action="toggle-compose-advanced"
-              aria-expanded="${state.composeAdvancedOpen}"
-            >
-              <span class="composer-advanced-chevron" aria-hidden="true">${state.composeAdvancedOpen ? "▾" : "▸"}</span>
-              <span>${state.composeAdvancedOpen ? "Masquer les options techniques" : "Options techniques"}</span>
-              <span class="composer-advanced-micro-hint dim">multipart HTML</span>
-            </button>
-            ${
-              state.composeAdvancedOpen
-                ? `<div class="composer-advanced-body composer-advanced-body--footnote">
-                    <div class="field-row field-row--tight-top field-row--advanced">
-                      <label for="compose-send-html" class="dim">HTML</label>
-                      <label class="composer-checkbox-inline">
-                        <input id="compose-send-html" type="checkbox" ${draft?.sendHtml ? "checked" : ""} />
-                        <span class="dim composer-checkbox-help">Envoyer en multipart (texte brut + HTML)</span>
-                      </label>
-                    </div>
-                  </div>`
-                : ""
-            }
           </div>
         </div>
       <div class="compose-editor-sheet">

@@ -8,12 +8,14 @@ import type { CleanedMessageView, LlmTranslationResult } from "../types";
 import { aiCacheKeySegment } from "./aiCacheKeySegment";
 import { shouldOfferPerMessageTranslate } from "./threadLangGuess";
 import { repairUtf8Mojibake } from "./threadViewUiHelpers";
+import { introducesLlmMeta } from "./llmMetaGuard";
 
 export async function hydrateMessageTranslationsFromCacheForThread(messages: CleanedMessageView[]): Promise<void> {
   if (!isTauriRuntime()) return;
   const targetLang = state.appPrefs.general.motherLanguage?.trim() || "fr";
   const seg = await aiCacheKeySegment();
   const batchSize = 12;
+  let applied = 0;
   for (let i = 0; i < messages.length; i += batchSize) {
     const slice = messages.slice(i, i + batchSize);
     await Promise.all(
@@ -29,13 +31,17 @@ export async function hydrateMessageTranslationsFromCacheForThread(messages: Cle
           if (!raw?.trim()) return;
           const o = JSON.parse(raw) as LlmTranslationResult;
           const tx = o.translatedText?.trim();
-          if (!tx) return;
-          state.messageTranslations[`${m.messageId}|${targetLang}`] = repairUtf8Mojibake(tx);
+          if (!tx || introducesLlmMeta(m.cleanedText || "", tx)) return;
+          const key = `${m.messageId}|${targetLang}`;
+          const repaired = repairUtf8Mojibake(tx);
+          if (state.messageTranslations[key] === repaired) return;
+          state.messageTranslations[key] = repaired;
+          applied += 1;
         } catch {
           /* cache absent ou JSON invalide */
         }
       }),
     );
   }
-  render();
+  if (applied > 0 && state.view === "thread") render();
 }
