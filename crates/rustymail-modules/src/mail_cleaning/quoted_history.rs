@@ -40,10 +40,7 @@ pub fn fold_quoted_history(html: &str) -> String {
 }
 
 fn skip_document(html: &str) -> bool {
-    html.contains("rustymail:amazon-digest")
-        || html.contains("rustymail:deblock-digest")
-        || html.contains("rustymail:github-digest")
-        || html.contains("rm-conversation-report")
+    super::digest_fixtures::html_has_digest_marker(html) || html.contains("rm-conversation-report")
 }
 
 fn sibling_fold(doc: &Html) -> Option<(String, String)> {
@@ -414,9 +411,7 @@ fn inside_preserved(el: ElementRef<'_>) -> bool {
             c == "rm-mail-folded-quote"
                 || c == "rm-mail-signature"
                 || c == "rm-conversation-report"
-                || c == "rm-amazon-digest"
-                || c == "rm-deblock-digest"
-                || c == "rm-github-digest"
+                || super::digest_fixtures::class_is_digest_article(c)
         })
     })
 }

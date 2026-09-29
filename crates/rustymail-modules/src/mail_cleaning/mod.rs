@@ -8,17 +8,20 @@
 //! | **Texte** | [`reading_text`](reading_text) si HTML, sinon plain (`signature_detection`, `quote_collapse`) | `cleanedText` = substance visible du corps affiché |
 //! | **Affichage** | DOMPurify + shadow `.mail` | Sécurité ; `.rm-mail-folded-quote` se déplie, `.rm-mail-signature` est masquée |
 //!
-//! Le générique sert la **lecture en discussion**. Les digests Amazon / Deblock / GitHub restent des plugins à part : ils ne sont pas un modèle à étendre au courrier personne-à-personne.
+//! Le générique sert la **lecture en discussion**. Les digests ne s’étendent pas au courrier personne-à-personne. Deblock est une fixture ; Amazon et GitHub restent des plugins.
 //!
 //! ## Ordre du pipeline HTML ([`clean_html_for_markdown`](pipeline::clean_html_for_markdown))
 //!
 //! 1. [`generic::generic_html_clean`] — MSO/VML, citations Gmail/Apple repliées, scripts, trackers
-//! 2. Plugin si détecté (Amazon, Deblock, GitHub) — digest structuré, inchangé
+//! 2. Plugin si détecté (Amazon, GitHub, fixture Deblock) — digest structuré, inchangé ensuite
 //! 3. Garde qualité (masse de texte)
 //! 4. [`generic::finalize_html_for_display`] — prune vide, historique cité replié (`rm-mail-folded-quote`), [`signature_html::fold_signature_tail`], attrs, lisibilité
 //!
-//! Digests tagués `rustymail:amazon-digest` / `rustymail:deblock-digest` / `rustymail:github-digest` : pas de strip agressif en finalize.
+//! Digests tagués `rustymail:digest` (et, le temps de la bascule, `rustymail:amazon-digest` / `rustymail:deblock-digest` / `rustymail:github-digest`) : pas de strip agressif en finalize.
+//!
+//! Deblock est une fixture YAML ([`digest_fixtures`]). Amazon et GitHub restent des plugins. Le générique ne gagne pas ce rendu.
 
+pub mod digest_fixtures;
 mod dom;
 mod error;
 mod generic;
@@ -33,6 +36,7 @@ pub mod signature_html;
 mod traits;
 pub mod types;
 
+pub use digest_fixtures::apply_fixture_yaml;
 pub use pipeline::{clean_html_builtin, clean_html_for_markdown};
 pub use reading_text::reading_text_from_cleaned_html;
 pub use registry::{ProviderRegistry, RegisteredProvider};

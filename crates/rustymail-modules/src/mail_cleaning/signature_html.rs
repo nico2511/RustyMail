@@ -54,10 +54,7 @@ static RE_POSTAL_CODE_FR: LazyLock<Regex> =
 
 /// Enveloppe la queue signature dans `<div class="rm-mail-signature">` (masquée côté UI).
 pub fn fold_signature_tail(html: &str) -> String {
-    if html.contains("rustymail:amazon-digest")
-        || html.contains("rustymail:deblock-digest")
-        || html.contains("rustymail:github-digest")
-    {
+    if super::digest_fixtures::html_has_digest_marker(html) {
         return html.to_string();
     }
     // Signatures explicites (#Signature, x_Signature…) : traitées par outlook_forward (wrap isolé).

@@ -61,4 +61,6 @@ Optional: screenshot of desired readable rendering — helpful but secondary to 
 | `Providerr_mockup/*.eml` | No (personal data; gitignored) |
 | `tests/fixtures/...*_anonymized.html` | Yes (anonymized, for CI) |
 
-For a **new provider** (not Amazon), follow the same pattern: MIME extraction script → fixture under `tests/fixtures/<provider>/` → Rust plugin under `mail_cleaning/providers/<name>.rs`.
+For a **new provider** (not Amazon), follow the same pattern today: MIME extraction script → fixture under `tests/fixtures/<provider>/` → Rust plugin under `mail_cleaning/providers/<name>.rs`.
+
+Deblock is the first declarative digest: `crates/rustymail-modules/fixtures/digests/deblock.yaml`, applied on read when sender domain and structure both match. The cut editor and the search bench are not implemented; see [docs/CADRAGE_DIGEST_TEMPLATES.md](../docs/CADRAGE_DIGEST_TEMPLATES.md). Do not commit raw `.eml` files either way.

@@ -36,10 +36,7 @@ static RE_OUTLOOK_INLINE_QUOTE: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Retire le bruit typique des transferts Outlook (sans nesting conversationnel complet).
 pub fn fold_outlook_forward_noise(html: &str) -> String {
-    if html.contains("rustymail:amazon-digest")
-        || html.contains("rustymail:deblock-digest")
-        || html.contains("rustymail:github-digest")
-    {
+    if super::digest_fixtures::html_has_digest_marker(html) {
         return html.to_string();
     }
     let mut doc = Html::parse_fragment(html);

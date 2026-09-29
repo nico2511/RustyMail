@@ -1,5 +1,6 @@
 use std::sync::OnceLock;
 
+use super::digest_fixtures::html_has_digest_marker;
 use super::generic::{self, generic_html_clean};
 use super::registry::ProviderRegistry;
 use super::types::{CleanHtmlResult, CleaningInput, ProviderId};
@@ -73,9 +74,7 @@ pub fn clean_html_for_markdown(
     let threshold = g_mass.saturating_mul(3) / 10;
     let threshold = threshold.max(50);
     // Amazon semantic digest deliberately drops noisy marketing blobs; bypass mass guard when tagged.
-    let digest_bypass_guard = after_plugin.contains("rustymail:amazon-digest")
-        || after_plugin.contains("rustymail:deblock-digest")
-        || after_plugin.contains("rustymail:github-digest");
+    let digest_bypass_guard = html_has_digest_marker(&after_plugin);
     if !digest_bypass_guard && p_mass < threshold && g_mass > 80 {
         diagnostics.push(format!(
             "quality guard: plugin text mass {p_mass} < max({threshold}, 30% of generic {g_mass}); fallback generic"

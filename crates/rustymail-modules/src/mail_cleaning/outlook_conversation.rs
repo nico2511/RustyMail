@@ -115,9 +115,7 @@ static RE_HTML_AFTER_GT_HEADER: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Construit un rapport conversationnel si ≥2 tranches détectées.
 pub fn try_build_report(html: &str) -> Option<ConversationReport> {
-    if html.contains("rustymail:amazon-digest")
-        || html.contains("rustymail:deblock-digest")
-        || html.contains("rustymail:github-digest")
+    if super::digest_fixtures::html_has_digest_marker(html)
         || html.contains("rm-conversation-report")
     {
         return None;

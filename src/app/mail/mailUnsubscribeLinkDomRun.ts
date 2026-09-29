@@ -41,7 +41,7 @@ export function hideRelocatedUnsubscribeInDoc(doc: Document): void {
       cell.classList.add("mail-unsubscribe-section--relocated");
     }
   });
-  doc.querySelectorAll("article.rm-amazon-digest, article.rm-deblock-digest").forEach((article) => {
+  doc.querySelectorAll("article.rm-digest, article.rm-amazon-digest, article.rm-deblock-digest").forEach((article) => {
     const h3 = article.querySelector(":scope > h3");
     if (!h3 || !/désabon|unsub/i.test(h3.textContent || "")) return;
     h3.classList.add("mail-unsubscribe-section--relocated");
