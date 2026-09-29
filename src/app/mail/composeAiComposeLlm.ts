@@ -9,7 +9,12 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { readComposePlainText, replaceComposeWithModelText } from "./composeBodyEditor";
-import { grammarOccurrenceCount, replacementDropsWords } from "./composeGrammarReplace";
+import {
+  grammarOccurrenceCount,
+  grammarOriginalTooLong,
+  replacementDropsCriticalPunct,
+  replacementDropsWords,
+} from "./composeGrammarReplace";
 import { computePreview } from "./composeComposerBridge";
 import {
   containsLlmMeta,
@@ -115,7 +120,10 @@ export async function composeAiGrammar(): Promise<void> {
         if (containsLlmMeta(original) || containsLlmMeta(replacement) || containsLlmMeta(g.reason ?? "")) {
           return false;
         }
-        if (replacementDropsWords(original, replacement)) return false;
+        if (grammarOriginalTooLong(original)) return false;
+        if (replacementDropsWords(original, replacement) || replacementDropsCriticalPunct(original, replacement)) {
+          return false;
+        }
         return grammarOccurrenceCount(current, current, g) > 0;
       });
       if (sawMeta && usable.length === 0) {

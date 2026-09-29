@@ -62,6 +62,11 @@ export async function fetchMailboxDigestRefresh(): Promise<void> {
     state.mailboxActionBrief = brief;
     state.mailboxBriefBannerHtml = "";
     state.mailboxDigestKey = key;
+    if (brief.outputPartial) {
+      toast.warning(
+        "Brief partiel : la réponse du modèle était incomplète. Les éléments manquants ne sont pas affichés.",
+      );
+    }
   } catch (error) {
     if (!isMailboxDigestRequestCurrent(gen)) return;
     const detail = tauriErrorMessage(error).replace(/\s+/g, " ").trim().slice(0, 400);

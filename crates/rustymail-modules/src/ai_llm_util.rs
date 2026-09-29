@@ -528,10 +528,10 @@ fn repair_truncated_json_drop_tail(s: &str) -> Option<String> {
     None
 }
 
-fn parse_json_with_optional_repair<T: DeserializeOwned>(s: &str) -> Result<T, LlmError> {
+fn parse_json_with_optional_repair<T: DeserializeOwned>(s: &str) -> Result<(T, bool), LlmError> {
     let normalized = normalize_json_loose(s);
     match serde_json::from_str::<T>(&normalized) {
-        Ok(v) => return Ok(v),
+        Ok(v) => Ok((v, false)),
         Err(e) => {
             let msg = e.to_string();
             let repairable = msg.contains("EOF")
@@ -544,19 +544,28 @@ fn parse_json_with_optional_repair<T: DeserializeOwned>(s: &str) -> Result<T, Ll
             }
             let repaired = close_truncated_json(&normalized);
             if let Ok(v) = serde_json::from_str::<T>(&repaired) {
-                return Ok(v);
+                return Ok((v, true));
             }
             if let Some(dropped) = repair_truncated_json_drop_tail(&normalized) {
                 return serde_json::from_str(&dropped)
+                    .map(|v| (v, true))
                     .map_err(|e3| LlmError::InvalidJson(format!("{msg} — réparation: {e3}")));
             }
             serde_json::from_str(&repaired)
+                .map(|v| (v, true))
                 .map_err(|e2| LlmError::InvalidJson(format!("{msg} — réparation: {e2}")))
         }
     }
 }
 
-pub(crate) fn parse_model_json<T: DeserializeOwned>(raw: &str) -> Result<T, LlmError> {
+pub(crate) struct ParsedModelJson<T> {
+    pub value: T,
+    pub repaired: bool,
+}
+
+pub(crate) fn parse_model_json_ex<T: DeserializeOwned>(
+    raw: &str,
+) -> Result<ParsedModelJson<T>, LlmError> {
     if raw.trim().is_empty() {
         return Err(LlmError::InvalidJson(
             "Réponse du modèle vide : aucun JSON exploitable.".into(),
@@ -568,7 +577,12 @@ pub(crate) fn parse_model_json<T: DeserializeOwned>(raw: &str) -> Result<T, LlmE
             "Réponse du modèle sans JSON exploitable (objet ou tableau attendu).".into(),
         ));
     }
-    parse_json_with_optional_repair(&s)
+    let (value, repaired) = parse_json_with_optional_repair(&s)?;
+    Ok(ParsedModelJson { value, repaired })
+}
+
+pub(crate) fn parse_model_json<T: DeserializeOwned>(raw: &str) -> Result<T, LlmError> {
+    parse_model_json_ex(raw).map(|parsed| parsed.value)
 }
 
 pub(crate) fn truncate_chars(text: &str, max_chars: usize) -> String {
@@ -645,6 +659,19 @@ mod tests {
     }
 
     #[test]
+    fn parse_model_json_ex_flags_repaired_truncation() {
+        let complete = r#"{"changes":[{"summary":"ok"}]}"#;
+        let parsed = parse_model_json_ex::<serde_json::Value>(complete).expect("complete");
+        assert!(!parsed.repaired);
+        assert_eq!(parsed.value["changes"][0]["summary"], "ok");
+
+        let partial = r#"{"changes":[{"summary":"ok"},{"summary":"#;
+        let parsed = parse_model_json_ex::<serde_json::Value>(partial).expect("repaired");
+        assert!(parsed.repaired);
+        assert_eq!(parsed.value["changes"][0]["summary"], "ok");
+    }
+
+    #[test]
     fn parse_model_json_reports_when_no_json_remains() {
         let err = parse_model_json::<serde_json::Value>("Je ne peux pas répondre en JSON.")
             .expect_err("prose");
@@ -655,8 +682,9 @@ mod tests {
     #[test]
     fn repair_drops_incomplete_object_in_facts_array() {
         let partial = r#"{"facts":[{"kind":"request","text":"Devis","messageIds":[]},{"kind":"deadline","tex"#;
-        let v: serde_json::Value =
+        let (v, repaired): (serde_json::Value, bool) =
             parse_json_with_optional_repair(partial).expect("facts json repaired");
+        assert!(repaired);
         let facts = v["facts"].as_array().expect("facts");
         assert!(!facts.is_empty());
         assert_eq!(facts[0]["text"], "Devis");
@@ -677,8 +705,9 @@ mod tests {
     #[test]
     fn repair_pretty_printed_truncated_brief() {
         let partial = "{\n  \"changes\": [\n    {\"id\": \"1\", \"summary\": \"ok\"},\n    {\"id\": \"2\", \"summary\":";
-        let v: serde_json::Value =
+        let (v, repaired): (serde_json::Value, bool) =
             parse_json_with_optional_repair(partial).expect("pretty brief repaired");
+        assert!(repaired);
         let changes = v["changes"].as_array().expect("changes");
         assert!(!changes.is_empty());
         assert_eq!(changes[0]["summary"], "ok");

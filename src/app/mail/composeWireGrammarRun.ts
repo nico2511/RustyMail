@@ -18,6 +18,8 @@ import {
   countGrammarOccurrences,
   findGrammarSpans,
   grammarTextsMatch,
+  grammarOriginalTooLong,
+  replacementDropsCriticalPunct,
   replacementDropsWords,
   type GrammarReplaceInput,
 } from "./composeGrammarReplace";
@@ -79,7 +81,13 @@ function finishApplied(index: number, suggestion: GrammarReplaceInput, occurrenc
 export function applyComposeGrammarSuggestionAtIndex(index: number): void {
   const suggestion = suggestionAt(index);
   if (!suggestion) return;
-  if (replacementDropsWords(suggestion.original, suggestion.replacement ?? "")) {
+  const original = suggestion.original;
+  const replacement = suggestion.replacement ?? "";
+  if (
+    grammarOriginalTooLong(original) ||
+    replacementDropsWords(original, replacement) ||
+    replacementDropsCriticalPunct(original, replacement)
+  ) {
     toast.warning("Cette suggestion retirerait du texte — elle n’a pas été appliquée.");
     return;
   }

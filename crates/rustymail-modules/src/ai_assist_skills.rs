@@ -3,6 +3,7 @@
 use serde::Deserialize;
 
 use crate::ai_agent_prepare_reply::AgentIntentResult;
+use crate::ai_llm_contracts::ensure_mail_body_output;
 use crate::ai_llm_util::{
     gen_params_for_tier, gen_params_text_echo_for_prompt, parse_model_json, truncate_chars,
 };
@@ -123,9 +124,7 @@ pub fn adapt_draft_tone_with_llm(
     } else {
         raw.trim().to_string()
     };
-    if t.is_empty() {
-        return Ok(draft.to_string());
-    }
+    let t = ensure_mail_body_output(draft, &t)?;
     Ok(t.chars().take(8000).collect())
 }
 

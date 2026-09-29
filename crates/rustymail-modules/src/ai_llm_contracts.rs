@@ -174,6 +174,22 @@ pub fn introduces_llm_meta(source: &str, output: &str) -> bool {
         .any(|m| out.contains(m) && !src.contains(m))
 }
 
+pub const MAIL_BODY_META_ERR: &str = "Le modèle a renvoyé une consigne (format JSON, message système) au lieu du message. Le texte n’a pas été modifié.";
+
+/// Corps de mail produit par un modèle : refuse consigne, refus ou méta absents de la source.
+pub fn ensure_mail_body_output(source: &str, output: &str) -> Result<String, LlmError> {
+    let text = output.trim();
+    if text.is_empty() {
+        return Err(LlmError::Msg(
+            "Réponse vide : le texte n’a pas été modifié.".into(),
+        ));
+    }
+    if introduces_llm_meta(source, text) {
+        return Err(LlmError::Msg(MAIL_BODY_META_ERR.into()));
+    }
+    Ok(text.to_string())
+}
+
 /// Rejette les sorties hors bornes avant normalisation métier.
 pub fn validate_summary_llm_shape(
     title: &str,
@@ -755,5 +771,11 @@ mod tests {
             "Le format JSON requis est en pièce jointe."
         ));
         assert!(!contains_llm_meta("Salut, je m'appelle Nicola."));
+        assert!(ensure_mail_body_output("Salu je mappel nicola", leak).is_err());
+        assert!(ensure_mail_body_output(
+            "Le format JSON requis figure en pièce jointe.",
+            "Le format JSON requis figure en pièce jointe."
+        )
+        .is_ok());
     }
 }

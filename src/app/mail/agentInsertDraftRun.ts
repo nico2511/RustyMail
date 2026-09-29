@@ -17,6 +17,7 @@ import { draftHasRecipientsExtra } from "./composeDraftRecipients";
 import { startNewDraftSession } from "./composeDraftSession";
 import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
 import { enterComposeView } from "./composeViewWireActions";
+import { introducesLlmMeta, LLM_META_BODY_TOAST } from "./llmMetaGuard";
 import { threadIsAutoMail } from "./threadAutoMail";
 
 export async function agentInsertDraftIntoCompose(extra?: string): Promise<void> {
@@ -24,6 +25,11 @@ export async function agentInsertDraftIntoCompose(extra?: string): Promise<void>
   if (!s?.draft.trim() && !extra?.trim()) return;
   let body = s?.draft?.trim() ?? "";
   if (extra?.trim()) body = appendSchedulingSlotsToDraft(body, extra.trim());
+  const source = (state.selectedThread?.messages ?? []).map((message) => message.cleanedText || "").join("\n");
+  if (introducesLlmMeta(source, body)) {
+    toast.error(LLM_META_BODY_TOAST);
+    return;
+  }
 
   const threadId = (s?.threadId ?? state.selectedThreadId ?? "").trim();
   if (!threadId) {

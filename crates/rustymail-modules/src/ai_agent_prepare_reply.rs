@@ -1,14 +1,15 @@
 use std::convert::Infallible;
 use std::ops::ControlFlow;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
 
 use crate::ai_assist_facts::facts_block_for_draft;
 use crate::ai_assist_thread::facts_support_scheduling;
+use crate::ai_llm_contracts::{ensure_mail_body_output, introduces_llm_meta};
 use crate::ai_llm_util::{
     budget_report, cancelled_llm_err, gen_params_json_for_prompt, gen_params_text_echo_for_prompt,
-    parse_model_json, stream_chunk_or_cancel, truncate_chars,
+    parse_model_json, truncate_chars,
 };
 use rustymail_domain::{AssistFactsSnapshot, AssistUserPrefs};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -114,6 +115,7 @@ pub fn agent_draft_reply_streaming(
         user_prefs,
         prior_facts,
     );
+    let mut streamed = String::new();
     let raw = engine.generate_streaming(
         system.as_str(),
         &user,
@@ -126,13 +128,22 @@ pub fn agent_draft_reply_streaming(
             8192,
         ),
         |piece| -> ControlFlow<Result<(), Infallible>> {
-            stream_chunk_or_cancel(cancelled, piece, &mut on_chunk)
+            if cancelled.load(Ordering::Relaxed) {
+                return ControlFlow::Break(Ok(()));
+            }
+            streamed.push_str(piece);
+            if introduces_llm_meta(thread_context, &streamed) {
+                return ControlFlow::Break(Ok(()));
+            }
+            on_chunk(piece);
+            ControlFlow::Continue(())
         },
     )?;
     if let Some(e) = cancelled_llm_err(cancelled) {
         return Err(e);
     }
-    let draft = raw.trim().chars().take(8000).collect::<String>();
+    let draft = ensure_mail_body_output(thread_context, raw.trim())?;
+    let draft: String = draft.chars().take(8000).collect();
     let _ = budget_report(
         engine.n_ctx(),
         engine,

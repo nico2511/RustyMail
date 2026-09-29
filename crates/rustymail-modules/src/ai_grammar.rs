@@ -295,6 +295,29 @@ fn replacement_drops_words(original: &str, replacement: &str) -> bool {
     coverage >= 0.75 && repl.len() < orig.len()
 }
 
+const MAX_GRAMMAR_ORIGINAL_CHARS: usize = 180;
+
+fn trailing_sentence_mark(text: &str) -> bool {
+    let trimmed = text.trim_end();
+    let mut chars = trimmed.chars().rev();
+    while let Some(c) = chars.next() {
+        if matches!(c, '"' | '\'' | '’' | '»' | ')' | ']') {
+            continue;
+        }
+        return matches!(c, '.' | '!' | '?' | '…');
+    }
+    false
+}
+
+fn has_sentence_mark(text: &str) -> bool {
+    text.chars().any(|c| matches!(c, '.' | '!' | '?' | '…'))
+}
+
+/// Point, exclamation, interrogation ou points de suspension de fin de phrase retirés.
+fn replacement_drops_critical_punct(original: &str, replacement: &str) -> bool {
+    trailing_sentence_mark(original) && !has_sentence_mark(replacement)
+}
+
 fn sanitize_grammar_suggestions(
     source: &str,
     suggestions: Vec<GrammarSuggestion>,
@@ -317,7 +340,11 @@ fn sanitize_grammar_suggestions(
         {
             continue;
         }
-        if !excerpt_in_source(source, original) || replacement_drops_words(original, replacement) {
+        if original.chars().count() > MAX_GRAMMAR_ORIGINAL_CHARS
+            || !excerpt_in_source(source, original)
+            || replacement_drops_words(original, replacement)
+            || replacement_drops_critical_punct(original, replacement)
+        {
             continue;
         }
         out.push(GrammarSuggestion {
@@ -409,7 +436,7 @@ pub fn grammar_check_with_llm(
     let system = crate::prompts::system_prompt_for_language("grammar", output_language);
     let user = truncate_chars(text, 32_768);
     let user_block = format!(
-        "Correct only the draft below. Each original must be an exact excerpt of this draft. Do not delete words.\nText:\n{user}"
+        "Correct only the draft below. Each original must be a short exact excerpt of this draft (at most a short sentence), not a whole paragraph. Do not delete words or sentence-ending punctuation.\nText:\n{user}"
     );
 
     let (suggestions, raw) = match grammar_once(engine, system.as_str(), &user_block, text) {
@@ -548,5 +575,41 @@ mod tests {
         };
         let kept = sanitize_grammar_suggestions("Bonjour  Nicola", vec![same]).expect("ok");
         assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn sanitize_drops_long_excerpt_and_missing_sentence_mark() {
+        let long = "mot ".repeat(50);
+        let source = long.trim();
+        let wide = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: source.into(),
+            replacement: source.replacen("mot", "mots", 1),
+            reason: "accord".into(),
+        };
+        assert!(source.chars().count() > 180);
+        let kept = sanitize_grammar_suggestions(source, vec![wide]).expect("no meta");
+        assert!(kept.is_empty());
+
+        let punct = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: "Bonjour.".into(),
+            replacement: "Bonjour".into(),
+            reason: "ponctuation".into(),
+        };
+        let dropped = sanitize_grammar_suggestions("Bonjour.", vec![punct]).expect("ok");
+        assert!(dropped.is_empty());
+
+        let swapped = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: "Bonjour.".into(),
+            replacement: "Bonjour!".into(),
+            reason: "ponctuation".into(),
+        };
+        let kept = sanitize_grammar_suggestions("Bonjour.", vec![swapped]).expect("ok");
+        assert_eq!(kept.len(), 1);
     }
 }

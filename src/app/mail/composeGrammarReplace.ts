@@ -196,6 +196,31 @@ function tokensSimilar(a: string, b: string): boolean {
  * Vrai si le remplacement est surtout l’extrait d’origine avec un mot de contenu en moins.
  * Une reformulation (« salu moi c'est nicolas » → « Bonjour, je m'appelle Nicolas ») reste autorisée.
  */
+const MAX_GRAMMAR_ORIGINAL_CHARS = 180;
+
+export function grammarOriginalTooLong(original: string): boolean {
+  return [...original.trim()].length > MAX_GRAMMAR_ORIGINAL_CHARS;
+}
+
+function endsWithSentenceMark(value: string): boolean {
+  const trimmed = value.trimEnd();
+  for (let i = trimmed.length - 1; i >= 0; i--) {
+    const c = trimmed[i]!;
+    if (c === '"' || c === "'" || c === "’" || c === "»" || c === ")" || c === "]") continue;
+    return c === "." || c === "!" || c === "?" || c === "…";
+  }
+  return false;
+}
+
+function hasSentenceMark(value: string): boolean {
+  return /[.!?…]/.test(value);
+}
+
+/** Point final retiré (« Bonjour. » → « Bonjour »). « Bonjour. » → « Bonjour! » reste autorisé. */
+export function replacementDropsCriticalPunct(original: string, replacement: string): boolean {
+  return endsWithSentenceMark(original) && !hasSentenceMark(replacement);
+}
+
 export function replacementDropsWords(original: string, replacement: string): boolean {
   const orig = contentTokens(original);
   const repl = contentTokens(replacement);

@@ -7,7 +7,7 @@ use serde::Deserialize;
 use crate::ai_llm_contracts::contains_llm_meta;
 use crate::ai_llm_util::{
     budget_report, gen_params_json_for_prompt, output_room_after_prompt, parse_model_json,
-    truncate_chars, user_text_for_engine,
+    parse_model_json_ex, truncate_chars, user_text_for_engine,
 };
 use rustymail_domain::{
     ActionBriefAmbiguity, ActionBriefChange, ActionBriefDecision, ActionBriefEvidenceLink,
@@ -16,7 +16,7 @@ use rustymail_domain::{
 };
 use rustymail_llm::{LlmEngine, LlmError};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefEvidenceDto {
     #[serde(default, alias = "thread_id", alias = "fil_id", alias = "filId")]
@@ -27,14 +27,14 @@ struct BriefEvidenceDto {
     label: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum FlexEvidence {
     Obj(BriefEvidenceDto),
     Id(String),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefChangeDto {
     #[serde(default)]
@@ -47,7 +47,7 @@ struct BriefChangeDto {
     evidence_links: Vec<FlexEvidence>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefDecisionDto {
     #[serde(default)]
@@ -62,7 +62,7 @@ struct BriefDecisionDto {
     evidence_links: Vec<FlexEvidence>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefActionDto {
     #[serde(default)]
@@ -79,7 +79,7 @@ struct BriefActionDto {
     evidence_links: Vec<FlexEvidence>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefRiskDto {
     #[serde(default)]
@@ -92,7 +92,7 @@ struct BriefRiskDto {
     evidence_links: Vec<FlexEvidence>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BriefAmbiguityDto {
     #[serde(default)]
@@ -103,7 +103,7 @@ struct BriefAmbiguityDto {
     evidence_links: Vec<FlexEvidence>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LlmBriefDto {
     #[serde(default)]
@@ -193,6 +193,7 @@ fn dto_to_result(
     user: &str,
     raw: &str,
     input_truncated: bool,
+    output_partial: bool,
 ) -> ActionBriefResult {
     let mut verification = dto.verification_recommended;
 
@@ -296,7 +297,7 @@ fn dto_to_result(
 
     let confidence = dto.confidence.clamp(0.0, 1.0);
 
-    ActionBriefResult {
+    let mut result = ActionBriefResult {
         account_id: account_id.trim().to_string(),
         mailbox: mailbox.trim().to_string(),
         mode,
@@ -309,6 +310,7 @@ fn dto_to_result(
         confidence,
         priority_bucket,
         verification_recommended: verification,
+        output_partial,
         executed_skills: vec![
             "signal_extractor_llm".into(),
             "prioritizer_rust_v1".into(),
@@ -323,6 +325,30 @@ fn dto_to_result(
             Some(raw),
             input_truncated,
         ),
+    };
+    if output_partial {
+        stamp_output_partial(&mut result);
+    }
+    result
+}
+
+fn stamp_output_partial(result: &mut ActionBriefResult) {
+    result.output_partial = true;
+    result.verification_recommended = true;
+    result.confidence = result.confidence.min(0.45);
+    let already = result
+        .ambiguities
+        .iter()
+        .any(|a| a.question.trim() == "Brief partiel");
+    if !already {
+        result.ambiguities.insert(
+            0,
+            ActionBriefAmbiguity {
+                question: "Brief partiel".into(),
+                why_it_matters: "La réponse JSON du modèle était incomplète et a été tronquée. Les éléments absents de cette réponse ne figurent pas ici.".into(),
+                evidence_links: vec![],
+            },
+        );
     }
 }
 
@@ -557,17 +583,17 @@ fn generate_brief_dto(
     system: &str,
     user: &str,
     mode: ActionBriefMode,
-) -> Result<(LlmBriefDto, String), LlmError> {
+) -> Result<(LlmBriefDto, String, bool), LlmError> {
     let raw = engine.generate(
         system,
         user,
         &gen_params_json_for_prompt(engine, system, user, 384, max_tokens_for_mode(mode)),
     )?;
-    let dto: LlmBriefDto = parse_model_json(&raw)?;
-    if !dto_has_signal(&dto) {
+    let parsed = parse_model_json_ex::<LlmBriefDto>(&raw)?;
+    if !dto_has_signal(&parsed.value) {
         return Err(LlmError::InvalidJson("brief vide".into()));
     }
-    Ok((dto, raw))
+    Ok((parsed.value, raw, parsed.repaired))
 }
 
 /// Génère un brief d'action à partir du snapshot texte (déjà trié / borné côté appli).
@@ -598,40 +624,48 @@ pub fn action_brief_with_llm(
         mailbox,
         &snapshot,
     )?;
-    let (dto, raw, effective_mode, user_used, clipped) =
-        match generate_brief_dto(engine, system.as_str(), &user, mode) {
-            Ok((dto, raw)) => (dto, raw, mode, user, fitted_clip),
-            Err(LlmError::InvalidJson(_)) => {
-                let short = clip_snapshot_lines(&snapshot, 2_400);
-                let (user_retry, retry_clip) = fit_brief_user(
-                    engine,
-                    system.as_str(),
-                    ActionBriefMode::Quick,
-                    account_id,
-                    mailbox,
-                    &short,
-                )?;
-                match generate_brief_dto(
-                    engine,
-                    system.as_str(),
-                    &user_retry,
-                    ActionBriefMode::Quick,
-                ) {
-                    Ok((dto, raw)) => (
-                        dto,
-                        raw,
-                        ActionBriefMode::Quick,
-                        user_retry,
-                        fitted_clip || retry_clip,
-                    ),
-                    Err(LlmError::InvalidJson(_)) => {
-                        return Err(LlmError::Msg(BRIEF_PARSE_ERR.into()));
-                    }
-                    Err(e) => return Err(e),
+    enum FirstBrief {
+        Clean(LlmBriefDto, String),
+        Repaired(LlmBriefDto, String),
+        Invalid,
+    }
+    let first = match generate_brief_dto(engine, system.as_str(), &user, mode) {
+        Ok((dto, raw, false)) => FirstBrief::Clean(dto, raw),
+        Ok((dto, raw, true)) => FirstBrief::Repaired(dto, raw),
+        Err(LlmError::InvalidJson(_)) => FirstBrief::Invalid,
+        Err(e) => return Err(e),
+    };
+    let (dto, raw, effective_mode, user_used, clipped, output_partial) = match first {
+        FirstBrief::Clean(dto, raw) => (dto, raw, mode, user, fitted_clip, false),
+        other => {
+            let short = clip_snapshot_lines(&snapshot, 2_400);
+            let (user_retry, retry_clip) = fit_brief_user(
+                engine,
+                system.as_str(),
+                ActionBriefMode::Quick,
+                account_id,
+                mailbox,
+                &short,
+            )?;
+            let clip = fitted_clip || retry_clip;
+            match generate_brief_dto(engine, system.as_str(), &user_retry, ActionBriefMode::Quick) {
+                Ok((dto, raw, false)) => {
+                    (dto, raw, ActionBriefMode::Quick, user_retry, clip, false)
                 }
+                Ok((dto, raw, true)) => match other {
+                    FirstBrief::Repaired(first_dto, first_raw) => {
+                        (first_dto, first_raw, mode, user, fitted_clip, true)
+                    }
+                    _ => (dto, raw, ActionBriefMode::Quick, user_retry, clip, true),
+                },
+                Err(LlmError::InvalidJson(_)) => match other {
+                    FirstBrief::Repaired(dto, raw) => (dto, raw, mode, user, fitted_clip, true),
+                    _ => return Err(LlmError::Msg(BRIEF_PARSE_ERR.into())),
+                },
+                Err(e) => return Err(e),
             }
-            Err(e) => return Err(e),
-        };
+        }
+    };
 
     Ok(dto_to_result(
         dto,
@@ -644,6 +678,7 @@ pub fn action_brief_with_llm(
         &user_used,
         &raw,
         input_truncated || clipped,
+        output_partial,
     ))
 }
 
@@ -671,6 +706,7 @@ pub fn action_brief_offline_stub(
         confidence: 0.0,
         priority_bucket: ActionBriefPriorityBucket::Routine,
         verification_recommended: true,
+        output_partial: false,
         executed_skills: vec!["offline_stub".into()],
         budget: TokenBudgetReport::empty_stub(),
     }
@@ -746,5 +782,20 @@ mod brief_context_tests {
             room >= 256,
             "output room collapsed ({room}); brief JSON cannot be completed"
         );
+    }
+
+    #[test]
+    fn stamp_output_partial_marks_repaired_json() {
+        let mut brief =
+            action_brief_offline_stub("acc", "INBOX", ActionBriefMode::Deep, "hors ligne");
+        brief.output_partial = true;
+        brief.confidence = 0.9;
+        brief.verification_recommended = false;
+        stamp_output_partial(&mut brief);
+        assert!(brief.output_partial);
+        assert!(brief.verification_recommended);
+        assert!(brief.confidence <= 0.45);
+        assert_eq!(brief.ambiguities[0].question, "Brief partiel");
+        assert!(brief.ambiguities[0].why_it_matters.contains("incomplète"));
     }
 }

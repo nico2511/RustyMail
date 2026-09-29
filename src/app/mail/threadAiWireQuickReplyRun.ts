@@ -8,7 +8,8 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
-import { prependComposePlainText } from "./composeBodyEditor";
+import { prependComposePlainText, readComposePlainText } from "./composeBodyEditor";
+import { introducesLlmMeta, LLM_META_BODY_TOAST } from "./llmMetaGuard";
 import { computePreview } from "./composeComposerBridge";
 import { withLlmQueue } from "./llmJobQueue";
 import { threadIsAutoMail } from "./threadAutoMail";
@@ -70,6 +71,10 @@ export async function llmQuickRepliesComposeUi() {
       const first = res.suggestions?.[0]?.text?.trim();
       if (!first) {
         toast.warning("Aucune suggestion.");
+        return;
+      }
+      if (introducesLlmMeta(readComposePlainText(), first)) {
+        toast.error(LLM_META_BODY_TOAST);
         return;
       }
       prependComposePlainText(first);

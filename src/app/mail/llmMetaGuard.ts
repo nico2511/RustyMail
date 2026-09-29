@@ -23,6 +23,9 @@ export const LLM_META_GRAMMAR_TOAST =
 export const LLM_META_TRANSLATION_TOAST =
   "Traduction refusée : le modèle a renvoyé une consigne au lieu du message traduit.";
 
+export const LLM_META_BODY_TOAST =
+  "Le modèle a renvoyé une consigne (format JSON, message système) au lieu du message. Le texte n’a pas été modifié.";
+
 function foldMeta(value: string): string {
   return value
     .toLowerCase()

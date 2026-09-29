@@ -3,6 +3,7 @@ import { state } from "../state";
 import { toast } from "../lib/toast";
 import { sendQuickReply } from "./composeSendQuickReply";
 import { prependComposePlainText } from "./composeBodyEditor";
+import { introducesLlmMeta, LLM_META_BODY_TOAST } from "./llmMetaGuard";
 import { computePreview } from "./composeComposerBridge";
 import { prepareReply } from "./composeThreadReply";
 
@@ -20,6 +21,11 @@ export async function tryHandleThreadLlmQuickReplyWire(action: string, element?:
         const idx = Number(qrRaw);
         const s = state.quickReplySuggestions[idx];
         if (!s?.text) return true;
+        const source = (state.selectedThread?.messages ?? []).map((message) => message.cleanedText || "").join("\n");
+        if (introducesLlmMeta(source, s.text)) {
+          toast.error(LLM_META_BODY_TOAST);
+          return true;
+        }
         state.composeGrammarSuggestions = null;
         await prepareReply();
         prependComposePlainText(s.text.trim());
