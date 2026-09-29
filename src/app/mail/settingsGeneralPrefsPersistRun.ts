@@ -21,7 +21,7 @@ import {
 
 export async function persistGeneralPrefsFromDom(): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("Enregistrement : lancez l’app Tauri.");
+    toast.warning("Enregistrement : lancez l’app Tauri.");
     return;
   }
   const sel = document.querySelector<HTMLSelectElement>("#prefs-mother-language");
@@ -65,9 +65,9 @@ export async function persistGeneralPrefsFromDom(): Promise<void> {
   else delete state.appPrefs.general.defaultAccountId;
   try {
     await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
-    toast(t("toast.prefsSaved"));
+    toast.success(t("toast.prefsSaved"));
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
     return;
   }
   if (accVal && state.view === "list") {

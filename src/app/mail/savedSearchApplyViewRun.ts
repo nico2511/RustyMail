@@ -17,7 +17,7 @@ export async function applySavedSearchView(id: string): Promise<void> {
   if (!isTauriRuntime()) return;
   const accountId = currentAccount()?.id?.trim();
   if (!accountId) {
-    toast("Compte requis pour ouvrir une vue.");
+    toast.warning("Compte requis pour ouvrir une vue.");
     return;
   }
   try {
@@ -42,6 +42,6 @@ export async function applySavedSearchView(id: string): Promise<void> {
     await refreshSuggestedSavedViews();
     render();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

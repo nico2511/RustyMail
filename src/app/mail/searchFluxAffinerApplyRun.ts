@@ -15,13 +15,13 @@ export async function runFluxAffinerApplyImapMove(ctx: FluxAffinerApplyContext):
   const total = visible.length;
   try {
     setSearchViewBatchJob({ phase: "create", done: 0, total: 1, target: mailbox });
-    toast(`Création du dossier « ${mailbox} »…`, 4500);
+    toast.info(`Création du dossier « ${mailbox} »…`, 4500);
     await withTimeout(
       invoke<string>("create_imap_mailbox", { accountId, mailbox }),
       MAIL_ACTION_TIMEOUT_MS,
     );
     setSearchViewBatchJob({ phase: "move", done: 0, total, target: mailbox });
-    toast(`Déplacement de ${total} fil(s) vers « ${mailbox} »…`, 5000);
+    toast.info(`Déplacement de ${total} fil(s) vers « ${mailbox} »…`, 5000);
     const ids = new Set(visible.map((t) => String(t.id)));
     let moved = 0;
     const errors: string[] = [];
@@ -54,11 +54,11 @@ export async function runFluxAffinerApplyImapMove(ctx: FluxAffinerApplyContext):
       }
     }
     if (errors.length && moved === 0) {
-      toast(`Déplacement échoué : ${errors[0]}`, 10_000);
+      toast.error(`Déplacement échoué : ${errors[0]}`, 10_000);
     } else if (errors.length) {
       toast(`${moved}/${total} fil(s) déplacé(s) vers « ${mailbox} » · ${errors.length} échec(s).`, 10_000);
     } else {
-      toast(`${moved} fil(s) déplacé(s) vers « ${mailbox} ».`, 10_000);
+      toast.success(`${moved} fil(s) déplacé(s) vers « ${mailbox} ».`, 10_000);
     }
     state.syncMessage = moved > 0 ? `${moved} déplacé(s) → ${mailbox}` : "";
     if (moved > 0) {
@@ -80,6 +80,6 @@ export async function runFluxAffinerApplyImapMove(ctx: FluxAffinerApplyContext):
     }
   } catch (e) {
     setSearchViewBatchJob(null, false);
-    toast(tauriErrorMessage(e), 10_000);
+    toast.error(tauriErrorMessage(e), 10_000);
   }
 }

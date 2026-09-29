@@ -26,7 +26,7 @@ export function toastSplitImapNotices(notes: Array<string | null | undefined> | 
   const shorten = (s: string, n = 220) => (s.length <= n ? s : `${s.slice(0, n)}…`);
   for (const note of notes) {
     const t = note?.trim();
-    if (t) toast(`Information : ${shorten(t)}`);
+    if (t) toast.info(`Information : ${shorten(t)}`);
   }
 }
 

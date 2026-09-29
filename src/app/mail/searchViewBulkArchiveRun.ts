@@ -45,10 +45,10 @@ export async function bulkArchiveSearchViewThreads(): Promise<void> {
   if (errors.length) {
     clearThreadsRecentlyRemoved(ids);
     state.threads = prevThreads;
-    toast(`Archivage partiel : ${errors[0]}`);
+    toast.warning(`Archivage partiel : ${errors[0]}`);
     render();
     return;
   }
-  toast(`${idList.length} conversation(s) archivée(s).`);
+  toast.success(`${idList.length} conversation(s) archivée(s).`);
   await searchThreads();
 }

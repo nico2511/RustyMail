@@ -10,11 +10,11 @@ import { readNlButtonRule } from "./newsletterRuleInput";
 export async function addNewsletterDomainRuleFromInput(): Promise<void> {
   const raw = document.querySelector<HTMLInputElement>("#newsletter-domain-input")?.value?.trim() ?? "";
   if (!raw) {
-    toast("Indiquez une règle (domaine, *.domaine ou local@domaine).");
+    toast.warning("Indiquez une règle (domaine, *.domaine ou local@domaine).");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Ajout de règles : exécutez l’app Tauri.");
+    toast.warning("Ajout de règles : exécutez l’app Tauri.");
     return;
   }
   try {
@@ -22,29 +22,29 @@ export async function addNewsletterDomainRuleFromInput(): Promise<void> {
     await loadNewsletterRules();
     const inp = document.querySelector<HTMLInputElement>("#newsletter-domain-input");
     if (inp) inp.value = "";
-    toast("Règle enregistrée.");
+    toast.success("Règle enregistrée.");
     render();
   } catch (error) {
-    toast(tauriErrorMessage(error));
+    toast.error(tauriErrorMessage(error));
   }
 }
 
 export async function removeNewsletterDomainRuleFromElement(element?: HTMLElement): Promise<void> {
   const dom = readNlButtonRule(element);
   if (!dom) {
-    toast("Règle invalide ou manquante.");
+    toast.error("Règle invalide ou manquante.");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Suppression des règles : lancez l’app bureau Tauri.");
+    toast.warning("Suppression des règles : lancez l’app bureau Tauri.");
     return;
   }
   try {
     await withTimeout(invoke("remove_newsletter_rule", { input: dom }), MAIL_ACTION_TIMEOUT_MS);
     await loadNewsletterRules();
-    toast("Règle supprimée.");
+    toast.success("Règle supprimée.");
     render();
   } catch (error) {
-    toast(tauriErrorMessage(error));
+    toast.error(tauriErrorMessage(error));
   }
 }

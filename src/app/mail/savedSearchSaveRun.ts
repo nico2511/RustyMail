@@ -14,17 +14,17 @@ import { suggestSavedSearchName, syncCommitSearchDraftForSave } from "./savedSea
 
 export async function saveCurrentSearchView(): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("Vues enregistrées : disponible dans l’app Tauri.");
+    toast.warning("Vues enregistrées : disponible dans l’app Tauri.");
     return;
   }
   const accountId = searchAccountIdForQuery();
   if (!accountId) {
-    toast("Choisissez un compte avant d’enregistrer une vue.");
+    toast.warning("Choisissez un compte avant d’enregistrer une vue.");
     return;
   }
   syncCommitSearchDraftForSave();
   if (!canSaveSearchView()) {
-    toast("Lancez d’abord la recherche (Entrée), puis enregistrez la vue.");
+    toast.warning("Lancez d’abord la recherche (Entrée), puis enregistrez la vue.");
     return;
   }
   const defaultName = suggestSavedSearchName();
@@ -32,7 +32,7 @@ export async function saveCurrentSearchView(): Promise<void> {
   if (name === null) return;
   const trimmed = name.trim();
   if (!trimmed) {
-    toast("Nom de vue invalide.");
+    toast.error("Nom de vue invalide.");
     return;
   }
   const iconRaw = window.prompt("Icône courte (2–4 caractères)", "Vu");
@@ -54,11 +54,11 @@ export async function saveCurrentSearchView(): Promise<void> {
     state.activeSavedSearchId = saved.id;
     await markSavedSearchSeenCmd(accountId, saved.id);
     recordActivity({ eventType: "saved_view_created", metaJson: JSON.stringify({ savedSearchId: saved.id }) });
-    toast(`Vue « ${trimmed} » enregistrée — surveillance à jour.`);
+    toast.success(`Vue « ${trimmed} » enregistrée — surveillance à jour.`);
     await refreshSavedSearches(true);
     await refreshSuggestedSavedViews();
     render();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

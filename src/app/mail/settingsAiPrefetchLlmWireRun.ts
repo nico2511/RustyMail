@@ -15,27 +15,27 @@ export async function tryHandleSettingsAiPrefetchLlmWire(action: string): Promis
       void (async () => {
         try {
           await invoke("cancel_prefetch_llm_model", {});
-          toast("Téléchargement du modèle annulé.");
+          toast.warning("Téléchargement du modèle annulé.");
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       })();
       return true;
     }
     case "prefetch-llm-model": {
       if (!isTauriRuntime()) {
-        toast("Téléchargement du modèle : ouvrez l’application de bureau (Tauri).");
+        toast.warning("Téléchargement du modèle : ouvrez l’application de bureau (Tauri).");
         return true;
       }
       if (state.llmPrefetchInFlight) {
-        toast("Un téléchargement est déjà en cours — utilisez Annuler pour l’arrêter.");
+        toast.info("Un téléchargement est déjà en cours — utilisez Annuler pour l’arrêter.");
         return true;
       }
       state.llmPrefetchInFlight = true;
       state.llmPrefetchPercent = 0;
       paintLlmPrefetchProgressDom();
       paintStatusBarProgressDom();
-      toast("Téléchargement du modèle en arrière-plan — vous pouvez continuer à utiliser l’app.");
+      toast.info("Téléchargement du modèle en arrière-plan — vous pouvez continuer à utiliser l’app.");
       void (async () => {
         try {
           const msg = await withTimeout(invoke<string>("prefetch_llm_model", {}), 1_800_000);

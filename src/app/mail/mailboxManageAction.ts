@@ -15,16 +15,16 @@ export async function mailboxManageAction(
   kind: "create" | "rename" | "delete" | "subscribe",
 ): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("Mailbox : disponible seulement dans l’app Tauri.");
+    toast.warning("Mailbox : disponible seulement dans l’app Tauri.");
     return;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return;
   }
   if (kind !== "create" && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast("Les dossiers IMAP ne s’appliquent pas aux brouillons locaux.");
+    toast.warning("Les dossiers IMAP ne s’appliquent pas aux brouillons locaux.");
     return;
   }
   const locks = state.folderManager.report?.lockedMailboxes ?? [];
@@ -55,7 +55,7 @@ export async function mailboxManageAction(
     render();
   } catch (err) {
     console.error("mailboxManageAction", err);
-    toast(tauriErrorMessage(err));
+    toast.error(tauriErrorMessage(err));
     render();
   }
 }

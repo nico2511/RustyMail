@@ -20,25 +20,25 @@ export function requireSearchViewBulkPreflight(options?: {
   const tauriLabel = options?.tauriRequiredLabel ?? "Action lot";
   const imapOnlyLabel = options?.imapOnlyLabel ?? "Action lot";
   if (!isTauriRuntime()) {
-    toast(`${tauriLabel} : IMAP requiert l’app Tauri.`);
+    toast.warning(`${tauriLabel} : IMAP requiert l’app Tauri.`);
     return null;
   }
   if (!isSearchActive() && !state.activeSavedSearchId) {
-    toast("Actions lot : ouvrez une recherche ou une vue enregistrée.");
+    toast.warning("Actions lot : ouvrez une recherche ou une vue enregistrée.");
     return null;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return null;
   }
   if (options?.blockSavedDraftsMailbox && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast(`${imapOnlyLabel} : actions IMAP uniquement.`);
+    toast.warning(`${imapOnlyLabel} : actions IMAP uniquement.`);
     return null;
   }
   const visible = searchViewBatchThreads();
   if (!visible.length) {
-    toast("Aucune conversation dans cette vue.");
+    toast.warning("Aucune conversation dans cette vue.");
     return null;
   }
   return { account, visible };

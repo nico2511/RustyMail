@@ -46,7 +46,7 @@ export async function finalizeOrgV2ApplyOutcome(
   }
 
   if (merged.errors.length > 0) {
-    toast(merged.errors.slice(0, 3).join(" · "));
+    toast.error(merged.errors.slice(0, 3).join(" · "));
   }
 
   const hadImapChange =

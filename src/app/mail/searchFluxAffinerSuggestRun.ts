@@ -23,21 +23,21 @@ export type FluxAffinerApplyContext = {
 export async function runFluxAffinerSuggestAndConfirm(): Promise<FluxAffinerApplyContext | null> {
   const d = requireSearchViewBatchDeps();
   if (!isTauriRuntime()) {
-    toast("Affiner : disponible dans l’app Tauri.");
+    toast.warning("Affiner : disponible dans l’app Tauri.");
     return null;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureOrgProposalsEnabled")) {
-    toast("Activez « Propositions Organiser (LLM) » dans Paramètres → IA.");
+    toast.warning("Activez « Propositions Organiser (LLM) » dans Paramètres → IA.");
     return null;
   }
   const account = currentAccount();
   if (!account?.id) {
-    toast("Compte requis.");
+    toast.warning("Compte requis.");
     return null;
   }
   const visible = searchViewBatchThreads().slice(0, 50);
   if (visible.length < 5) {
-    toast("Affiner : au moins 5 fils visibles requis.");
+    toast.warning("Affiner : au moins 5 fils visibles requis.");
     return null;
   }
   const viewLabel =

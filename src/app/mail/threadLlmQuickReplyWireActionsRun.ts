@@ -24,7 +24,7 @@ export async function tryHandleThreadLlmQuickReplyWire(action: string, element?:
         await prepareReply();
         prependComposePlainText(s.text.trim());
         void computePreview();
-        toast("Texte inséré dans le compositeur.");
+        toast.success("Texte inséré dans le compositeur.");
         render();
       } else {
         await prepareReply();

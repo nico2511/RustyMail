@@ -60,7 +60,7 @@ export async function saveDraftRevisionNow(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error("draft_revision_save", error);
-    toast(`Enregistrement local impossible : ${tauriErrorMessage(error)}`);
+    toast.error(`Enregistrement local impossible : ${tauriErrorMessage(error)}`);
     return false;
   }
 }

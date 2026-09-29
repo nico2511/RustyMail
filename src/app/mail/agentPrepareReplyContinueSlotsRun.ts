@@ -39,7 +39,7 @@ export async function agentPrepareReplyContinueFromDraftReply(): Promise<boolean
       state.agentSession.plan = res.plan ?? state.agentSession.plan;
       state.agentSession.busy = false;
     } catch (e) {
-      toast(tauriErrorMessage(e));
+      toast.error(tauriErrorMessage(e));
       if (state.agentSession) state.agentSession.busy = false;
     }
     render();

@@ -24,12 +24,12 @@ export async function openSavedDraftById(savedDraftId: string): Promise<void> {
   const sdid = savedDraftId.trim();
   if (!sdid) return;
   if (!isTauriRuntime()) {
-    toast("Ouvrir un brouillon enregistré : lancez l’app Tauri.");
+    toast.warning("Ouvrir un brouillon enregistré : lancez l’app Tauri.");
     return;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte.");
+    toast.warning("Configurez d’abord un compte.");
     return;
   }
   try {
@@ -56,7 +56,7 @@ export async function openSavedDraftById(savedDraftId: string): Promise<void> {
     scheduleDraftRevisionSave(350);
   } catch (error) {
     console.error("saved_draft_open", error);
-    toast(tauriErrorMessage(error));
+    toast.error(tauriErrorMessage(error));
     render();
   }
 }

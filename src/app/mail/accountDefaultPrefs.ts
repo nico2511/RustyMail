@@ -61,7 +61,7 @@ export function shouldShowDefaultAccountPrompt(): boolean {
 export async function persistDefaultAccountId(accountId: string): Promise<void> {
   const id = accountId.trim();
   if (!id || !state.accounts.some((a) => a.id === id)) {
-    toast("Compte introuvable.");
+    toast.error("Compte introuvable.");
     return;
   }
   if (!isTauriRuntime()) return;

@@ -14,7 +14,7 @@ export async function runOAuthDesktopConnect(
   providerLabel: string,
 ): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("OAuth2 : lancez l’application bureau Tauri.");
+    toast.warning("OAuth2 : lancez l’application bureau Tauri.");
     return;
   }
   try {
@@ -22,12 +22,12 @@ export async function runOAuthDesktopConnect(
     warnOAuthEphemeralRedirect(o);
     const email = (o.email ?? "").trim();
     if (!email.includes("@")) {
-      toast(`OAuth ${providerLabel} : adresse e-mail absente ou invalide.`);
+      toast.error(`OAuth ${providerLabel} : adresse e-mail absente ou invalide.`);
       return;
     }
     setSkipAccountIdentityCaptureOnce(true);
     await finishOAuthNewAccountAfterLogin(authKind, email, (o.displayName ?? "").trim());
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

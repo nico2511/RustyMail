@@ -12,14 +12,14 @@ export async function fetchOpenThreadOrNotify(
   const tid = threadId.trim();
   if (!tid) return null;
   if (!isTauriRuntime()) {
-    if (!opts?.quiet) toast("Ouvrir un fil : lancez l’app Tauri.");
+    if (!opts?.quiet) toast.warning("Ouvrir un fil : lancez l’app Tauri.");
     return null;
   }
   try {
     return await withTimeout(invoke<DiscussionThreadView>("open_thread", { threadId: tid }), BOOT_INVOKE_TIMEOUT_MS);
   } catch (error) {
     console.error("open_thread", error);
-    if (!opts?.quiet) toast(`Impossible d’ouvrir le fil : ${tauriErrorMessage(error)}`);
+    if (!opts?.quiet) toast.error(`Impossible d’ouvrir le fil : ${tauriErrorMessage(error)}`);
     return null;
   }
 }

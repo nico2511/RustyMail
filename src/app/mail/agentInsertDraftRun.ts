@@ -27,15 +27,15 @@ export async function agentInsertDraftIntoCompose(extra?: string): Promise<void>
 
   const threadId = (s?.threadId ?? state.selectedThreadId ?? "").trim();
   if (!threadId) {
-    toast("Ouvrez le fil auquel vous répondez, puis réessayez.");
+    toast.warning("Ouvrez le fil auquel vous répondez, puis réessayez.");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Réponse dans le fil : application desktop (Tauri) requise.");
+    toast.warning("Réponse dans le fil : application desktop (Tauri) requise.");
     return;
   }
   if (threadIsAutoMail(state.selectedThread, threadId)) {
-    toast("Réponse indisponible pour ce fil automatique / newsletter.");
+    toast.warning("Réponse indisponible pour ce fil automatique / newsletter.");
     return;
   }
 
@@ -59,6 +59,6 @@ export async function agentInsertDraftIntoCompose(extra?: string): Promise<void>
     scheduleDraftRevisionSave(350);
   } catch (e) {
     console.error("agentInsertDraftIntoCompose prepare_reply", e);
-    toast(`Impossible d’ouvrir la réponse dans le fil : ${tauriErrorMessage(e)}`);
+    toast.error(`Impossible d’ouvrir la réponse dans le fil : ${tauriErrorMessage(e)}`);
   }
 }

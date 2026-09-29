@@ -33,7 +33,7 @@ export async function agentRunDraftStream(signal: AbortSignal): Promise<boolean>
   if (done === "cancelled") {
     await stopAgentTelemetry();
     state.agentSession = null;
-    toast("Assistant réponse annulé.");
+    toast.warning("Assistant réponse annulé.");
     return false;
   }
   const draft =

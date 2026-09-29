@@ -30,7 +30,7 @@ export async function tryHandleThreadReplyMailLinksWire(
       const href = decodeHtmlEntitiesLoose(element?.dataset.href?.trim() ?? "");
       const normalized = normalizeMailHrefForOpen(href);
       if (normalized) void openExternalFromMailHref(normalized);
-      else toast("Lien de désabonnement invalide.");
+      else toast.error("Lien de désabonnement invalide.");
       return true;
     }
     default:

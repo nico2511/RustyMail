@@ -31,7 +31,7 @@ export async function discardCurrentDraftSession(): Promise<void> {
     }
   } catch (e) {
     console.error("discardCurrentDraftSession", e);
-    toast(`Impossible de supprimer le brouillon local : ${tauriErrorMessage(e)}`);
+    toast.error(`Impossible de supprimer le brouillon local : ${tauriErrorMessage(e)}`);
   }
   clearDraftSession();
   void requireComposeCloseFlowDeps().refreshSavedDraftsMailboxCount();

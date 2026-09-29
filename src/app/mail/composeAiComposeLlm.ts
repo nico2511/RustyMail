@@ -14,21 +14,21 @@ import { withLlmQueue } from "./llmJobQueue";
 
 export async function composeAiRewrite(styleRaw: string): Promise<void> {
   if (state.view !== "compose") {
-    toast("Ouvre le compositeur pour réécrire.");
+    toast.warning("Ouvre le compositeur pour réécrire.");
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureComposeRewriteEnabled")) {
-    toast("Réécriture IA désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
+    toast.warning("Réécriture IA désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
   const src = readComposePlainText();
   if (!src.trim()) {
-    toast("Le message est vide.");
+    toast.warning("Le message est vide.");
     return;
   }
   const style = styleRaw.trim() || "Neutral";
   const styleLabel = rewriteStyleLabelFr(style);
-  if (!isTauriRuntime()) return void toast("Réécriture IA : Tauri requis.");
+  if (!isTauriRuntime()) return void toast.warning("Réécriture IA : Tauri requis.");
   const ran = await withLlmQueue(composeRewriteJobLabel(style), async (signal) => {
     if (signal.aborted) return;
     try {
@@ -38,12 +38,12 @@ export async function composeAiRewrite(styleRaw: string): Promise<void> {
       );
       if (signal.aborted) return;
       replaceComposeWithModelText(res.text ?? src);
-      toast(`Texte réécrit (${styleLabel}).`);
+      toast.success(`Texte réécrit (${styleLabel}).`);
       render();
       void computePreview();
     } catch (e) {
       if (signal.aborted) return;
-      toast(tauriErrorMessage(e));
+      toast.error(tauriErrorMessage(e));
     }
   });
   if (ran === null) return;
@@ -51,19 +51,19 @@ export async function composeAiRewrite(styleRaw: string): Promise<void> {
 
 export async function composeAiGrammar(): Promise<void> {
   if (state.view !== "compose") {
-    toast("Ouvre le compositeur.");
+    toast.warning("Ouvre le compositeur.");
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureComposeGrammarEnabled")) {
-    toast("Correction grammaticale désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
+    toast.warning("Correction grammaticale désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
   const src = readComposePlainText();
   if (!src.trim()) {
-    toast("Le message est vide.");
+    toast.warning("Le message est vide.");
     return;
   }
-  if (!isTauriRuntime()) return void toast("Correction (LLM) : Tauri requis.");
+  if (!isTauriRuntime()) return void toast.warning("Correction (LLM) : Tauri requis.");
   const ran = await withLlmQueue(COMPOSE_GRAMMAR_JOB, async (signal) => {
     if (signal.aborted) return;
     try {
@@ -92,7 +92,7 @@ export async function composeAiGrammar(): Promise<void> {
       );
     } catch (e) {
       state.composeGrammarSuggestions = null;
-      toast(tauriErrorMessage(e));
+      toast.error(tauriErrorMessage(e));
     }
     render();
   });

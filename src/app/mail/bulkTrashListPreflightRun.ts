@@ -22,30 +22,30 @@ function listFilterLabelForBulkTrash(): string {
 
 export async function confirmBulkTrashVisibleThreadIds(): Promise<string[] | null> {
   if (!isTauriRuntime()) {
-    toast("Corbeille : IMAP requiert l’app Tauri.");
+    toast.warning("Corbeille : IMAP requiert l’app Tauri.");
     return null;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return null;
   }
   if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
-    toast("Corbeille : actions IMAP uniquement.");
+    toast.warning("Corbeille : actions IMAP uniquement.");
     return null;
   }
   if (mailboxKind(state.selectedMailbox || "") === "trash") {
-    toast("Utilisez « Vider la corbeille » dans ce dossier.");
+    toast.warning("Utilisez « Vider la corbeille » dans ce dossier.");
     return null;
   }
   if (isSearchActive()) {
-    toast("Tout supprimer : désactivé pendant une recherche. Retirez les filtres de recherche d’abord.");
+    toast.warning("Tout supprimer : désactivé pendant une recherche. Retirez les filtres de recherche d’abord.");
     return null;
   }
   const d = requireBulkTrashListDeps();
   const visible = d.threadsVisibleInList();
   if (!visible.length) {
-    toast("Aucune conversation à supprimer dans cette vue.");
+    toast.warning("Aucune conversation à supprimer dans cette vue.");
     return null;
   }
   const filterLabel = listFilterLabelForBulkTrash();

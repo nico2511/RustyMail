@@ -8,8 +8,8 @@ export async function tryHandleListThreadQuickWire(action: string, element?: HTM
   const t = s?.text?.trim();
   if (!t) return true;
   void navigator.clipboard.writeText(t).then(
-    () => toast("Copié dans le presse-papiers."),
-    () => toast("Copie impossible (permission navigateur).")
+    () => toast.success("Copié dans le presse-papiers."),
+    () => toast.error("Copie impossible (permission navigateur).")
   );
   return true;
 }

@@ -22,7 +22,7 @@ export function wireSettingsAiDomListeners(signal: AbortSignal, immediateCheckbo
           try {
             await persistAiFeaturePrefs();
           } catch (e) {
-            toast(tauriErrorMessage(e));
+            toast.error(tauriErrorMessage(e));
           }
         })();
       },

@@ -25,7 +25,7 @@ export function ensureBootProgressEventListeners(): void {
           .catch(() => {});
       }
       if (ph && ph !== "done") {
-        toast(`Téléchargement modèles : ${ph}`);
+        toast.info(`Téléchargement modèles : ${ph}`);
       }
     });
     void listen<{ minilmOk?: boolean; whisperOk?: boolean; error?: string | null }>(
@@ -35,9 +35,9 @@ export function ensureBootProgressEventListeners(): void {
         state.appPrefs.general.bootstrapModelsCompleted = Boolean(
           e.payload?.minilmOk && e.payload?.whisperOk,
         );
-        if (e.payload?.error) toast(e.payload.error);
+        if (e.payload?.error) toast.error(e.payload.error);
         else if (e.payload?.minilmOk && e.payload?.whisperOk) {
-          toast("Modèles légers (MiniLM + dictée) prêts.");
+          toast.success("Modèles légers (MiniLM + dictée) prêts.");
         }
         render();
       },

@@ -49,6 +49,6 @@ export async function finalizeOAuthNewAccountAfterSave(saved: Account): Promise<
   clearAccountOAuthWizard();
   state.accountOAuthWizardRetry = null;
   state.accountMessage = `Compte ${saved.email} prêt.`;
-  toast(`Compte ${saved.displayName || saved.email} ajouté et synchronisé.`);
+  toast.success(`Compte ${saved.displayName || saved.email} ajouté et synchronisé.`);
   render();
 }

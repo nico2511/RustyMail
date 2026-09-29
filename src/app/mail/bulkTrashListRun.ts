@@ -14,11 +14,11 @@ export async function bulkTrashVisibleThreads(): Promise<void> {
 
   if (errors.length) {
     rollbackBulkTrashOptimistic(snap, ids);
-    toast(`Échec corbeille (lot) : ${errors[0]}${errors.length > 1 ? "…" : ""}`);
+    toast.error(`Échec corbeille (lot) : ${errors[0]}${errors.length > 1 ? "…" : ""}`);
     return;
   }
 
-  toast(`${moved} conversation${moved === 1 ? "" : "s"} déplacée${moved === 1 ? "" : "s"} dans la corbeille.`);
+  toast.success(`${moved} conversation${moved === 1 ? "" : "s"} déplacée${moved === 1 ? "" : "s"} dans la corbeille.`);
   const d = requireBulkTrashListDeps();
   void d.loadMailboxUnread();
   await d.loadMailView(false);

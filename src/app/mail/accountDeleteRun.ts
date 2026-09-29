@@ -18,7 +18,7 @@ import { loadMailView, loadMailboxUnread } from "./mailListView";
 
 export async function deleteSettingsAccount() {
   if (!isTauriRuntime()) {
-    toast("La suppression du compte requiert l’app Tauri (npm run tauri:dev).");
+    toast.warning("La suppression du compte requiert l’app Tauri (npm run tauri:dev).");
     return;
   }
   const id = state.settingsSelectedAccountId;

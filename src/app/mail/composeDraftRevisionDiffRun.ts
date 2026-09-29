@@ -32,7 +32,7 @@ export async function computeDraftDiffAgainstRevision(revisionId: string): Promi
       MAIL_ACTION_TIMEOUT_MS,
     );
     if (!other) {
-      toast("Cette version n’existe plus.");
+      toast.warning("Cette version n’existe plus.");
       state.draftDiffLoading = false;
       render();
       return;
@@ -51,14 +51,14 @@ export async function computeDraftDiffAgainstRevision(revisionId: string): Promi
     const a = splitDraftDiffLines(curBody);
     const b = splitDraftDiffLines(otherBody);
     if (a.length + b.length > 8000) {
-      toast("Diff trop volumineux : affichez une version plus courte (limite lignes).");
+      toast.warning("Diff trop volumineux : affichez une version plus courte (limite lignes).");
       state.draftDiffLines = [];
     } else {
       state.draftDiffLines = myersDiffDraftLines(a, b);
     }
   } catch (error) {
     console.error("draft_revision_restore (diff)", error);
-    toast(`Diff impossible: ${tauriErrorMessage(error)}`);
+    toast.error(`Diff impossible: ${tauriErrorMessage(error)}`);
   } finally {
     state.draftDiffLoading = false;
     render();

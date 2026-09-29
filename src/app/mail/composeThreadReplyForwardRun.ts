@@ -13,7 +13,7 @@ import {
 async function prepareForwardWithOptionalMessage(messageId: string | null): Promise<void> {
   const threadId = currentThreadIdForReply();
   if (!threadId) {
-    toast("Aucun fil sélectionné.");
+    toast.warning("Aucun fil sélectionné.");
     return;
   }
   const mid = messageId?.trim() || null;
@@ -25,7 +25,7 @@ async function prepareForwardWithOptionalMessage(messageId: string | null): Prom
     );
   } catch (error) {
     console.error("Tauri command failed: prepare_forward", error);
-    toast(`Impossible de préparer le transfert: ${tauriErrorMessage(error)}`);
+    toast.error(`Impossible de préparer le transfert: ${tauriErrorMessage(error)}`);
     return;
   }
   d.loadComposeMarkdownIntoEditor(state.draft.markdownBody);
@@ -44,7 +44,7 @@ export async function prepareForwardToMessage(messageId: string): Promise<void> 
   }
   const threadId = currentThreadIdForReply();
   if (!threadId) {
-    toast("Aucun fil sélectionné.");
+    toast.warning("Aucun fil sélectionné.");
     return;
   }
   const thread = state.selectedThread;

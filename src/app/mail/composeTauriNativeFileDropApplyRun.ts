@@ -31,12 +31,12 @@ export function setComposerNativeDragHighlight(on: boolean): void {
 export function applyNativeDroppedFilePaths(dropped: string[]): void {
   if (!dropped.length) return;
   if (state.view !== "compose" || !state.draft) {
-    toast(`${dropped.length} fichier(s) détecté(s) — ouvrez le composeur pour les ajouter.`);
+    toast.warning(`${dropped.length} fichier(s) détecté(s) — ouvrez le composeur pour les ajouter.`);
     return;
   }
   const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...dropped]));
   state.draft.attachmentPaths = merged;
   const attachmentsField = document.querySelector<HTMLInputElement>("#compose-attachments");
   if (attachmentsField) attachmentsField.value = attachmentPathsJoinedForHiddenField(merged);
-  toast(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
+  toast.success(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
 }
