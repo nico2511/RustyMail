@@ -344,7 +344,6 @@ export function renderThread() {
             const isMine = renderDeps().isOwnSender(message.sender);
             const isRoot = laneTree.isRoot;
             const isSolo = msgs.length === 1;
-            const laneRight = laneTree.laneRight;
             const accentVars = renderDeps().senderAccentVars(message.sender);
             const isoWhen = renderDeps().receivedAtIsoDatetime(message.receivedAt);
             const eff = renderDeps().effectiveMessageViewMode(message, userMode);
@@ -389,7 +388,7 @@ export function renderThread() {
               ${participantFirst}
               ${recipientPresenceHtml}
               <a class="thread-msg-anchor" name="${escapeAttr(anchorName)}" id="${escapeAttr(anchorId)}" aria-hidden="true"></a>
-              <article class="message thread-msg ${msgOpen ? "thread-msg--open" : "thread-msg--folded"} ${unreadMark ? "thread-msg--unread" : ""} ${isMine ? "mine" : ""} ${laneRight ? "thread-msg--lane-right" : ""} ${isRoot ? "thread-msg--root" : ""} ${isSolo ? "thread-msg--solo" : ""} ${showsHtmlBubble ? "has-html" : ""} ${showMeta ? "thread-msg--head" : "compact"}" style="${accentVars}">
+              <article class="message thread-msg ${msgOpen ? "thread-msg--open" : "thread-msg--folded"} ${unreadMark ? "thread-msg--unread" : ""} ${isMine ? "mine" : ""} ${isRoot ? "thread-msg--root" : ""} ${isSolo ? "thread-msg--solo" : ""} ${showsHtmlBubble ? "has-html" : ""} ${showMeta ? "thread-msg--head" : "compact"}" style="${accentVars}">
                 ${showAvatar ? `<span class="avatar thread-msg-avatar">${initials(message.sender)}</span>` : `<span class="avatar avatar-spacer" aria-hidden="true"></span>`}
                 <div class="message-stack">
                   <header class="message-head-row${showMeta ? "" : " message-head-row--compact"}">
