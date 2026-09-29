@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerRender } from "../dispatch";
 import { state } from "../state";
 import type { Draft } from "../types";
-import { escapeHtml } from "../../ui/sanitize";
 import { computePreview, registerComposeDraftPreviewDeps } from "./composeDraftPreview";
 import { tryHandleComposeEditorAiWire } from "./composeEditorAiWireRun";
+import { destroyComposeBodyEditor, mountComposeBodyEditor, readComposePlainText } from "./composeBodyEditor";
 import { loadComposeMarkdownIntoEditor, resetMarkdownEditorHistory } from "./composeMarkdownEditor";
 import { persistDraft } from "./composePersistDraft";
 import { applyComposeGrammarSuggestionAtIndex } from "./composeWireGrammarRun";
@@ -58,14 +58,16 @@ function paintShell(): void {
   app.innerHTML = `
     <section class="composer-mail-shell">
       <div class="composer-body composer-body--split">
-        <textarea id="compose-body">${escapeHtml(state.composeBody)}</textarea>
+        <div id="compose-body" class="compose-tiptap"></div>
         <div class="preview">${state.preview?.html ?? ""}</div>
       </div>
     </section>`;
+  const host = document.querySelector<HTMLElement>("#compose-body");
+  if (host) mountComposeBodyEditor(host);
 }
 
 function bodyValue(): string {
-  return document.querySelector<HTMLTextAreaElement>("#compose-body")?.value ?? "";
+  return readComposePlainText();
 }
 
 function previewText(): string {
@@ -102,6 +104,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  destroyComposeBodyEditor();
   document.body.innerHTML = "";
   state.composeGrammarSuggestions = null;
   state.view = "list";
@@ -128,9 +131,9 @@ describe("applyComposeGrammarSuggestionAtIndex", () => {
     await flushPreview();
 
     expect(bodyValue()).toBe("Bonjour, je m'appelle Nicolas");
-    expect(state.composeBody).toBe("Bonjour, je m'appelle Nicolas");
-    expect(state.composeCanonicalBody).toBe("Bonjour, je m'appelle Nicolas");
-    expect(state.draft?.markdownBody).toBe("Bonjour, je m'appelle Nicolas");
+    expect(state.composeBody).toContain("Bonjour, je m'appelle Nicolas");
+    expect(state.composeCanonicalBody).toContain("Bonjour, je m'appelle Nicolas");
+    expect(state.draft?.markdownBody).toContain("Bonjour, je m'appelle Nicolas");
     expect(previewText()).toContain("Bonjour, je m'appelle Nicolas");
     expect(previewText()).not.toContain("salu moi");
     expect(toastText()).toContain("Remplacement appliqué.");
@@ -165,7 +168,7 @@ describe("applyComposeGrammarSuggestionAtIndex", () => {
     applyComposeGrammarSuggestionAtIndex(0);
 
     expect(bodyValue()).toBe("bb puis aa");
-    expect(state.composeCanonicalBody).toBe("bb puis aa");
+    expect(state.composeCanonicalBody).toContain("bb puis aa");
     expect(toastText()).toContain("Remplacement appliqué (première occurrence).");
     expect(state.composeGrammarSuggestions).toHaveLength(1);
   });
@@ -200,8 +203,8 @@ describe("applyComposeGrammarSuggestionAtIndex", () => {
 
     applyComposeGrammarSuggestionAtIndex(0);
 
-    expect(bodyValue().startsWith("Bonjour ")).toBe(true);
-    expect(state.composeCanonicalBody.startsWith("Bonjour ")).toBe(true);
+    expect(bodyValue().startsWith("Bonjour")).toBe(true);
+    expect(state.composeCanonicalBody).toContain("Bonjour");
     expect(state.composeCanonicalBody).toContain(data);
     expect(state.draft?.markdownBody).toContain(data);
   });

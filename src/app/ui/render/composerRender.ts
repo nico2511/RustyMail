@@ -167,7 +167,7 @@ export function renderComposer() {
       <header class="compose-fs-header">
         <div class="compose-fs-hintbar">
           <p class="compose-fs-layout-hint dim" aria-hidden="true">
-            Markdown · <span class="kbd">M</span> basculer la vue du compositeur
+            Éditeur · <span class="kbd">M</span> basculer la vue du compositeur
           </p>
         </div>
         <div class="compose-fs-header-row">
@@ -272,12 +272,11 @@ export function renderComposer() {
         })}
         ${correctionPanelHtml}
         <div class="composer-body composer-body--${isHistorique ? "historique" : layout}">
-          <textarea
+          <div
             id="compose-body"
-            class="${textareaOffscreen ? "composer-source-offscreen" : ""}"
-            placeholder="Rédiger en Markdown…"
-            ${textareaOffscreen ? 'tabindex="-1" aria-hidden="true"' : ""}
-          >${escapeHtml(state.composeBody)}</textarea>
+            class="compose-tiptap${textareaOffscreen ? " composer-source-offscreen" : ""}"
+            data-compose-editor="tiptap"
+          ></div>
           ${isHistorique ? renderComposerHistoriquePane() : showPreviewPane ? `<div class="preview">${state.preview?.html ?? ""}</div>` : ""}
           <div class="drop-hint" aria-hidden="true">
             <strong>Déposez des fichiers dans cette fenêtre</strong>

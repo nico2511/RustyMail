@@ -6,8 +6,7 @@ import type { Tone } from "../../types";
 
 /**
  * Commandes stables du compositeur.
- * L’éditeur actuel est un textarea Markdown (`data-md`, `data-action`).
- * Une migration TipTap peut lier les mêmes id sans redessiner cette barre :
+ * TipTap les exécute sans redessiner cette barre :
  * `md:*`, `ai:grammar`, `ai:rewrite`, `ai:shorten`, `ai:replies`, `dictate`.
  */
 export type ComposeMdCommand = {
@@ -17,6 +16,13 @@ export type ComposeMdCommand = {
   className: string;
 };
 
+/** Niveaux 1–3 dans un seul contrôle. Un second clic sur le niveau actif revient au paragraphe. */
+export const COMPOSE_HEADING_LEVELS: readonly { id: string; label: string; title: string }[] = [
+  { id: "h1", label: "1", title: "Titre 1" },
+  { id: "h2", label: "2", title: "Titre 2" },
+  { id: "h3", label: "3", title: "Titre 3" },
+];
+
 export const COMPOSE_MD_GROUPS: readonly (readonly ComposeMdCommand[])[] = [
   [
     { id: "bold", label: "Gras", title: "Gras (Ctrl+B)", className: "compose-tool--bold" },
@@ -24,16 +30,11 @@ export const COMPOSE_MD_GROUPS: readonly (readonly ComposeMdCommand[])[] = [
     { id: "underline", label: "Souligné", title: "Souligné (Ctrl+U)", className: "compose-tool--underline" },
   ],
   [
-    { id: "h1", label: "Titre 1", title: "Titre 1 (#)", className: "compose-tool--h1" },
-    { id: "h2", label: "Titre 2", title: "Titre 2 (##)", className: "compose-tool--h2" },
-    { id: "h3", label: "Titre 3", title: "Titre 3 (###)", className: "compose-tool--h3" },
-  ],
-  [
     { id: "ul", label: "Puces", title: "Liste à puces", className: "" },
     { id: "ol", label: "Numéros", title: "Liste numérotée", className: "" },
     { id: "link", label: "Lien", title: "Lien (Ctrl+K)", className: "" },
-    { id: "image", label: "Image", title: "Image (URL Markdown)", className: "" },
-    { id: "table", label: "Tableau", title: "Tableau Markdown", className: "" },
+    { id: "image", label: "Image", title: "Image", className: "" },
+    { id: "table", label: "Tableau", title: "Tableau", className: "" },
   ],
   [
     { id: "code", label: "Code", title: "Code", className: "compose-tool--code" },
@@ -78,21 +79,31 @@ function aiButton(opts: {
   }<span>${escapeHtml(opts.label)}</span></button>`;
 }
 
+function renderMdButton(cmd: ComposeMdCommand): string {
+  return `<button type="button" class="ghost-button md-button compose-tool ${cmd.className}" data-md="${escapeAttr(cmd.id)}" data-compose-cmd="md:${escapeAttr(cmd.id)}" title="${escapeAttr(cmd.title)}">${escapeHtml(cmd.label)}</button>`;
+}
+
+function renderHeadingGroup(): string {
+  const levels = COMPOSE_HEADING_LEVELS.map(
+    (level) =>
+      `<button type="button" class="ghost-button md-button compose-tool compose-heading-group__level" data-md="${escapeAttr(level.id)}" data-compose-cmd="md:${escapeAttr(level.id)}" title="${escapeAttr(level.title)}" aria-label="${escapeAttr(level.title)}" aria-pressed="false">${escapeHtml(level.label)}</button>`,
+  ).join("");
+  return `<div class="compose-heading-group" role="group" aria-label="Titre"><span class="compose-heading-group__name">Titre</span>${levels}</div>`;
+}
+
 export function renderComposeToolbar(props: ComposeToolbarProps): string {
   const busy = composeAiBusyKind(props.llmJobLabel);
   const blocked = busy !== null;
   const showAi = props.grammarEnabled || props.rewriteEnabled;
 
-  const mdHtml = COMPOSE_MD_GROUPS.map((group, index) => {
-    const buttons = group
-      .map(
-        (cmd) =>
-          `<button type="button" class="ghost-button md-button compose-tool ${cmd.className}" data-md="${escapeAttr(cmd.id)}" data-compose-cmd="md:${escapeAttr(cmd.id)}" title="${escapeAttr(cmd.title)}">${escapeHtml(cmd.label)}</button>`,
-      )
-      .join("");
-    const sep = index > 0 ? `<span class="md-toolbar-sep" aria-hidden="true"></span>` : "";
-    return `${sep}${buttons}`;
-  }).join("");
+  const mdChunks = [
+    COMPOSE_MD_GROUPS[0]!.map(renderMdButton).join(""),
+    renderHeadingGroup(),
+    ...COMPOSE_MD_GROUPS.slice(1).map((group) => group.map(renderMdButton).join("")),
+  ];
+  const mdHtml = mdChunks
+    .map((chunk, index) => `${index > 0 ? `<span class="md-toolbar-sep" aria-hidden="true"></span>` : ""}${chunk}`)
+    .join("");
 
   const replies = props.quickRepliesEnabled
     ? aiButton({

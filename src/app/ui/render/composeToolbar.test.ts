@@ -29,6 +29,17 @@ describe("barre du compositeur", () => {
     expect(html).toContain(">Transformer<");
     expect(html).toContain('data-md="bold"');
     expect(html).toContain('data-md="quote"');
+    expect(html).toContain('class="compose-heading-group"');
+    expect(html).toContain('aria-label="Titre"');
+    expect(html).toContain(">Titre<");
+    expect(html).toContain('data-md="h1"');
+    expect(html).toContain('data-md="h2"');
+    expect(html).toContain('data-md="h3"');
+    expect(html).toContain('aria-label="Titre 1"');
+    expect(html).not.toContain(">Titre 1<");
+    expect(html).not.toContain(">Titre 2<");
+    expect(html).not.toContain(">Titre 3<");
+    expect(html).not.toContain('data-md="h4"');
     expect(html).toContain('data-action="mic"');
     expect(html).toContain('data-action="compose-ai-grammar"');
     expect(html).toContain('data-action="compose-ai-rewrite-selected-tone"');

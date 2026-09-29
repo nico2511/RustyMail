@@ -3,6 +3,7 @@ import type { DraftPreview } from "../types";
 import { safeInvoke } from "../lib/tauriCommand";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { composeSourcePlainText, isComposeHtmlSource, unwrapComposeHtml } from "./composeHtmlBody";
 
 export type ComposeDraftPreviewDeps = {
   persistDraft: () => void;
@@ -35,6 +36,13 @@ function applyComposerPreviewDom(htmlRaw: string) {
 
 /** Aperçu local immédiat (le moteur Tauri le remplace quand il répond). */
 export function fallbackDraftPreview(markdown: string): DraftPreview {
+  if (isComposeHtmlSource(markdown)) {
+    const html = unwrapComposeHtml(markdown);
+    return {
+      textPlain: composeSourcePlainText(markdown),
+      html,
+    };
+  }
   return {
     textPlain: markdown,
     html: `<p>${escapeHtml(markdown).replace(/\n/g, "<br />")}</p>`,

@@ -8,6 +8,7 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { readComposePlainText, replaceComposeWithModelText } from "./composeBodyEditor";
 import { computePreview } from "./composeComposerBridge";
 import { withLlmQueue } from "./llmJobQueue";
 
@@ -20,8 +21,7 @@ export async function composeAiRewrite(styleRaw: string): Promise<void> {
     toast("Réécriture IA désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
-  const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  const src = ta?.value ?? state.composeBody;
+  const src = readComposePlainText();
   if (!src.trim()) {
     toast("Le message est vide.");
     return;
@@ -37,10 +37,7 @@ export async function composeAiRewrite(styleRaw: string): Promise<void> {
         LLM_INVOKE_TIMEOUT_MS,
       );
       if (signal.aborted) return;
-      const text = res.text ?? src;
-      state.composeCanonicalBody = text;
-      state.composeBody = text;
-      if (ta) ta.value = text;
+      replaceComposeWithModelText(res.text ?? src);
       toast(`Texte réécrit (${styleLabel}).`);
       render();
       void computePreview();
@@ -61,8 +58,7 @@ export async function composeAiGrammar(): Promise<void> {
     toast("Correction grammaticale désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
-  const ta = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  const src = ta?.value ?? state.composeBody;
+  const src = readComposePlainText();
   if (!src.trim()) {
     toast("Le message est vide.");
     return;

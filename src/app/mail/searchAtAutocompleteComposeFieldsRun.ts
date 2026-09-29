@@ -41,8 +41,8 @@ export function wireComposeAtAutocompleteFields(detachers: Array<() => void>): v
       }),
     );
   }
-  const composeBody = document.querySelector<HTMLTextAreaElement>("#compose-body");
-  if (composeBody) {
+  const composeBody = document.querySelector("#compose-body");
+  if (composeBody instanceof HTMLTextAreaElement) {
     detachers.push(
       attachAtAutocomplete({
         input: composeBody,
