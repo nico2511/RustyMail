@@ -163,11 +163,35 @@ fn brief_text_ok(s: &str) -> bool {
     !t.is_empty() && !contains_llm_meta(t)
 }
 
+fn scrub_optional_meta(s: String) -> String {
+    let t = s.trim();
+    if t.is_empty() || contains_llm_meta(t) {
+        String::new()
+    } else {
+        t.to_string()
+    }
+}
+
+fn scrub_hints(hints: Vec<String>) -> Vec<String> {
+    hints
+        .into_iter()
+        .map(scrub_optional_meta)
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
 fn ev_from(d: BriefEvidenceDto) -> ActionBriefEvidenceLink {
     ActionBriefEvidenceLink {
         thread_id: d.thread_id.trim().to_string(),
         message_ids: d.message_ids,
-        label: d.label.filter(|s| !s.trim().is_empty()),
+        label: d.label.and_then(|s| {
+            let cleaned = scrub_optional_meta(s);
+            if cleaned.is_empty() {
+                None
+            } else {
+                Some(cleaned)
+            }
+        }),
     }
 }
 
@@ -232,8 +256,8 @@ fn dto_to_result(
             ActionBriefDecision {
                 rank: d.rank,
                 title: d.title,
-                impact: d.impact,
-                options_hint: d.options_hint,
+                impact: scrub_optional_meta(d.impact),
+                options_hint: scrub_hints(d.options_hint),
                 evidence_links: ev,
             }
         })
@@ -251,7 +275,7 @@ fn dto_to_result(
             ActionBriefRecommendedAction {
                 rank: a.rank,
                 action: a.action,
-                suggested_owner: a.suggested_owner,
+                suggested_owner: scrub_optional_meta(a.suggested_owner),
                 suggested_due: a.suggested_due,
                 priority: a.priority,
                 evidence_links: ev,
@@ -271,7 +295,7 @@ fn dto_to_result(
             ActionBriefRisk {
                 label: r.label,
                 severity: r.severity,
-                detail: r.detail,
+                detail: scrub_optional_meta(r.detail),
                 evidence_links: ev,
             }
         })
@@ -285,7 +309,7 @@ fn dto_to_result(
             let ev = filter_evidence_vec(flex_evidence(a.evidence_links), allowed_threads);
             ActionBriefAmbiguity {
                 question: a.question,
-                why_it_matters: a.why_it_matters,
+                why_it_matters: scrub_optional_meta(a.why_it_matters),
                 evidence_links: ev,
             }
         })
@@ -782,6 +806,33 @@ mod brief_context_tests {
             room >= 256,
             "output room collapsed ({room}); brief JSON cannot be completed"
         );
+    }
+
+    #[test]
+    fn scrub_optional_fields_drop_meta_and_keep_plain_text() {
+        assert_eq!(scrub_optional_meta("moi".into()), "moi");
+        assert!(scrub_optional_meta("Je ne peux pas répondre.".into()).is_empty());
+        assert!(scrub_optional_meta("Impact : format JSON requis.".into()).is_empty());
+        assert!(scrub_optional_meta("   ".into()).is_empty());
+        let hints = scrub_hints(vec![
+            "Appeler le client".into(),
+            "I cannot comply".into(),
+            "  ".into(),
+        ]);
+        assert_eq!(hints, vec!["Appeler le client".to_string()]);
+        let link = ev_from(BriefEvidenceDto {
+            thread_id: "thread-1".into(),
+            message_ids: vec![],
+            label: Some("I can't open this".into()),
+        });
+        assert_eq!(link.thread_id, "thread-1");
+        assert!(link.label.is_none());
+        let kept = ev_from(BriefEvidenceDto {
+            thread_id: "thread-1".into(),
+            message_ids: vec![],
+            label: Some("Devis".into()),
+        });
+        assert_eq!(kept.label.as_deref(), Some("Devis"));
     }
 
     #[test]

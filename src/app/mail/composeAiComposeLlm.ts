@@ -139,9 +139,11 @@ export async function composeAiGrammar(): Promise<void> {
         );
       }
     } catch (e) {
+      if (signal.aborted || !composeAiStillOnSameDraft(sessionId, src)) return;
       state.composeGrammarSuggestions = null;
       toast.error(tauriErrorMessage(e));
     }
+    if (signal.aborted || !composeAiStillOnSameDraft(sessionId, src)) return;
     render();
   });
   if (ran === null) return;
