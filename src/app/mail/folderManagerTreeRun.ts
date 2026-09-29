@@ -20,7 +20,7 @@ export async function refreshFolderManagerTree(): Promise<void> {
     state.folderManager.report = await fetchMailboxTree(acc.id);
     state.folderManager.message = `${state.folderManager.report.entries.length} dossier(s) personnel(s)`;
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     state.folderManager.loading = false;
     if (state.view === "folderManager") render();
@@ -41,7 +41,7 @@ export async function fmSelectMailbox(mailbox: string, opts?: { skipHistory?: bo
   try {
     await requireFolderManagerRunDeps().loadMailView(false);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
   render();
 }
@@ -49,11 +49,11 @@ export async function fmSelectMailbox(mailbox: string, opts?: { skipHistory?: bo
 export async function openFolderManagerView(): Promise<void> {
   const acc = currentAccount();
   if (!acc?.id) {
-    toast("Configurez un compte pour gérer les dossiers.");
+    toast.warning("Configurez un compte pour gérer les dossiers.");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Vue Dossiers : disponible dans l’app Tauri.");
+    toast.warning("Vue Dossiers : disponible dans l’app Tauri.");
     return;
   }
   beginNavigation("folderManager");

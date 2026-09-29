@@ -28,11 +28,11 @@ export async function onOrgV2IgnoreMailboxUi(mailbox: string): Promise<void> {
       };
       state.organizationV2.applyMessage = `Dossier « ${threadMailboxListLabel(mb).label} » exclu de l’analyse.`;
     }
-    toast(`« ${threadMailboxListLabel(mb).label} » exclu de l’analyse.`);
+    toast.success(`« ${threadMailboxListLabel(mb).label} » exclu de l’analyse.`);
     render();
     void refreshOrganizationV2Report();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
@@ -53,11 +53,11 @@ export async function onOrgV2UnignoreMailboxUi(mailbox: string): Promise<void> {
       };
       state.organizationV2.applyMessage = `Dossier « ${threadMailboxListLabel(mb).label} » réintégré.`;
     }
-    toast(`« ${threadMailboxListLabel(mb).label} » réintégré dans l’analyse.`);
+    toast.success(`« ${threadMailboxListLabel(mb).label} » réintégré dans l’analyse.`);
     render();
     void refreshOrganizationV2Report();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
@@ -72,9 +72,9 @@ export async function orgV2DismissProposal(proposalId: string): Promise<void> {
       state.organizationV2.report = optimisticOrgV2RemoveProposal(state.organizationV2.report, proposalId);
     }
     state.organizationV2.applyMessage = "Proposition ignorée (mémorisée).";
-    toast("Ignorée — ne reviendra pas pour ce lot.");
+    toast.warning("Ignorée — ne reviendra pas pour ce lot.");
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
   render();
 }
@@ -90,9 +90,9 @@ export async function orgV2SnoozeProposal(proposalId: string): Promise<void> {
       state.organizationV2.report = optimisticOrgV2RemoveProposal(state.organizationV2.report, proposalId);
     }
     state.organizationV2.applyMessage = "Reportée 7 jours.";
-    toast("Reportée 7 jours.");
+    toast.success("Reportée 7 jours.");
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
   render();
 }

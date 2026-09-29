@@ -22,19 +22,19 @@ export async function agentPrepareReplyStart(): Promise<void> {
   const tid = state.selectedThreadId?.trim();
   const accountId = currentAccount()?.id?.trim();
   if (!tid) {
-    toast(t("toast.openThreadForAgent"));
+    toast.warning(t("toast.openThreadForAgent"));
     return;
   }
   if (!accountId) {
-    toast(t("toast.selectAccountForAgent"));
+    toast.warning(t("toast.selectAccountForAgent"));
     return;
   }
   if (threadIsAutoMail(state.selectedThread, tid)) {
-    toast(t("toast.agentAutoMail"));
+    toast.warning(t("toast.agentAutoMail"));
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureAgentPrepareReplyEnabled")) {
-    toast(t("toast.enableAgentInSettings"));
+    toast.warning(t("toast.enableAgentInSettings"));
     return;
   }
   await stopAgentTelemetry();
@@ -80,7 +80,7 @@ export async function agentPrepareReplyStart(): Promise<void> {
         busy: false,
       };
     } catch (e) {
-      toast(tauriErrorMessage(e));
+      toast.error(tauriErrorMessage(e));
       await stopAgentTelemetry();
       state.agentSession = null;
     }

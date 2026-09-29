@@ -14,6 +14,7 @@ import {
   buildAppShellInnerHtml,
   readAppShellLayoutFlags,
 } from "./appShellRenderMarkupRun";
+import { commitAppShellHtml, restoreParkedMain } from "./appShellRenderCommitRun";
 
 export function renderAppShell(): void {
   syncMailboxDigestPanelWithFeaturePref();
@@ -21,6 +22,7 @@ export function renderAppShell(): void {
 
   const scrollPrev = snapshotAppShellScroll();
   const { isCompose, aiPanelExpanded, panelW } = readAppShellLayoutFlags();
+  const { fullHtml, mainHtml } = buildAppShellInnerHtml({ isCompose, aiPanelExpanded, panelW });
 
   appShell.className = buildAppShellClassName({
     isCompose,
@@ -28,10 +30,11 @@ export function renderAppShell(): void {
     sidebarCollapsed: state.sidebarCollapsed,
   });
   appShell.style.setProperty("--ai-width", aiPanelExpanded ? `${panelW}px` : "0px");
-  appShell.innerHTML = buildAppShellInnerHtml({ isCompose, aiPanelExpanded, panelW });
+  const parkedMain = commitAppShellHtml(appShell, fullHtml, mainHtml, state.view === "thread");
 
   wireEvents();
   wireFolderManagerDnD();
   focusPromptsAfterRender();
   restoreScrollAfterRender(scrollPrev);
+  restoreParkedMain(appShell, parkedMain);
 }

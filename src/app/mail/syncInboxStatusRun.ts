@@ -52,7 +52,7 @@ export function notifySyncCompletionToasts(
           : "Synchronisation IMAP terminée",
     );
   } else if (skippedOnServer.length > 0 || syncErrors.length > 0) {
-    toast("Synchronisation partielle — voir la ligne d’état sous le titre du dossier.");
+    toast.warning("Synchronisation partielle — voir la ligne d’état sous le titre du dossier.");
   }
 }
 
@@ -73,7 +73,7 @@ export function maybeTriggerSemanticReindex(
       payload: { accountId: account.id },
     }).catch(() => {});
     if (uniqueTouched.length > 1 && !options?.background) {
-      toast(t("toast.semanticIndexing"));
+      toast.info(t("toast.semanticIndexing"));
     }
   }
 }

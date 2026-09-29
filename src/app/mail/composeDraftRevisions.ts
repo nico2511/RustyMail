@@ -21,7 +21,7 @@ export async function refreshDraftRevisions(limit = 50): Promise<void> {
     );
   } catch (error) {
     console.error("draft_revision_list", error);
-    toast(`Impossible de charger l’historique: ${tauriErrorMessage(error)}`);
+    toast.error(`Impossible de charger l’historique: ${tauriErrorMessage(error)}`);
   } finally {
     state.draftRevisionsLoading = false;
     render();

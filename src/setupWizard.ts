@@ -4,6 +4,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import type { ToastApi } from "./app/lib/toast";
 import type { AppPrefs } from "./prefs_defaults";
 import { setLocale, t } from "./i18n";
 
@@ -16,7 +17,7 @@ export type LlamaDetectResult = {
 type WizardOpts = {
   prefs: AppPrefs;
   onDismiss: (prefs: AppPrefs) => void;
-  toast: (msg: string) => void;
+  toast: ToastApi;
 };
 
 type WizardDraft = {
@@ -174,7 +175,8 @@ function bindLlamaHelpers(overlay: HTMLElement, prefs: AppPrefs, toast: WizardOp
     wingetBtn.disabled = true;
     try {
       const res = await invoke<{ success: boolean; message: string }>("llama_server_winget_install", {});
-      toast(res.message);
+      if (res.success) toast.success(res.message);
+      else toast.error(res.message);
       if (res.success) {
         prefs.ai.llamaServerEnabled = true;
         prefs.ai.llamaServerSpawnEnabled = true;
@@ -183,7 +185,7 @@ function bindLlamaHelpers(overlay: HTMLElement, prefs: AppPrefs, toast: WizardOp
       }
       await refreshLlamaStatus();
     } catch (e) {
-      toast(String(e));
+      toast.error(String(e));
     } finally {
       wingetBtn.disabled = false;
     }

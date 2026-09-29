@@ -19,7 +19,7 @@ export function registerComposePickAttachmentsDeps(deps: ComposePickAttachmentsD
 export async function pickAttachments(): Promise<void> {
   if (!state.draft) return;
   if (!isTauriRuntime()) {
-    toast("Ajouter des pièces jointes : disponible seulement dans l’app Tauri.");
+    toast.warning("Ajouter des pièces jointes : disponible seulement dans l’app Tauri.");
     return;
   }
   const d = composePickAttachmentsDeps;
@@ -29,10 +29,10 @@ export async function pickAttachments(): Promise<void> {
     if (!picked.length) return;
     const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...picked]));
     state.draft.attachmentPaths = merged;
-    toast(`${picked.length} pièce(s) jointe(s) ajoutée(s).`);
+    toast.success(`${picked.length} pièce(s) jointe(s) ajoutée(s).`);
     render();
     d.scheduleDraftRevisionSave(250);
   } catch (error) {
-    toast(`Picker PJ échoué: ${tauriErrorMessage(error)}`);
+    toast.error(`Picker PJ échoué: ${tauriErrorMessage(error)}`);
   }
 }

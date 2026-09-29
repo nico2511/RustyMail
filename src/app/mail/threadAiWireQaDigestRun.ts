@@ -17,18 +17,18 @@ import { repairUtf8Mojibake } from "./threadViewUiHelpers";
 export async function llmQaThreadUi() {
   const threadId = state.selectedThreadId?.trim();
   if (!threadId) {
-    toast("Ouvre un fil.");
+    toast.warning("Ouvre un fil.");
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadQaEnabled")) {
-    toast("Q&A fil désactivé — activez-le dans Paramètres IA.");
+    toast.warning("Q&A fil désactivé — activez-le dans Paramètres IA.");
     return;
   }
-  if (!isTauriRuntime()) return void toast("Q&A fil : Tauri requis.");
+  if (!isTauriRuntime()) return void toast.warning("Q&A fil : Tauri requis.");
   const qaInput = document.querySelector<HTMLTextAreaElement>("#thread-qa-input");
   const question = (qaInput?.value ?? state.threadQaDraft).trim();
   if (!question) {
-    toast("Saisissez une question.");
+    toast.warning("Saisissez une question.");
     return;
   }
   state.threadQaDraft = question;
@@ -49,7 +49,7 @@ export async function llmQaThreadUi() {
     });
     state.threadQaStreamText = "";
     if (done === "cancelled") {
-      toast("Question annulée.");
+      toast.warning("Question annulée.");
       render();
       return;
     }
@@ -59,9 +59,9 @@ export async function llmQaThreadUi() {
         evidenceMessageIds: done.qa.evidenceMessageIds ?? [],
       };
       state.aiThreadScope = String(threadId);
-      toast("Réponse prête.");
+      toast.success("Réponse prête.");
     } else {
-      toast("Réponse IA illisible — réessayez.");
+      toast.warning("Réponse IA illisible — réessayez.");
     }
     render();
   });
@@ -70,10 +70,10 @@ export async function llmQaThreadUi() {
 
 export async function llmInboxDigestUi() {
   if (!isMailboxDigestFeatureEnabled()) return;
-  if (!isTauriRuntime()) return void toast("Brief d’action : Tauri requis.");
-  if (!currentAccount()?.id?.trim()) return void toast("Sélectionne un compte.");
+  if (!isTauriRuntime()) return void toast.warning("Brief d’action : Tauri requis.");
+  if (!currentAccount()?.id?.trim()) return void toast.warning("Sélectionne un compte.");
   if (!mailboxDigestPanelEligible()) {
-    toast("Ouvre la liste d’un dossier IMAP pour le brief d’action.");
+    toast.warning("Ouvre la liste d’un dossier IMAP pour le brief d’action.");
     return;
   }
   openMailboxDigestPanel(true);

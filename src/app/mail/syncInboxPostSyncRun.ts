@@ -26,7 +26,7 @@ export async function refreshMailboxListAfterSyncIfNeeded(
       }
     } catch (error) {
       console.error("list_imap_mailboxes after sync", error);
-      toast(`Impossible de rafraîchir la liste des dossiers : ${tauriErrorMessage(error)}`);
+      toast.error(`Impossible de rafraîchir la liste des dossiers : ${tauriErrorMessage(error)}`);
     }
     ensureValidSelectedMailbox();
     render();

@@ -50,12 +50,12 @@ export async function acceptSuggestedSavedView(senderEmail: string): Promise<voi
     );
     await dismissViewSuggestionCmd(accountId, item.senderEmail, "accepted");
     state.activeSavedSearchId = saved.id;
-    toast(`Vue « ${item.suggestedName} » enregistrée.`);
+    toast.success(`Vue « ${item.suggestedName} » enregistrée.`);
     await refreshSavedSearches(true);
     await refreshSuggestedSavedViews();
     render();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
@@ -75,6 +75,6 @@ export async function dismissSuggestedSavedView(
     await refreshSuggestedSavedViews();
     render();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

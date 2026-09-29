@@ -10,7 +10,7 @@ import { loadNewsletterRules } from "./newsletterRulesLoad";
 export async function openOrganizationView(): Promise<void> {
   const acc = currentAccount();
   if (!acc?.id) {
-    toast("Configurez un compte pour organiser la boîte.");
+    toast.warning("Configurez un compte pour organiser la boîte.");
     return;
   }
   await loadNewsletterRules();
@@ -24,7 +24,7 @@ export async function openOrganizationView(): Promise<void> {
 export async function openOrganizationV2View(): Promise<void> {
   const acc = currentAccount();
   if (!acc?.id) {
-    toast("Configurez un compte pour organiser la boîte.");
+    toast.warning("Configurez un compte pour organiser la boîte.");
     return;
   }
   beginNavigation("organizationV2", { resetStack: true });
@@ -39,7 +39,7 @@ export async function openOrganizationV2View(): Promise<void> {
     state.organizationV2.report = report;
     state.organizationV2.applyMessage = orgV2ScanStatusLine(report);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     state.organizationV2.scanning = false;
     if (state.view === "organizationV2") render();

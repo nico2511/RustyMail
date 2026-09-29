@@ -24,7 +24,7 @@ export async function tryHandleSettingsAiRuntimeEngineModeWire(
     try {
       await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
     } catch (e) {
-      toast(tauriErrorMessage(e));
+      toast.error(tauriErrorMessage(e));
       return;
     }
     toast(

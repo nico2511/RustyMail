@@ -15,11 +15,11 @@ export async function tryHandleListThreadSavedDraftWire(action: string, element?
     case "save-saved-draft": {
       void (async () => {
         if (!isTauriRuntime()) {
-          toast("Enregistrer dans la liste : lancez l’app Tauri.");
+          toast.warning("Enregistrer dans la liste : lancez l’app Tauri.");
           return;
         }
         if (!state.draft) {
-          toast("Aucun contenu à enregistrer.");
+          toast.warning("Aucun contenu à enregistrer.");
           return;
         }
         await saveDraftToSavedListNow();
@@ -40,19 +40,19 @@ export async function tryHandleListThreadSavedDraftWire(action: string, element?
         if (!ok) return;
         const accountId = currentAccount()?.id?.trim();
         if (!accountId) {
-          toast("Aucun compte actif.");
+          toast.warning("Aucun compte actif.");
           return;
         }
         try {
           await withTimeout(invoke("saved_draft_delete", { accountId, savedDraftId: sid }), MAIL_ACTION_TIMEOUT_MS);
-          toast("Brouillon retiré de la liste.");
+          toast.success("Brouillon retiré de la liste.");
           await loadMailView(false);
           await refreshSavedDraftsMailboxCount();
           state.selectedThreadId = state.threads[0]?.id;
           state.selectedThread = undefined;
           render();
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
           render();
         }
       })();

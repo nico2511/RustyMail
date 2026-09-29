@@ -18,16 +18,16 @@ import {
 export async function onThreadSeen(kind: "read" | "unread", threadId: string): Promise<void> {
   if (!threadId.trim()) return;
   if (savedDraftIdFromThreadId(threadId)) {
-    toast("Marquer lu / non lu : disponible pour les mails IMAP, pas pour les brouillons sauvegardés.");
+    toast.warning("Marquer lu / non lu : disponible pour les mails IMAP, pas pour les brouillons sauvegardés.");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Marquer lu/non-lu : IMAP requiert l’app Tauri.");
+    toast.warning("Marquer lu/non-lu : IMAP requiert l’app Tauri.");
     return;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return;
   }
   const mailbox = sourceMailboxForThread(threadId);
@@ -48,7 +48,7 @@ export async function onThreadSeen(kind: "read" | "unread", threadId: string): P
     render();
   } catch (err) {
     console.error(cmd, err);
-    toast(tauriErrorMessage(err));
+    toast.error(tauriErrorMessage(err));
     render();
   }
 }
@@ -57,16 +57,16 @@ export async function onThreadToggleFollow(threadId: string): Promise<void> {
   const tid = String(threadId ?? "").trim();
   if (!tid) return;
   if (savedDraftIdFromThreadId(tid)) {
-    toast("Suivre : disponible pour les mails IMAP, pas pour les brouillons sauvegardés.");
+    toast.warning("Suivre : disponible pour les mails IMAP, pas pour les brouillons sauvegardés.");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Suivre un fil : requiert l’app Tauri.");
+    toast.warning("Suivre un fil : requiert l’app Tauri.");
     return;
   }
   const account = currentAccount();
   if (!account) {
-    toast("Configurez d’abord un compte IMAP.");
+    toast.warning("Configurez d’abord un compte IMAP.");
     return;
   }
   try {
@@ -80,13 +80,13 @@ export async function onThreadToggleFollow(threadId: string): Promise<void> {
         break;
       }
     }
-    toast(next ? "Fil ajouté au suivi." : "Fil retiré du suivi.");
+    toast.success(next ? "Fil ajouté au suivi." : "Fil retiré du suivi.");
     render();
     await reloadCurrentThreadList(false);
     render();
   } catch (err) {
     console.error("thread_toggle_follow", err);
-    toast(tauriErrorMessage(err));
+    toast.error(tauriErrorMessage(err));
     render();
   }
 }

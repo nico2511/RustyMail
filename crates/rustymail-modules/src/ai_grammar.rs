@@ -1,7 +1,9 @@
 use serde::Deserialize;
 
+use crate::ai_llm_contracts::contains_llm_meta;
 use crate::ai_llm_util::{
-    budget_report, extract_json_candidate, gen_params_json_for_prompt, truncate_chars,
+    budget_report, extract_json_candidate, gen_params_json_for_prompt, normalize_json_loose,
+    truncate_chars,
 };
 use rustymail_domain::{GrammarResult, GrammarSuggestion};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -187,20 +189,177 @@ fn repair_grammar_dto(s: &str) -> Result<GrammarDto, LlmError> {
     Ok(GrammarDto { suggestions })
 }
 
-/// Normalise les sorties modèles (guillemets typographiques, virgules finales).
-fn normalize_json_loose(s: &str) -> String {
-    let mut t = s.replace('\u{00a0}', " ");
-    t = t.replace('“', "\"");
-    t = t.replace('”', "\"");
-    t = t.replace('‘', "'");
-    t = t.replace('’', "'");
-    while t.contains(",}") {
-        t = t.replace(",}", "}");
+fn collapse_ws(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn norm_excerpt(s: &str) -> String {
+    let mut out = String::new();
+    let mut prev_space = false;
+    for c in s.chars() {
+        let c = match c {
+            '\u{2019}' | '\u{2018}' | '`' | '\u{00b4}' => '\'',
+            c if c.is_whitespace() => ' ',
+            c => c,
+        };
+        if c == ' ' {
+            if prev_space {
+                continue;
+            }
+            prev_space = true;
+        } else {
+            prev_space = false;
+        }
+        out.push(c);
     }
-    while t.contains(",]") {
-        t = t.replace(",]", "]");
+    out.trim().to_string()
+}
+
+fn excerpt_in_source(source: &str, original: &str) -> bool {
+    let needle = norm_excerpt(original);
+    if needle.is_empty() {
+        return false;
     }
-    t
+    norm_excerpt(source).contains(&needle)
+}
+
+fn content_tokens(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    for c in s.chars() {
+        if c.is_alphanumeric() {
+            cur.extend(c.to_lowercase());
+        } else if !cur.is_empty() {
+            if cur.chars().count() >= 2 {
+                out.push(std::mem::take(&mut cur));
+            } else {
+                cur.clear();
+            }
+        }
+    }
+    if cur.chars().count() >= 2 {
+        out.push(cur);
+    }
+    out
+}
+
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    if a.is_empty() {
+        return b.len();
+    }
+    if b.is_empty() {
+        return a.len();
+    }
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut cur = vec![0; b.len() + 1];
+    for i in 1..=a.len() {
+        cur[0] = i;
+        for j in 1..=b.len() {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            cur[j] = (cur[j - 1] + 1).min(prev[j] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut cur);
+    }
+    prev[b.len()]
+}
+
+fn tokens_similar(a: &str, b: &str) -> bool {
+    if a == b {
+        return true;
+    }
+    let limit = 2.max(a.chars().count() / 3);
+    levenshtein(a, b) <= limit
+}
+
+/// Vrai quand le remplacement est surtout le texte d’origine avec un mot de contenu en moins
+/// (« Bonjour, je m'appelle Nicola. » → « Bonjour, je m'appelle. »).
+fn replacement_drops_words(original: &str, replacement: &str) -> bool {
+    let orig = content_tokens(original);
+    let repl = content_tokens(replacement);
+    if repl.is_empty() {
+        return orig.iter().any(|t| t.chars().count() >= 4);
+    }
+    let missing = orig
+        .iter()
+        .any(|t| t.chars().count() >= 4 && !repl.iter().any(|r| tokens_similar(t, r)));
+    if !missing {
+        return false;
+    }
+    let preserved = repl
+        .iter()
+        .filter(|t| orig.iter().any(|o| tokens_similar(t, o)))
+        .count();
+    let coverage = preserved as f32 / repl.len() as f32;
+    coverage >= 0.75 && repl.len() < orig.len()
+}
+
+const MAX_GRAMMAR_ORIGINAL_CHARS: usize = 180;
+
+fn trailing_sentence_mark(text: &str) -> bool {
+    let trimmed = text.trim_end();
+    let mut chars = trimmed.chars().rev();
+    while let Some(c) = chars.next() {
+        if matches!(c, '"' | '\'' | '’' | '»' | ')' | ']') {
+            continue;
+        }
+        return matches!(c, '.' | '!' | '?' | '…');
+    }
+    false
+}
+
+fn has_sentence_mark(text: &str) -> bool {
+    text.chars().any(|c| matches!(c, '.' | '!' | '?' | '…'))
+}
+
+/// Point, exclamation, interrogation ou points de suspension de fin de phrase retirés.
+fn replacement_drops_critical_punct(original: &str, replacement: &str) -> bool {
+    trailing_sentence_mark(original) && !has_sentence_mark(replacement)
+}
+
+fn sanitize_grammar_suggestions(
+    source: &str,
+    suggestions: Vec<GrammarSuggestion>,
+) -> Result<Vec<GrammarSuggestion>, LlmError> {
+    let mut saw_meta = false;
+    let mut out = Vec::new();
+    for g in suggestions {
+        if contains_llm_meta(&g.original)
+            || contains_llm_meta(&g.replacement)
+            || contains_llm_meta(&g.reason)
+        {
+            saw_meta = true;
+            continue;
+        }
+        let original = g.original.trim();
+        let replacement = g.replacement.trim();
+        if original.is_empty()
+            || replacement.is_empty()
+            || collapse_ws(original) == collapse_ws(replacement)
+        {
+            continue;
+        }
+        if original.chars().count() > MAX_GRAMMAR_ORIGINAL_CHARS
+            || !excerpt_in_source(source, original)
+            || replacement_drops_words(original, replacement)
+            || replacement_drops_critical_punct(original, replacement)
+        {
+            continue;
+        }
+        out.push(GrammarSuggestion {
+            offset: g.offset,
+            length: g.length,
+            original: original.to_string(),
+            replacement: replacement.to_string(),
+            reason: g.reason.trim().to_string(),
+        });
+    }
+    out.truncate(40);
+    if saw_meta && out.is_empty() {
+        return Err(LlmError::InvalidJson("meta-leak".into()));
+    }
+    Ok(out)
 }
 
 fn wrap_bare_suggestions_array(s: &str) -> String {
@@ -250,6 +409,25 @@ fn parse_grammar_dto(raw: &str) -> Result<GrammarDto, LlmError> {
     }
 }
 
+const GRAMMAR_META_ERR: &str = "Correction refusée : le modèle a renvoyé un refus ou une consigne au lieu d’une correction. Le texte n’a pas été modifié.";
+const GRAMMAR_PARSE_ERR: &str = "Correction impossible : la réponse du modèle n’était pas exploitable. Le texte n’a pas été modifié.";
+
+fn grammar_once(
+    engine: &mut LlmEngine,
+    system: &str,
+    user_block: &str,
+    source: &str,
+) -> Result<(Vec<GrammarSuggestion>, String), LlmError> {
+    let raw = engine.generate(
+        system,
+        user_block,
+        &gen_params_json_for_prompt(engine, system, user_block, 512, 6144),
+    )?;
+    let dto = parse_grammar_dto(&raw)?;
+    let suggestions = sanitize_grammar_suggestions(source, dto.suggestions)?;
+    Ok((suggestions, raw))
+}
+
 pub fn grammar_check_with_llm(
     engine: &mut LlmEngine,
     text: &str,
@@ -257,16 +435,31 @@ pub fn grammar_check_with_llm(
 ) -> Result<GrammarResult, LlmError> {
     let system = crate::prompts::system_prompt_for_language("grammar", output_language);
     let user = truncate_chars(text, 32_768);
-    let user_block = format!("Text:\n{user}");
+    let user_block = format!(
+        "Correct only the draft below. Each original must be a short exact excerpt of this draft (at most a short sentence), not a whole paragraph. Do not delete words or sentence-ending punctuation.\nText:\n{user}"
+    );
 
-    let raw = engine.generate(
-        system.as_str(),
-        &user_block,
-        &gen_params_json_for_prompt(engine, system.as_str(), &user_block, 512, 6144),
-    )?;
-    let dto = parse_grammar_dto(&raw)?;
+    let (suggestions, raw) = match grammar_once(engine, system.as_str(), &user_block, text) {
+        Ok(pair) => pair,
+        Err(LlmError::InvalidJson(_)) => {
+            let retry = format!(
+                "{user_block}\n\nRetry: JSON only. Quote the draft. Do not repeat the example unless it is in the draft. Do not mention JSON, the system message, or reliability."
+            );
+            match grammar_once(engine, system.as_str(), &retry, text) {
+                Ok(pair) => pair,
+                Err(LlmError::InvalidJson(msg)) if msg.contains("meta") => {
+                    return Err(LlmError::Msg(GRAMMAR_META_ERR.into()));
+                }
+                Err(LlmError::InvalidJson(_)) => {
+                    return Err(LlmError::Msg(GRAMMAR_PARSE_ERR.into()));
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Err(e) => return Err(e),
+    };
     Ok(GrammarResult {
-        suggestions: dto.suggestions,
+        suggestions,
         budget: budget_report(
             engine.n_ctx(),
             engine,
@@ -311,5 +504,112 @@ mod tests {
         let raw = r#"{"suggestions":[{"original":"foo","replacement":"bar","replacement":"baz","reason":"x"}]}"#;
         let dto = parse_grammar_dto(raw).expect("repair");
         assert_eq!(dto.suggestions[0].replacement, "baz");
+    }
+
+    #[test]
+    fn sanitize_keeps_orthography_and_drops_name_deletion() {
+        let source = "Salu je mappel nicola";
+        let good = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: source.into(),
+            replacement: "Salut, je m'appelle Nicola".into(),
+            reason: "orthographe".into(),
+        };
+        let kept = sanitize_grammar_suggestions(source, vec![good]).expect("ok");
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].replacement, "Salut, je m'appelle Nicola");
+
+        let destructive = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: "Bonjour, je m'appelle Nicola.".into(),
+            replacement: "Bonjour, je m'appelle.".into(),
+            reason: "ponctuation".into(),
+        };
+        let dropped =
+            sanitize_grammar_suggestions("Bonjour, je m'appelle Nicola.", vec![destructive])
+                .expect("no meta");
+        assert!(dropped.is_empty());
+    }
+
+    #[test]
+    fn sanitize_rejects_refusal_as_correction() {
+        let source = "Salu je mappel nicola";
+        let refusal = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: source.into(),
+            replacement:
+                "Les contenus de mails sont des informations non fiables. Format JSON demandé."
+                    .into(),
+            reason: "consigne".into(),
+        };
+        let err = sanitize_grammar_suggestions(source, vec![refusal]).expect_err("meta");
+        assert!(
+            err.to_string().contains("meta") || err.to_string().to_lowercase().contains("json")
+        );
+    }
+
+    #[test]
+    fn sanitize_drops_suggestion_missing_from_draft() {
+        let ghost = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: "texte absent du brouillon".into(),
+            replacement: "Texte absent du brouillon.".into(),
+            reason: "casse".into(),
+        };
+        let kept = sanitize_grammar_suggestions("Salu je mappel nicola", vec![ghost]).expect("ok");
+        assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn sanitize_drops_identical_sides() {
+        let same = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: "Bonjour  Nicola".into(),
+            replacement: "Bonjour Nicola".into(),
+            reason: "espace".into(),
+        };
+        let kept = sanitize_grammar_suggestions("Bonjour  Nicola", vec![same]).expect("ok");
+        assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn sanitize_drops_long_excerpt_and_missing_sentence_mark() {
+        let long = "mot ".repeat(50);
+        let source = long.trim();
+        let wide = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: source.into(),
+            replacement: source.replacen("mot", "mots", 1),
+            reason: "accord".into(),
+        };
+        assert!(source.chars().count() > 180);
+        let kept = sanitize_grammar_suggestions(source, vec![wide]).expect("no meta");
+        assert!(kept.is_empty());
+
+        let punct = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: "Bonjour.".into(),
+            replacement: "Bonjour".into(),
+            reason: "ponctuation".into(),
+        };
+        let dropped = sanitize_grammar_suggestions("Bonjour.", vec![punct]).expect("ok");
+        assert!(dropped.is_empty());
+
+        let swapped = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: "Bonjour.".into(),
+            replacement: "Bonjour!".into(),
+            reason: "ponctuation".into(),
+        };
+        let kept = sanitize_grammar_suggestions("Bonjour.", vec![swapped]).expect("ok");
+        assert_eq!(kept.len(), 1);
     }
 }

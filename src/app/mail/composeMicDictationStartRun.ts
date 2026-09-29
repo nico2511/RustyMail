@@ -10,16 +10,16 @@ import { stopMicDictationAndTranscribe } from "./composeMicDictationStopRun";
 
 export function validateDictationCanStart(): boolean {
   if (!isTauriRuntime()) {
-    toast("Dictée : l’app bureau Tauri est requise.");
+    toast.warning("Dictée : l’app bureau Tauri est requise.");
     return false;
   }
   if (!state.appPrefs.ai.dictationEnabled) {
-    toast("Activez la dictée dans Paramètres → IA.");
+    toast.warning("Activez la dictée dans Paramètres → IA.");
     return false;
   }
   const backend = state.appPrefs.ai.dictationBackend;
   if (backend === "cloud" && !state.dictationApiKeySet) {
-    toast("Clé API absente : Paramètres → IA.");
+    toast.warning("Clé API absente : Paramètres → IA.");
     return false;
   }
   if (
@@ -27,11 +27,11 @@ export function validateDictationCanStart(): boolean {
     state.appPrefs.ai.whisperCloudFallback &&
     !state.dictationApiKeySet
   ) {
-    toast("Repli cloud activé : enregistrez une clé API, ou désactivez le repli.");
+    toast.warning("Repli cloud activé : enregistrez une clé API, ou désactivez le repli.");
     return false;
   }
   if (backend === "local_http" && !state.appPrefs.ai.localCompanionBaseUrl.trim()) {
-    toast("Indiquez l’URL du compagnon local (Paramètres → IA).");
+    toast.warning("Indiquez l’URL du compagnon local (Paramètres → IA).");
     return false;
   }
   return true;
@@ -78,7 +78,7 @@ export async function startMicDictationRecording(opts?: MicActionOpts): Promise<
     }, 1000);
     render();
   } catch (e) {
-    toast(micPermissionErrorMessage(e));
+    toast.error(micPermissionErrorMessage(e));
     micDictationCtx.micStream?.getTracks().forEach((t) => t.stop());
     micDictationCtx.micStream = null;
     micDictationCtx.micMediaRecorder = null;

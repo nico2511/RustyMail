@@ -24,7 +24,7 @@ export async function runOrgApply(
   try {
     const proposal = state.organization.report?.proposals.find((p) => p.id === proposalId);
     if (!proposal) {
-      toast("Proposition introuvable — relancez l’analyse du compte.");
+      toast.error("Proposition introuvable — relancez l’analyse du compte.");
       return;
     }
     const p = await orgApplyProposal(
@@ -39,7 +39,7 @@ export async function runOrgApply(
     state.organization.applyMessage = p.message;
     toast(p.message);
     if (p.errors.length > 0) {
-      toast(p.errors.slice(0, 2).join(" · "));
+      toast.error(p.errors.slice(0, 2).join(" · "));
     }
     if (state.organization.report) {
       state.organization.report = optimisticPatchOrgReport(state.organization.report, proposalId, p);
@@ -59,7 +59,7 @@ export async function runOrgApply(
     }
     await refreshOrganizationReport();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     state.organization.applying = false;
     render();

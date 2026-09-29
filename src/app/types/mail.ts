@@ -310,6 +310,8 @@ export type ActionBriefResult = {
   confidence: number;
   priorityBucket: string;
   verificationRecommended: boolean;
+  /** JSON tronqué puis réparé : le brief affiché n’est pas complet. */
+  outputPartial?: boolean;
   executedSkills: string[];
 };
 

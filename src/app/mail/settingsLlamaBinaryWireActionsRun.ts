@@ -12,7 +12,7 @@ export async function tryHandleSettingsLlamaBinaryWire(action: string, _element?
     case "llama-server-detect": {
       void (async () => {
         if (!isTauriRuntime()) {
-          toast("Détection : lancez l’app Tauri.");
+          toast.warning("Détection : lancez l’app Tauri.");
           return;
         }
         try {
@@ -24,12 +24,12 @@ export async function tryHandleSettingsLlamaBinaryWire(action: string, _element?
             binaryHint: state.appPrefs.ai.llamaServerBinaryPath || "llama-server",
           });
           if (det.onPath || det.wingetInstalled) {
-            toast(`llama-server détecté${det.resolvedPath ? ` (${det.resolvedPath})` : ""}.`);
+            toast.success(`llama-server détecté${det.resolvedPath ? ` (${det.resolvedPath})` : ""}.`);
           } else {
-            toast("llama-server introuvable (PATH et winget).");
+            toast.error("llama-server introuvable (PATH et winget).");
           }
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       })();
       return true;
@@ -37,10 +37,10 @@ export async function tryHandleSettingsLlamaBinaryWire(action: string, _element?
     case "llama-server-winget-install": {
       void (async () => {
         if (!isTauriRuntime()) {
-          toast("winget : lancez l’app Tauri sous Windows.");
+          toast.warning("winget : lancez l’app Tauri sous Windows.");
           return;
         }
-        toast("Installation winget… une fenêtre administrateur peut s’ouvrir.");
+        toast.info("Installation winget… une fenêtre administrateur peut s’ouvrir.");
         try {
           const res = await invoke<{ success: boolean; message: string }>("llama_server_winget_install", {});
           toast(res.message);
@@ -53,7 +53,7 @@ export async function tryHandleSettingsLlamaBinaryWire(action: string, _element?
             void refreshLlmRuntimeStatus(false).then(() => render());
           }
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
         render();
       })();
@@ -62,7 +62,7 @@ export async function tryHandleSettingsLlamaBinaryWire(action: string, _element?
     case "pick-llama-server-binary-path": {
       void (async () => {
         if (!isTauriRuntime()) {
-          toast("Parcourir : lancez l’app Tauri.");
+          toast.warning("Parcourir : lancez l’app Tauri.");
           return;
         }
         try {
@@ -71,15 +71,15 @@ export async function tryHandleSettingsLlamaBinaryWire(action: string, _element?
             MAIL_ACTION_TIMEOUT_MS
           );
           if (!picked?.trim()) {
-            toast("Aucun fichier sélectionné.");
+            toast.warning("Aucun fichier sélectionné.");
             return;
           }
           state.appPrefs.ai.llamaServerBinaryPath = picked.trim();
           await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
-          toast("Chemin llama-server enregistré.");
+          toast.success("Chemin llama-server enregistré.");
           void refreshLlmRuntimeStatus(false).then(() => render());
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
         render();
       })();

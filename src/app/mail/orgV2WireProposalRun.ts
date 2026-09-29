@@ -40,7 +40,7 @@ export function tryHandleOrgV2ProposalWire(action: string, element?: HTMLElement
       }
       const applyProposal = state.organizationV2.report?.proposals.find((p: OrgProposal) => p.id === proposalId);
       if (!applyProposal) {
-        toast("Proposition introuvable — relancez l’analyse.");
+        toast.error("Proposition introuvable — relancez l’analyse.");
         return true;
       }
       void confirmThenRunOrgV2Apply(acc.id, proposalId);

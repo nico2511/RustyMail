@@ -39,13 +39,13 @@ export async function resumeOrphanDraftSession(sessionId: string): Promise<void>
     syncPreviewOpenFromComposeLayout();
     resetMarkdownEditorHistory();
     await upsertSavedDraftSilent();
-    toast("Brouillon repris.");
+    toast.success("Brouillon repris.");
     render();
     window.setTimeout(() => void computePreview(), 0);
     scheduleDraftRevisionSave(350);
   } catch (e) {
     console.error("draft_orphan_session_open", e);
-    toast(`Reprise impossible : ${tauriErrorMessage(e)}`);
+    toast.error(`Reprise impossible : ${tauriErrorMessage(e)}`);
   }
 }
 

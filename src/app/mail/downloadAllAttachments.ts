@@ -8,13 +8,13 @@ import { state } from "../state";
 export async function downloadAllAttachmentsForMessage(messageId: string): Promise<void> {
   if (!messageId.trim()) return;
   if (!isTauriRuntime()) {
-    toast("Téléchargement : lancez l’application bureau Tauri.");
+    toast.warning("Téléchargement : lancez l’application bureau Tauri.");
     return;
   }
   const msg = state.selectedThread?.messages.find((m) => m.messageId === messageId);
   const atts = msg?.attachments ?? [];
   if (atts.length < 2) {
-    toast("Ce message n’a pas plusieurs pièces jointes à regrouper.");
+    toast.warning("Ce message n’a pas plusieurs pièces jointes à regrouper.");
     return;
   }
   let ok = 0;
@@ -33,11 +33,11 @@ export async function downloadAllAttachmentsForMessage(messageId: string): Promi
     }
   }
   if (errors.length === 0) {
-    toast(
+    toast.success(
       `${ok} pièce${ok > 1 ? "s" : ""} jointe${ok > 1 ? "s" : ""} enregistrée${ok > 1 ? "s" : ""} dans Téléchargements`,
     );
   } else {
     const hint = errors.slice(0, 2).join(" · ");
-    toast(`${ok}/${atts.length} téléchargée(s). ${hint}${errors.length > 2 ? "…" : ""}`);
+    toast.warning(`${ok}/${atts.length} téléchargée(s). ${hint}${errors.length > 2 ? "…" : ""}`);
   }
 }

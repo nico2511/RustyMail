@@ -17,7 +17,7 @@ export function launchTagMailSearch(tag: Tag): void {
   const d = requireSearchLaunchDeps();
   const draft = tagToSearchDraft(tag);
   if (!draft) {
-    toast("Ce tag n’est pas utilisable pour la recherche.");
+    toast.warning("Ce tag n’est pas utilisable pour la recherche.");
     return;
   }
   navReset();

@@ -13,15 +13,15 @@ export async function summarizeThread() {
       state.selectedThreadId.trim()
     : currentThreadIdForReply();
   if (!threadId) {
-    toast("Aucun fil sélectionné.");
+    toast.warning("Aucun fil sélectionné.");
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")) {
-    toast("Synthèse de fil désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
+    toast.warning("Synthèse de fil désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Résumé du fil : lancez l’application RustyMail (Tauri), pas le navigateur seul.");
+    toast.warning("Résumé du fil : lancez l’application RustyMail (Tauri), pas le navigateur seul.");
     state.aiOpen = true;
     state.aiOutput =
       "La synthèse utilise la base locale et les commandes Tauri ; elle n’est pas disponible en prévisualisation web seule.";

@@ -16,17 +16,17 @@ export { confirmAndExecuteSplitSend } from "./composeSendDraftSplitRun";
 export async function sendDraft(): Promise<void> {
   persistDraft();
   if (!state.draft) {
-    toast("Aucun brouillon à envoyer.");
+    toast.warning("Aucun brouillon à envoyer.");
     console.warn("sendDraft: state.draft is undefined");
     return;
   }
   const toEmails = state.draft.to.map((x) => x.email?.trim()).filter(Boolean);
   if (toEmails.length === 0) {
-    toast("Ajoutez au moins une adresse dans le champ À.");
+    toast.warning("Ajoutez au moins une adresse dans le champ À.");
     return;
   }
   if (!state.draft.subject?.trim()) {
-    toast("Renseignez l’objet du message.");
+    toast.warning("Renseignez l’objet du message.");
     return;
   }
   const accountId = currentAccount()?.id ?? null;

@@ -12,7 +12,7 @@ import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 export async function openContactsView(): Promise<void> {
   const acc = currentAccount();
   if (!acc?.id) {
-    toast("Configurez un compte pour le carnet.");
+    toast.warning("Configurez un compte pour le carnet.");
     return;
   }
   beginNavigation("contacts", { resetStack: true });
@@ -27,7 +27,7 @@ export async function openContactsView(): Promise<void> {
     await loadContactsList(acc.id, { reset: true });
     await loadAddressBookSidebarCount();
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
   render();
 }
@@ -45,7 +45,7 @@ export async function openContactDetailView(email: string, opts?: { skipHistory?
   try {
     await loadContactDetail(acc.id, em);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
   recordActivity({ eventType: "contact_opened", senderEmail: em });
   render();

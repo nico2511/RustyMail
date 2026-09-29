@@ -26,14 +26,14 @@ export async function tryHandleThreadLlmDemoWire(action: string): Promise<boolea
 
 async function demoResetPlaygroundMailbox(): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("Démo : lance l’app via Tauri (`npm run tauri:dev`), pas le navigateur seul.");
+    toast.warning("Démo : lance l’app via Tauri (`npm run tauri:dev`), pas le navigateur seul.");
     return;
   }
   try {
     const msg = await invoke<string>("demo_reset_playground_mailbox");
     toast(msg);
     const ok = await loadAccountsFromBackend({ silent: false });
-    if (!ok) toast("Rechargement des comptes incomplet — vérifie la liste.");
+    if (!ok) toast.warning("Rechargement des comptes incomplet — vérifie la liste.");
     if (state.accounts.some((a: Account) => a.id === DEMO_PLAYGROUND_ACCOUNT_ID)) {
       state.selectedAccountId = DEMO_PLAYGROUND_ACCOUNT_ID;
       state.view = "list";
@@ -44,13 +44,13 @@ async function demoResetPlaygroundMailbox(): Promise<void> {
     render();
   } catch (e) {
     console.error("demo_reset_playground_mailbox", e);
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
 async function demoRemovePlaygroundMailbox(): Promise<void> {
   if (!isTauriRuntime()) {
-    toast("Démo : lance l’app via Tauri (`npm run tauri:dev`), pas le navigateur seul.");
+    toast.warning("Démo : lance l’app via Tauri (`npm run tauri:dev`), pas le navigateur seul.");
     return;
   }
   const confirmed = await openConfirmModal({
@@ -65,7 +65,7 @@ async function demoRemovePlaygroundMailbox(): Promise<void> {
     const msg = await invoke<string>("demo_remove_playground_mailbox");
     toast(msg);
     const ok = await loadAccountsFromBackend({ silent: false });
-    if (!ok) toast("Rechargement des comptes incomplet — vérifie la liste.");
+    if (!ok) toast.warning("Rechargement des comptes incomplet — vérifie la liste.");
     if (state.selectedAccountId === DEMO_PLAYGROUND_ACCOUNT_ID) {
       state.selectedAccountId = state.accounts[0]?.id ?? "";
     }
@@ -84,6 +84,6 @@ async function demoRemovePlaygroundMailbox(): Promise<void> {
     render();
   } catch (e) {
     console.error("demo_remove_playground_mailbox", e);
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

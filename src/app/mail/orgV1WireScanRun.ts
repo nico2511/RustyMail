@@ -25,7 +25,7 @@ export function tryHandleOrgV1ScanWire(action: string): boolean {
         .catch((e: unknown) => {
           state.organization.scanning = false;
           state.organization.applyMessage = "";
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
           render();
         });
       return true;
@@ -35,7 +35,7 @@ export function tryHandleOrgV1ScanWire(action: string): boolean {
       if (!acc?.id) return true;
       state.organization.applying = true;
       state.organization.applyMessage = "Normalisation des tags en cours…";
-      toast("Recalcul des tags sur tout le compte…");
+      toast.info("Recalcul des tags sur tout le compte…");
       render();
       void orgRetagAccount(acc.id, false)
         .then(async (p: OrgApplyProgress) => {
@@ -48,7 +48,7 @@ export function tryHandleOrgV1ScanWire(action: string): boolean {
         .catch((e: unknown) => {
           state.organization.applying = false;
           state.organization.applyMessage = "";
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
           render();
         });
       return true;

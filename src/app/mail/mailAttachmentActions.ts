@@ -51,9 +51,9 @@ export async function onAttachmentAction(
           invoke<string>(cmd, { req: { messageId, attachmentId } }),
           MAIL_ACTION_TIMEOUT_MS,
         );
-    toast(kind === "open" ? `Attachment opened: ${saved}` : `Attachment downloaded: ${saved}`);
+    toast.success(kind === "open" ? `Attachment opened: ${saved}` : `Attachment downloaded: ${saved}`);
   } catch (err) {
     console.error(cmd, err);
-    toast(tauriErrorMessage(err));
+    toast.error(tauriErrorMessage(err));
   }
 }

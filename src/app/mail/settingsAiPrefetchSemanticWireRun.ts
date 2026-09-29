@@ -15,10 +15,10 @@ export async function tryHandleSettingsAiPrefetchSemanticWire(action: string): P
     case "prefetch-semantic-minilm": {
       void (async () => {
         if (!isTauriRuntime()) {
-          toast("Téléchargement MiniLM : lancez l’app Tauri.");
+          toast.warning("Téléchargement MiniLM : lancez l’app Tauri.");
           return;
         }
-        toast("Téléchargement all-MiniLM-L6-v2 (ONNX + tokenizer)…");
+        toast.info("Téléchargement all-MiniLM-L6-v2 (ONNX + tokenizer)…");
         try {
           const msg = await withTimeout(invoke<string>("prefetch_semantic_minilm_model", {}), 900_000);
           toast(msg);
@@ -31,7 +31,7 @@ export async function tryHandleSettingsAiPrefetchSemanticWire(action: string): P
             state.semanticModelAvailable = false;
           }
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
         render();
       })();
@@ -40,24 +40,24 @@ export async function tryHandleSettingsAiPrefetchSemanticWire(action: string): P
     case "reindex-semantic-account": {
       void (async () => {
         if (!isTauriRuntime()) {
-          toast("Réindexation : lancez l’app Tauri.");
+          toast.warning("Réindexation : lancez l’app Tauri.");
           return;
         }
         if (!ipcThrottleMs("reindex_semantic_account_ui", 3500)) {
-          toast("Une réindexation vient d’être demandée — patiente quelques secondes.");
+          toast.info("Une réindexation vient d’être demandée — patiente quelques secondes.");
           return;
         }
         const aid = state.selectedAccountId?.trim() || currentAccount()?.id?.trim();
         if (!aid) {
-          toast("Sélectionne un compte actif avant de réindexer.");
+          toast.warning("Sélectionne un compte actif avant de réindexer.");
           return;
         }
         if (!state.semanticModelAvailable) {
-          toast("Modèle MiniLM absent (model.onnx + tokenizer.json).");
+          toast.warning("Modèle MiniLM absent (model.onnx + tokenizer.json).");
           return;
         }
         try {
-          toast("Réindexation sémantique (tout le compte, dossiers présents localement)…");
+          toast.info("Réindexation sémantique (tout le compte, dossiers présents localement)…");
           const stats = await withTimeout(
             invoke<{ indexed: number; skipped: number; errors: number }>("reindex_semantic_account_cmd", {
               accountId: aid,
@@ -68,7 +68,7 @@ export async function tryHandleSettingsAiPrefetchSemanticWire(action: string): P
           await searchThreads();
           await refreshSemanticEmbeddingCounts();
         } catch (e) {
-          toast(tauriErrorMessage(e));
+          toast.error(tauriErrorMessage(e));
         }
       })();
       return true;

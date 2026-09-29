@@ -35,9 +35,9 @@ export async function fmCreateMailbox(parentPrefix?: string): Promise<void> {
     await refreshMailboxesAfterImapChange();
     await refreshFolderManagerTree();
     await fmSelectMailbox(name);
-    toast(`Dossier créé : ${name}`);
+    toast.success(`Dossier créé : ${name}`);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }
 
@@ -66,8 +66,8 @@ export async function fmRenameMailbox(from: string): Promise<void> {
     await refreshMailboxesAfterImapChange();
     await refreshFolderManagerTree();
     await fmSelectMailbox(to);
-    toast(`Dossier renommé : ${to}`);
+    toast.success(`Dossier renommé : ${to}`);
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   }
 }

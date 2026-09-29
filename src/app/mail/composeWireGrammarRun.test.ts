@@ -141,6 +141,23 @@ describe("applyComposeGrammarSuggestionAtIndex", () => {
     expect(state.composeGrammarSuggestions).toBeNull();
   });
 
+  it("n’applique pas une suggestion qui retire un nom", () => {
+    const source = "Bonjour, je m'appelle Nicola.";
+    state.composeBody = source;
+    state.composeCanonicalBody = source;
+    state.draft = emptyDraft(source);
+    state.composeGrammarSuggestions = [
+      { reason: "ponctuation", original: source, replacement: "Bonjour, je m'appelle." },
+    ];
+    paintShell();
+
+    applyComposeGrammarSuggestionAtIndex(0);
+
+    expect(bodyValue()).toBe(source);
+    expect(toastText()).toContain("retirerait du texte");
+    expect(toastText()).not.toContain("Remplacement appliqué");
+  });
+
   it("ne confirme pas le remplacement si l’extrait est absent", () => {
     state.composeBody = "salu moi c'est nicolas";
     state.composeCanonicalBody = state.composeBody;

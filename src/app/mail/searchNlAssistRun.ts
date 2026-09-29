@@ -15,11 +15,11 @@ import { searchThreads } from "./searchThreadsRun";
 export async function searchNlAssist(): Promise<void> {
   const d = requireSearchCommitDeps();
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureSearchNlEnabled")) {
-    toast("Recherche en langage naturel désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
+    toast.warning("Recherche en langage naturel désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Recherche NL : Tauri requis.");
+    toast.warning("Recherche NL : Tauri requis.");
     return;
   }
   const phrase =
@@ -34,7 +34,7 @@ export async function searchNlAssist(): Promise<void> {
   if (!phrase) return;
   const accountId = state.selectedAccountId?.trim();
   if (!accountId) {
-    toast("Sélectionnez un compte avant la recherche en langage naturel.");
+    toast.warning("Sélectionnez un compte avant la recherche en langage naturel.");
     return;
   }
   const ran = await d.withLlmQueue("Recherche NL", async (signal) => {
@@ -43,7 +43,7 @@ export async function searchNlAssist(): Promise<void> {
     if (signal.aborted) return;
     applyNlSearchResultFromAssist(phrase, sq);
     if (nlSearchCriteriaEmpty()) {
-      toast(NL_SEARCH_NO_CRITERIA_TOAST);
+      toast.warning(NL_SEARCH_NO_CRITERIA_TOAST);
       return;
     }
     await searchThreads();
@@ -62,7 +62,7 @@ export async function searchNlAssist(): Promise<void> {
           : "Aucun résultat pour cette recherche NL.",
       );
     } else {
-      toast(bits.length ? `Recherche appliquée — ${bits.join(" · ")}` : "Recherche appliquée.");
+      toast.info(bits.length ? `Recherche appliquée — ${bits.join(" · ")}` : "Recherche appliquée.");
     }
   });
   if (ran === null) return;

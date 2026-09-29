@@ -10,9 +10,9 @@ export function persistAiPrefsImmediateFromDom(): void {
   void (async () => {
     try {
       await withTimeout(invoke("set_app_prefs", { prefs: state.appPrefs }), MAIL_ACTION_TIMEOUT_MS);
-      toast("Réglage IA enregistré.");
+      toast.success("Réglage IA enregistré.");
     } catch (e) {
-      toast(tauriErrorMessage(e));
+      toast.error(tauriErrorMessage(e));
     }
   })();
 }

@@ -12,26 +12,27 @@ import type { LlmTranslationResult } from "../types";
 import { aiCacheKeySegment } from "./aiCacheKeySegment";
 import { shouldOfferPerMessageTranslate } from "./threadLangGuess";
 import { repairUtf8Mojibake } from "./threadViewUiHelpers";
+import { introducesLlmMeta, LLM_META_TRANSLATION_TOAST } from "./llmMetaGuard";
 
 export async function llmTranslateMessageUi(messageId: string, forceRefresh = false) {
   const threadId = state.selectedThreadId?.trim();
   const mid = messageId.trim();
   if (!threadId || !mid) {
-    toast("Ouvre un message dans un fil.");
+    toast.warning("Ouvre un message dans un fil.");
     return;
   }
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureMessageTranslateEnabled")) {
-    toast("Traduction par message désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
+    toast.warning("Traduction par message désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
   if (!isTauriRuntime()) {
-    toast("Traduire un message : lancez Tauri.");
+    toast.warning("Traduire un message : lancez Tauri.");
     return;
   }
   const targetLang = state.appPrefs.general.motherLanguage?.trim() || "fr";
   const msg = state.selectedThread?.messages.find((m) => m.messageId === mid);
   if (!forceRefresh && msg && !shouldOfferPerMessageTranslate(msg, targetLang)) {
-    toast("Message déjà dans la langue mère — traduction inutile.");
+    toast.warning("Message déjà dans la langue mère — traduction inutile.");
     return;
   }
   const seg = await aiCacheKeySegment();
@@ -51,9 +52,9 @@ export async function llmTranslateMessageUi(messageId: string, forceRefresh = fa
       try {
         const o = JSON.parse(cached) as LlmTranslationResult;
         const tx = o.translatedText?.trim();
-        if (tx) {
+        if (tx && !introducesLlmMeta(msg?.cleanedText ?? "", tx)) {
           state.messageTranslations[mapKey] = repairUtf8Mojibake(tx);
-          toast("Traduction du message (cache locale).");
+          toast.info("Traduction du message (cache locale).");
           return;
         }
       } catch {
@@ -65,10 +66,14 @@ export async function llmTranslateMessageUi(messageId: string, forceRefresh = fa
       LLM_INVOKE_TIMEOUT_MS,
     );
     const tx = res.translatedText?.trim();
+    if (tx && introducesLlmMeta(msg?.cleanedText ?? "", tx)) {
+      toast.error(LLM_META_TRANSLATION_TOAST);
+      return;
+    }
     if (tx) state.messageTranslations[mapKey] = repairUtf8Mojibake(tx);
-    toast("Message traduit.");
+    toast.success("Message traduit.");
   } catch (e) {
-    toast(tauriErrorMessage(e));
+    toast.error(tauriErrorMessage(e));
   } finally {
     delete state.messageTranslationBusy[mid];
     render();

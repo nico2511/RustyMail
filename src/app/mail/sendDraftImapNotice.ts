@@ -5,5 +5,5 @@ export function toastSendDraftImapNotice(outcome: SendDraftOutcome | undefined):
   const note = outcome?.imapNotice?.trim();
   if (!note) return;
   const shorten = (s: string, n = 220) => (s.length <= n ? s : `${s.slice(0, n)}…`);
-  toast(`Information : ${shorten(note)}`);
+  toast.info(`Information : ${shorten(note)}`);
 }

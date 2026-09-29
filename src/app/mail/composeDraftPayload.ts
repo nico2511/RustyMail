@@ -12,7 +12,7 @@ export function draftPayloadForRust(d: Draft): Draft {
     bcc: [...(d.bcc ?? [])],
     subject: d.subject ?? "",
     markdownBody: d.markdownBody ?? "",
-    sendHtml: d.sendHtml !== false,
+    sendHtml: true,
     inReplyTo: d.inReplyTo ?? null,
     references: [...(d.references ?? [])],
     attachmentPaths,

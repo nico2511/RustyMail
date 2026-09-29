@@ -77,7 +77,7 @@ export async function stopMicDictationAndTranscribe(): Promise<void> {
     console.error("transcribe_dictation", e);
     const errMsg = tauriErrorMessage(e);
     if (micDictationCtx.micDictationTarget === "compose") state.composeMessage = errMsg;
-    toast(errMsg);
+    toast.error(errMsg);
   }
   state.micState = "idle";
   state.micSeconds = 0;
