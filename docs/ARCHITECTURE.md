@@ -58,7 +58,7 @@ Adapters and persistence:
 Optional product capabilities:
 
 - **Readability pipeline** → `CleanedMessageView`
-- **`mail_cleaning`** — generic reading path, Amazon and GitHub digest plugins, and a declarative Deblock fixture (`fixtures/digests/deblock.yaml`). Cut editor and search bench: [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md), not shipped.
+- **`mail_cleaning`** — generic reading path, Amazon and GitHub digest plugins, and a declarative Deblock fixture (`fixtures/digests/deblock.yaml`). The search bench is in Settings. The painted cut editor is not shipped. See [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md).
 - **`mail_security`** — SPF/DKIM/DMARC heuristics, attachment risk, punycode
 - **`ai_*`** — translation, summary, Q&A, rewrite, quick replies, NL search, org proposals
 
@@ -114,4 +114,4 @@ HTML from mail is sanitized with **DOMPurify** before render; remote images bloc
 - [IPC_SECURITY.md](IPC_SECURITY.md) — invoke command surface
 - [SECURITY.md](SECURITY.md) — encryption, keyring, release checks
 - [AI_AND_MODELS.md](AI_AND_MODELS.md) — models and generative features
-- [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md) — digest cut (header/body/footer). Phase 1 reads the Deblock fixture; the editor and the search bench are not shipped.
+- [CADRAGE_DIGEST_TEMPLATES.md](CADRAGE_DIGEST_TEMPLATES.md) — digest cut (header/body/footer). Phase 1 reads the Deblock fixture; the search bench is in Settings. The painted cut editor is not shipped.

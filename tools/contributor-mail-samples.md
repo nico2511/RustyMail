@@ -63,4 +63,4 @@ Optional: screenshot of desired readable rendering — helpful but secondary to 
 
 For a **new provider** (not Amazon), follow the same pattern today: MIME extraction script → fixture under `tests/fixtures/<provider>/` → Rust plugin under `mail_cleaning/providers/<name>.rs`.
 
-Deblock is the first declarative digest: `crates/rustymail-modules/fixtures/digests/deblock.yaml`, applied on read when sender domain and structure both match. The cut editor and the search bench are not implemented; see [docs/CADRAGE_DIGEST_TEMPLATES.md](../docs/CADRAGE_DIGEST_TEMPLATES.md). Do not commit raw `.eml` files either way.
+Deblock is the first declarative digest: `crates/rustymail-modules/fixtures/digests/deblock.yaml`, applied on read when sender domain and structure both match. Settings → Banc d’essai previews a candidate YAML on real mail found by the current search. The painted cut editor is not implemented; see [docs/CADRAGE_DIGEST_TEMPLATES.md](../docs/CADRAGE_DIGEST_TEMPLATES.md). Do not commit raw `.eml` files either way.
