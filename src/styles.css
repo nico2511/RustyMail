@@ -2783,25 +2783,76 @@ textarea {
   min-width: 0;
 }
 
+/* Pastilles TYPE / SOURCE / ÉTAT (modale « Tags du fil »).
+   Texte = --text (charbon en clair, clair en sombre) sur un fond teinté opaque,
+   pour rester lisible sur le fond clair de la modale comme en thème sombre. */
 .thread-tag-chip {
-  font-size: 10px;
+  --tag-chip-bg: var(--surface-elevated);
+  --tag-chip-border: var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
   padding: 4px 8px;
   border-radius: var(--radius-btn);
-  background: rgba(78, 88, 100, 0.12);
-  border: 1px solid rgba(78, 88, 100, 0.22);
-  color: rgba(220, 230, 218, 0.9);
+  background: var(--tag-chip-bg);
+  border: 1px solid var(--tag-chip-border);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.thread-tag-chip--kind {
+  --tag-chip-bg: #f7eee8;
+  --tag-chip-border: #e0bba8;
+}
+
+.thread-tag-chip--source {
+  --tag-chip-bg: #e7eef6;
+  --tag-chip-border: #c5d4e4;
+}
+
+.thread-tag-chip--state {
+  --tag-chip-bg: #e6f0e7;
+  --tag-chip-border: #c2d6c4;
+}
+
+.thread-tag-chip--entity {
+  --tag-chip-bg: #f3e8ef;
+  --tag-chip-border: #dcc4d2;
+}
+
+body.clarity-dark .thread-tag-chip--kind {
+  --tag-chip-bg: #4a342c;
+  --tag-chip-border: #c48464;
+}
+
+body.clarity-dark .thread-tag-chip--source {
+  --tag-chip-bg: #2c3a4a;
+  --tag-chip-border: #8aa4be;
+}
+
+body.clarity-dark .thread-tag-chip--state {
+  --tag-chip-bg: #2c3c30;
+  --tag-chip-border: #8aab86;
+}
+
+body.clarity-dark .thread-tag-chip--entity {
+  --tag-chip-bg: #3e303a;
+  --tag-chip-border: #b08aa0;
 }
 
 button.thread-tag-chip {
-  font: inherit;
   cursor: pointer;
+  text-align: left;
 }
 
 button.thread-tag-chip--search:hover,
 button.thread-tag-chip--search:focus-visible {
-  background: rgba(78, 88, 100, 0.22);
-  border-color: rgba(140, 160, 135, 0.45);
-  outline: none;
+  background: color-mix(in srgb, var(--text) 10%, var(--tag-chip-bg));
+  border-color: color-mix(in srgb, var(--text) 32%, var(--tag-chip-border));
+  color: var(--text);
 }
 
 .thread-more-actions {
