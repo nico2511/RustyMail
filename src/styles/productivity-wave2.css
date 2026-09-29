@@ -611,6 +611,7 @@ body.clarity-dark {
 .thread-reading.thread-reading--reading-layout .message.mine .thread-msg-card {
   background: var(--select);
   border-color: color-mix(in srgb, var(--copper) 28%, var(--border));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--copper) 62%, transparent);
 }
 
 .thread-reading.thread-reading--reading-layout .thread-msg-fold-preview {

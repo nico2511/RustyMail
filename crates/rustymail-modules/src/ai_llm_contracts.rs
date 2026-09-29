@@ -56,7 +56,7 @@ ids-kv ::= "\"threadIds\"" space ":" space string-arr
 kw-kv ::= "\"searchKeywords\"" space ":" space string-arr
 sug-kv ::= "\"suggestedAction\"" space ":" space action-enum
 mb-kv ::= "\"targetMailbox\"" space ":" space (string | "null")
-action-enum ::= "\"archive\"" | "\"move\"" | "\"trash\"" | "\"markRead\""
+action-enum ::= "\"archive\"" | "\"move\"" | "\"trash\"" | "\"markRead\"" | "\"deleteMailbox\""
 string-arr ::= "[" space (string ("," space string)*)? space "]"
 string ::= "\"" char* "\""
 char ::= [^"\\] | "\\" .
@@ -361,15 +361,60 @@ pub fn validate_search_nl_shape(
     Ok(())
 }
 
-fn org_action_allowed(action: &str) -> bool {
-    matches!(
-        action.trim().to_ascii_lowercase().as_str(),
-        "archive" | "move" | "trash" | "markread" | "mark_read"
-    )
+/// Ramène un `suggestedAction` LLM vers l’enum Organiser V2, ou `None` s’il n’est pas applicable.
+///
+/// Enum : `archive`, `move`, `trash`, `markRead`, `deleteMailbox`.
+/// Les séparateurs, la casse et les alias courants sont acceptés (`delete` / `junk` / `remove` → `trash`,
+/// `read` / `mark_as_read` → `markRead`, `delete_mailbox` → `deleteMailbox`).
+/// `retag` et `repairThreading` ne font pas partie des actions applicables en V2.
+pub fn normalize_org_suggested_action(raw: &str) -> Option<&'static str> {
+    let key = fold_org_action_key(raw);
+    match key.as_str() {
+        "archive" | "archived" | "archiver" => Some("archive"),
+        "move" | "relocate" | "deplacer" | "moveto" => Some("move"),
+        "trash" | "delete" | "junk" | "remove" | "spam" | "discard" | "bin" | "corbeille"
+        | "supprimer" | "effacer" | "junkmail" | "movetojunk" | "movetotrash" | "movetospam" => {
+            Some("trash")
+        }
+        "markread" | "markasread" | "read" | "seen" | "markseen" | "setread" | "marquerlu"
+        | "marquercommelu" => Some("markRead"),
+        "deletemailbox" | "removemailbox" | "deletefolder" | "removefolder" | "dropmailbox"
+        | "dropfolder" | "deletethemailbox" | "removethemailbox" | "deletethefolder"
+        | "removethefolder" | "deleteemptymailbox" | "supprimerdossier" | "supprimerledossier"
+        | "effacerdossier" => Some("deleteMailbox"),
+        _ => None,
+    }
 }
 
-/// Rejette une orientation vide, trop grande, ou une action hors enum.
-/// N’invente pas de diagnostic de repli : l’appelant affiche un état d’erreur.
+fn fold_org_action_key(raw: &str) -> String {
+    raw.trim()
+        .chars()
+        .filter_map(|c| {
+            let c = match c {
+                'é' | 'è' | 'ê' | 'ë' => 'e',
+                'à' | 'â' | 'ä' | 'á' => 'a',
+                'ù' | 'û' | 'ü' | 'ú' => 'u',
+                'î' | 'ï' | 'í' => 'i',
+                'ô' | 'ö' | 'ó' => 'o',
+                'ç' => 'c',
+                other => other,
+            };
+            if c.is_ascii_alphanumeric() {
+                Some(c.to_ascii_lowercase())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn org_action_allowed(action: &str) -> bool {
+    normalize_org_suggested_action(action).is_some()
+}
+
+/// Rejette une orientation hors contrat (diagnostic, recommandations, bornes d’une action reconnue).
+/// Une action au `suggestedAction` inconnu est ignorée : elle ne fait pas échouer l’orientation.
+/// Le contrat autorise `actions: []` ; aucun diagnostic de repli n’est inventé.
 pub fn validate_org_orientation_shape(
     diagnosis: &str,
     recommendations: &[String],
@@ -396,12 +441,20 @@ pub fn validate_org_orientation_shape(
             )));
         }
     }
-    if actions.len() > MAX_ORG_ACTIONS {
+    let recognized = actions
+        .iter()
+        .filter(|action| org_action_allowed(action.suggested_action))
+        .count();
+    if recognized > MAX_ORG_ACTIONS {
         return Err(err_msg(format!(
             "Orientation : trop d’actions (max {MAX_ORG_ACTIONS})."
         )));
     }
     for (i, action) in actions.iter().enumerate() {
+        if !org_action_allowed(action.suggested_action) {
+            // Verbe hors enum V2 : on ignore cette action (diagnostic et actions valides conservés).
+            continue;
+        }
         let title_n = action.title.trim().chars().count();
         if title_n < 2 || title_n > MAX_ORG_ACTION_TITLE_CHARS {
             return Err(err_msg(format!(
@@ -412,11 +465,6 @@ pub fn validate_org_orientation_shape(
         if rationale_n < 4 || rationale_n > MAX_ORG_ACTION_RATIONALE_CHARS {
             return Err(err_msg(format!(
                 "Orientation : justification d’action {i} hors bornes."
-            )));
-        }
-        if !org_action_allowed(action.suggested_action) {
-            return Err(err_msg(format!(
-                "Orientation : suggestedAction inconnu pour l’action {i}."
             )));
         }
         if action.thread_ids.len() > MAX_ORG_ACTION_THREAD_IDS {
@@ -525,7 +573,62 @@ mod tests {
     }
 
     #[test]
-    fn org_orientation_rejects_empty_diagnosis_and_unknown_action() {
+    fn org_suggested_action_aliases_map_to_v2_enum() {
+        assert_eq!(normalize_org_suggested_action("delete"), Some("trash"));
+        assert_eq!(normalize_org_suggested_action("Junk"), Some("trash"));
+        assert_eq!(normalize_org_suggested_action("remove"), Some("trash"));
+        assert_eq!(normalize_org_suggested_action("read"), Some("markRead"));
+        assert_eq!(
+            normalize_org_suggested_action("mark_as_read"),
+            Some("markRead")
+        );
+        assert_eq!(
+            normalize_org_suggested_action("Mark-Read"),
+            Some("markRead")
+        );
+        assert_eq!(
+            normalize_org_suggested_action("deleteMailbox"),
+            Some("deleteMailbox")
+        );
+        assert_eq!(
+            normalize_org_suggested_action("delete_mailbox"),
+            Some("deleteMailbox")
+        );
+        assert_eq!(
+            normalize_org_suggested_action("supprimer le dossier"),
+            Some("deleteMailbox")
+        );
+        assert_eq!(normalize_org_suggested_action("déplacer"), Some("move"));
+        assert_eq!(normalize_org_suggested_action("ARCHIVE"), Some("archive"));
+        assert_eq!(normalize_org_suggested_action("destroy"), None);
+        assert_eq!(normalize_org_suggested_action("deleteEverything"), None);
+        assert_eq!(normalize_org_suggested_action("retag"), None);
+        assert_eq!(normalize_org_suggested_action("repairThreading"), None);
+        assert_eq!(normalize_org_suggested_action(""), None);
+        assert!(org_action_allowed("delete"));
+        assert!(!org_action_allowed("destroy"));
+    }
+
+    #[test]
+    fn org_orientation_gbnf_lists_v2_actions_only() {
+        for token in [
+            r#"\"archive\""#,
+            r#"\"move\""#,
+            r#"\"trash\""#,
+            r#"\"markRead\""#,
+            r#"\"deleteMailbox\""#,
+        ] {
+            assert!(
+                ORG_ORIENTATION_JSON_GBNF.contains(token),
+                "GBNF missing {token}"
+            );
+        }
+        assert!(!ORG_ORIENTATION_JSON_GBNF.contains("retag"));
+        assert!(!ORG_ORIENTATION_JSON_GBNF.contains("repairThreading"));
+    }
+
+    #[test]
+    fn org_orientation_rejects_empty_diagnosis_and_ignores_unknown_action() {
         let recs = vec!["Archiver les newsletters lues de plus de 30 jours.".into()];
         assert!(validate_org_orientation_shape("court", &recs, &[]).is_err());
         assert!(validate_org_orientation_shape("   ", &recs, &[]).is_err());
@@ -535,9 +638,9 @@ mod tests {
             &[]
         )
         .is_err());
-        let bad = OrgOrientationActionShape {
-            title: "Trop",
-            rationale: "Action inconnue à ne pas appliquer.",
+        let unknown = || OrgOrientationActionShape {
+            title: "",
+            rationale: "",
             thread_ids: &[],
             search_keywords: &[],
             suggested_action: "deleteEverything",
@@ -546,13 +649,21 @@ mod tests {
         assert!(validate_org_orientation_shape(
             "La boîte contient surtout des newsletters lues.",
             &recs,
-            &[bad],
+            &[unknown()],
         )
-        .is_err());
+        .is_ok());
         let ids = vec!["t1".to_string()];
-        let ok = OrgOrientationActionShape {
-            title: "Archiver l’inbox ancienne",
-            rationale: "Ces fils lus n’ont plus d’activité récente.",
+        let aliased = || OrgOrientationActionShape {
+            title: "Mettre les pubs en corbeille",
+            rationale: "Ces fils n’ont plus d’intérêt.",
+            thread_ids: &ids,
+            search_keywords: &[],
+            suggested_action: "delete",
+            target_mailbox: None,
+        };
+        let broken = OrgOrientationActionShape {
+            title: "x",
+            rationale: "Titre trop court pour une action reconnue.",
             thread_ids: &ids,
             search_keywords: &[],
             suggested_action: "archive",
@@ -561,9 +672,15 @@ mod tests {
         assert!(validate_org_orientation_shape(
             "La boîte contient surtout des newsletters lues.",
             &recs,
-            &[ok],
+            &[unknown(), aliased()],
         )
         .is_ok());
+        assert!(validate_org_orientation_shape(
+            "La boîte contient surtout des newsletters lues.",
+            &recs,
+            &[aliased(), broken],
+        )
+        .is_err());
     }
 
     #[test]

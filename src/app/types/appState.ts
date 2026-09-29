@@ -272,7 +272,14 @@ export type State = {
   /** Texte brut pendant streaming Q&A. */
   threadQaStreamText: string;
   /** Suggestions correction orthographe / formulation LLM (compositeur). */
-  composeGrammarSuggestions: Array<{ reason: string; replacement: string; original: string }> | null;
+  composeGrammarSuggestions: Array<{
+    reason: string;
+    replacement: string;
+    original: string;
+    /** Indice UTF-16 optionnel renvoyé par le modèle, utilisé si l’extrait ne matche pas tel quel. */
+    offset?: number;
+    length?: number;
+  }> | null;
   /** Modale : citations repliées regroupées par mail / fragment « On … wrote ». */
   quoteFoldModal: null | { senderLabel: string; blocks: string[]; foldedLines: number };
   /** Bloc réponse rapide en bas du fil (lecture). */
