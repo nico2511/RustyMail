@@ -2,11 +2,11 @@
 
 RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI (summaries, rewrite, translation, grammar, dictation, semantic search) runs on-device or over HTTP to OpenRouter / llama-server — never required for core mail.
 
-**0.3.2** includes a **TipTap** compose body, **toasts** (info, success, warning, error, with duration and dismiss), and **conversational reading** for person-to-person threads (folded quotes, signatures set aside). Newsletter and provider digests stay on their own path (Amazon, Deblock, GitHub). Digest templates and a fixture bench are **phase 1 framing** in [#26](https://github.com/nico2511/RustyMail/pull/26) — not wired into this build.
+**0.3.3** includes a **TipTap** compose body, **toasts** (info, success, warning, error, with duration and dismiss), and **conversational reading** for person-to-person threads (folded quotes, signatures set aside). Newsletter and provider digests stay on their own path (Amazon, Deblock, GitHub). Deblock reading applies the embedded digest fixture; Settings includes a digest fixture bench ([#31](https://github.com/nico2511/RustyMail/pull/31)).
 
 ## Screenshots
 
-UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.2 build (compose in the app uses TipTap, not the mockup’s markdown field).
+UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.3 build (compose in the app uses TipTap, not the mockup’s markdown field).
 
 **Inbox** — unified list, charcoal rail, account labels.
 
