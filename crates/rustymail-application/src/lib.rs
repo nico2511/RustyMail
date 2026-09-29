@@ -1,12 +1,12 @@
 pub mod ai;
 
 use pulldown_cmark::{html, CowStr, Event, Options, Parser};
+use rustymail_domain::compose_html::{
+    compose_body_is_html, compose_html_fragment, compose_html_to_plain, sanitize_compose_html,
+};
 /// Découpage pure (tailles connues) — utilisé après `stat_attachments` côté infrastructure / Tauri.
 pub use rustymail_domain::split_send::{
     plan_split as plan_attachment_split, SplitChunk, SplitError, SplitPlan,
-};
-use rustymail_domain::compose_html::{
-    compose_body_is_html, compose_html_fragment, compose_html_to_plain, sanitize_compose_html,
 };
 use rustymail_domain::{
     lexical_search_terms, DiscussionThreadView, Draft, DraftId, DraftKind, DraftPreview,

@@ -374,9 +374,7 @@ mod compose_html_send_tests {
 
     #[test]
     fn tiptap_html_is_not_passed_through_markdown() {
-        let html = markdown_body_to_html(&format!(
-            "{COMPOSE_HTML_MARK}<p><em>ciao</em></p>"
-        ));
+        let html = markdown_body_to_html(&format!("{COMPOSE_HTML_MARK}<p><em>ciao</em></p>"));
         assert!(html.contains("<em>ciao</em>"));
         assert!(!html.contains("&lt;em&gt;"));
     }

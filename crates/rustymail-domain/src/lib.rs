@@ -1,11 +1,11 @@
 pub mod account;
-pub mod compose_html;
 pub mod action_brief;
 pub mod activity;
 pub mod ai_assist;
 pub mod ai_budget;
 pub mod ai_llm;
 pub mod attachment;
+pub mod compose_html;
 pub mod draft;
 pub mod entity;
 pub mod flux_affiner;
@@ -25,13 +25,13 @@ pub mod translation;
 pub mod writing;
 
 pub use account::*;
-pub use compose_html::*;
 pub use action_brief::*;
 pub use activity::*;
 pub use ai_assist::*;
 pub use ai_budget::*;
 pub use ai_llm::*;
 pub use attachment::*;
+pub use compose_html::*;
 pub use draft::*;
 pub use entity::*;
 pub use flux_affiner::*;

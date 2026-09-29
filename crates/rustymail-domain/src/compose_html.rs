@@ -495,7 +495,9 @@ mod tests {
     fn detects_mark_and_keeps_fragment() {
         let body = format!("{COMPOSE_HTML_MARK}<p>Bonjour <strong>monde</strong></p>");
         assert!(compose_body_is_html(&body));
-        assert!(sanitize_compose_html(compose_html_fragment(&body)).contains("<strong>monde</strong>"));
+        assert!(
+            sanitize_compose_html(compose_html_fragment(&body)).contains("<strong>monde</strong>")
+        );
         let plain = compose_html_to_plain(&body);
         assert!(plain.contains("Bonjour"));
         assert!(plain.contains("monde"));
