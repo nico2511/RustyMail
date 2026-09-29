@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyGrammarReplacement, grammarOccurrenceCount, replacementDropsWords } from "./composeGrammarReplace";
+import { applyGrammarReplacement, grammarOccurrenceCount, replacementDropsWords, retainGrammarSuggestionsInText } from "./composeGrammarReplace";
 
 const suggestion = (original: string, replacement: string, extra?: { offset?: number; length?: number }) => ({
   original,
@@ -76,6 +76,15 @@ describe("applyGrammarReplacement", () => {
     expect(replacementDropsWords("Salu je mappel nicola", "Salut, je m'appelle Nicola")).toBe(false);
     expect(replacementDropsWords("salu moi c'est nicolas", "Bonjour, je m'appelle Nicolas")).toBe(false);
     expect(replacementDropsWords("aa", "bb")).toBe(false);
+  });
+
+  it("oublie une suggestion dont l’extrait n’est plus dans le corps", () => {
+    const suggestions = [
+      suggestion("Salu je mappel nicola", "Salut, je m'appelle Nicola"),
+      suggestion("aa", "bb"),
+    ];
+    expect(retainGrammarSuggestionsInText(suggestions, "")).toEqual([]);
+    expect(retainGrammarSuggestionsInText(suggestions, "aa reste")).toEqual([suggestions[1]]);
   });
 
   it("compte d’abord dans le texte affiché", () => {

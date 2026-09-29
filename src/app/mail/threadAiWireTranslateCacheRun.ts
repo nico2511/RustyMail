@@ -15,6 +15,7 @@ export async function hydrateMessageTranslationsFromCacheForThread(messages: Cle
   const targetLang = state.appPrefs.general.motherLanguage?.trim() || "fr";
   const seg = await aiCacheKeySegment();
   const batchSize = 12;
+  let applied = 0;
   for (let i = 0; i < messages.length; i += batchSize) {
     const slice = messages.slice(i, i + batchSize);
     await Promise.all(
@@ -31,12 +32,16 @@ export async function hydrateMessageTranslationsFromCacheForThread(messages: Cle
           const o = JSON.parse(raw) as LlmTranslationResult;
           const tx = o.translatedText?.trim();
           if (!tx || introducesLlmMeta(m.cleanedText || "", tx)) return;
-          state.messageTranslations[`${m.messageId}|${targetLang}`] = repairUtf8Mojibake(tx);
+          const key = `${m.messageId}|${targetLang}`;
+          const repaired = repairUtf8Mojibake(tx);
+          if (state.messageTranslations[key] === repaired) return;
+          state.messageTranslations[key] = repaired;
+          applied += 1;
         } catch {
           /* cache absent ou JSON invalide */
         }
       }),
     );
   }
-  render();
+  if (applied > 0 && state.view === "thread") render();
 }

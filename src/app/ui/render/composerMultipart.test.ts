@@ -53,4 +53,16 @@ describe("renderComposer", () => {
     expect(html).toContain('data-compose-cmd="ai:grammar"');
     expect(html).toContain('data-compose-cmd="ai:rewrite"');
   });
+
+  it("n’affiche pas une correction dont le corps ne contient plus l’extrait", () => {
+    state.composeBody = "";
+    state.composeCanonicalBody = "";
+    state.composeGrammarSuggestions = [
+      { reason: "ponctuation", original: "Salu je mappel nicola", replacement: "Salut, je m'appelle Nicola" },
+    ];
+    const html = renderComposer();
+    expect(html).not.toContain("Correction de texte");
+    expect(html).not.toContain("Salu je mappel nicola");
+    expect(state.composeGrammarSuggestions).toBeNull();
+  });
 });

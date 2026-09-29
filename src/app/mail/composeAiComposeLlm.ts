@@ -19,6 +19,10 @@ import {
 } from "./llmMetaGuard";
 import { withLlmQueue } from "./llmJobQueue";
 
+function composeAiStillOnSameDraft(sessionId: string | null, sourcePlain: string): boolean {
+  return state.view === "compose" && state.draftSessionId === sessionId && readComposePlainText() === sourcePlain;
+}
+
 export async function composeAiRewrite(styleRaw: string): Promise<void> {
   if (state.view !== "compose") {
     toast.warning("Ouvre le compositeur pour réécrire.");
@@ -36,14 +40,15 @@ export async function composeAiRewrite(styleRaw: string): Promise<void> {
   const style = styleRaw.trim() || "Neutral";
   const styleLabel = rewriteStyleLabelFr(style);
   if (!isTauriRuntime()) return void toast.warning("Réécriture IA : Tauri requis.");
+  const sessionId = state.draftSessionId;
   const ran = await withLlmQueue(composeRewriteJobLabel(style), async (signal) => {
-    if (signal.aborted) return;
+    if (signal.aborted || !composeAiStillOnSameDraft(sessionId, src)) return;
     try {
       const res = await withTimeout(
         invoke<{ text: string }>("llm_rewrite_compose", { text: src, style }),
         LLM_INVOKE_TIMEOUT_MS,
       );
-      if (signal.aborted) return;
+      if (signal.aborted || !composeAiStillOnSameDraft(sessionId, src)) return;
       const rewritten = (res.text ?? "").trim();
       if (!rewritten || introducesLlmMeta(src, rewritten)) {
         toast.error(LLM_META_REWRITE_TOAST);
@@ -76,8 +81,9 @@ export async function composeAiGrammar(): Promise<void> {
     return;
   }
   if (!isTauriRuntime()) return void toast.warning("Correction (LLM) : Tauri requis.");
+  const sessionId = state.draftSessionId;
   const ran = await withLlmQueue(COMPOSE_GRAMMAR_JOB, async (signal) => {
-    if (signal.aborted) return;
+    if (signal.aborted || state.view !== "compose" || state.draftSessionId !== sessionId) return;
     try {
       const res = await withTimeout(
         invoke<{
@@ -94,7 +100,8 @@ export async function composeAiGrammar(): Promise<void> {
         ),
         LLM_INVOKE_TIMEOUT_MS,
       );
-      if (signal.aborted) return;
+      if (signal.aborted || state.view !== "compose" || state.draftSessionId !== sessionId) return;
+      const current = readComposePlainText();
       const incoming = res.suggestions ?? [];
       const sawMeta = incoming.some(
         (g) => containsLlmMeta(g.original) || containsLlmMeta(g.replacement) || containsLlmMeta(g.reason),
@@ -109,7 +116,7 @@ export async function composeAiGrammar(): Promise<void> {
           return false;
         }
         if (replacementDropsWords(original, replacement)) return false;
-        return grammarOccurrenceCount(src, src, g) > 0;
+        return grammarOccurrenceCount(current, current, g) > 0;
       });
       if (sawMeta && usable.length === 0) {
         state.composeGrammarSuggestions = null;

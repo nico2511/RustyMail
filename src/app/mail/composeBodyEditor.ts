@@ -20,6 +20,7 @@ import {
   markComposeHtml,
   unwrapComposeHtml,
 } from "./composeHtmlBody";
+import { syncStaleComposeGrammarSuggestions } from "./composeGrammarPanelSync";
 import { schedulePreviewUpdate } from "./composeDraftPreview";
 import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 
@@ -75,6 +76,7 @@ function persistFromEditor(ed: Editor): void {
   state.composeBody = stored;
   state.composeCanonicalBody = stored;
   if (state.draft) state.draft.markdownBody = stored;
+  syncStaleComposeGrammarSuggestions(editorPlain(ed).replace(/\u00a0/g, " "));
 }
 
 function scheduleAfterEdit(): void {
@@ -470,4 +472,5 @@ function assignComposeSource(source: string): void {
   if (state.draft) state.draft.markdownBody = source;
   loadedSource = "";
   syncComposeEditorFromState();
+  syncStaleComposeGrammarSuggestions(composeSourcePlainText(source));
 }

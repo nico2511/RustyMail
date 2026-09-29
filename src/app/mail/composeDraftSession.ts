@@ -1,4 +1,5 @@
 import { state } from "../state";
+import { clearComposeGrammarUi } from "./composeGrammarPanelSync";
 
 export function newDraftSessionId(): string {
   const anyCrypto = (globalThis as { crypto?: Crypto }).crypto;
@@ -8,6 +9,7 @@ export function newDraftSessionId(): string {
 }
 
 export function startNewDraftSession(): void {
+  clearComposeGrammarUi();
   state.draftSessionId = newDraftSessionId();
   state.savedDraftRecordId = null;
   state.draftRevisionsLoading = false;

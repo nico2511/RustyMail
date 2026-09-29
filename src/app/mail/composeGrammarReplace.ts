@@ -217,6 +217,15 @@ export function countGrammarOccurrences(source: string, suggestion: GrammarRepla
   return findGrammarSpans(source, suggestion).length;
 }
 
+/** Suggestions dont l’extrait est encore dans le texte visible. */
+export function retainGrammarSuggestionsInText<T extends GrammarReplaceInput>(
+  suggestions: readonly T[] | null | undefined,
+  plain: string,
+): T[] {
+  if (!suggestions?.length) return [];
+  return suggestions.filter((suggestion) => grammarOccurrenceCount(plain, plain, suggestion) > 0);
+}
+
 /** Occurrences dans le texte affiché, sinon dans le markdown canonique (images inline). */
 export function grammarOccurrenceCount(display: string, canonical: string, suggestion: GrammarReplaceInput): number {
   const inDisplay = countGrammarOccurrences(display, suggestion);

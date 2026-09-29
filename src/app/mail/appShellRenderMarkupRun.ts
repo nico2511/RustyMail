@@ -44,21 +44,22 @@ export function buildAppShellInnerHtml(options: {
   isCompose: boolean;
   aiPanelExpanded: boolean;
   panelW: number;
-}): string {
-  const { isCompose, aiPanelExpanded, panelW } = options;
+}): { fullHtml: string; mainHtml: string } {
+  const { isCompose, aiPanelExpanded } = options;
   const mainColumn =
     !isCompose && state.sidebarCollapsed ?
       `<button type="button" class="main-sidebar-reveal" data-action="toggle-sidebar" aria-label="Afficher le menu des dossiers" title="Menu">☰</button>`
     : "";
 
+  const mainHtml = isCompose ? "" : `<main class="main">${mainColumn}${renderMain()}</main>`;
   const body =
     isCompose ?
       renderComposer()
     : `${renderSidebar()}
-    <main class="main">${mainColumn}${renderMain()}</main>
+    ${mainHtml}
     ${aiPanelExpanded ? renderAiPanel() : ""}`;
 
-  return `
+  const fullHtml = `
     <div class="noise"></div>
     ${body}
     ${renderMoveDialog()}
@@ -77,6 +78,7 @@ export function buildAppShellInnerHtml(options: {
     ${renderGlobalStatusFooter()}
     ${renderAccountModalHtml()}
   `;
+  return { fullHtml, mainHtml };
 }
 
 export function readAppShellLayoutFlags(): {
