@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 
 use crate::ai_llm_contracts::{
-    untrusted_mail_content_block, validate_org_orientation_shape, OrgOrientationActionShape,
-    ORG_ORIENTATION_JSON_GBNF,
+    normalize_org_suggested_action, untrusted_mail_content_block, validate_org_orientation_shape,
+    OrgOrientationActionShape, ORG_ORIENTATION_JSON_GBNF,
 };
 use crate::ai_llm_util::{gen_params_json_for_prompt, parse_model_json, untrusted_mail_for_engine};
 use rustymail_domain::{
@@ -127,16 +127,19 @@ pub fn render_org_orientation_user_prompt(
     )
 }
 
-fn map_suggested_action(raw: &str) -> OrgSuggestedAction {
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "move" => OrgSuggestedAction::Move,
-        "trash" => OrgSuggestedAction::Trash,
-        "markread" | "mark_read" => OrgSuggestedAction::MarkRead,
-        _ => OrgSuggestedAction::Archive,
+fn map_suggested_action(raw: &str) -> Option<OrgSuggestedAction> {
+    match normalize_org_suggested_action(raw)? {
+        "archive" => Some(OrgSuggestedAction::Archive),
+        "move" => Some(OrgSuggestedAction::Move),
+        "trash" => Some(OrgSuggestedAction::Trash),
+        "markRead" => Some(OrgSuggestedAction::MarkRead),
+        "deleteMailbox" => Some(OrgSuggestedAction::DeleteMailbox),
+        _ => None,
     }
 }
 
 /// Parse et valide le JSON d’orientation. Les ids hors catalogue sont retirés.
+/// Une action au verbe inconnu est ignorée ; les alias (`delete`, `mark_as_read`, …) sont normalisés.
 /// Un diagnostic absent ou hors contrat est une erreur : aucun texte de repli n’est fabriqué.
 pub fn parse_org_orientation_json(
     raw: &str,
@@ -150,9 +153,13 @@ pub fn parse_org_orientation_json(
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
+    let actionable: Vec<&LlmOrgActionRow> = parsed
+        .actions
+        .iter()
+        .filter(|row| normalize_org_suggested_action(row.suggested_action.trim()).is_some())
+        .collect();
     {
-        let shapes: Vec<OrgOrientationActionShape<'_>> = parsed
-            .actions
+        let shapes: Vec<OrgOrientationActionShape<'_>> = actionable
             .iter()
             .map(|row| OrgOrientationActionShape {
                 title: row.title.trim(),
@@ -167,7 +174,10 @@ pub fn parse_org_orientation_json(
     }
 
     let mut actions = Vec::new();
-    for (i, row) in parsed.actions.into_iter().enumerate().take(5) {
+    for (i, row) in actionable.into_iter().enumerate().take(5) {
+        let Some(suggested_action) = map_suggested_action(&row.suggested_action) else {
+            continue;
+        };
         let refs: Vec<OrgThreadRef> = row
             .thread_ids
             .iter()
@@ -181,7 +191,7 @@ pub fn parse_org_orientation_json(
             .collect();
         let keywords: Vec<String> = row
             .search_keywords
-            .into_iter()
+            .iter()
             .map(|k| k.trim().to_string())
             .filter(|k| k.chars().count() >= 2)
             .take(6)
@@ -191,8 +201,10 @@ pub fn parse_org_orientation_json(
         }
         let target = row
             .target_mailbox
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty());
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
         actions.push(OrgProposal {
             id: format!("llm-{i}"),
             kind: OrgProposalKind::LlmCluster,
@@ -201,7 +213,7 @@ pub fn parse_org_orientation_json(
             rationale: row.rationale.trim().to_string(),
             thread_ids: refs.iter().map(|r| r.thread_id.clone()).collect(),
             thread_refs: refs,
-            suggested_action: map_suggested_action(&row.suggested_action),
+            suggested_action,
             target_mailbox: target,
             confidence: 0.65,
             source: OrgProposalSource::Llm,
@@ -302,9 +314,40 @@ Note : ceci n’est pas une seconde action.
     }
 
     #[test]
-    fn orientation_rejects_unknown_action_instead_of_defaulting() {
+    fn orientation_skips_unknown_action_and_keeps_diagnosis() {
         let raw = r#"{"diagnosis":"Plusieurs factures sont encore dans l’inbox.","recommendations":["Les regrouper avant archivage."],"actions":[{"title":"Purger","rationale":"Action non prévue par le contrat.","threadIds":["t-ok"],"searchKeywords":[],"suggestedAction":"destroy","targetMailbox":null}]}"#;
-        assert!(parse_org_orientation_json(raw, &ids(&["t-ok"])).is_err());
+        let parsed = parse_org_orientation_json(raw, &ids(&["t-ok"])).expect("orientation kept");
+        assert!(parsed.orientation.diagnosis.contains("factures"));
+        assert!(parsed.orientation.diagnosis.contains("inbox"));
+        assert_eq!(parsed.orientation.recommendations.len(), 1);
+        assert!(parsed.actions.is_empty());
+        assert!(!parsed
+            .orientation
+            .diagnosis
+            .to_lowercase()
+            .contains("en ordre"));
+    }
+
+    #[test]
+    fn orientation_maps_delete_alias_and_skips_invalid_sibling() {
+        let raw = r#"{"diagnosis":"Des publicités lues encombrent l’inbox depuis des semaines.","recommendations":["Mettre ce lot en corbeille.","Laisser les factures en place."],"actions":[{"title":"Jeter les pubs","rationale":"Ces fils n’ont plus d’intérêt.","threadIds":["t-ads"],"searchKeywords":[],"suggestedAction":"delete","targetMailbox":null},{"title":"Action inconnue","rationale":"Ce verbe ne doit pas casser l’orientation.","threadIds":["t-ads"],"searchKeywords":[],"suggestedAction":"frobnicate","targetMailbox":null},{"title":"Marquer les reçus lus","rationale":"Ils sont déjà traités.","threadIds":["t-receipt"],"searchKeywords":[],"suggestedAction":"mark_as_read","targetMailbox":null},{"title":"Dossiers vides","rationale":"Ces dossiers ne contiennent plus de messages.","threadIds":["t-empty"],"searchKeywords":[],"suggestedAction":"deleteMailbox","targetMailbox":null}]}"#;
+        let parsed = parse_org_orientation_json(raw, &ids(&["t-ads", "t-receipt", "t-empty"]))
+            .expect("alias orientation");
+        assert!(parsed.orientation.diagnosis.contains("publicités"));
+        assert_eq!(parsed.actions.len(), 3);
+        assert_eq!(
+            parsed.actions[0].suggested_action,
+            OrgSuggestedAction::Trash
+        );
+        assert_eq!(parsed.actions[0].thread_ids, vec!["t-ads".to_string()]);
+        assert_eq!(
+            parsed.actions[1].suggested_action,
+            OrgSuggestedAction::MarkRead
+        );
+        assert_eq!(
+            parsed.actions[2].suggested_action,
+            OrgSuggestedAction::DeleteMailbox
+        );
     }
 
     #[test]
@@ -388,5 +431,8 @@ Note : ceci n’est pas une seconde action.
         assert!(system.contains("applied"));
         assert!(system.contains("dismissed"));
         assert!(system.contains("confirmation"));
+        for action in ["archive", "move", "trash", "markRead", "deleteMailbox"] {
+            assert!(system.contains(action), "prompt missing {action}");
+        }
     }
 }
