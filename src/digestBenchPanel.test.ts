@@ -2,7 +2,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleDigestBenchAction } from "./app/mail/digestBenchActions";
 import { digestBench } from "./app/mail/digestBenchState";
+import { digestCut } from "./app/mail/digestCutState";
 import { renderDigestBenchPanel } from "./app/ui/render/digestBenchRender";
+import { state } from "./app/state";
 
 beforeEach(() => {
   digestBench.queryDraft = "@deblock.com";
@@ -41,6 +43,8 @@ describe("renderDigestBenchPanel", () => {
     expect(html).toContain("Accepter ne l&#039;allume pas");
     expect(html).toContain("pas le texte encore en cours d'édition");
     expect(html).toContain("Côte à côte");
+    expect(html).toContain('data-action="digest-bench-cut"');
+    expect(html).toContain("@domaine");
   });
 
   it("sanitizes the raw pane and explains a non-applicable fixture", () => {
@@ -101,6 +105,25 @@ describe("handleDigestBenchAction", () => {
     expect(digestBench.notice).toContain("n'active pas la lecture");
     expect(digestBench.accepted).toBe(false);
     expect(digestBench.readingEnabled).toBe(false);
+  });
+
+  it("sends the selected mailbox message to the cut editor", async () => {
+    digestBench.selectedMessageId = "m1";
+    digestBench.threadSubject = "Facture";
+    digestBench.messages = [
+      {
+        id: "m1",
+        sender: "Shop",
+        senderEmail: "notes@exemple.fr",
+        receivedAt: "2026-01-01",
+        html: "<p>Montant 12 EUR</p>",
+      },
+    ];
+    expect(await handleDigestBenchAction("digest-bench-cut")).toBe(true);
+    expect(digestCut.sourceKind).toBe("mailbox");
+    expect(digestCut.html).toContain("Montant 12 EUR");
+    expect(digestCut.senderEmail).toBe("notes@exemple.fr");
+    expect(state.settingsTab).toBe("digestCut");
   });
 
   it("refuses a mailbox search when no account is selected", async () => {

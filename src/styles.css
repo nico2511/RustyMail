@@ -10130,8 +10130,34 @@ button.thread-tag-chip--search:focus-visible {
 .digest-bench__thread-title { margin: 12px 0 0; font-size: 13px; }
 
 .digest-cut__layout { margin-top: 12px; }
-.digest-cut__preview { display: grid; gap: 10px; }
+.digest-cut__pick { margin-top: 8px; }
+.digest-cut__preview { display: grid; gap: 10px; margin-top: 12px; }
 .digest-cut__zones { display: grid; gap: 10px; margin-top: 12px; }
+.digest-cut__explain {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.digest-cut .ghost-button,
+.digest-cut .primary-button { padding: 8px 12px; }
+.digest-cut__file { display: inline-flex; align-items: center; cursor: pointer; }
+.digest-cut__zone-actions .ghost-button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--text, #eef0ee);
+}
+.digest-cut__code { margin-top: 12px; }
+.digest-cut__source {
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .digest-cut__zone {
   border: 1px solid rgba(120, 119, 117, 0.22);
   border-radius: 10px;

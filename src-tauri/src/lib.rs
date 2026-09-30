@@ -2397,6 +2397,7 @@ pub fn run() {
             digest_bench::digest_bench_enable_reading,
             digest_bench::digest_bench_disable_reading,
             digest_cut::digest_cut_builtin_sample,
+            digest_cut::digest_cut_parse_eml,
             digest_cut::digest_cut_propose_zones,
             digest_cut::digest_cut_proposal_yaml,
             digest_cut::digest_cut_preview

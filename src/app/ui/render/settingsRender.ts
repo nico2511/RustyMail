@@ -684,7 +684,7 @@ export function renderSettings() {
             settingsNavButton("storage", t("settings.tabs.storage"), tabStorage, "SQLite, JSON, modèles"),
             settingsNavButton("shortcuts", t("settings.tabs.shortcuts"), tabShortcuts, "Raccourcis clavier"),
             settingsNavButton("developer", t("settings.tabs.developer"), tabDeveloper, "Dépôt, crates, libs"),
-            settingsNavButton("digestCut", t("settings.tabs.digestCut"), tabDigestCut, "Proposition de zones sur un échantillon"),
+            settingsNavButton("digestCut", t("settings.tabs.digestCut"), tabDigestCut, "Découpe d'un mail de la boîte"),
             settingsNavButton("digestBench", t("settings.tabs.digestBench"), tabDigestBench, "Découpe digest sur la recherche"),
           ].join(""),
         )}

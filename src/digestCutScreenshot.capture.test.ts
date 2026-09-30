@@ -1,40 +1,40 @@
 // @vitest-environment happy-dom
 /**
- * Generates docs screenshots for the digest cut editor (PR review).
+ * Stage screenshots for the digest cut editor.
+ * The HTML in the loaded-mail shots is a render stand-in produced by the Rust
+ * heuristic test. The app does not offer that HTML as a sample.
  * Run: CAPTURE_DIGEST_CUT=1 npx vitest run src/digestCutScreenshot.capture.test.ts
  */
 import { execSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { digestCut } from "./app/mail/digestCutState";
+import { digestCut, type DigestCutProposal } from "./app/mail/digestCutState";
 import { renderDigestCutPanel } from "./app/ui/render/digestCutRender";
 
 const CAPTURE = process.env.CAPTURE_DIGEST_CUT === "1";
 const ROOT = join(import.meta.dirname, "..");
 const OUT_DIR = join(ROOT, "docs", "screenshots");
-const RECEIVE = readFileSync(
-  join(ROOT, "crates/rustymail-modules/tests/fixtures/deblock/receive_200eur.html"),
-  "utf8",
-);
 
-function loadYamlAndPreviewFromRust(): { yaml: string; previewHtml: string } {
+function between(text: string, start: string, end: string): string {
+  const startAt = text.indexOf(start);
+  const endAt = text.indexOf(end);
+  if (startAt < 0 || endAt < 0 || endAt <= startAt) {
+    throw new Error(`missing ${start} in harness output:\n${text.slice(-2500)}`);
+  }
+  return text.slice(startAt + start.length, endAt).trim();
+}
+
+function loadStageFromRust(): { html: string; proposal: DigestCutProposal; yaml: string; previewHtml: string } {
   const out = execSync(
-    "cargo test -p rustymail-modules --lib dump_deblock_cut_preview_for_docs -- --ignored --nocapture 2>&1",
+    "cargo test -p rustymail-modules --lib dump_cut_stage_preview_for_docs -- --ignored --nocapture 2>&1",
     { cwd: ROOT, encoding: "utf8", maxBuffer: 4 * 1024 * 1024 },
   );
-  const yamlStart = out.indexOf("DIGEST_CUT_YAML_START");
-  const yamlEnd = out.indexOf("DIGEST_CUT_YAML_END");
-  const previewStart = out.indexOf("DIGEST_CUT_PREVIEW_START");
-  const previewEnd = out.indexOf("DIGEST_CUT_PREVIEW_END");
-  if (yamlStart < 0 || yamlEnd < 0 || previewStart < 0 || previewEnd < 0) {
-    throw new Error(`preview harness failed:\n${out.slice(-2500)}`);
-  }
   return {
-    yaml: out.slice(yamlStart + "DIGEST_CUT_YAML_START".length + 1, yamlEnd).trim(),
-    previewHtml: out
-      .slice(previewStart + "DIGEST_CUT_PREVIEW_START".length + 1, previewEnd)
-      .trim(),
+    html: between(out, "DIGEST_CUT_HTML_START", "DIGEST_CUT_HTML_END"),
+    proposal: JSON.parse(between(out, "DIGEST_CUT_PROPOSAL_START", "DIGEST_CUT_PROPOSAL_END")) as DigestCutProposal,
+    yaml: between(out, "DIGEST_CUT_YAML_START", "DIGEST_CUT_YAML_END"),
+    previewHtml: between(out, "DIGEST_CUT_PREVIEW_START", "DIGEST_CUT_PREVIEW_END"),
   };
 }
 
@@ -72,89 +72,87 @@ function settingsShell(panelHtml: string): string {
 </html>`;
 }
 
+function chromeBin(): string {
+  for (const bin of ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser"]) {
+    try {
+      execSync(`command -v ${bin}`, { stdio: "ignore" });
+      return bin;
+    } catch {
+      /* try the next binary */
+    }
+  }
+  throw new Error("no chrome or chromium binary for screenshots");
+}
+
 function chromeScreenshot(htmlPath: string, pngPath: string): void {
   execSync(
-    `google-chrome-stable --headless=new --disable-gpu --window-size=1440,1280 --hide-scrollbars --screenshot="${pngPath}" "file://${htmlPath}"`,
+    `${chromeBin()} --headless=new --disable-gpu --window-size=1440,1180 --hide-scrollbars --screenshot="${pngPath}" "file://${htmlPath}"`,
     { stdio: "inherit" },
   );
 }
 
-function resetDigestCutState(): void {
-  digestCut.sampleLoaded = true;
-  digestCut.html = RECEIVE;
-  digestCut.senderEmail = "support@deblock.com";
-  digestCut.subject = "Vous allez recevoir 200 EUR";
+function resetCut(): void {
+  digestCut.sourceKind = "none";
+  digestCut.queryDraft = "";
+  digestCut.searching = false;
+  digestCut.searchError = "";
+  digestCut.threads = [];
+  digestCut.selectedThreadId = null;
+  digestCut.threadSubject = "";
+  digestCut.messages = [];
+  digestCut.selectedMessageId = null;
+  digestCut.html = "";
+  digestCut.senderEmail = "";
+  digestCut.subject = "";
+  digestCut.proposal = null;
+  digestCut.yaml = "";
+  digestCut.yamlReady = false;
   digestCut.proposing = false;
   digestCut.previewing = false;
+  digestCut.previewApplicable = null;
+  digestCut.previewHtml = "";
   digestCut.previewError = "";
-  digestCut.notice =
-    "Proposition heuristique (structure DOM). Le modèle local peut affiner si configuré.";
+  digestCut.showCode = false;
+  digestCut.notice = "";
 }
 
-describe.skipIf(!CAPTURE)("digest cut screenshot capture", () => {
-  it("writes PNGs under docs/screenshots", () => {
+function shoot(name: string, panelHtml: string): void {
+  const htmlPath = join(OUT_DIR, `_${name}.html`);
+  const pngPath = join(OUT_DIR, `${name}.png`);
+  writeFileSync(htmlPath, settingsShell(panelHtml));
+  chromeScreenshot(htmlPath, pngPath);
+  unlinkSync(htmlPath);
+  expect(readFileSync(pngPath).length).toBeGreaterThan(10_000);
+}
+
+describe.skipIf(!CAPTURE)("digest cut stage screenshots", () => {
+  it("writes pick, explain, and refine PNGs under docs/screenshots", () => {
     mkdirSync(OUT_DIR, { recursive: true });
-    const { yaml, previewHtml } = loadYamlAndPreviewFromRust();
+    const stage = loadStageFromRust();
 
-    resetDigestCutState();
-    digestCut.proposal = {
-      fixtureId: "deblock-com",
-      ruleSetVersion: "1",
-      source: "heuristic",
-      match: {
-        senderDomains: [{ exact: "deblock.com" }, { suffix: ".deblock.com" }],
-        structureRoot: "div.f-fallback",
-        minChildren: 3,
-      },
-      zones: {
-        header: {
-          action: "show",
-          presentation: "prominent",
-          anchors: [
-            { selector: "h3", index: 0, role: "title" },
-            { selector: "div", classContains: "code", role: "amount" },
-          ],
-          rationale:
-            "Premier titre et bloc montant dans div.f-fallback (structure Deblock).",
-        },
-        body: {
-          action: "show",
-          presentation: "key_value",
-          anchors: [
-            {
-              selector: "h3",
-              index: 1,
-              textContainsAny: ["détails", "details", "👇"],
-            },
-          ],
-          detailsHeading: "Détails",
-          rowSelector: "p",
-          rationale: "Lignes libellé/valeur après le second h3 jusqu'au pied.",
-        },
-        footer: {
-          action: "hide",
-          anchors: [{ selector: "div", classContains: "warning" }],
-          rationale: "Pied marketing / avertissement (div.warning).",
-        },
-      },
-    };
-    digestCut.yaml = yaml;
+    resetCut();
+    digestCut.queryDraft = "@exemple.fr";
+    digestCut.notice = "Indiquez un domaine de votre boîte, ouvrez un fil, puis choisissez le message.";
+    shoot("digest-cut-stage-pick", renderDigestCutPanel());
+
+    resetCut();
+    digestCut.sourceKind = "mailbox";
+    digestCut.queryDraft = "@exemple.fr";
+    digestCut.subject = "Votre commande est confirmée";
+    digestCut.senderEmail = "notes@exemple.fr";
+    digestCut.html = stage.html;
+    digestCut.proposal = stage.proposal;
+    digestCut.yaml = stage.yaml;
     digestCut.yamlReady = true;
-    digestCut.previewApplicable = null;
-    digestCut.previewHtml = "";
-
-    const proposeHtmlPath = join(OUT_DIR, "_digest-cut-propose.html");
-    writeFileSync(proposeHtmlPath, settingsShell(renderDigestCutPanel()));
-    chromeScreenshot(proposeHtmlPath, join(OUT_DIR, "digest-cut-editor.png"));
-    // ephemeral harness pages (not committed)
+    digestCut.notice = "Proposition structurelle, expliquée en français. Ajustez les zones, puis l'aperçu.";
+    shoot("digest-cut-stage-explain", renderDigestCutPanel());
 
     digestCut.previewApplicable = true;
-    digestCut.previewHtml = previewHtml;
-    const previewHtmlPath = join(OUT_DIR, "_digest-cut-preview.html");
-    writeFileSync(previewHtmlPath, settingsShell(renderDigestCutPanel()));
-    chromeScreenshot(previewHtmlPath, join(OUT_DIR, "digest-cut-preview.png"));
-
-    expect(readFileSync(join(OUT_DIR, "digest-cut-editor.png")).length).toBeGreaterThan(10_000);
-    expect(readFileSync(join(OUT_DIR, "digest-cut-preview.png")).length).toBeGreaterThan(10_000);
+    digestCut.previewHtml = stage.previewHtml;
+    digestCut.notice = "Pied masqué. L'aperçu montre la lecture coupée. Affiner redemande au modèle local.";
+    if (digestCut.proposal) {
+      digestCut.proposal.zones.footer.action = "hide";
+    }
+    shoot("digest-cut-stage-refine", renderDigestCutPanel());
   });
 });

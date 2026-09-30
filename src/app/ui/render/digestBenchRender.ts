@@ -82,6 +82,7 @@ export function renderDigestBenchPanel(): string {
       <p class="dim settings-card__lead">
         Même recherche que la boîte (mode lexical) : <code>@domaine</code>, texte sujet et corps, <code>#dossier:</code>.
         Ouvrir un mail applique la fixture candidate. Le domaine seul ne réécrit pas.
+        « Découper ce mail » envoie le message choisi dans l'éditeur de découpe.
         Accepter enregistre le verdict du banc. Cela n'active pas la lecture.
       </p>
       <p class="digest-bench__status">${escapeHtml(accepted)} ${escapeHtml(reading)}</p>
@@ -90,7 +91,7 @@ export function renderDigestBenchPanel(): string {
         <div class="digest-bench__col">
           <label class="digest-bench__label" for="digest-bench-query">Recherche</label>
           <div class="digest-bench__search">
-            <input id="digest-bench-query" class="digest-bench__input" type="search" value="${escapeAttr(digestBench.queryDraft)}" placeholder="@deblock.com reçu #dossier:INBOX" />
+            <input id="digest-bench-query" class="digest-bench__input" type="search" value="${escapeAttr(digestBench.queryDraft)}" placeholder="@domaine #dossier:INBOX" />
             <button type="button" class="primary-button" data-action="digest-bench-search">${digestBench.searching ? "Recherche…" : "Chercher"}</button>
           </div>
           ${digestBench.searchError ? `<p class="digest-bench__warn">${escapeHtml(digestBench.searchError)}</p>` : ""}
@@ -106,6 +107,7 @@ export function renderDigestBenchPanel(): string {
           <textarea id="digest-bench-yaml" class="digest-bench__yaml" rows="16" spellcheck="false">${escapeHtml(digestBench.yaml)}</textarea>
           <div class="settings-card__actions digest-bench__actions">
             <button type="button" class="primary-button" data-action="digest-bench-preview">Aperçu</button>
+            <button type="button" class="ghost-button" data-action="digest-bench-cut">Découper ce mail</button>
             <button type="button" class="ghost-button" data-action="digest-bench-tweak">Ajuster</button>
             <button type="button" class="ghost-button" data-action="digest-bench-accept">Accepter</button>
             <button type="button" class="ghost-button" data-action="digest-bench-reject">Refuser</button>
