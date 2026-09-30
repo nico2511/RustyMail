@@ -1,7 +1,12 @@
 import { render } from "../dispatch";
 import { state } from "../state";
 import { openSettingsView } from "./settingsOpenView";
-import { applyInboxScopeAccount, applyInboxScopeAll, closeAccountChrome } from "./inboxAccountScope";
+import {
+  applyInboxScopeAccount,
+  applyInboxScopeAll,
+  closeAccountChrome,
+  railAccountRowExpanded,
+} from "./inboxAccountScope";
 
 export async function tryHandleInboxAccountScopeWire(
   action: string,
@@ -32,6 +37,22 @@ export async function tryHandleInboxAccountScopeWire(
     case "inbox-scope-account": {
       const id = element?.dataset.accountId ?? "";
       await applyInboxScopeAccount(id);
+      return true;
+    }
+    case "toggle-rail-account-section": {
+      const id = element?.dataset.accountId?.trim() ?? "";
+      if (!id || !state.accounts.some((a) => a.id === id)) return true;
+      if (railAccountRowExpanded(id)) {
+        state.railAccountSectionOpen = false;
+        render();
+        return true;
+      }
+      state.railAccountSectionOpen = true;
+      if (state.selectedAccountId !== id) {
+        await applyInboxScopeAccount(id);
+        return true;
+      }
+      render();
       return true;
     }
     case "open-add-account":

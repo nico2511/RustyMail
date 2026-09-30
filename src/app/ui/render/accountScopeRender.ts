@@ -12,6 +12,7 @@ import {
   accountInboxUnreadCount,
   allAccountsInboxUnread,
   currentInboxScope,
+  railAccountRowExpanded,
 } from "../../mail/inboxAccountScope";
 import { state } from "../../state";
 
@@ -94,11 +95,18 @@ function railAccountButton(account: Account, scoped: boolean): string {
       ? `<span class="folder-count folder-count-unread" aria-label="${escapeAttr(unreadCountLabelFr(n))}">${n}</span>`
       : `<span class="folder-count">0</span>`;
   const title = email ? `${label} — ${email} — ${unreadCountLabelFr(n)}` : `${label} — ${unreadCountLabelFr(n)}`;
-  return `<button type="button" class="folder-button folder-button--account${scoped ? " folder-button--scope" : ""}" data-action="inbox-scope-account" data-account-id="${escapeAttr(account.id)}" data-account-hue="${hue}" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}">
-    <span class="folder-icon" aria-hidden="true">${escapeHtml(accountMonogram(label))}</span>
-    <span class="folder-name">${escapeHtml(label)}</span>
-    ${count}
-  </button>`;
+  const expanded = railAccountRowExpanded(account.id);
+  const foldLabel = expanded ? `Replier ${label}` : `Déplier ${label}`;
+  return `<div class="sidebar-account-row${expanded ? " is-expanded" : ""}" data-rail-account="${escapeAttr(account.id)}">
+    <button type="button" class="sidebar-account-fold" data-action="toggle-rail-account-section" data-account-id="${escapeAttr(account.id)}" aria-expanded="${expanded ? "true" : "false"}" aria-label="${escapeAttr(foldLabel)}" title="${escapeAttr(foldLabel)}">
+      <span class="sidebar-account-fold__chevron" aria-hidden="true"></span>
+    </button>
+    <button type="button" class="folder-button folder-button--account${scoped ? " folder-button--scope" : ""}" data-action="inbox-scope-account" data-account-id="${escapeAttr(account.id)}" data-account-hue="${hue}" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}">
+      <span class="folder-icon" aria-hidden="true">${escapeHtml(accountMonogram(label))}</span>
+      <span class="folder-name">${escapeHtml(label)}</span>
+      ${count}
+    </button>
+  </div>`;
 }
 
 export function inboxScopeTitleEligible(listMailbox: string, opts: { draft: boolean; search: boolean; panel: boolean }): boolean {

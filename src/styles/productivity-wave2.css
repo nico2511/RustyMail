@@ -189,6 +189,61 @@ body.clarity-dark {
   background: #322830;
 }
 
+.sidebar-account-row {
+  position: relative;
+  min-width: 0;
+}
+
+.sidebar-account-fold {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  width: 18px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--rail-mute);
+  cursor: pointer;
+}
+
+.sidebar-account-fold:hover {
+  color: #ffffff;
+}
+
+.sidebar-account-fold__chevron {
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.sidebar-account-row.is-expanded .sidebar-account-fold__chevron {
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+/* Gouttière du chevron : les icônes du rail restent alignées. */
+.sidebar .folder-list--account-fold .folder-button {
+  padding-left: 22px;
+}
+
+.sidebar .folder-list--account-fold .sidebar-section-label--in-nav {
+  padding-left: 22px;
+}
+
+.app-shell.sidebar-collapsed .sidebar-account-fold {
+  display: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar .folder-list--account-fold .folder-button,
+.app-shell.sidebar-collapsed .sidebar .folder-list--account-fold .sidebar-section-label--in-nav {
+  padding-left: 0;
+}
+
 .sidebar .folder-button--account.folder-button--scope {
   background: rgba(255, 255, 255, 0.06);
 }

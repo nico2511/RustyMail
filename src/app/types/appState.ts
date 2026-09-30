@@ -112,6 +112,11 @@ export type State = {
   inboxAccountMenuOpen: boolean;
   /** Modale comptes (avatar). Mêmes compteurs que le rail et le filtre. */
   accountModalOpen: boolean;
+  /**
+   * Rail multi-compte : dossiers IMAP + personnels du compte actif.
+   * Un seul compte est déplié ; `false` replie aussi le compte actif.
+   */
+  railAccountSectionOpen: boolean;
   /** Compteurs puces filtre liste (dossier courant + suivis compte). */
   inboxFilterCounts: InboxFilterCounts | null;
   mailboxTotal: Record<string, number>;

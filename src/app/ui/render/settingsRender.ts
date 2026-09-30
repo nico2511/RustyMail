@@ -573,7 +573,7 @@ function renderSettingsDeveloperPanel(): string {
     <article class="settings-card surface-sm" aria-labelledby="settings-dev-demo-heading">
       <h3 id="settings-dev-demo-heading" class="thread-kicker settings-form-kicker settings-card__title">Données démo (pro fictif)</h3>
       <p class="dim settings-card__lead">
-        <strong>Essayer</strong> — crée ou réinitialise <code>playground@demo.rustymail.app</code> (conversations pro en local, IMAP factice) pour tester le <strong>Brief d’action</strong>.
+        <strong>Essayer</strong> — crée ou réinitialise <code>playground@demo.rustymail.app</code> (fils pro locaux plus longs : plusieurs participants, liens, tableaux, IMAP factice) pour tester la lecture et le <strong>Brief d’action</strong>.
       </p>
       <p class="dim" style="margin:0 0 4px;font-size:13px;line-height:1.55">
         <strong>Passer à un vrai compte</strong> — supprimez la démo puis ajoutez un compte IMAP dans <strong>Paramètres → Comptes</strong>.

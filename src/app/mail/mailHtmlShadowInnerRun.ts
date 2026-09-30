@@ -108,6 +108,9 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-conversation-report .rm-conversation-body :is(p, div){margin:0 0 10px}
         .mail article.rm-conversation-report .rm-conversation-body br{display:block;content:"";margin-bottom:0.45em}
         .mail table{max-width:100%;width:100%;border-collapse:collapse}
+        .mail table.rm-mail-data{font-size:12.5px;margin:8px 0 12px}
+        .mail table.rm-mail-data th,.mail table.rm-mail-data td{padding:6px 8px;border:1px solid rgba(120,119,117,.35);vertical-align:top;text-align:left;line-height:1.4}
+        .mail table.rm-mail-data th{font-weight:650;background:rgba(255,255,255,.04)}
         .mail blockquote{padding:8px 12px;border-left:2px solid rgba(232,228,223,.12);background:rgba(255,255,255,.02);border-radius:10px}
         .mail.mail--clean{line-height:1.65}
         .mail details.rm-mail-folded-quote{margin:1.45rem 0 0}
