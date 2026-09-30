@@ -232,9 +232,11 @@ function renderSettingsAddressBookPanel(): string {
           <table class="address-book-table">
             <thead><tr><th></th><th>Nom</th><th>E-mail</th><th>Notes</th><th></th></tr></thead>
             <tbody>
-              ${rows
-                .map(
-                  (r) => `
+              ${
+                rows.length
+                  ? rows
+                      .map(
+                        (r) => `
                 <tr>
                   <td><button type="button" class="address-book-star${r.isFavorite ? " is-on" : ""}" data-action="address-book-toggle-fav" data-email="${escapeAttr(r.email)}" title="Favori">${r.isFavorite ? "★" : "☆"}</button></td>
                   <td>${escapeHtml(r.displayName || "—")}</td>
@@ -245,8 +247,10 @@ function renderSettingsAddressBookPanel(): string {
                     ${r.source === "manual" ? `<button type="button" class="ghost-button" data-action="address-book-delete" data-email="${escapeAttr(r.email)}">Supprimer</button>` : ""}
                   </td>
                 </tr>`
-                )
-                .join("")}
+                      )
+                      .join("")
+                  : `<tr><td colspan="5" class="dim">Aucun contact.</td></tr>`
+              }
             </tbody>
           </table>
         </div>

@@ -14,7 +14,10 @@ export async function loadAddressBookSidebarCount(): Promise<void> {
     return;
   }
   try {
-    const n = await invoke<number>("count_address_contacts_scoped_cmd", { accountId: acc.id });
+    const n = await invoke<number>("count_address_contacts_scoped_cmd", {
+      accountId: acc.id,
+      globalScope: Boolean(state.appPrefs.general.addressBookGlobalScope),
+    });
     state.addressBookSidebarCount = Math.max(0, Math.floor(Number(n)) || 0);
   } catch {
     state.addressBookSidebarCount = null;
