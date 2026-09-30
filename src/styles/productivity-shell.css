@@ -655,3 +655,120 @@ select {
 .search-modal {
   font-family: var(--font-sans);
 }
+
+/* Barre de titre intégrée (Windows, décorations natives coupées).
+   Même rail que le volet et le pied : les boutons ne sont plus le chrome OS. */
+.app-shell.has-window-chrome {
+  grid-template-rows: 32px minmax(0, 1fr) 28px;
+  box-shadow: inset 0 0 0 1px #0b0c0e;
+}
+
+.app-shell.has-window-chrome:has(.window-chrome__btn.is-maximized) {
+  box-shadow: none;
+}
+
+/* Les toasts sont en haut à droite : les laisser sous la barre, pas sur Réduire / Fermer. */
+body:has(.app-shell.has-window-chrome) .toast-box {
+  top: 40px;
+}
+
+.app-shell.has-window-chrome > .window-chrome {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.app-shell.has-window-chrome > .sidebar,
+.app-shell.has-window-chrome > .main,
+.app-shell.has-window-chrome > .ai-panel {
+  grid-row: 2;
+}
+
+.app-shell.has-window-chrome > .status-bar-wrap {
+  grid-row: 3;
+}
+
+.app-shell.has-window-chrome.compose-fullscreen-active,
+.app-shell.has-window-chrome.ai-collapsed.compose-fullscreen-active {
+  grid-template-rows: 32px minmax(0, 1fr) 28px;
+}
+
+.app-shell.has-window-chrome.compose-fullscreen-active > .composer-fullscreen-shell {
+  grid-row: 2;
+}
+
+.app-shell.has-window-chrome.compose-fullscreen-active > .status-bar-wrap {
+  grid-row: 3;
+}
+
+.window-chrome {
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  background: var(--rail);
+  color: var(--rail-text);
+  user-select: none;
+  border-bottom: 1px solid #000;
+  z-index: 20;
+}
+
+.window-chrome__drag {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
+.window-chrome__controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+.window-chrome__btn {
+  width: 46px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--rail-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  line-height: 0;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+.window-chrome__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.window-chrome__btn:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.window-chrome__btn--close:hover,
+.window-chrome__btn--close:active {
+  background: var(--copper);
+  color: #fff;
+}
+
+.window-chrome__btn--close:active {
+  background: var(--copper-press);
+}
+
+.window-chrome__btn:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: -2px;
+}
+
+.window-chrome__glyph {
+  display: block;
+}

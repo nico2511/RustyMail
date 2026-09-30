@@ -126,10 +126,7 @@ export function renderGlobalStatusFooter(): string {
   const st = state.status;
   const coreReady = isTauriRuntime() && Boolean(state.capabilities?.mailCore);
   const dotClass = coreReady ? "status-dot status-dot--ok" : "status-dot status-dot--idle";
-  const modeLabel = isTauriRuntime() ? "Tauri" : "Navigateur";
-  const coreLabel = !isTauriRuntime() ? "hors Tauri" : coreReady ? "cœur prêt" : "cœur off";
-  const readLabel =
-    !isTauriRuntime() ? "—" : state.capabilities?.readabilityModules ? "lisibilité OK" : "lisibilité off";
+  const dotTitle = coreReady ? "Messagerie disponible" : "Messagerie indisponible";
   const chips = renderBackgroundActivityChips({ digestSlot: true });
   const chipBlock = chips ? `<span class="status-bar-chip-group" role="status" aria-live="polite">${chips}</span>` : "";
   const acc = renderDeps().currentAccount();
@@ -147,10 +144,8 @@ export function renderGlobalStatusFooter(): string {
     <footer class="status-bar-wrap">
       ${composeAiQuick}
       <footer class="status-bar">
-        <span class="${dotClass}" title="${coreReady ? "Noyau mail prêt" : "Noyau mail indisponible ou navigateur"}"></span>
+        <span class="${dotClass}" title="${escapeAttr(dotTitle)}"></span>
         <span class="status-bar-app">${escapeHtml(st?.appName ?? "RustyMail")} ${escapeHtml(st?.version ?? "0.1.1")}</span>
-        <span class="status-bar-sep" aria-hidden="true">·</span>
-        <span class="dim status-bar-compact">${escapeHtml(modeLabel)} · ${escapeHtml(coreLabel)} · ${escapeHtml(readLabel)}</span>
         ${progressInline}
         ${chipBlock}
         ${

@@ -15,11 +15,13 @@ import {
 } from "./appRuntimeFallbacks";
 import { bindMicPushToTalk } from "./composeMicDictation";
 import { bindTauriNativeFileDropAsync } from "./composeTauriNativeFileDrop";
+import { bindWindowChrome } from "./windowChromeActions";
 
 export async function bootInitShellAndRuntime(): Promise<void> {
   setLocale(state.appPrefs.general.motherLanguage ?? "fr");
   applyAppearanceFromPrefs(state.appPrefs.general);
   render();
+  void bindWindowChrome();
   bindKeyboard();
   bindMouseNavigation();
   bindMicPushToTalk();
