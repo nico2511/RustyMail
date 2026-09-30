@@ -2,7 +2,7 @@
 import { wireEventsDomInboxListMove } from "./wireEventsDomInboxListMoveRun";
 import { wireEventsDomInboxListNav } from "./wireEventsDomInboxListNavRun";
 
-export function wireEventsDomInboxList(_signal: AbortSignal): void {
-  wireEventsDomInboxListNav();
-  wireEventsDomInboxListMove();
+export function wireEventsDomInboxList(signal: AbortSignal): void {
+  wireEventsDomInboxListNav(signal);
+  wireEventsDomInboxListMove(signal);
 }
