@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { t, setLocale } from "../../i18n";
 import { clearSuggestionShownKeys } from "../../activity";
+import { loadContactsList } from "../../contactsView";
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
@@ -13,6 +14,9 @@ import type { State } from "../types";
 import { applyListFilter } from "./mailListView";
 import { isSearchActive } from "./searchQueryContext";
 import { refreshSuggestedSavedViews } from "./savedSearchViews";
+import { currentAccount } from "../core/accountContext";
+import { loadAddressBookSidebarCount } from "./loadAddressBookSidebarCount";
+import { refreshAddressBookList } from "./addressBookListState";
 import {
   defaultListFilterFromPrefs,
   switchActiveAccount,
@@ -69,6 +73,14 @@ export async function persistGeneralPrefsFromDom(): Promise<void> {
   } catch (e) {
     toast.error(tauriErrorMessage(e));
     return;
+  }
+  await loadAddressBookSidebarCount();
+  const acc = currentAccount();
+  if (acc?.id && state.view === "contacts") {
+    await loadContactsList(acc.id, { reset: true });
+  }
+  if (state.view === "settings" && state.settingsTab === "addressBook") {
+    await refreshAddressBookList();
   }
   if (accVal && state.view === "list") {
     await switchActiveAccount(accVal);
