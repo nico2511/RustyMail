@@ -1787,3 +1787,32 @@ body.clarity-dark .compose-toolbar__go:hover:not(:disabled) {
     align-items: flex-start;
   }
 }
+
+/* Sauvés — le filet d’en-tête et le cadre de liste collaient au premier brouillon. */
+.inbox-index--sauves .inbox-appbar {
+  border-bottom: 0;
+  padding-bottom: 16px;
+}
+
+.inbox-index--sauves .inbox-panel.surface {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.inbox-index--sauves .inbox-thread-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+
+.inbox-index--sauves .thread-row.inbox-thread-row {
+  border-bottom: 0;
+  border-radius: var(--radius-md);
+}
+
+.inbox-index--sauves .inbox-panel-footer {
+  border-top: 0;
+  margin-top: 8px;
+}

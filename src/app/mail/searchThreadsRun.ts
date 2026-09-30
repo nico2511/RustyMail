@@ -28,14 +28,6 @@ export async function searchThreads(): Promise<void> {
 
   if (isTauriRuntime() && isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
     await loadMailView(false);
-    const q = state.search.trim().toLowerCase();
-    if (q) {
-      state.threads = state.threads.filter((t) => {
-        const subj = t.subject.toLowerCase();
-        const who = (t.participants[0] ?? "").toLowerCase();
-        return subj.includes(q) || who.includes(q);
-      });
-    }
     if (gen !== getSearchThreadsGeneration()) return;
     render();
     if (!searchHadFocus) return;
