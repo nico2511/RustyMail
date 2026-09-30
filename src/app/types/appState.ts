@@ -67,7 +67,8 @@ export type State = {
     | "storage"
     | "shortcuts"
     | "developer"
-    | "digestBench";
+    | "digestBench"
+    | "digestCut";
   /** Modale de recherche globale (Ctrl+T). */
   searchModalOpen: boolean;
   /** Modale Paramètres → IA (catégorie ouverte). */
