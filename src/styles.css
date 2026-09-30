@@ -2324,6 +2324,8 @@ textarea {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  /* Menu natif : schéma clair (fond blanc). Le texte suit cette palette. */
+  color-scheme: light;
 }
 
 .inbox-thread-folder-move:hover,
@@ -2333,11 +2335,32 @@ textarea {
   outline: none;
 }
 
-.inbox-thread-folder-move option {
+.inbox-thread-folder-move:focus,
+.move-target-select:focus {
+  /* Ouvert : le popup hérite souvent de la couleur du select, pas de <option>. */
+  color: #16191e;
+  background-color: #ffffff;
+  color-scheme: light;
+}
+
+/* WebKitGTK / Chromium : le menu <option> ignore var(--text) / var(--surface)
+   (fond blanc, texte clair). Littéraux = :root --text / --base. */
+.inbox-thread-folder-move option,
+.move-target-select option {
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text);
-  background: var(--surface);
+  font-size: 13px;
+  color-scheme: light;
+  color: #16191e;
+  -webkit-text-fill-color: #16191e;
+  background-color: #ffffff;
+}
+
+.inbox-thread-folder-move option:checked,
+.move-target-select option:checked {
+  color: #16191e;
+  -webkit-text-fill-color: #16191e;
+  background-color: #f7eee8;
 }
 
 .inbox-thread-follow-toggle {
@@ -6473,6 +6496,17 @@ button.thread-tag-chip--search:focus-visible {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.move-target-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--border-weak);
+  background: var(--base);
+  color: var(--text);
+  font-size: 13px;
+  color-scheme: light;
 }
 
 /* Lightbox images : doit l’emporter sur `.modal { width: 520px }` déclaré plus haut (même sélecteur sinon écrasé). */

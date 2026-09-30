@@ -192,7 +192,7 @@ export function renderMoveDialog(): string {
             noTargets
               ? `<p class="dim" style="margin:0;font-size:12px">Aucun dossier cible disponible.</p>`
               : `<label class="dim" style="display:grid;gap:6px;font-size:12px">Dossier cible
-                  <select id="move-target-select" data-action="move-target-change" style="padding:8px 10px;border-radius:var(--radius-btn,6px);background:transparent;color:var(--text);border:1px solid var(--border-weak)">
+                  <select id="move-target-select" class="move-target-select" data-action="move-target-change">
                     ${optionsHtml}
                   </select>
                 </label>`
