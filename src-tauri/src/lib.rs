@@ -21,6 +21,7 @@ use rustymail_infrastructure::{
 mod activity_commands;
 mod address_commands;
 mod digest_bench;
+mod digest_cut;
 mod folder_commands;
 mod imap_push;
 mod ipc_guard;
@@ -2394,7 +2395,11 @@ pub fn run() {
             digest_bench::digest_bench_accept,
             digest_bench::digest_bench_reject,
             digest_bench::digest_bench_enable_reading,
-            digest_bench::digest_bench_disable_reading
+            digest_bench::digest_bench_disable_reading,
+            digest_cut::digest_cut_builtin_sample,
+            digest_cut::digest_cut_propose_zones,
+            digest_cut::digest_cut_proposal_yaml,
+            digest_cut::digest_cut_preview
         ])
         .build(tauri::generate_context!())
         .expect("failed to build RustyMail")
