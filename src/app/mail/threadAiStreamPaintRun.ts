@@ -1,5 +1,7 @@
 import { render } from "../dispatch";
 import { formatPlainTextWithLinks } from "../lib/textFormat";
+import { state } from "../state";
+import { threadAiSummaryForCurrentThread } from "./threadAiSummaryScopeRun";
 import { zenSummaryHtmlFragments } from "./threadViewUiHelpers";
 
 let aiStreamPaintRaf = 0;
@@ -18,7 +20,8 @@ export function scheduleAiStreamDomPaint(paint: () => void): void {
 export function paintThreadAiSummaryDom(text: string): void {
   scheduleAiStreamDomPaint(() => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || !threadAiSummaryForCurrentThread()) return;
+    if ((state.aiOutput ?? "").trim() !== trimmed) return;
     const html = zenSummaryHtmlFragments(trimmed);
     document.querySelectorAll<HTMLElement>(".thread-reading .thread-zen .thread-zen-body").forEach((el) => {
       el.classList.add("is-ai-streaming");
