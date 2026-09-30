@@ -887,9 +887,11 @@ async fn send_draft(
     send_ack: Option<String>,
 ) -> Result<SendDraftOutcome, String> {
     ipc_guard::validate_send_draft_ack(send_ack.as_deref())?;
-    ipc_guard::validate_draft_for_ipc(&draft)?;
     let mut draft = draft;
     draft.send_html = true;
+    let inline_images =
+        rustymail_infrastructure::extract_inline_data_images(&mut draft.markdown_body)?;
+    ipc_guard::validate_draft_for_ipc(&draft)?;
     let to_preview: String = draft
         .to
         .first()
@@ -916,7 +918,9 @@ async fn send_draft(
         account.smtp.host.trim(),
         account.smtp.port
     );
-    let sent = match rustymail_infrastructure::send_draft_via_smtp(&account, &draft).await {
+    let sent = match rustymail_infrastructure::send_draft_via_smtp(&account, &draft, &inline_images)
+        .await
+    {
         Ok(m) => m,
         Err(e) => {
             eprintln!("[RustyMail] smtp failed: {e}");
@@ -952,6 +956,7 @@ async fn send_draft(
             mid.trim(),
             account.display_name.trim(),
             account.email.trim(),
+            &inline_images,
         ) {
             Ok(()) => eprintln!("[RustyMail] local sent message recorded for thread {tid}"),
             Err(e) => eprintln!(
@@ -966,6 +971,7 @@ async fn send_draft(
             mid.trim(),
             account.display_name.trim(),
             account.email.trim(),
+            &inline_images,
         ) {
             Ok(_tid) => eprintln!("[RustyMail] local new thread + sent message recorded"),
             Err(e) => eprintln!(
@@ -979,6 +985,8 @@ async fn send_draft(
 /// Calcule un plan de découpage des pièces jointes (tailles lues sur disque).
 #[tauri::command]
 async fn plan_split_send(draft: Draft) -> Result<rustymail_domain::SplitPlan, String> {
+    let mut draft = draft;
+    rustymail_infrastructure::extract_inline_data_images(&mut draft.markdown_body)?;
     ipc_guard::validate_draft_for_ipc(&draft)?;
     rustymail_infrastructure::plan_split_draft_attachments(
         &draft.attachment_paths,
@@ -997,9 +1005,11 @@ async fn execute_split_send_cmd(
     send_ack: Option<String>,
 ) -> Result<SplitSendResult, String> {
     ipc_guard::validate_send_draft_ack(send_ack.as_deref())?;
-    ipc_guard::validate_draft_for_ipc(&draft)?;
     let mut draft = draft;
     draft.send_html = true;
+    let inline_images =
+        rustymail_infrastructure::extract_inline_data_images(&mut draft.markdown_body)?;
+    ipc_guard::validate_draft_for_ipc(&draft)?;
     {
         let core = core.lock().map_err(|_| "core lock poisoned".to_string())?;
         core.send_draft(draft.clone()).map_err(|e| e.to_string())?;
@@ -1010,6 +1020,7 @@ async fn execute_split_send_cmd(
         &account,
         &draft,
         rustymail_infrastructure::DEFAULT_ATTACHMENT_BUDGET_BYTES,
+        &inline_images,
     )
     .await)
 }

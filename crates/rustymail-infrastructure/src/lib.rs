@@ -21,6 +21,7 @@ mod draft_revisions;
 mod folder_ops;
 mod imap;
 mod imap_tombstones;
+mod inline_compose_images;
 mod lang_detect;
 mod mail_autoconfig;
 mod mail_classify;
@@ -56,7 +57,7 @@ mod vcard;
 
 pub const KEYRING_SERVICE: &str = "RustyMail";
 const MAX_ATTACHMENT_DOWNLOAD_BYTES: usize = 75 * 1024 * 1024;
-const MAX_INLINE_IMAGE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_INLINE_IMAGE_BYTES: usize = inline_compose_images::MAX_INLINE_PART_BYTES;
 
 mod ai_features;
 mod app_prefs;
@@ -205,6 +206,7 @@ pub use draft_revisions::{
     sqlite_draft_revision_list, sqlite_draft_revision_purge_session, sqlite_draft_revision_save,
     DraftRevisionListItem, OrphanDraftSessionItem,
 };
+pub use inline_compose_images::{extract_inline_data_images, InlineImagePart};
 pub use saved_drafts::{
     sqlite_saved_draft_delete, sqlite_saved_draft_list, sqlite_saved_draft_open,
     sqlite_saved_draft_upsert_by_session, sqlite_saved_drafts_count, SavedDraftListItem,
