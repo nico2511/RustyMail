@@ -2,16 +2,24 @@
 import { toast } from "../lib/toast";
 import { switchMailbox } from "./switchMailboxAction";
 
-export function wireEventsDomInboxListSidebarNav(): void {
+export function wireEventsDomInboxListSidebarNav(signal: AbortSignal): void {
   document.querySelectorAll<HTMLElement>("[data-toast]").forEach((element) => {
-    element.addEventListener("click", () => toast.warning(element.dataset.toast ?? "Not implemented yet"));
+    element.addEventListener(
+      "click",
+      () => toast.warning(element.dataset.toast ?? "Not implemented yet"),
+      { signal },
+    );
   });
   document.querySelectorAll<HTMLButtonElement>("[data-mailbox]").forEach((el) => {
-    el.addEventListener("click", () => {
-      if (el.dataset.action?.trim()) return;
-      void (async () => {
-        await switchMailbox(el.dataset.mailbox || "INBOX");
-      })();
-    });
+    el.addEventListener(
+      "click",
+      () => {
+        if (el.dataset.action?.trim()) return;
+        void (async () => {
+          await switchMailbox(el.dataset.mailbox || "INBOX");
+        })();
+      },
+      { signal },
+    );
   });
 }
