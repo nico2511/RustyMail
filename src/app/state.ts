@@ -34,6 +34,7 @@ export const state: State = {
   accountInboxUnread: {},
   inboxAccountMenuOpen: false,
   accountModalOpen: false,
+  railAccountSectionOpen: true,
   inboxFilterCounts: null,
   mailboxTotal: {},
   threads: [],

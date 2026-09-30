@@ -52,6 +52,22 @@ export async function applyInboxScopeAll(): Promise<void> {
   await switchMailbox(UNIFIED_INBOX_MAILBOX);
 }
 
+export function activeRailAccountId(): string | undefined {
+  return state.selectedAccountId ?? state.accounts[0]?.id;
+}
+
+/** Compte dont le chevron est ouvert. Les autres restent repliés. */
+export function railAccountRowExpanded(accountId: string): boolean {
+  if (state.accounts.length < 2 || !state.railAccountSectionOpen) return false;
+  return activeRailAccountId() === accountId;
+}
+
+/** Dossiers IMAP et personnels. Le rail icônes les garde pour naviguer. */
+export function railImapFoldersVisible(): boolean {
+  if (state.accounts.length < 2 || state.sidebarCollapsed) return true;
+  return state.railAccountSectionOpen;
+}
+
 export async function applyInboxScopeAccount(accountId: string): Promise<void> {
   closeAccountChrome();
   const id = accountId.trim();
@@ -59,6 +75,7 @@ export async function applyInboxScopeAccount(accountId: string): Promise<void> {
     render();
     return;
   }
+  state.railAccountSectionOpen = true;
   const onThisInbox =
     state.selectedAccountId === id &&
     !isUnifiedInboxMailbox(state.selectedMailbox) &&

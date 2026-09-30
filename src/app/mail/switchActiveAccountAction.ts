@@ -36,6 +36,7 @@ export async function switchActiveAccount(accountId: string): Promise<void> {
   if (!id || !state.accounts.some((a) => a.id === id)) return;
   const d = switchDeps();
   state.selectedAccountId = id;
+  state.railAccountSectionOpen = true;
   if (isUnifiedInboxMailbox(state.selectedMailbox)) state.selectedMailbox = "INBOX";
   state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: id }, [], BOOT_INVOKE_TIMEOUT_MS);
   ensureValidSelectedMailbox();
