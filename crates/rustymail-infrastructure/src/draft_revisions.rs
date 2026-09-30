@@ -3,7 +3,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use rustymail_domain::{Draft, EmailAddress};
+use rustymail_domain::{
+    compose_body_is_html, compose_body_plain, compose_html_fragment, Draft, EmailAddress,
+};
 
 use crate::open_sqlite_migrated;
 
@@ -38,13 +40,47 @@ fn hash_recipient_list(h: &mut sha2::Sha256, list: &[EmailAddress]) {
     }
 }
 
+fn body_has_visible_content(body: &str) -> bool {
+    if !compose_body_plain(body).trim().is_empty() {
+        return true;
+    }
+    let fragment = if compose_body_is_html(body) {
+        compose_html_fragment(body)
+    } else {
+        body
+    };
+    fragment.to_ascii_lowercase().contains("<img")
+}
+
+/// Sujet, texte visible, image, destinataire ou pièce jointe. Les zones HTML vides ne comptent pas.
+fn draft_has_revision_content(draft: &Draft) -> bool {
+    if !draft.subject.trim().is_empty() {
+        return true;
+    }
+    if !draft.to.is_empty() || !draft.cc.is_empty() || !draft.bcc.is_empty() {
+        return true;
+    }
+    if draft.attachment_paths.iter().any(|p| !p.trim().is_empty()) {
+        return true;
+    }
+    body_has_visible_content(&draft.markdown_body)
+}
+
+fn body_for_content_hash(body: &str) -> &str {
+    if body_has_visible_content(body) {
+        body.trim()
+    } else {
+        ""
+    }
+}
+
 fn content_hash_for_draft(draft: &Draft) -> String {
     // Stable hash used only for de-duplication.
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();
     h.update(draft.subject.trim().as_bytes());
     h.update(b"\n");
-    h.update(draft.markdown_body.as_bytes());
+    h.update(body_for_content_hash(&draft.markdown_body).as_bytes());
     h.update(b"\n");
     h.update(if draft.send_html { b"html1" } else { b"html0" });
     h.update(b"\n");
@@ -103,6 +139,9 @@ pub fn sqlite_draft_revision_save(
     let session_norm = session_id.trim();
     if session_norm.is_empty() {
         return Err("session_id vide".to_string());
+    }
+    if !draft_has_revision_content(draft) {
+        return Ok(None);
     }
 
     let connection = open_sqlite_migrated(db_path.as_ref()).map_err(|e| e.to_string())?;
@@ -416,7 +455,7 @@ pub fn sqlite_draft_orphan_sessions_purge_stale(
 
 #[cfg(test)]
 mod tests {
-    use super::content_hash_for_draft;
+    use super::{content_hash_for_draft, draft_has_revision_content};
     use rustymail_domain::{Draft, DraftId, DraftKind, EmailAddress};
 
     fn sample_draft(to: Vec<EmailAddress>) -> Draft {
@@ -456,6 +495,40 @@ mod tests {
         a.send_html = false;
         b.send_html = true;
         assert_ne!(content_hash_for_draft(&a), content_hash_for_draft(&b));
+    }
+
+    #[test]
+    fn empty_html_shell_is_not_revision_content() {
+        let mut draft = sample_draft(vec![]);
+        draft.subject.clear();
+        draft.markdown_body = "<!--rustymail-html--><p></p>".into();
+        assert!(!draft_has_revision_content(&draft));
+        draft.markdown_body = "<!--rustymail-html--><p><br></p>".into();
+        assert!(!draft_has_revision_content(&draft));
+        draft.markdown_body =
+            "<!--rustymail-html--><p><br class=\"ProseMirror-trailingBreak\"></p>".into();
+        assert!(!draft_has_revision_content(&draft));
+    }
+
+    #[test]
+    fn empty_body_variants_share_content_hash() {
+        let mut empty = sample_draft(vec![]);
+        let mut html = sample_draft(vec![]);
+        empty.markdown_body.clear();
+        html.markdown_body = "<!--rustymail-html--><p><br></p>".into();
+        assert_eq!(
+            content_hash_for_draft(&empty),
+            content_hash_for_draft(&html)
+        );
+    }
+
+    #[test]
+    fn image_only_html_is_revision_content() {
+        let mut draft = sample_draft(vec![]);
+        draft.subject.clear();
+        draft.markdown_body =
+            "<!--rustymail-html--><p><img src=\"data:image/png;base64,AAAA\" alt=\"capture\" /></p>".into();
+        assert!(draft_has_revision_content(&draft));
     }
 
     #[test]

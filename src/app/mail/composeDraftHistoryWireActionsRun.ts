@@ -5,6 +5,7 @@ import { computeDraftDiffAgainstRevision } from "./composeDraftRevisionDiff";
 import { refreshDraftRevisions } from "./composeDraftRevisions";
 import { restoreDraftRevisionFromWire } from "./composeWireActionsRun";
 
+/** Comparer, déplier ou rafraîchir les versions ne modifie pas le brouillon. */
 export async function tryHandleComposeDraftHistoryWire(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
     case "refresh-draft-history":

@@ -17,6 +17,7 @@ export async function computeDraftDiffAgainstRevision(revisionId: string): Promi
   const accountId = currentAccount()?.id?.trim() ?? "";
   if (!isTauriRuntime() || !rid || !accountId) return;
   if (!state.draft) return;
+  // Lecture pour le diff : ne marque pas le brouillon comme modifié.
   d.persistDraft();
 
   state.draftDiffRevisionId = rid;

@@ -7,6 +7,8 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { rememberDraftContentSaved } from "./composeDraftContentKey";
+import { draftPayloadForRust } from "./composeDraftPayload";
 import { draftHasRecipientsExtra } from "./composeDraftRecipients";
 import {
   computePreview,
@@ -33,6 +35,7 @@ export async function resumeOrphanDraftSession(sessionId: string): Promise<void>
     state.draftSessionId = sid;
     state.draft = draft;
     loadComposeMarkdownIntoEditor(draft.markdownBody ?? "");
+    rememberDraftContentSaved(sid, draftPayloadForRust(draft));
     enterComposeView();
     state.composeCcBccOpen = draftHasRecipientsExtra(draft);
     state.composeLayout = "split";

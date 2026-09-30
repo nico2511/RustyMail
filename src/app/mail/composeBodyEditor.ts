@@ -21,6 +21,7 @@ import {
   unwrapComposeHtml,
 } from "./composeHtmlBody";
 import { syncStaleComposeGrammarSuggestions } from "./composeGrammarPanelSync";
+import { draftBodyIdentity, markComposeDraftEdited } from "./composeDraftContentKey";
 import { schedulePreviewUpdate } from "./composeDraftPreview";
 import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 
@@ -80,6 +81,7 @@ function persistFromEditor(ed: Editor): void {
 }
 
 function scheduleAfterEdit(): void {
+  markComposeDraftEdited();
   schedulePreviewUpdate();
   try {
     scheduleDraftRevisionSave();
@@ -328,6 +330,9 @@ export function mountComposeBodyEditor(host: HTMLElement): void {
       },
       onUpdate: ({ editor: ed }) => {
         if (ignore > 0) return;
+        const stored = storedFromEditor(ed);
+        const prev = state.composeCanonicalBody || state.composeBody || "";
+        if (draftBodyIdentity(stored) === draftBodyIdentity(prev)) return;
         dirty = true;
         persistFromEditor(ed);
         syncToolbarPressed(ed);
@@ -467,10 +472,12 @@ export function replaceComposeWithModelText(text: string): void {
 }
 
 function assignComposeSource(source: string): void {
+  const prev = state.composeCanonicalBody || state.composeBody || "";
   state.composeCanonicalBody = source;
   state.composeBody = source;
   if (state.draft) state.draft.markdownBody = source;
   loadedSource = "";
   syncComposeEditorFromState();
   syncStaleComposeGrammarSuggestions(composeSourcePlainText(source));
+  if (draftBodyIdentity(source) !== draftBodyIdentity(prev)) scheduleAfterEdit();
 }

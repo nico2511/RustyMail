@@ -1,8 +1,10 @@
 import { state } from "../state";
+import { resetDraftContentMemory } from "./composeDraftContentKey";
 import { clearComposeGrammarUi } from "./composeGrammarPanelSync";
 import { requireComposeCloseFlowDeps } from "./composeCloseFlowContext";
 
 export function clearDraftSession(): void {
+  resetDraftContentMemory();
   clearComposeGrammarUi();
   const d = requireComposeCloseFlowDeps();
   state.draftSessionId = null;

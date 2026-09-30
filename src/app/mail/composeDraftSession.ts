@@ -1,4 +1,5 @@
 import { state } from "../state";
+import { draftHasMeaningfulContent, resetDraftContentMemory } from "./composeDraftContentKey";
 import { clearComposeGrammarUi } from "./composeGrammarPanelSync";
 
 export function newDraftSessionId(): string {
@@ -9,6 +10,7 @@ export function newDraftSessionId(): string {
 }
 
 export function startNewDraftSession(): void {
+  resetDraftContentMemory();
   clearComposeGrammarUi();
   state.draftSessionId = newDraftSessionId();
   state.savedDraftRecordId = null;
@@ -24,11 +26,5 @@ export function startNewDraftSession(): void {
 }
 
 export function composeDraftHasMeaningfulContent(): boolean {
-  if (!state.draft) return false;
-  const d = state.draft;
-  if (d.subject.trim()) return true;
-  if (d.markdownBody.trim()) return true;
-  if (d.to.length > 0 || d.cc.length > 0 || d.bcc.length > 0) return true;
-  if ((d.attachmentPaths?.length ?? 0) > 0) return true;
-  return false;
+  return draftHasMeaningfulContent(state.draft);
 }

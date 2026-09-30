@@ -2,6 +2,7 @@ import { render } from "../dispatch";
 import { toast } from "../lib/toast";
 import { state } from "../state";
 import { attachmentPathsJoinedForHiddenField } from "./composeAttachmentPaths";
+import { markComposeDraftEdited } from "./composeDraftContentKey";
 
 export type ComposeAttachmentsActionDeps = {
   scheduleDraftRevisionSave: (delayMs?: number) => void;
@@ -23,6 +24,7 @@ export function removeAttachment(path: string): void {
   const p = path.trim();
   if (!p) return;
   state.draft.attachmentPaths = (state.draft.attachmentPaths ?? []).filter((x) => x !== p);
+  markComposeDraftEdited();
   const attachmentsField = document.querySelector<HTMLInputElement>("#compose-attachments");
   if (attachmentsField) attachmentsField.value = attachmentPathsJoinedForHiddenField(state.draft.attachmentPaths);
   render();
@@ -32,6 +34,7 @@ export function removeAttachment(path: string): void {
 export function clearAttachments(): void {
   if (!state.draft) return;
   state.draft.attachmentPaths = [];
+  markComposeDraftEdited();
   toast.success("Pièces jointes supprimées.");
   render();
   attachmentDeps().scheduleDraftRevisionSave(250);
