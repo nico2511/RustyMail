@@ -10,10 +10,17 @@
 
 mod apply;
 mod model;
+pub mod proposal;
 
 use std::sync::{Mutex, OnceLock};
 
-pub use model::{parse_fixture, DigestFixture, FixtureError};
+pub use model::{
+    parse_fixture, AnchorRole, DigestFixture, FixtureError, ZoneAction, ZonePresentation,
+};
+pub use proposal::{
+    analyze_html_structure_heuristic, empty_or_invalid_proposal_does_not_apply,
+    proposal_to_fixture_yaml, structure_outline_for_llm, DigestCutProposal, ProposalSource,
+};
 
 const DEBLOCK_FIXTURE_YAML: &str = include_str!("../../../fixtures/digests/deblock.yaml");
 

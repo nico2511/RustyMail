@@ -31,7 +31,8 @@
       "storage": "Stockage",
       "shortcuts": "Raccourcis",
       "developer": "Développeur",
-      "digestBench": "Banc d'essai"
+      "digestBench": "Banc d'essai",
+      "digestCut": "Éditeur de découpe"
     },
     "general": {
       "languageHeading": "Langue",

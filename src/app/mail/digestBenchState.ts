@@ -36,7 +36,7 @@ export type DigestBenchModel = {
 };
 
 export const digestBench: DigestBenchModel = {
-  queryDraft: "@deblock.com",
+  queryDraft: "",
   threads: [],
   searchError: "",
   searching: false,
