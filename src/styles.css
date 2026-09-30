@@ -2324,6 +2324,8 @@ textarea {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  /* Menu natif : schéma clair (fond blanc). Le texte suit cette palette. */
+  color-scheme: light;
 }
 
 .inbox-thread-folder-move:hover,
@@ -2333,11 +2335,32 @@ textarea {
   outline: none;
 }
 
-.inbox-thread-folder-move option {
+.inbox-thread-folder-move:focus,
+.move-target-select:focus {
+  /* Ouvert : le popup hérite souvent de la couleur du select, pas de <option>. */
+  color: #16191e;
+  background-color: #ffffff;
+  color-scheme: light;
+}
+
+/* WebKitGTK / Chromium : le menu <option> ignore var(--text) / var(--surface)
+   (fond blanc, texte clair). Littéraux = :root --text / --base. */
+.inbox-thread-folder-move option,
+.move-target-select option {
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text);
-  background: var(--surface);
+  font-size: 13px;
+  color-scheme: light;
+  color: #16191e;
+  -webkit-text-fill-color: #16191e;
+  background-color: #ffffff;
+}
+
+.inbox-thread-folder-move option:checked,
+.move-target-select option:checked {
+  color: #16191e;
+  -webkit-text-fill-color: #16191e;
+  background-color: #f7eee8;
 }
 
 .inbox-thread-follow-toggle {
@@ -2984,6 +3007,9 @@ button.thread-tag-chip--search:focus-visible {
 .thread-reading .message {
   align-items: flex-start;
   justify-content: flex-start;
+  /* Pas d’entrée en fondu : un second rendu (lu, push IMAP, sécurité) rejouait
+     opacity 0 → 1 sur tout le fil et donnait l’impression que l’UI clignote. */
+  animation: none;
 }
 
 /* Fil mail : une seule colonne à gauche. « Moi », la racine et les anciennes
@@ -6473,6 +6499,17 @@ button.thread-tag-chip--search:focus-visible {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.move-target-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--border-weak);
+  background: var(--base);
+  color: var(--text);
+  font-size: 13px;
+  color-scheme: light;
 }
 
 /* Lightbox images : doit l’emporter sur `.modal { width: 520px }` déclaré plus haut (même sélecteur sinon écrasé). */
@@ -10128,3 +10165,17 @@ button.thread-tag-chip--search:focus-visible {
 .digest-bench__pane-body table { width: 100%; border-collapse: collapse; }
 .digest-bench__pane-body th, .digest-bench__pane-body td { padding: 6px 10px 6px 0; vertical-align: top; text-align: left; }
 .digest-bench__thread-title { margin: 12px 0 0; font-size: 13px; }
+
+.digest-cut__layout { margin-top: 12px; }
+.digest-cut__preview { display: grid; gap: 10px; }
+.digest-cut__zones { display: grid; gap: 10px; margin-top: 12px; }
+.digest-cut__zone {
+  border: 1px solid rgba(120, 119, 117, 0.22);
+  border-radius: 10px;
+  padding: 10px;
+}
+.digest-cut__zone-title { margin: 0 0 4px; font-size: 13px; }
+.digest-cut__zone-anchors { margin: 0 0 6px; font-size: 12px; }
+.digest-cut__zone-rationale { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
+.digest-cut__zone-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.digest-cut__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

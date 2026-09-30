@@ -4,6 +4,9 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 
 export function micPermissionErrorMessage(error: unknown): string {
   const raw = tauriErrorMessage(error);
+  if (raw.trim().toLowerCase().startsWith("micro")) {
+    return raw;
+  }
   const low = raw.toLowerCase();
   if (
     low.includes("permission denied") ||
@@ -11,14 +14,19 @@ export function micPermissionErrorMessage(error: unknown): string {
     (low.includes("permission") && low.includes("denied"))
   ) {
     return (
-      "Micro refusé par Windows ou la WebView. Ouvrez Paramètres Windows → Confidentialité → Microphone, " +
-      "autorisez RustyMail, puis relancez l’app. Si le problème persiste, utilisez le bouton micro (clic) une fois."
+      "Micro refusé. Ouvrez Paramètres Windows → Confidentialité et sécurité → Microphone, " +
+      "activez l’accès au micro et autorisez les applications de bureau, puis réessayez."
     );
   }
   return `Micro inaccessible : ${raw}`;
 }
 
 export async function requestMicStream(): Promise<MediaStream> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error(
+      "Micro indisponible dans cette fenêtre. Réessayez après avoir autorisé le microphone pour les applications de bureau.",
+    );
+  }
   try {
     return await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (e) {

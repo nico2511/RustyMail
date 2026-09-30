@@ -73,4 +73,31 @@ describe("fil de lecture aligné d’un seul côté", () => {
       expect(getComputedStyle(article).flexDirection).not.toBe("row-reverse");
     }
   });
+
+  it("laisse un jour entre le trait non-lu et l’avatar", () => {
+    installThreadCss(document);
+    document.body.innerHTML = `<section class="thread-view thread-reading thread-reading--reading-layout">
+      <div class="thread-messages thread-messages-reading">
+        ${message("message thread-msg thread-msg--open thread-msg--unread thread-msg--head", "ML")}
+        ${message("message thread-msg thread-msg--folded thread-msg--unread thread-msg--head", "ML")}
+        ${message("message thread-msg thread-msg--open thread-msg--head", "S")}
+      </div>
+    </section>`;
+
+    const bar = 3;
+    const gap = 12;
+    const inset = `${bar}px + ${gap}px`;
+    for (const article of document.querySelectorAll<HTMLElement>(".thread-msg--unread")) {
+      const style = getComputedStyle(article);
+      expect(style.paddingLeft).toBe(`calc(${inset})`);
+      expect(style.marginLeft).toBe(`calc(calc(${inset}) * -1)`);
+      expect(style.maxWidth).toBe("none");
+      expect(style.boxShadow).toMatch(/inset/);
+    }
+
+    const read = document.querySelector<HTMLElement>(".thread-msg--open:not(.thread-msg--unread)");
+    expect(read).not.toBeNull();
+    expect(getComputedStyle(read!).paddingLeft).toBe("0px");
+    expect(getComputedStyle(read!).marginLeft).toBe("0px");
+  });
 });

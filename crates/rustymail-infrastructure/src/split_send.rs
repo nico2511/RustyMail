@@ -7,8 +7,8 @@ use rustymail_domain::{plan_split, Draft, DraftId, DraftKind, SplitPlan};
 use tokio::fs;
 
 use crate::{
-    imap_append_sent_copy, send_draft_via_smtp, sqlite_record_sent_message_copy,
-    sqlite_record_sent_starting_thread, DraftSendOutcome,
+    imap_append_sent_copy, inline_compose_images::InlineImagePart, send_draft_via_smtp,
+    sqlite_record_sent_message_copy, sqlite_record_sent_starting_thread, DraftSendOutcome,
 };
 
 /// Budget brut par défaut (~18 Mo fichiers → ~25 Mo MIME avec base64 + marge).
@@ -108,6 +108,7 @@ pub async fn execute_split_send(
     account: &rustymail_domain::Account,
     base: &Draft,
     budget_bytes: u64,
+    inline_images: &[InlineImagePart],
 ) -> SplitSendResult {
     let plan = match plan_split_draft_attachments(&base.attachment_paths, budget_bytes).await {
         Ok(p) => p,
@@ -177,8 +178,9 @@ pub async fn execute_split_send(
             thread_id: effective_thread_id.clone(),
         };
 
+        let chunk_inline: &[InlineImagePart] = if idx == 0 { inline_images } else { &[] };
         let sent: Result<DraftSendOutcome, String> =
-            send_draft_via_smtp(account, &chunk_draft).await;
+            send_draft_via_smtp(account, &chunk_draft, chunk_inline).await;
         let sent = match sent {
             Ok(s) => s,
             Err(e) => {
@@ -204,6 +206,7 @@ pub async fn execute_split_send(
                 mid.trim(),
                 account.display_name.trim(),
                 account.email.trim(),
+                chunk_inline,
             ) {
                 eprintln!("[RustyMail] split send: warn sqlite copy: {e}");
             }
@@ -215,6 +218,7 @@ pub async fn execute_split_send(
                 mid.trim(),
                 account.display_name.trim(),
                 account.email.trim(),
+                chunk_inline,
             ) {
                 Ok(tid) if !tid.trim().is_empty() => {
                     effective_thread_id = Some(tid);
