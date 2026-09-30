@@ -17,14 +17,14 @@ import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
 import { enterComposeView } from "./composeViewWireActions";
 import { startNewDraftSession } from "./composeDraftSession";
 import { refreshSavedDraftsMailboxCount } from "./savedDraftsMailboxCountRefresh";
-import { sanitizeEmailHtml } from "./mailEmailHtmlSanitize";
+import { sanitizeComposePreviewHtml } from "./mailEmailHtmlSanitize";
 import { formatThreadReadingWhen } from "./threadMessageSort";
 import { loadMailView } from "./mailListView";
 
 export function registerAppComposeWireDraftDeps(): void {
   registerComposeDraftPreviewDeps({
     persistDraft,
-    sanitizePreviewHtml: (htmlRaw) => sanitizeEmailHtml(htmlRaw, { relocateUnsubscribe: false }).html,
+    sanitizePreviewHtml: sanitizeComposePreviewHtml,
   });
 
   registerComposeDraftLocalSaveDeps({

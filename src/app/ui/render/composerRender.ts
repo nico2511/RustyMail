@@ -67,7 +67,7 @@ function renderComposerHistoriquePane(): string {
             state.draftDiffLoading
               ? `<p class="composer-history-pane__microhint dim">Chargement…</p>`
               : state.draftDiffView === "preview"
-                ? `<div class="preview preview--revision">${renderDeps().sanitizeEmailHtml(state.draftRevisionPreview?.html ?? "").html}</div>`
+                ? `<div class="preview preview--revision">${renderDeps().sanitizeEmailHtml(state.draftRevisionPreview?.html ?? "", { preserveImageDimensions: true }).html}</div>`
                 : state.draftDiffLines.length
                   ? `<pre class="draft-diff__pre draft-diff__pre--composer">${state.draftDiffLines
                       .map((l) => {

@@ -8,7 +8,7 @@ export function messageHtmlForDisplay(message: CleanedMessageView, mode: Message
   return message.htmlBody?.trim() || null;
 }
 
-export { sanitizeEmailHtml } from "./mailEmailHtmlSanitizeCoreRun";
+export { sanitizeComposePreviewHtml, sanitizeEmailHtml } from "./mailEmailHtmlSanitizeCoreRun";
 
 export function extractUnsubscribeLinksFromHtml(raw: string): MailUnsubscribeLink[] {
   if (!raw.trim()) return [];

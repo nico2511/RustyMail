@@ -5494,10 +5494,10 @@ button.thread-tag-chip--search:focus-visible {
   padding: 0;
 }
 
-/* Composer preview : captures collées lisibles mais pas géantes ; clic → lightbox grande. */
+/* Composer preview : captures collées lisibles mais pas géantes ; clic → lightbox grande.
+   Pas de `width: auto` ici : l’attribut width et le style inline de l’éditeur doivent s’afficher. */
 .composer-body .preview img {
   max-width: min(100%, 720px);
-  width: auto;
   height: auto;
   max-height: min(88vh, 1400px);
   object-fit: contain;
@@ -5505,6 +5505,10 @@ button.thread-tag-chip--search:focus-visible {
   border-radius: 12px;
   border: 1px solid var(--border-weak);
   cursor: zoom-in;
+}
+
+.composer-body .preview img[width] {
+  max-width: 100%;
 }
 
 /* Email HTML content is rendered in a ShadowRoot for CSS isolation. */
@@ -5988,6 +5992,11 @@ button.thread-tag-chip--search:focus-visible {
   line-height: 1.35;
 }
 
+.composer-history-pane .preview img {
+  max-width: 100%;
+  height: auto;
+}
+
 .composer-history-pane .preview,
 .composer-history-pane .preview--revision {
   flex: 1;
@@ -6036,6 +6045,126 @@ button.thread-tag-chip--search:focus-visible {
   background: transparent;
   line-height: 1.7;
   font-size: 13px;
+}
+
+.compose-tiptap .compose-image {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+  line-height: 0;
+}
+
+.compose-tiptap .compose-image.is-selected,
+.compose-tiptap .compose-image:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.compose-tiptap .compose-image__img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.compose-tiptap .compose-image__handle {
+  display: none;
+  position: absolute;
+  z-index: 3;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  background: var(--base);
+  touch-action: none;
+}
+
+.compose-tiptap .compose-image.is-selected .compose-image__handle,
+.compose-tiptap .compose-image:focus-within .compose-image__handle {
+  display: block;
+}
+
+.compose-tiptap .compose-image__handle--se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+
+.compose-tiptap .compose-image__handle--sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: nesw-resize;
+}
+
+.compose-tiptap .compose-image__handle--ne {
+  right: -6px;
+  top: -6px;
+  cursor: nesw-resize;
+}
+
+.compose-tiptap .compose-image__handle--nw {
+  left: -6px;
+  top: -6px;
+  cursor: nwse-resize;
+}
+
+.compose-tiptap .compose-image__chrome {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  bottom: 6px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: min(440px, 92vw);
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+  line-height: 1.2;
+}
+
+.compose-tiptap .compose-image.is-selected .compose-image__chrome,
+.compose-tiptap .compose-image:focus-within .compose-image__chrome {
+  display: flex;
+}
+
+.compose-tiptap .compose-image__preset {
+  border: 1px solid var(--btn-secondary-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: var(--btn-secondary-bg);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.compose-tiptap .compose-image__preset.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.compose-tiptap .compose-image__slider {
+  width: 120px;
+  min-width: 72px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: ew-resize;
+}
+
+.compose-tiptap .compose-image__readout {
+  min-width: 48px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .composer-body.drag-over {
