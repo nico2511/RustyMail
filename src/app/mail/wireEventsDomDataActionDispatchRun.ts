@@ -3,6 +3,6 @@ import { wireEventsDomDataActionChange } from "./wireEventsDomDataActionChangeRu
 import { wireEventsDomDataActionClick } from "./wireEventsDomDataActionClickRun";
 
 export function wireEventsDomDataActionDispatch(signal: AbortSignal): void {
-  wireEventsDomDataActionClick();
+  wireEventsDomDataActionClick(signal);
   wireEventsDomDataActionChange(signal);
 }

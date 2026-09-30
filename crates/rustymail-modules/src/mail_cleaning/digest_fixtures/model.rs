@@ -4,7 +4,7 @@
 //! ancres de zones décident si ce mail est le même pattern. Sans les deux, on
 //! ne produit pas de digest.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -15,7 +15,7 @@ pub enum FixtureError {
     Invalid(String),
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ZoneAction {
     Show,
@@ -24,7 +24,7 @@ pub enum ZoneAction {
     Collapse,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ZonePresentation {
     /// Titre en `<h2>`, second bloc en `<strong>` (header Deblock).
@@ -35,7 +35,7 @@ pub enum ZonePresentation {
     AsIs,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AnchorRole {
     Title,

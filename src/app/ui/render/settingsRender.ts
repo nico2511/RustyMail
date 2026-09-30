@@ -12,6 +12,7 @@ import {
   type SettingsAiPanelDeps,
 } from "../../../settingsAiPanel";
 import { renderDigestBenchPanel } from "./digestBenchRender";
+import { renderDigestCutPanel } from "./digestCutRender";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { formatNewsletterRuleInput } from "../../lib/newsletterRuleFormat";
 import { settingsExplainHtml } from "../../lib/settingsExplainHtml";
@@ -616,6 +617,7 @@ export function renderSettings() {
   const tabShortcuts = state.settingsTab === "shortcuts";
   const tabDeveloper = state.settingsTab === "developer";
   const tabDigestBench = state.settingsTab === "digestBench";
+  const tabDigestCut = state.settingsTab === "digestCut";
   let settingsBody = "";
   switch (state.settingsTab) {
     case "accounts":
@@ -647,6 +649,9 @@ export function renderSettings() {
       break;
     case "digestBench":
       settingsBody = renderDigestBenchPanel();
+      break;
+    case "digestCut":
+      settingsBody = renderDigestCutPanel();
       break;
     default:
       settingsBody = renderSettingsAccountsPanel();
@@ -683,6 +688,7 @@ export function renderSettings() {
             settingsNavButton("storage", t("settings.tabs.storage"), tabStorage, "SQLite, JSON, modèles"),
             settingsNavButton("shortcuts", t("settings.tabs.shortcuts"), tabShortcuts, "Raccourcis clavier"),
             settingsNavButton("developer", t("settings.tabs.developer"), tabDeveloper, "Dépôt, crates, libs"),
+            settingsNavButton("digestCut", t("settings.tabs.digestCut"), tabDigestCut, "Proposition de zones sur un échantillon"),
             settingsNavButton("digestBench", t("settings.tabs.digestBench"), tabDigestBench, "Découpe digest sur la recherche"),
           ].join(""),
         )}
