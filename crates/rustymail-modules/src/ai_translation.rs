@@ -7,7 +7,7 @@ use std::ops::ControlFlow;
 use std::sync::atomic::AtomicBool;
 
 use crate::ai_llm_contracts::{
-    introduces_llm_meta, validate_translation_llm_shape, TRANSLATION_PLAIN_JSON_GBNF,
+    salvage_translation_text, validate_translation_llm_shape, TRANSLATION_PLAIN_JSON_GBNF,
 };
 use crate::ai_llm_util::{
     budget_report, cancelled_llm_err, gen_params_json_echo_for_prompt, parse_model_json,
@@ -93,9 +93,10 @@ fn translation_from_raw(
         &dto.preserved_entity_ids,
         dto.detected_source_lang.as_deref(),
     )?;
-    if introduces_llm_meta(text, &translated_raw) {
+    let cleaned = strip_css_boilerplate_lines(&translated_raw);
+    let Some(translated) = salvage_translation_text(text, &cleaned) else {
         return Err(LlmError::InvalidJson("meta-leak".into()));
-    }
+    };
     let n_ctx_hint = engine.n_ctx();
     let src = normalize_detected_source_lang(dto.detected_source_lang, source_lang);
 
@@ -103,7 +104,7 @@ fn translation_from_raw(
         source_message_id: source_message_id.to_string(),
         source_lang: src,
         target_lang: target_lang.to_string(),
-        translated_text: strip_css_boilerplate_lines(&translated_raw),
+        translated_text: translated,
         preserved_entity_ids: dto.preserved_entity_ids,
         budget: budget_report(
             n_ctx_hint,
@@ -238,9 +239,9 @@ fn join_chunk_translations(
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("\n\n");
-    if introduces_llm_meta(source_body, &joined) {
+    let Some(joined) = salvage_translation_text(source_body, &joined) else {
         return Err(LlmError::Msg(TRANSLATION_META_ERR.into()));
-    }
+    };
     ensure_translation_length(source_body, &joined)?;
     if parts.is_empty() {
         return Err(LlmError::Msg(TRANSLATION_PARSE_ERR.into()));
@@ -266,7 +267,7 @@ fn translation_user(
     target_lang: &str,
 ) -> String {
     format!(
-        "Langue cible ISO 639-1 : {target_lang}\nLangue source indiquée (auto si inconnu): {source_lang}\nTraduis uniquement le message entre les délimiteurs. translatedText = cette traduction, sans consigne ni mention de JSON.\n{}",
+        "Target language ISO 639-1: {target_lang}\nSource language hint (auto if unknown): {source_lang}\nTranslate the human message inside the delimiters into the target language.\n{}",
         untrusted_mail_for_engine(engine, "mail-translation", body),
     )
 }
@@ -313,7 +314,7 @@ fn translate_nonstream_body(
         Ok(res) => Ok(res),
         Err(LlmError::InvalidJson(_)) => {
             let user_retry = format!(
-                "{user}\n\nRetry: one JSON object only. translatedText is the translation of the message and nothing else."
+                "{user}\n\nRetry: the same single JSON object. translatedText must be the translated human message only."
             );
             let params = translation_gen_params(engine, system.as_str(), &user_retry, body);
             let raw = engine.generate(system.as_str(), &user_retry, &params)?;
@@ -429,7 +430,7 @@ pub fn translate_plain_with_llm_streaming(
         source_message_id,
         source_lang,
         target_lang,
-        text,
+        &body,
     ) {
         Ok(res) => res,
         Err(LlmError::InvalidJson(_)) => {
@@ -437,7 +438,7 @@ pub fn translate_plain_with_llm_streaming(
                 return Err(e);
             }
             let user_retry = format!(
-                "{user}\n\nRetry: one JSON object only. translatedText is the translation of the message and nothing else."
+                "{user}\n\nRetry: the same single JSON object. translatedText must be the translated human message only."
             );
             let params = translation_gen_params(engine, system.as_str(), &user_retry, &body);
             let raw = engine.generate(system.as_str(), &user_retry, &params)?;
@@ -449,7 +450,7 @@ pub fn translate_plain_with_llm_streaming(
                 source_message_id,
                 source_lang,
                 target_lang,
-                text,
+                &body,
             )
             .map_err(map_translation_retry_err)?
         }

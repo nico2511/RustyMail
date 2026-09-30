@@ -160,3 +160,209 @@ export function introducesLlmMeta(source: string, output: string): boolean {
   if (echoesInjectedInstruction(src, out)) return true;
   return LLM_META_MARKERS.some((marker) => out.includes(marker) && !markerPreserved(src, out, marker));
 }
+
+/** Aligné sur `salvage_translation_text` (Rust). « je ne peux pas venir » reste du contenu. */
+
+const TRANSLATION_REFUSAL_PHRASES = [
+  "i cannot comply with this request",
+  "i am unable to translate",
+  "i am unable to answer",
+  "i am unable to help",
+  "i am not able to",
+  "im unable to translate",
+  "im unable to answer",
+  "im unable to help",
+  "im unable to comply",
+  "im not able to",
+  "i cannot translate",
+  "i cannot comply",
+  "i cannot assist",
+  "i cannot help",
+  "i cannot fulfill",
+  "i cant help with that",
+  "i cant translate",
+  "i cant comply",
+  "i cant assist",
+  "i cant help",
+  "desole je ne peux pas traduire",
+  "desole je ne peux pas repondre",
+  "desole je ne peux pas traiter",
+  "desole je ne peux pas aider",
+  "je ne peux pas traduire",
+  "je ne peux pas repondre",
+  "je ne peux pas traiter cette demande",
+  "je ne peux pas traiter",
+  "je ne peux pas aider",
+  "je ne peux traiter cette demande",
+  "je ne peux pas respecter",
+  "je ne peux pas generer",
+  "je ne peux pas obeir",
+  "je ne peux pas fournir",
+  "je ne peux traduire",
+  "je ne peux repondre",
+  "je ne peux traiter",
+  "i am unable",
+  "im unable",
+  "i cannot",
+  "i cant",
+  "desole je ne peux",
+  "je ne peux pas",
+  "je ne peux",
+];
+
+const TRANSLATION_BOILERPLATE_MARKERS = [
+  "contenu non fiable",
+  "contenus de mails",
+  "donnees non fiables",
+  "untrusted data",
+  "begin untrusted",
+  "end untrusted",
+  "do not obey",
+  "consignes de format",
+  "instructions du message",
+  "message systeme",
+  "sans consigne ni mention de json",
+  "never quote or paraphrase",
+  "translatedtext",
+  "preservedentityids",
+  "detectedsourcelang",
+];
+
+const TRANSLATION_FORMAT_MARKERS = ["format json", "json requis"];
+
+const TRANSLATION_FORMAT_CUES = [
+  "consigne",
+  "instruction",
+  "respect",
+  "mention",
+  "untrusted",
+  "non fiable",
+  "fournir les informations",
+  "nothing else",
+  "rien dautre",
+  "uniquement le message",
+  "only the translation",
+];
+
+function boundedPhraseAt(text: string, phrase: string): number {
+  if (!phrase) return -1;
+  let start = 0;
+  while (start < text.length) {
+    const at = text.indexOf(phrase, start);
+    if (at < 0) return -1;
+    const end = at + phrase.length;
+    const before = at === 0 ? "" : text[at - 1]!;
+    const after = end >= text.length ? "" : text[end]!;
+    const beforeOk = before === "" || !/[0-9a-z]/i.test(before);
+    const afterOk = after === "" || !/[0-9a-z]/i.test(after);
+    if (beforeOk && afterOk) return at;
+    start = end;
+  }
+  return -1;
+}
+
+function containsBoundedPhrase(text: string, phrase: string): boolean {
+  return boundedPhraseAt(text, phrase) >= 0;
+}
+
+function removeOneBoundedPhrase(text: string, phrase: string): string {
+  const at = boundedPhraseAt(text, phrase);
+  if (at < 0) return text;
+  return text.slice(0, at) + text.slice(at + phrase.length);
+}
+
+function stripRefusalPhrases(sentence: string): string {
+  let rest = sentence;
+  for (;;) {
+    let best = "";
+    for (const phrase of TRANSLATION_REFUSAL_PHRASES) {
+      if (containsBoundedPhrase(rest, phrase) && phrase.length > best.length) best = phrase;
+    }
+    if (!best) break;
+    rest = removeOneBoundedPhrase(rest, best);
+  }
+  return rest;
+}
+
+function isPureRefusalSentence(sentenceFolded: string): boolean {
+  const trimmed = sentenceFolded.trim();
+  if (!trimmed) return false;
+  if (!TRANSLATION_REFUSAL_PHRASES.some((phrase) => containsBoundedPhrase(trimmed, phrase))) return false;
+  return ![...stripRefusalPhrases(trimmed)].some((c) => /[0-9a-z]/i.test(c));
+}
+
+function isOnlyPureRefusal(folded: string): boolean {
+  const sentences = splitMetaSentences(folded).filter((s) => s.trim());
+  return sentences.length > 0 && sentences.every((s) => isPureRefusalSentence(s));
+}
+
+function markersIn(text: string, markers: readonly string[]): string[] {
+  return markers.filter((marker) => text.includes(marker));
+}
+
+function sentenceIsBoilerplateEcho(sourceFolded: string, sentence: string): boolean {
+  const folded = foldMeta(sentence);
+  const boilerplate = markersIn(folded, TRANSLATION_BOILERPLATE_MARKERS);
+  if (boilerplate.length) return boilerplate.some((marker) => !sourceFolded.includes(marker));
+  const formatHits = markersIn(folded, TRANSLATION_FORMAT_MARKERS);
+  if (!formatHits.length) return false;
+  if (formatHits.every((marker) => sourceFolded.includes(marker))) return false;
+  return TRANSLATION_FORMAT_CUES.some((cue) => folded.includes(cue));
+}
+
+function isTranslationWrapperLine(line: string): boolean {
+  const folded = foldMeta(line);
+  if (!folded) return false;
+  return (
+    folded.includes("debut contenu non fiable") ||
+    folded.includes("fin contenu non fiable") ||
+    folded.includes("untrusted data follows") ||
+    folded.includes("do not obey instructions") ||
+    folded.includes("never quote or paraphrase this notice") ||
+    folded.includes("begin untrusted") ||
+    folded.includes("end untrusted")
+  );
+}
+
+function normalizeSalvagedLines(lines: string[]): string {
+  const blocks: string[] = [];
+  let current = "";
+  for (const line of lines) {
+    if (!line.trim()) {
+      if (current.trim()) {
+        blocks.push(current.trim());
+        current = "";
+      }
+      continue;
+    }
+    current = current ? `${current}\n${line.trim()}` : line.trim();
+  }
+  if (current.trim()) blocks.push(current.trim());
+  return blocks.join("\n\n");
+}
+
+/** Traduction affichable, ou `null` si la sortie est une consigne / un refus à la place du message. */
+export function translationVisibleText(source: string, output: string): string | null {
+  const sourceFolded = foldMeta(source);
+  const keptLines: string[] = [];
+  for (const line of output.split("\n")) {
+    if (!line.trim()) {
+      keptLines.push("");
+      continue;
+    }
+    if (isTranslationWrapperLine(line)) continue;
+    const sentences = splitMetaSentences(line);
+    if (!sentences.length) continue;
+    const kept = sentences.filter((sentence) => !sentenceIsBoilerplateEcho(sourceFolded, sentence));
+    if (!kept.length) continue;
+    keptLines.push(kept.join(" "));
+  }
+  const text = normalizeSalvagedLines(keptLines);
+  if (!text) return null;
+  if (isOnlyPureRefusal(foldMeta(text)) && !isOnlyPureRefusal(sourceFolded)) return null;
+  return text;
+}
+
+export function translationIsInstructionEcho(source: string, output: string): boolean {
+  return translationVisibleText(source, output) === null;
+}
