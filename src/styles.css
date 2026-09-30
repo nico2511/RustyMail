@@ -2984,6 +2984,9 @@ button.thread-tag-chip--search:focus-visible {
 .thread-reading .message {
   align-items: flex-start;
   justify-content: flex-start;
+  /* Pas d’entrée en fondu : un second rendu (lu, push IMAP, sécurité) rejouait
+     opacity 0 → 1 sur tout le fil et donnait l’impression que l’UI clignote. */
+  animation: none;
 }
 
 /* Fil mail : une seule colonne à gauche. « Moi », la racine et les anciennes

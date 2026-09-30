@@ -11,6 +11,10 @@ export function beginComposeWireSignal(): AbortSignal {
   return composeAbortRef.current.signal;
 }
 
+export function currentComposeWireSignal(): AbortSignal | undefined {
+  return wireEventsContext().composeInteractionsAbortRef.current?.signal;
+}
+
 export function wireComposeGlobalInputs(): void {
   wireComposeRecipientChips();
   wireAtAutocompleteFields();
