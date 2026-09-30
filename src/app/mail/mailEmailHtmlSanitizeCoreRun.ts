@@ -38,11 +38,18 @@ const FORBIDDEN_ACTIVE_TAGS = [
 
 export function sanitizeEmailHtml(
   input: string,
-  opts?: { allowRemoteImages?: boolean; relocateUnsubscribe?: boolean; stripOutlookNoise?: boolean },
+  opts?: {
+    allowRemoteImages?: boolean;
+    relocateUnsubscribe?: boolean;
+    stripOutlookNoise?: boolean;
+    /** Garde width/height (et le style de taille) — aperçu du compositeur. */
+    preserveImageDimensions?: boolean;
+  },
 ): { html: string; unsubscribeLinks: MailUnsubscribeLink[] } {
   const allowRemoteImages = opts?.allowRemoteImages === true;
   const relocateUnsubscribe = opts?.relocateUnsubscribe !== false;
   const stripOutlookNoise = opts?.stripOutlookNoise === true;
+  const preserveImageDimensions = opts?.preserveImageDimensions === true;
   try {
     const stripped = dropActiveContentFromHtml(String(input));
     const clean = DOMPurify.sanitize(stripped, {
@@ -50,12 +57,14 @@ export function sanitizeEmailHtml(
       // DOMPurify bloque déjà tous les attributs on*. La liste reste explicite pour les relecteurs.
       FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur"],
       ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|cid|tel):|data:image\/(?:png|jpe?g|gif|webp|bmp);base64,)/i,
+      // `width` / `height` ne sont pas « inert » : sans ceci, une valeur `320` est rejetée.
+      ...(preserveImageDimensions ? { ADD_URI_SAFE_ATTR: ["width", "height"] } : {}),
     });
     const doc = new DOMParser().parseFromString(String(clean), "text/html");
     flattenNestedParagraphInDocument(doc);
     stripUnsafeInlineStylesInEmailDoc(doc);
     normalizeEmailLinksInDoc(doc);
-    sanitizeEmailImagesInDoc(doc, allowRemoteImages);
+    sanitizeEmailImagesInDoc(doc, allowRemoteImages, preserveImageDimensions);
     const unsubscribeLinks = collectUnsubscribeLinksFromDoc(doc);
     if (relocateUnsubscribe && unsubscribeLinks.length) hideRelocatedUnsubscribeInDoc(doc);
     const hasConversationReport = Boolean(doc.querySelector("article.rm-conversation-report"));
@@ -64,4 +73,9 @@ export function sanitizeEmailHtml(
   } catch {
     return { html: escapeHtml(input), unsubscribeLinks: [] };
   }
+}
+
+/** Aperçu du compositeur : la largeur choisie dans l’éditeur reste visible. */
+export function sanitizeComposePreviewHtml(htmlRaw: string): string {
+  return sanitizeEmailHtml(htmlRaw, { relocateUnsubscribe: false, preserveImageDimensions: true }).html;
 }

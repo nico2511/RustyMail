@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { sanitizeEmailHtml } from "./mailEmailHtmlSanitize";
+import { sanitizeComposePreviewHtml, sanitizeEmailHtml } from "./mailEmailHtmlSanitize";
 
 describe("sanitizeEmailHtml", () => {
   it("retire style, video et svg sans laisser l’URL de tracking", () => {
@@ -62,5 +62,28 @@ describe("sanitizeEmailHtml", () => {
   it("conserve une image png inline", () => {
     const { html } = sanitizeEmailHtml(`<img src="data:image/png;base64,iVBORw0KGgo=" alt="ok"/>`);
     expect(html).toContain("data:image/png;base64,iVBORw0KGgo=");
+  });
+
+  it("retire la taille des images reçues", () => {
+    const { html } = sanitizeEmailHtml(
+      `<img src="data:image/png;base64,iVBORw0KGgo=" alt="ok" width="320" style="width: 320px; height: auto"/>`,
+    );
+    expect(html).not.toContain("width=");
+    expect(html).not.toMatch(/width\s*:/);
+  });
+
+  it("conserve la taille dans l’aperçu du compositeur", () => {
+    const raw = `<img src="data:image/png;base64,iVBORw0KGgo=" alt="ok" width="320" style="width: 320px; height: auto; max-width: 100%; color: red"/>`;
+    const html = sanitizeComposePreviewHtml(raw);
+    expect(html).toContain('width="320"');
+    expect(html).toContain("width: 320px");
+    expect(html).toContain("height: auto");
+    expect(html).toContain("max-width: 100%");
+    const blocked = sanitizeComposePreviewHtml(
+      `<img src="data:image/png;base64,iVBORw0KGgo=" alt="ok" width="javascript:alert(1)" style="width: expression(alert(1))"/>`,
+    );
+    expect(blocked.toLowerCase()).not.toContain("javascript");
+    expect(blocked.toLowerCase()).not.toContain("expression");
+    expect(blocked).not.toContain("width=");
   });
 });

@@ -96,7 +96,12 @@ export type RenderDeps = {
   formatDraftRevisionStamp: (iso: string) => string;
   sanitizeEmailHtml: (
     input: string,
-    opts?: { allowRemoteImages?: boolean; relocateUnsubscribe?: boolean; stripOutlookNoise?: boolean },
+    opts?: {
+      allowRemoteImages?: boolean;
+      relocateUnsubscribe?: boolean;
+      stripOutlookNoise?: boolean;
+      preserveImageDimensions?: boolean;
+    },
   ) => { html: string; unsubscribeLinks: MailUnsubscribeLink[] };
   settingsDraftProfile: () => Account | undefined;
   mergedProfileForAccountsForm: () => Account | undefined;

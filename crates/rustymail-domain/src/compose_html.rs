@@ -275,7 +275,10 @@ fn attr_allowed(tag: &str, name: &str) -> bool {
     matches!(
         (tag, name),
         ("a", "href" | "title")
-            | ("img", "src" | "alt" | "title" | "width" | "height")
+            | (
+                "img",
+                "src" | "alt" | "title" | "width" | "height" | "style"
+            )
             | ("td" | "th", "colspan" | "rowspan")
             | ("ol", "start")
     )
@@ -352,6 +355,97 @@ fn rewrite_tags(input: &str) -> String {
     out
 }
 
+fn normalize_img_dimension(value: &str) -> Option<String> {
+    let compact: String = value.split_whitespace().collect();
+    let lower = compact.to_ascii_lowercase();
+    let num = lower.strip_suffix("px").unwrap_or(&lower);
+    if num.is_empty() || num.len() > 4 || !num.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    if num.len() > 1 && num.starts_with('0') {
+        return None;
+    }
+    let n: u32 = num.parse().ok()?;
+    if (1..=4000).contains(&n) {
+        Some(n.to_string())
+    } else {
+        None
+    }
+}
+
+fn normalize_img_css_size(prop: &str, value: &str) -> Option<String> {
+    let compact: String = value.split_whitespace().collect();
+    if compact.is_empty() || compact.len() > 16 {
+        return None;
+    }
+    let lower = compact.to_ascii_lowercase();
+    if lower.contains(['(', ')', '\\', '"', '\'', '!', '{', '}']) {
+        return None;
+    }
+    if (prop == "height" || prop == "max-height") && lower == "auto" {
+        return Some("auto".to_string());
+    }
+    let (num, unit) = if let Some(rest) = lower.strip_suffix("px") {
+        (rest, "px")
+    } else {
+        let rest = lower.strip_suffix('%')?;
+        (rest, "%")
+    };
+    if num.is_empty() || num.len() > 4 || !num.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    if num.len() > 1 && num.starts_with('0') {
+        return None;
+    }
+    let n: u32 = num.parse().ok()?;
+    let ok = if unit == "%" {
+        (1..=100).contains(&n)
+    } else {
+        (1..=4000).contains(&n)
+    };
+    if !ok {
+        return None;
+    }
+    Some(format!("{n}{unit}"))
+}
+
+/// Ne garde que width / height / max-width / max-height, en px, % ou `auto` (hauteur).
+fn sanitize_img_style(value: &str) -> Option<String> {
+    let mut kept: Vec<(usize, String)> = Vec::new();
+    for part in value.split(';') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let Some((raw_prop, raw_val)) = part.split_once(':') else {
+            continue;
+        };
+        let prop = raw_prop.trim().to_ascii_lowercase();
+        let order = match prop.as_str() {
+            "width" => 0,
+            "height" => 1,
+            "max-width" => 2,
+            "max-height" => 3,
+            _ => continue,
+        };
+        let Some(normalized) = normalize_img_css_size(&prop, raw_val.trim()) else {
+            continue;
+        };
+        kept.retain(|(existing, _)| *existing != order);
+        kept.push((order, format!("{prop}: {normalized}")));
+    }
+    if kept.is_empty() {
+        return None;
+    }
+    kept.sort_by_key(|(order, _)| *order);
+    Some(
+        kept.into_iter()
+            .map(|(_, decl)| decl)
+            .collect::<Vec<_>>()
+            .join("; "),
+    )
+}
+
 fn push_start(out: &mut String, name: &str, attrs: &[(String, String)], self_closing: bool) {
     out.push('<');
     out.push_str(name);
@@ -362,10 +456,23 @@ fn push_start(out: &mut String, name: &str, attrs: &[(String, String)], self_clo
         if (key == "href" || key == "src") && !safe_url(value, name == "img" && key == "src") {
             continue;
         }
+        let rendered = if name == "img" && (key == "width" || key == "height") {
+            match normalize_img_dimension(value) {
+                Some(clean) => clean,
+                None => continue,
+            }
+        } else if name == "img" && key == "style" {
+            match sanitize_img_style(value) {
+                Some(clean) => clean,
+                None => continue,
+            }
+        } else {
+            value.clone()
+        };
         out.push(' ');
         out.push_str(key);
         out.push_str("=\"");
-        out.push_str(&escape_attr(value));
+        out.push_str(&escape_attr(&rendered));
         out.push('"');
     }
     if self_closing || void_tag(name) {
@@ -521,6 +628,31 @@ mod tests {
         let plain = compose_html_to_plain(&format!("{COMPOSE_HTML_MARK}{html}"));
         assert!(plain.contains("[image: capture]"));
         assert!(!plain.contains("base64"));
+    }
+
+    #[test]
+    fn keeps_image_width_and_safe_style() {
+        let html = r#"<p style="color:red">OK</p><img src="https://example.com/a.png" alt="photo" width="320" height="180px" style="width: 320px; height: auto; max-width: 100%; position: fixed; background: url(https://evil.example/x)" />"#;
+        let safe = sanitize_compose_html(html);
+        assert!(!safe.contains("color"));
+        assert!(safe.contains("width=\"320\""));
+        assert!(safe.contains("height=\"180\""));
+        assert!(safe.contains("width: 320px"));
+        assert!(safe.contains("height: auto"));
+        assert!(safe.contains("max-width: 100%"));
+        assert!(!safe.to_ascii_lowercase().contains("position"));
+        assert!(!safe.to_ascii_lowercase().contains("url("));
+        assert!(!safe.contains("evil.example"));
+    }
+
+    #[test]
+    fn drops_unsafe_image_dimensions() {
+        let html = r#"<img src="https://example.com/a.png" alt="x" width="javascript:alert(1)" style="width: expression(alert(1))" />"#;
+        let safe = sanitize_compose_html(html);
+        assert!(!safe.to_ascii_lowercase().contains("javascript"));
+        assert!(!safe.to_ascii_lowercase().contains("expression"));
+        assert!(!safe.contains("width="));
+        assert!(!safe.contains("style="));
     }
 
     #[test]

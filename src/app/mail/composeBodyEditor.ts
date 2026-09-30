@@ -1,5 +1,5 @@
 import { Editor, Extension } from "@tiptap/core";
-import Image from "@tiptap/extension-image";
+import { ComposeImage, selectComposeImageSrc } from "./composeImage";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Table from "@tiptap/extension-table";
@@ -244,6 +244,7 @@ async function promptImage(from: number, to: number): Promise<void> {
   const chain = next.chain().focus();
   if (start !== end) chain.deleteRange({ from: start, to: end });
   chain.setImage({ src, alt }).run();
+  selectComposeImageSrc(next, src);
 }
 
 function insertImageFile(file: File): void {
@@ -255,6 +256,7 @@ function insertImageFile(file: File): void {
     if (!ed) return;
     const stamp = new Date().toLocaleString();
     ed.chain().focus().setImage({ src: dataUrl, alt: `Capture ${stamp}` }).run();
+    selectComposeImageSrc(ed, dataUrl);
   };
   reader.readAsDataURL(file);
 }
@@ -301,7 +303,7 @@ export function mountComposeBodyEditor(host: HTMLElement): void {
           linkOnPaste: true,
           HTMLAttributes: { rel: "noopener noreferrer" },
         }),
-        Image.configure({ inline: true, allowBase64: true }),
+        ComposeImage.configure({ inline: true, allowBase64: true }),
         Placeholder.configure({ placeholder: "Écrire le message…" }),
         Table.configure({ resizable: false }),
         TableRow,

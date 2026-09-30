@@ -6,7 +6,7 @@
  *   aperçu et envoi passent par pulldown-cmark.
  * - HTML TipTap, dès que le message est édité dans l’éditeur :
  *   préfixe `<!--rustymail-html-->` puis un fragment HTML e-mail
- *   (`p`, `strong`, `em`, `u`, listes, titres, liens, images, tableaux).
+ *   (`p`, `strong`, `em`, `u`, listes, titres, liens, images avec largeur, tableaux).
  *   L’aperçu et l’envoi détectent le préfixe et utilisent ce fragment comme
  *   `text/html`, avec un texte brut dérivé (les images data deviennent `[image]`).
  */
