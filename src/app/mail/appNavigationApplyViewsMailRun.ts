@@ -1,8 +1,11 @@
+import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import type { NavSnapshot } from "../../navigation";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { defaultListFilterFromPrefs } from "./accountDefaultPrefs";
 import type { AppNavigationStackDeps } from "./appNavigationStackContext";
+import { loadMailView } from "./mailListView";
+import { refreshSavedDraftsMailboxCount } from "./savedDraftsMailboxCountRefresh";
 import { searchThreads } from "./searchThreadsRun";
 import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 
@@ -13,6 +16,10 @@ export async function applyNavSnapshotMailViews(snap: NavSnapshot, d: AppNavigat
       state.selectedThread = undefined;
       state.selectedThreadId = undefined;
       clearThreadAiSummaryState();
+      if (isSavedDraftsVirtualMailbox(state.selectedMailbox)) {
+        await loadMailView(false);
+        await refreshSavedDraftsMailboxCount();
+      }
       render();
       if (
         (snap.search?.trim() ?? "") ||

@@ -7,6 +7,7 @@ import { toast } from "../lib/toast";
 import { state } from "../state";
 import { clearDraftSession } from "./composeCloseDraftClearRun";
 import { requireComposeCloseFlowDeps } from "./composeCloseFlowContext";
+import { forgetSavedDraftLocally } from "./savedDraftListLocalForget";
 
 export async function discardCurrentDraftSession(): Promise<void> {
   if (!isTauriRuntime()) {
@@ -23,6 +24,7 @@ export async function discardCurrentDraftSession(): Promise<void> {
         invoke("saved_draft_delete", { accountId, savedDraftId: savedId }),
         MAIL_ACTION_TIMEOUT_MS,
       );
+      forgetSavedDraftLocally(savedId);
     } else if (accountId && sessionId) {
       await withTimeout(
         invoke("draft_revision_purge_session", { accountId, sessionId }),
@@ -34,5 +36,5 @@ export async function discardCurrentDraftSession(): Promise<void> {
     toast.error(`Impossible de supprimer le brouillon local : ${tauriErrorMessage(e)}`);
   }
   clearDraftSession();
-  void requireComposeCloseFlowDeps().refreshSavedDraftsMailboxCount();
+  await requireComposeCloseFlowDeps().refreshSavedDraftsMailboxCount();
 }

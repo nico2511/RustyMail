@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { clearThreadsRecentlyRemoved } from "../../recentlyRemovedThreads";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { currentAccount } from "../core/accountContext";
 import { render } from "../dispatch";
@@ -9,6 +10,7 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { openConfirmModal } from "../modals/promptConfirm";
 import { loadMailView } from "./mailListView";
 import { refreshSavedDraftsMailboxCount, saveDraftToSavedListNow } from "./accountWireActions";
+import { forgetSavedDraftLocally, savedDraftThreadId } from "./savedDraftListLocalForget";
 
 export async function tryHandleListThreadSavedDraftWire(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -43,15 +45,23 @@ export async function tryHandleListThreadSavedDraftWire(action: string, element?
           toast.warning("Aucun compte actif.");
           return;
         }
+        const threadId = savedDraftThreadId(sid);
+        forgetSavedDraftLocally(sid);
+        render();
         try {
           await withTimeout(invoke("saved_draft_delete", { accountId, savedDraftId: sid }), MAIL_ACTION_TIMEOUT_MS);
           toast.success("Brouillon retiré de la liste.");
           await loadMailView(false);
           await refreshSavedDraftsMailboxCount();
-          state.selectedThreadId = state.threads[0]?.id;
-          state.selectedThread = undefined;
           render();
         } catch (e) {
+          clearThreadsRecentlyRemoved([threadId]);
+          try {
+            await loadMailView(false);
+            await refreshSavedDraftsMailboxCount();
+          } catch {
+            /* le toast ci-dessous suffit si le rechargement échoue aussi */
+          }
           toast.error(tauriErrorMessage(e));
           render();
         }
