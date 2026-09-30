@@ -2,8 +2,8 @@
 //! La **langue** choisie dans les préférences pilote le nom du fichier GGML (variante `.en` si anglais pur
 //! et disponible pour la taille), plus l’indice langue pour l’inférence.
 
-use std::io::Cursor;
-use std::path::PathBuf;
+use std::io::{Cursor, Read};
+use std::path::{Path, PathBuf};
 
 use rustymail_infrastructure::{download_hf_file_if_needed, hf_resolve_url};
 
@@ -43,6 +43,21 @@ impl std::fmt::Display for WhisperError {
 }
 
 pub const DEFAULT_WHISPER_GGML_HF_REPO: &str = "ggerganov/whisper.cpp";
+
+/// `GGML_FILE_MAGIC` (`0x67676d6c`), little-endian sur disque (`lmgg`).
+const GGML_FILE_MAGIC: u32 = 0x6767_6d6c;
+
+/// Codes acceptés par `whisper_lang_id`. Un code inconnu renvoie -1 et peut
+/// ensuite `abort()` dans whisper.cpp.
+const WHISPER_LANG_CODES: &[&str] = &[
+    "af", "am", "ar", "as", "az", "ba", "be", "bg", "bn", "bo", "br", "bs", "ca", "cs", "cy", "da",
+    "de", "el", "en", "es", "et", "eu", "fa", "fi", "fo", "fr", "gl", "gu", "ha", "he", "hi", "hr",
+    "ht", "hu", "hy", "id", "is", "it", "ja", "jw", "ka", "kk", "km", "kn", "ko", "la", "lb", "ln",
+    "lo", "lt", "lv", "mg", "mi", "mk", "ml", "mn", "mr", "ms", "mt", "my", "ne", "nl", "nn", "no",
+    "oc", "pa", "pl", "ps", "pt", "ro", "ru", "sa", "sd", "si", "sk", "sl", "sn", "so", "sq", "sr",
+    "su", "sv", "sw", "ta", "te", "tg", "th", "tk", "tl", "tr", "tt", "uk", "ur", "uz", "vi", "yi",
+    "yo", "zh",
+];
 
 fn whisper_cache_dir(repo_id: &str, revision: &str, file_name: &str) -> PathBuf {
     let base = dirs::cache_dir()
@@ -159,10 +174,10 @@ pub fn ensure_ggml_weights(
 
     for file in candidates {
         let dest = whisper_cache_dir(rid, rev, &file);
-        if let Ok(m) = std::fs::metadata(&dest) {
-            if m.len() > 1024 {
-                return Ok(dest);
-            }
+        if cached_ggml_is_usable(&dest) {
+            return Ok(dest);
+        }
+        if dest.exists() {
             let _ = std::fs::remove_file(&dest);
         }
 
@@ -172,7 +187,11 @@ pub fn ensure_ggml_weights(
         }
         eprintln!("[RustyMail Whisper] essai {}\n → {}", url, dest.display());
         match download_hf_file_if_needed(&url, &dest, "whisper-dictation") {
-            Ok(()) => return Ok(dest),
+            Ok(()) if cached_ggml_is_usable(&dest) => return Ok(dest),
+            Ok(()) => {
+                last_err = format!("« {file} » : fichier GGML invalide (magic)");
+                let _ = std::fs::remove_file(&dest);
+            }
             Err(e) => {
                 last_err = format!("« {file} » : {e}");
                 let _ = std::fs::remove_file(&dest);
@@ -257,10 +276,74 @@ fn effective_use_gpu(unit: WhisperAccelerator) -> bool {
     unit.use_gpu() && whisper_gpu_compiled()
 }
 
+/// Toujours ≥ 1. `0` laisse le défaut whisper.cpp, qui vaut `hardware_concurrency()`
+/// et peut être 0 : `log_mel_spectrogram` fait alors `vector<thread>(n_threads - 1)` et `std::terminate`.
+fn dictation_n_threads(profile: &str) -> i32 {
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get() as i32)
+        .unwrap_or(4)
+        .max(1);
+    match profile {
+        "fast" => cores.clamp(1, 8),
+        _ => cores.min(4).max(1),
+    }
+}
+
+fn normalize_whisper_language(raw: &str) -> Result<Option<String>, WhisperError> {
+    let trimmed = raw.trim().to_ascii_lowercase();
+    if trimmed.is_empty() || trimmed == "auto" {
+        return Ok(None);
+    }
+    let primary = trimmed.split(|c| c == '-' || c == '_').next().unwrap_or("");
+    if WHISPER_LANG_CODES.binary_search(&primary).is_ok() {
+        Ok(Some(primary.to_string()))
+    } else {
+        Err(WhisperError::Other {
+            message: format!(
+                "Langue Whisper non reconnue « {primary} ». Choisissez une langue de la liste ou « auto »."
+            ),
+        })
+    }
+}
+
+fn cached_ggml_is_usable(path: &Path) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return false;
+    };
+    if meta.len() <= 1024 {
+        return false;
+    }
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let mut magic = [0u8; 4];
+    if file.read_exact(&mut magic).is_err() {
+        return false;
+    }
+    u32::from_le_bytes(magic) == GGML_FILE_MAGIC
+}
+
 pub fn transcribe_whisper_wav_bytes_typed(
     wav: &[u8],
     prefs: &rustymail_infrastructure::AiPrefs,
 ) -> Result<String, WhisperError> {
+    // `catch_unwind` n'intercepte pas `abort()` / `std::terminate` de whisper.cpp
+    // (WHISPER_ASSERT, `wstring_convert` sur certains chemins Windows).
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        transcribe_whisper_wav_bytes_inner(wav, prefs)
+    })) {
+        Ok(result) => result,
+        Err(_) => Err(WhisperError::Other {
+            message: "Transcription Whisper interrompue (erreur interne). Réessayez ; si besoin, retéléchargez le modèle.".into(),
+        }),
+    }
+}
+
+fn transcribe_whisper_wav_bytes_inner(
+    wav: &[u8],
+    prefs: &rustymail_infrastructure::AiPrefs,
+) -> Result<String, WhisperError> {
+    let language = normalize_whisper_language(&prefs.whisper_cpp_language)?;
     let path = ensure_ggml_weights(
         &prefs.whisper_hf_repo_id,
         &prefs.whisper_hf_revision,
@@ -286,23 +369,7 @@ pub fn transcribe_whisper_wav_bytes_typed(
         gpu_device: GPU_DEVICE_AUTO,
     };
 
-    let lang_owned = prefs.whisper_cpp_language.trim().to_string();
-    let language: Option<String> = if lang_owned.is_empty() || lang_owned == "auto" {
-        None
-    } else {
-        Some(lang_owned)
-    };
-
-    let n_threads = match profile.as_str() {
-        "fast" => {
-            let n = std::thread::available_parallelism()
-                .map(|n| n.get() as i32)
-                .unwrap_or(4)
-                .min(8);
-            n.max(1)
-        }
-        _ => 0,
-    };
+    let n_threads = dictation_n_threads(&profile);
 
     let mut engine =
         WhisperEngine::load_with_params(&path, load).map_err(|e: TranscribeError| {
@@ -344,4 +411,75 @@ pub fn transcribe_whisper_wav_bytes(
     prefs: &rustymail_infrastructure::AiPrefs,
 ) -> Result<String, String> {
     transcribe_whisper_wav_bytes_typed(wav, prefs).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn n_threads_never_below_one() {
+        for profile in ["", "fast", "balanced", "accurate", "unknown"] {
+            let n = dictation_n_threads(profile);
+            assert!(n >= 1, "{profile} => {n}");
+            if profile == "fast" {
+                assert!(n <= 8, "{profile} => {n}");
+            } else {
+                assert!(n <= 4, "{profile} => {n}");
+            }
+        }
+    }
+
+    #[test]
+    fn language_normalize_accepts_primary_and_bcp47() {
+        assert_eq!(
+            normalize_whisper_language("fr").unwrap().as_deref(),
+            Some("fr")
+        );
+        assert_eq!(
+            normalize_whisper_language("fr-FR").unwrap().as_deref(),
+            Some("fr")
+        );
+        assert_eq!(
+            normalize_whisper_language(" EN_us ").unwrap().as_deref(),
+            Some("en")
+        );
+        assert_eq!(normalize_whisper_language("auto").unwrap(), None);
+        assert_eq!(normalize_whisper_language("").unwrap(), None);
+        assert_eq!(normalize_whisper_language("  AUTO ").unwrap(), None);
+        assert!(normalize_whisper_language("zz-bogus").is_err());
+        assert!(normalize_whisper_language("français").is_err());
+        assert_eq!(WHISPER_LANG_CODES.len(), 98);
+    }
+
+    #[test]
+    fn ggml_magic_accepts_only_real_headers() {
+        let dir = std::env::temp_dir().join(format!(
+            "rustymail-ggml-magic-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let ok = dir.join("ok.bin");
+        let mut bytes = vec![0u8; 1100];
+        bytes[..4].copy_from_slice(&GGML_FILE_MAGIC.to_le_bytes());
+        std::fs::write(&ok, &bytes).unwrap();
+        assert!(cached_ggml_is_usable(&ok));
+
+        let bad = dir.join("bad.bin");
+        let mut bytes = vec![0u8; 1100];
+        bytes[..4].copy_from_slice(b"HTML");
+        std::fs::write(&bad, &bytes).unwrap();
+        assert!(!cached_ggml_is_usable(&bad));
+
+        let short = dir.join("short.bin");
+        std::fs::write(&short, &GGML_FILE_MAGIC.to_le_bytes()).unwrap();
+        assert!(!cached_ggml_is_usable(&short));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

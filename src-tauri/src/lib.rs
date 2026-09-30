@@ -42,6 +42,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::Emitter;
 use tauri::Manager;
 use tauri::State;
@@ -2169,6 +2170,11 @@ pub fn run() {
     ))
     .try_init();
     tauri::Builder::default()
+        // WebView2 tue le process si getUserMedia retombe sur l'état DEFAULT.
+        .on_permission_request(|_webview, kind| match kind {
+            PermissionKind::Microphone => PermissionResponse::Allow,
+            _ => PermissionResponse::Default,
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
