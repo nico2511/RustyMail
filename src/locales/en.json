@@ -31,7 +31,8 @@
       "storage": "Storage",
       "shortcuts": "Shortcuts",
       "developer": "Developer",
-      "digestBench": "Fixture bench"
+      "digestBench": "Fixture bench",
+      "digestCut": "Cut editor"
     },
     "general": {
       "languageHeading": "Language",

@@ -8,6 +8,6 @@ export function wireEventsDomInboxThread(signal: AbortSignal): void {
   wireEventsDomInboxList(signal);
   wireEventsDomOrgMailboxInline(signal);
   wireEventsDomThreadAttachments(signal);
-  wireEventsDomInboxThreadChrome();
+  wireEventsDomInboxThreadChrome(signal);
   wireEventsDomOrgConfirmModals(signal);
 }

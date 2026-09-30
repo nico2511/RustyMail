@@ -77,5 +77,7 @@ export async function loadMailView(append: boolean = false) {
   syncSelectionAfterThreadPage(page.length);
   scheduleMailboxDigestRefresh();
   scheduleIdleAiCachePrefetch();
-  void loadInboxFilterCounts().then(() => render());
+  void loadInboxFilterCounts().then(() => {
+    if (state.view === "list") render();
+  });
 }
