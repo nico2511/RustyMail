@@ -12,7 +12,9 @@ import {
   loadComposeMarkdownIntoEditor,
   setComposeFromTextareaValue,
 } from "./composeComposerBridge";
+import { markComposeDraftEdited } from "./composeDraftContentKey";
 import { fallbackDraftPreview } from "./composeDraftPreview";
+import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 import {
   applyGrammarReplacement,
   countGrammarOccurrences,
@@ -69,6 +71,14 @@ function forgetSuggestionIfExhausted(index: number, suggestion: GrammarReplaceIn
 
 function finishApplied(index: number, suggestion: GrammarReplaceInput, occurrences: number): void {
   forgetSuggestionIfExhausted(index, suggestion);
+  markComposeDraftEdited();
+  try {
+    scheduleDraftRevisionSave();
+  } catch (err) {
+    if (!(err instanceof Error) || !err.message.includes("registerComposeDraftRevisionAutosaveDeps")) {
+      throw err;
+    }
+  }
   toast.success(occurrences > 1 ? TOAST_APPLIED_FIRST : TOAST_APPLIED);
   paintComposeEditor();
   void computePreview();

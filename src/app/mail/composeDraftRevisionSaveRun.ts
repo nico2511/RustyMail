@@ -6,7 +6,14 @@ import { withTimeout, tauriErrorMessage } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { state } from "../state";
 import { draftPayloadForRust } from "./composeDraftPayload";
-import { composeDraftHasMeaningfulContent } from "./composeDraftSession";
+import {
+  draftHasMeaningfulContent,
+  draftRevisionContentKey,
+  draftSavedContentMatches,
+  markComposeDraftEdited,
+  rememberDraftContentSaved,
+  shouldAutosaveDraftRevision,
+} from "./composeDraftContentKey";
 import { persistDraft } from "./composePersistDraft";
 import { refreshDraftRevisions } from "./composeDraftRevisions";
 import { requireComposeDraftLocalSaveDeps } from "./composeDraftLocalSaveContext";
@@ -36,27 +43,37 @@ export async function upsertSavedDraftSilent(): Promise<boolean> {
   }
 }
 
-export async function saveDraftRevisionNow(): Promise<boolean> {
+export async function saveDraftRevisionNow(opts?: { force?: boolean }): Promise<boolean> {
   const accountId = currentAccount()?.id?.trim() ?? "";
   const sessionId = state.draftSessionId?.trim() ?? "";
   if (!isTauriRuntime() || !accountId || !sessionId) return false;
   if (!state.draft) return false;
   persistDraft();
+  const payload = draftPayloadForRust(state.draft);
+  if (!draftHasMeaningfulContent(payload)) return false;
+  if (draftSavedContentMatches(sessionId, payload)) {
+    rememberDraftContentSaved(sessionId, payload);
+    return false;
+  }
+  if (!opts?.force && !shouldAutosaveDraftRevision(payload, sessionId)) return false;
   try {
     await withTimeout(
       invoke("draft_revision_save", {
         accountId,
         sessionId,
-        draft: draftPayloadForRust(state.draft),
+        draft: payload,
       }),
       MAIL_ACTION_TIMEOUT_MS,
     );
+    rememberDraftContentSaved(sessionId, payload);
+    const latest = state.draft ? draftPayloadForRust(state.draft) : payload;
+    if (draftRevisionContentKey(latest) !== draftRevisionContentKey(payload)) {
+      markComposeDraftEdited();
+    }
     if (state.composeLayout === "historique") {
       void refreshDraftRevisions(60);
     }
-    if (composeDraftHasMeaningfulContent()) {
-      await upsertSavedDraftSilent();
-    }
+    await upsertSavedDraftSilent();
     return true;
   } catch (error) {
     console.error("draft_revision_save", error);

@@ -2,6 +2,7 @@ import { attachAtAutocomplete } from "../../atAutocomplete";
 import { isAiFeatureEnabled } from "../../aiFeatures";
 import { currentAccount } from "../core/accountContext";
 import { state } from "../state";
+import { markComposeDraftEdited } from "./composeDraftContentKey";
 import { requireSearchAtAutocompleteWireDeps } from "./searchAtAutocompleteWireContext";
 
 export function wireComposeAtAutocompleteFields(detachers: Array<() => void>): void {
@@ -36,6 +37,7 @@ export function wireComposeAtAutocompleteFields(detachers: Array<() => void>): v
           if (state.draft) {
             state.draft[spec.field] = handle?.getRecipients() ?? state.draft[spec.field];
           }
+          markComposeDraftEdited();
           d.scheduleDraftRevisionSave();
         },
       }),
@@ -51,6 +53,7 @@ export function wireComposeAtAutocompleteFields(detachers: Array<() => void>): v
         isTauri: true,
         isFeatureEnabled: addressAutocompleteOn,
         onMentionPick: () => {
+          markComposeDraftEdited();
           d.scheduleDraftRevisionSave();
         },
       }),

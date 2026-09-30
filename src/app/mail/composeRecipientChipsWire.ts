@@ -7,6 +7,7 @@ import {
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { state } from "../state";
 import type { Draft } from "../types";
+import { markComposeDraftEdited, recipientListsEqual } from "./composeDraftContentKey";
 import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 
 let composeChipsTo: ComposeRecipientChipsHandle | null = null;
@@ -81,7 +82,9 @@ export function wireComposeRecipientChips(): void {
       isTauri: isTauriRuntime(),
       onChange: (recipients) => {
         if (!state.draft) return;
+        if (recipientListsEqual(state.draft[field], recipients)) return;
         state.draft[field] = recipients;
+        markComposeDraftEdited();
         scheduleDraftRevisionSave();
       },
       onPendingInputChange: (raw) => {

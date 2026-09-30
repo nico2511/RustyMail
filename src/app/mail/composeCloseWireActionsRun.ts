@@ -1,6 +1,8 @@
 import { render } from "../dispatch";
 import { state } from "../state";
+import { composeDraftUserHasEdited } from "./composeDraftContentKey";
 import { finalizeCloseComposeFromUser } from "./composeCloseFlow";
+import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 import {
   dismissOrphanDraftSession,
   resumeOrphanDraftSession,
@@ -15,6 +17,15 @@ export async function tryHandleComposeCloseWire(action: string, element?: HTMLEl
     case "close-close-compose-modal":
       state.closeComposeModal = null;
       render();
+      if (composeDraftUserHasEdited()) {
+        try {
+          scheduleDraftRevisionSave();
+        } catch (err) {
+          if (!(err instanceof Error) || !err.message.includes("registerComposeDraftRevisionAutosaveDeps")) {
+            throw err;
+          }
+        }
+      }
       return true;
     case "close-compose-without-saving":
       void closeComposeWithoutSavingFromWire();

@@ -19,7 +19,7 @@ export async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }):
     return false;
   }
   persistDraft();
-  await saveDraftRevisionNow();
+  await saveDraftRevisionNow({ force: true });
   const titleRaw = state.draft.subject?.trim() ?? "";
   const title = titleRaw.length ? titleRaw : "Sans objet";
   try {

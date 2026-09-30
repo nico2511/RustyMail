@@ -8,6 +8,8 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import type { SavedDraftOpenPayload } from "../types";
+import { rememberDraftContentSaved } from "./composeDraftContentKey";
+import { draftPayloadForRust } from "./composeDraftPayload";
 import { draftHasRecipientsExtra } from "./composeDraftRecipients";
 import {
   computePreview,
@@ -49,6 +51,7 @@ export async function openSavedDraftById(savedDraftId: string): Promise<void> {
     syncPreviewOpenFromComposeLayout();
     resetMarkdownEditorHistory();
     loadComposeMarkdownIntoEditor(state.draft.markdownBody ?? "");
+    rememberDraftContentSaved(res.sessionId, draftPayloadForRust(state.draft));
     state.preview = undefined;
     state.composeMessage = "";
     render();

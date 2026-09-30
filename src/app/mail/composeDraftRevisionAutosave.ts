@@ -1,6 +1,13 @@
 let draftRevisionDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-const DRAFT_REVISION_DEBOUNCE_MS = 1800;
+/**
+ * Pause après la dernière modification avant un snapshot d’historique.
+ * 3000 ms (auparavant 1800) : une micro-pause ne crée plus une version,
+ * et la fermeture / `pagehide` enregistre encore une frappe non vide.
+ * Les corps vides et les contenus identiques au dernier snapshot sont ignorés
+ * dans `saveDraftRevisionNow`.
+ */
+const DRAFT_REVISION_DEBOUNCE_MS = 3000;
 
 export type ComposeDraftRevisionAutosaveDeps = {
   canScheduleDraftRevisionSave: () => boolean;

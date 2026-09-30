@@ -14,6 +14,7 @@ import {
   resetMarkdownEditorHistory,
   scheduleDraftRevisionSave,
 } from "./composeComposerBridge";
+import { markComposeDraftEdited } from "./composeDraftContentKey";
 import { computeDraftDiffAgainstRevision } from "./composeDraftRevisionDiff";
 import { refreshDraftRevisions } from "./composeDraftRevisions";
 import { enterComposeView, syncPreviewOpenFromComposeLayout } from "./composeViewWireActions";
@@ -52,6 +53,7 @@ export async function restoreDraftRevisionFromWire(revisionId: string): Promise<
     } else {
       window.setTimeout(() => void computePreview(), 0);
     }
+    markComposeDraftEdited();
     scheduleDraftRevisionSave(450);
   } catch (error) {
     console.error("draft_revision_restore", error);

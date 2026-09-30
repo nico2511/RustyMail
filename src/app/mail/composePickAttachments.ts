@@ -5,6 +5,7 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { markComposeDraftEdited } from "./composeDraftContentKey";
 
 export type ComposePickAttachmentsDeps = {
   scheduleDraftRevisionSave: (delayMs?: number) => void;
@@ -29,6 +30,7 @@ export async function pickAttachments(): Promise<void> {
     if (!picked.length) return;
     const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...picked]));
     state.draft.attachmentPaths = merged;
+    markComposeDraftEdited();
     toast.success(`${picked.length} pièce(s) jointe(s) ajoutée(s).`);
     render();
     d.scheduleDraftRevisionSave(250);

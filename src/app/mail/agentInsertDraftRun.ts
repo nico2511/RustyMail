@@ -13,6 +13,7 @@ import {
   resetMarkdownEditorHistory,
   scheduleDraftRevisionSave,
 } from "./composeComposerBridge";
+import { markComposeDraftEdited } from "./composeDraftContentKey";
 import { draftHasRecipientsExtra } from "./composeDraftRecipients";
 import { startNewDraftSession } from "./composeDraftSession";
 import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
@@ -62,6 +63,7 @@ export async function agentInsertDraftIntoCompose(extra?: string): Promise<void>
     resetMarkdownEditorHistory();
     render();
     window.setTimeout(() => void computePreview(), 0);
+    markComposeDraftEdited();
     scheduleDraftRevisionSave(350);
   } catch (e) {
     console.error("agentInsertDraftIntoCompose prepare_reply", e);
