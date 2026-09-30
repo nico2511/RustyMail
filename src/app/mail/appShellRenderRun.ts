@@ -9,6 +9,7 @@ import {
   restoreScrollAfterRender,
   snapshotAppShellScroll,
 } from "./appShellRenderChromeRun";
+import { shouldShowIntegratedWindowChrome } from "../ui/windowChrome";
 import {
   buildAppShellClassName,
   buildAppShellInnerHtml,
@@ -22,12 +23,19 @@ export function renderAppShell(): void {
 
   const scrollPrev = snapshotAppShellScroll();
   const { isCompose, aiPanelExpanded, panelW } = readAppShellLayoutFlags();
-  const { fullHtml, mainHtml } = buildAppShellInnerHtml({ isCompose, aiPanelExpanded, panelW });
+  const windowChrome = shouldShowIntegratedWindowChrome();
+  const { fullHtml, mainHtml } = buildAppShellInnerHtml({
+    isCompose,
+    aiPanelExpanded,
+    panelW,
+    windowChrome,
+  });
 
   appShell.className = buildAppShellClassName({
     isCompose,
     aiPanelExpanded,
     sidebarCollapsed: state.sidebarCollapsed,
+    windowChrome,
   });
   appShell.style.setProperty("--ai-width", aiPanelExpanded ? `${panelW}px` : "0px");
   const parkedMain = commitAppShellHtml(appShell, fullHtml, mainHtml, state.view === "thread");

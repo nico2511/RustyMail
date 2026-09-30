@@ -8,6 +8,7 @@ import { renderSettingsAiModal } from "../ui/render/settingsRender";
 import { renderAccountModalHtml } from "../ui/render/accountScopeRender";
 import { renderSidebar } from "../ui/render/sidebarRender";
 import { renderGlobalStatusFooter } from "../ui/render/statusFooterRender";
+import { renderWindowChromeHtml, windowChromeMaximized } from "../ui/windowChrome";
 import {
   renderCloseComposeDialog,
   renderImageDialog,
@@ -33,19 +34,21 @@ export function buildAppShellClassName(options: {
   isCompose: boolean;
   aiPanelExpanded: boolean;
   sidebarCollapsed: boolean;
+  windowChrome: boolean;
 }): string {
-  const { isCompose, aiPanelExpanded, sidebarCollapsed } = options;
+  const { isCompose, aiPanelExpanded, sidebarCollapsed, windowChrome } = options;
   return `app-shell ${aiPanelExpanded ? "" : "ai-collapsed"}${isCompose ? " compose-fullscreen-active" : ""}${
     !isCompose && sidebarCollapsed ? " sidebar-collapsed" : ""
-  }`;
+  }${windowChrome ? " has-window-chrome" : ""}`;
 }
 
 export function buildAppShellInnerHtml(options: {
   isCompose: boolean;
   aiPanelExpanded: boolean;
   panelW: number;
+  windowChrome: boolean;
 }): { fullHtml: string; mainHtml: string } {
-  const { isCompose, aiPanelExpanded } = options;
+  const { isCompose, aiPanelExpanded, windowChrome } = options;
   const mainColumn =
     !isCompose && state.sidebarCollapsed ?
       `<button type="button" class="main-sidebar-reveal" data-action="toggle-sidebar" aria-label="Afficher le menu des dossiers" title="Menu">☰</button>`
@@ -61,6 +64,7 @@ export function buildAppShellInnerHtml(options: {
 
   const fullHtml = `
     <div class="noise"></div>
+    ${windowChrome ? renderWindowChromeHtml({ maximized: windowChromeMaximized() }) : ""}
     ${body}
     ${renderMoveDialog()}
     ${renderMailboxManageDialog()}

@@ -16,7 +16,7 @@ export function paintStatusBarProgressDom(): void {
     existing.outerHTML = html;
     return;
   }
-  const anchor = bar.querySelector(".status-bar-compact") ?? bar.querySelector(".status-bar-sep");
+  const anchor = bar.querySelector(".status-bar-app") ?? bar.querySelector(".status-bar-sep");
   if (anchor) anchor.insertAdjacentHTML("afterend", html);
   else bar.insertAdjacentHTML("beforeend", html);
 }
