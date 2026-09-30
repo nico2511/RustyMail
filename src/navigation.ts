@@ -23,7 +23,8 @@ export type NavSettingsTab =
   | "storage"
   | "shortcuts"
   | "developer"
-  | "digestBench";
+  | "digestBench"
+  | "digestCut";
 
 export type NavSnapshot = {
   view: AppView;

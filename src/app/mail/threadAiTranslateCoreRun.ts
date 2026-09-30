@@ -11,7 +11,7 @@ import { aiCacheKeySegment } from "./aiCacheKeySegment";
 import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 import { applyThreadAiOutputIfLive, paintThreadAiSummaryDom } from "./threadAiStreamDom";
 import { repairUtf8Mojibake } from "./threadViewUiHelpers";
-import { introducesLlmMeta, LLM_META_TRANSLATION_TOAST } from "./llmMetaGuard";
+import { LLM_META_TRANSLATION_TOAST, translationVisibleText } from "./llmMetaGuard";
 
 function threadSourceText(): string {
   return (state.selectedThread?.messages ?? []).map((message) => message.cleanedText || "").join("\n");
@@ -41,8 +41,11 @@ export async function translateThreadCore(
   if (cached && !signal.aborted) {
     try {
       const o = JSON.parse(cached) as LlmTranslationResult;
-      if (o.translatedText && !introducesLlmMeta(threadSourceText(), o.translatedText)) {
-        if (applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(o.translatedText))) {
+      const cachedText = o.translatedText
+        ? translationVisibleText(threadSourceText(), o.translatedText)
+        : null;
+      if (cachedText) {
+        if (applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(cachedText))) {
           if (!prefetchOnly) {
             toast.info("Traduction (cache locale).");
             render();
@@ -63,9 +66,10 @@ export async function translateThreadCore(
         signal,
         onChunk: (acc) => {
           const preview = extractPartialJsonStringField(acc, "translatedText");
-          if (!preview || introducesLlmMeta(threadSourceText(), preview)) return;
-          if (applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(preview))) {
-            paintThreadAiSummaryDom(repairUtf8Mojibake(preview));
+          const visible = preview ? translationVisibleText(threadSourceText(), preview) : null;
+          if (!visible) return;
+          if (applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(visible))) {
+            paintThreadAiSummaryDom(repairUtf8Mojibake(visible));
           }
         },
       }),
@@ -95,13 +99,14 @@ export async function translateThreadCore(
     done.translation?.translatedText?.trim() ||
     done.displayText?.trim() ||
     "";
-  if (tx && introducesLlmMeta(threadSourceText(), tx)) {
+  const visible = tx ? translationVisibleText(threadSourceText(), tx) : null;
+  if (tx && !visible) {
     if (threadIdsMatch(state.aiThreadScope, threadId)) clearThreadAiSummaryState();
     if (!prefetchOnly) toast.error(LLM_META_TRANSLATION_TOAST);
     if (!prefetchOnly) render();
     return fail(LLM_META_TRANSLATION_TOAST);
   }
-  if (tx) applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(tx));
+  if (visible) applyThreadAiOutputIfLive(threadId, repairUtf8Mojibake(visible));
   if (!prefetchOnly) toast.success("Traduction terminée.");
   if (!prefetchOnly) render();
   return { status: "done" };

@@ -13,10 +13,14 @@ export function wireEventsDomComposeEditorFields(signal: AbortSignal): void {
     { signal },
   );
   bindComposerDropzone();
-  document.querySelector<HTMLInputElement>("[data-quick-reply]")?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      void sendQuickReply("reply");
-    }
-  });
+  document.querySelector<HTMLInputElement>("[data-quick-reply]")?.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void sendQuickReply("reply");
+      }
+    },
+    { signal },
+  );
 }
