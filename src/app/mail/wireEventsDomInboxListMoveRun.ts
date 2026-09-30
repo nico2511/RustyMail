@@ -2,7 +2,7 @@
 import { wireEventsDomInboxListFolderMove } from "./wireEventsDomInboxListFolderMoveRun";
 import { wireEventsDomInboxListTrashArchive } from "./wireEventsDomInboxListTrashArchiveRun";
 
-export function wireEventsDomInboxListMove(): void {
-  wireEventsDomInboxListTrashArchive();
-  wireEventsDomInboxListFolderMove();
+export function wireEventsDomInboxListMove(signal: AbortSignal): void {
+  wireEventsDomInboxListTrashArchive(signal);
+  wireEventsDomInboxListFolderMove(signal);
 }

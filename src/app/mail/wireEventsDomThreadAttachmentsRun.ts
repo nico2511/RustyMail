@@ -3,8 +3,8 @@ import { hydrateEmailHtml } from "./mailContentWireActions";
 import { state } from "../state";
 import { wireEventsDomThreadAttachmentButtons } from "./wireEventsDomThreadAttachmentButtonsRun";
 
-export function wireEventsDomThreadAttachments(_signal: AbortSignal): void {
-  wireEventsDomThreadAttachmentButtons();
+export function wireEventsDomThreadAttachments(signal: AbortSignal): void {
+  wireEventsDomThreadAttachmentButtons(signal);
   if (state.view === "thread") {
     hydrateEmailHtml();
   }

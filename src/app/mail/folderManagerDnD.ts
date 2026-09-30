@@ -8,10 +8,11 @@ import {
 } from "./folderManagerActions";
 import { onThreadMoveTo } from "./threadListActions";
 
-export function wireFolderManagerDnD(): void {
+export function wireFolderManagerDnD(signal?: AbortSignal): void {
   if (state.view !== "folderManager") return;
+  const opts = signal ? { signal } : undefined;
   document.querySelectorAll<HTMLElement>(".folder-tree-act, .folder-tree-chevron, .folder-tree-drag-handle").forEach((el) => {
-    el.addEventListener("click", (e) => e.stopPropagation());
+    el.addEventListener("click", (e) => e.stopPropagation(), opts);
   });
   document.querySelectorAll<HTMLElement>("[data-action=fm-drag-start]").forEach((el) => {
     el.addEventListener("dragstart", (ev) => {
@@ -20,12 +21,12 @@ export function wireFolderManagerDnD(): void {
       state.folderManager.dragFolder = mb;
       ev.dataTransfer?.setData("text/plain", mb);
       ev.dataTransfer!.effectAllowed = "move";
-    });
+    }, opts);
     el.addEventListener("dragend", () => {
       state.folderManager.dragFolder = null;
       state.folderManager.dropTarget = null;
       render();
-    });
+    }, opts);
   });
   document.querySelectorAll<HTMLElement>("[data-drop-mailbox]").forEach((el) => {
     el.addEventListener("dragover", (ev) => {
@@ -43,10 +44,10 @@ export function wireFolderManagerDnD(): void {
       ev.preventDefault();
       state.folderManager.dropTarget = target;
       ev.dataTransfer!.dropEffect = "move";
-    });
+    }, opts);
     el.addEventListener("dragleave", () => {
       state.folderManager.dropTarget = null;
-    });
+    }, opts);
     el.addEventListener("drop", (ev) => {
       ev.preventDefault();
       const target = el.dataset.dropMailbox?.trim();
@@ -61,7 +62,7 @@ export function wireFolderManagerDnD(): void {
         return;
       }
       if (from && target) void fmMoveFolder(from, target);
-    });
+    }, opts);
   });
   document.querySelectorAll<HTMLElement>(".inbox-thread-row[data-thread-id]").forEach((el) => {
     el.setAttribute("draggable", "true");
@@ -70,6 +71,6 @@ export function wireFolderManagerDnD(): void {
       if (!tid) return;
       ev.dataTransfer?.setData("application/x-rustymail-thread", tid);
       ev.dataTransfer!.effectAllowed = "move";
-    });
+    }, opts);
   });
 }

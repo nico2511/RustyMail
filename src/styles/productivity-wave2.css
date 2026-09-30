@@ -550,7 +550,8 @@ body.clarity-dark {
 }
 
 .thread-reading .message.thread-msg--unread {
-  box-shadow: inset 3px 0 0 var(--copper);
+  --thread-unread-bar: 3px;
+  box-shadow: inset var(--thread-unread-bar) 0 0 var(--copper);
 }
 
 .thread-msg-fold-preview {
@@ -840,6 +841,17 @@ body.clarity-dark {
   height: 28px;
   font-size: 10px;
   font-weight: 600;
+}
+
+/* Trait non-lu (3px, inset) : il collait à l’avatar. Le jour utile est --space-3
+   (12px), comme les autres écarts du chrome. La marge négative pose le trait
+   dans la gouttière pour que l’avatar reste aligné avec les autres messages. */
+.thread-reading.thread-reading--reading-layout .message.thread-msg--unread {
+  --thread-unread-inset: calc(var(--thread-unread-bar, 3px) + var(--space-3, 12px));
+  padding-left: var(--thread-unread-inset);
+  margin-left: calc(var(--thread-unread-inset) * -1);
+  width: calc(100% + var(--thread-unread-inset));
+  max-width: none;
 }
 
 .thread-reading.thread-reading--reading-layout .message {

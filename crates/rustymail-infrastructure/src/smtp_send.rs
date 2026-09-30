@@ -12,6 +12,7 @@ use rustymail_domain::compose_html::{
 use rustymail_domain::{Account, Draft, MailAuthKind, SecurityMode};
 
 use crate::get_account_password;
+use crate::inline_compose_images::InlineImagePart;
 use crate::tls_policy;
 
 fn parse_mailbox(email: &str, display_name: Option<&str>) -> Result<Mailbox, String> {
@@ -170,7 +171,8 @@ fn strip_data_image_markdown(markdown: &str) -> String {
                     if let Some(close_paren) = markdown[cb + 2..].find(')') {
                         let cp = cb + 2 + close_paren;
                         let url = &markdown[cb + 2..cp];
-                        if url.trim_start().starts_with("data:image/") {
+                        let url_lower = url.trim_start().to_ascii_lowercase();
+                        if url_lower.starts_with("data:image/") || url_lower.starts_with("cid:") {
                             let alt = &markdown[i + 2..cb];
                             let alt_clean = alt.trim();
                             if alt_clean.is_empty() {
@@ -251,11 +253,34 @@ pub struct DraftSendOutcome {
     pub rfc822: Vec<u8>,
 }
 
-pub async fn send_draft_via_smtp(
+fn image_content_type(mime: &str) -> ContentType {
+    mime.parse()
+        .unwrap_or_else(|_| ContentType::parse("application/octet-stream").expect("octet-stream"))
+}
+
+fn attach_inline_images(body: MultiPart, inline_images: &[InlineImagePart]) -> MultiPart {
+    if inline_images.is_empty() {
+        return body;
+    }
+    let mut related = MultiPart::related().multipart(body);
+    for image in inline_images {
+        let content_type = image_content_type(&image.mime_type);
+        related = related.singlepart(
+            LettreAttachment::new_inline_with_name(
+                image.content_id.clone(),
+                image.file_name.clone(),
+            )
+            .body(image.bytes.clone(), content_type),
+        );
+    }
+    related
+}
+
+fn build_draft_message(
     account: &Account,
     draft: &Draft,
-) -> Result<DraftSendOutcome, String> {
-    // Reuse the stored secret (password) or OAuth2 access token (même trousseau / flux OAuth).
+    inline_images: &[InlineImagePart],
+) -> Result<(String, Message), String> {
     let from = parse_mailbox(&account.email, Some(&account.display_name))?;
     let sender_domain = account
         .email
@@ -314,12 +339,13 @@ pub async fn send_draft_via_smtp(
             .body(outbound_plain_body(&draft.markdown_body));
         MultiPart::mixed().singlepart(plain_part)
     };
+    let root = attach_inline_images(body_part, inline_images);
     let message = if draft.attachment_paths.is_empty() {
         msg_builder
-            .multipart(body_part)
+            .multipart(root)
             .map_err(|e| format!("smtp message build failed: {e}"))?
     } else {
-        let mut mixed = MultiPart::mixed().multipart(body_part);
+        let mut mixed = MultiPart::mixed().multipart(root);
         let mut pj_bytes_total: usize = 0;
         for raw_path in &draft.attachment_paths {
             let p = std::path::PathBuf::from(raw_path.trim());
@@ -353,6 +379,16 @@ pub async fn send_draft_via_smtp(
             .map_err(|e| format!("smtp message build failed: {e}"))?
     };
 
+    Ok((message_id, message))
+}
+
+pub async fn send_draft_via_smtp(
+    account: &Account,
+    draft: &Draft,
+    inline_images: &[InlineImagePart],
+) -> Result<DraftSendOutcome, String> {
+    // Reuse the stored secret (password) or OAuth2 access token (même trousseau / flux OAuth).
+    let (message_id, message) = build_draft_message(account, draft, inline_images)?;
     let rfc822 = message.formatted();
 
     let transport = build_transport(account).await?;
@@ -369,13 +405,105 @@ pub async fn send_draft_via_smtp(
 
 #[cfg(test)]
 mod compose_html_send_tests {
-    use super::markdown_body_to_html;
+    use super::{build_draft_message, markdown_body_to_html};
+    use crate::extract_inline_data_images;
     use rustymail_domain::compose_html::COMPOSE_HTML_MARK;
+    use rustymail_domain::{
+        Account, AccountId, Draft, DraftId, DraftKind, EmailAddress, MailAuthKind, SecurityMode,
+        ServerSettings,
+    };
 
     #[test]
     fn tiptap_html_is_not_passed_through_markdown() {
         let html = markdown_body_to_html(&format!("{COMPOSE_HTML_MARK}<p><em>ciao</em></p>"));
         assert!(html.contains("<em>ciao</em>"));
         assert!(!html.contains("&lt;em&gt;"));
+    }
+
+    fn account() -> Account {
+        Account {
+            id: AccountId("user@example.com".into()),
+            display_name: "Nicolas".into(),
+            email: "user@example.com".into(),
+            imap: ServerSettings {
+                host: "imap.example.com".into(),
+                port: 993,
+                security: SecurityMode::Tls,
+                allow_invalid_tls: false,
+            },
+            smtp: ServerSettings {
+                host: "smtp.example.com".into(),
+                port: 465,
+                security: SecurityMode::Tls,
+                allow_invalid_tls: false,
+            },
+            auth_kind: MailAuthKind::Password,
+        }
+    }
+
+    fn draft(body: &str, send_html: bool) -> Draft {
+        Draft {
+            id: DraftId("draft-1".into()),
+            kind: DraftKind::New,
+            to: vec![EmailAddress {
+                name: None,
+                email: "ada@example.com".into(),
+            }],
+            cc: Vec::new(),
+            bcc: Vec::new(),
+            subject: "Sujet".into(),
+            markdown_body: body.to_string(),
+            send_html,
+            in_reply_to: None,
+            references: Vec::new(),
+            attachment_paths: Vec::new(),
+            thread_id: None,
+        }
+    }
+
+    fn rfc822(body: &str, send_html: bool, inline: &[crate::InlineImagePart]) -> String {
+        let (_id, message) =
+            build_draft_message(&account(), &draft(body, send_html), inline).unwrap();
+        String::from_utf8_lossy(&message.formatted()).into_owned()
+    }
+
+    #[test]
+    fn plain_text_message_stays_free_of_related_parts() {
+        let raw = rfc822("Bonjour\n\nmonde", false, &[]);
+        assert!(raw.contains("Bonjour"));
+        assert!(!raw.to_ascii_lowercase().contains("multipart/related"));
+        assert!(!raw.contains("Content-ID"));
+    }
+
+    #[test]
+    fn html_without_images_stays_alternative() {
+        let raw = rfc822(&format!("{COMPOSE_HTML_MARK}<p>Bonjour</p>"), true, &[]);
+        assert!(raw.contains("Bonjour"));
+        assert!(!raw.to_ascii_lowercase().contains("multipart/related"));
+    }
+
+    #[test]
+    fn inline_image_is_a_cid_part_not_a_data_url() {
+        const PNG_1X1_B64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+        let mut body = format!(
+            r#"{COMPOSE_HTML_MARK}<p>Bonjour <img src="data:image/png;base64,{PNG_1X1_B64}" alt="capture"></p>"#
+        );
+        let parts = extract_inline_data_images(&mut body).unwrap();
+        assert_eq!(parts.len(), 1);
+        let raw = rfc822(&body, true, &parts);
+        let lower = raw.to_ascii_lowercase();
+        assert!(lower.contains("multipart/related"), "{raw}");
+        assert!(lower.contains("content-id:"), "{raw}");
+        assert!(
+            raw.contains(&format!("cid:{}", parts[0].content_id)),
+            "{raw}"
+        );
+        assert!(raw.contains(&parts[0].content_id), "{raw}");
+        assert!(!raw.contains("data:image"), "{raw}");
+        assert!(
+            raw.contains("[image: capture]") || raw.contains("capture"),
+            "{raw}"
+        );
+        assert!(raw.contains("Bonjour"));
     }
 }

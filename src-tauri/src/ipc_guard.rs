@@ -21,6 +21,8 @@ const MAX_DICTATION_BASE64_LEN: usize = 32 * 1024 * 1024;
 const MAX_FILE_NAME_LEN: usize = 255;
 const MAX_MIME_TYPE_LEN: usize = 128;
 const MAX_DRAFT_SUBJECT_LEN: usize = 998;
+/// Texte du brouillon une fois les images `data:` extraites en CID.
+/// Un corps sans ces images, réellement plus long, est encore refusé.
 const MAX_DRAFT_BODY_LEN: usize = 512 * 1024;
 const MAX_DRAFT_RECIPIENTS: usize = 200;
 const MAX_DRAFT_ATTACHMENTS: usize = 50;
@@ -510,6 +512,40 @@ mod tests {
         assert!(validate_delete_account_ack(Some(" delete-account ")).is_ok());
         assert!(validate_delete_account_ack(None).is_err());
         assert!(validate_delete_account_ack(Some("delete")).is_err());
+    }
+
+    fn sample_draft(body: &str) -> Draft {
+        Draft {
+            id: rustymail_domain::DraftId("draft-1".into()),
+            kind: rustymail_domain::DraftKind::New,
+            to: vec![rustymail_domain::EmailAddress {
+                name: None,
+                email: "a@example.com".into(),
+            }],
+            cc: Vec::new(),
+            bcc: Vec::new(),
+            subject: "Sujet".into(),
+            markdown_body: body.to_string(),
+            send_html: true,
+            in_reply_to: None,
+            references: Vec::new(),
+            attachment_paths: Vec::new(),
+            thread_id: None,
+        }
+    }
+
+    #[test]
+    fn draft_body_at_the_cap_is_accepted() {
+        let body = "a".repeat(MAX_DRAFT_BODY_LEN);
+        assert!(validate_draft_for_ipc(&sample_draft(&body)).is_ok());
+    }
+
+    #[test]
+    fn draft_body_over_the_cap_keeps_the_explicit_error() {
+        let body = "a".repeat(MAX_DRAFT_BODY_LEN + 1);
+        let err = validate_draft_for_ipc(&sample_draft(&body)).unwrap_err();
+        assert!(err.contains("draft.markdownBody"), "{err}");
+        assert!(err.contains("524288"), "{err}");
     }
 
     #[test]

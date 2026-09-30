@@ -7,6 +7,7 @@ use std::path::Path;
 
 use crate::{
     address_contacts::{upsert_contacts_from_addresses, upsert_contacts_from_message_row},
+    inline_compose_images::InlineImagePart,
     lang_detect, open_sqlite_migrated,
     smtp_send::markdown_body_to_html,
 };
@@ -100,6 +101,33 @@ fn insert_attachment_rows_from_paths(
     Ok(())
 }
 
+fn insert_inline_image_rows(
+    conn: &rusqlite::Connection,
+    message_row_id: &str,
+    images: &[InlineImagePart],
+) -> Result<(), String> {
+    for image in images {
+        let aid = format!("a-local-{}", uuid::Uuid::new_v4().simple());
+        conn.execute(
+            "
+            INSERT INTO message_attachments (id, message_id, file_name, mime_type, size_bytes, kind, content_id, content_blob)
+            VALUES (?1, ?2, ?3, ?4, ?5, 'inline', ?6, ?7)
+            ",
+            params![
+                aid,
+                message_row_id,
+                image.file_name,
+                image.mime_type,
+                image.bytes.len() as i64,
+                image.content_id,
+                image.bytes,
+            ],
+        )
+        .map_err(|e| format!("SQLite message_attachments (inline): {e}"))?;
+    }
+    Ok(())
+}
+
 /// Ajoute au fil `thread_id` une ligne `messages` pour le message envoyé (idem style date que sync IMAP).
 pub fn sqlite_record_sent_message_copy(
     db_path: impl AsRef<Path>,
@@ -109,6 +137,7 @@ pub fn sqlite_record_sent_message_copy(
     message_id_header: &str,
     sender_name: &str,
     sender_email: &str,
+    inline_images: &[InlineImagePart],
 ) -> Result<(), String> {
     let tid = thread_id.trim();
     if tid.is_empty() {
@@ -295,6 +324,7 @@ pub fn sqlite_record_sent_message_copy(
         )
         .map_err(|e| format!("SQLite record sent message: {e}"))?;
     insert_attachment_rows_from_paths(&transaction, &row_id, &draft.attachment_paths)?;
+    insert_inline_image_rows(&transaction, &row_id, inline_images)?;
     upsert_contacts_from_message_row(
         &transaction,
         account_norm,
@@ -333,6 +363,7 @@ pub fn sqlite_record_sent_starting_thread(
     message_id_header: &str,
     sender_name: &str,
     sender_email: &str,
+    inline_images: &[InlineImagePart],
 ) -> Result<String, String> {
     let account_norm = account_id.trim();
     if account_norm.is_empty() {
@@ -450,6 +481,7 @@ pub fn sqlite_record_sent_starting_thread(
         .map_err(|e| format!("SQLite message (nouveau fil): {e}"))?;
 
     insert_attachment_rows_from_paths(&transaction, &row_id, &draft.attachment_paths)?;
+    insert_inline_image_rows(&transaction, &row_id, inline_images)?;
 
     transaction.commit().map_err(|e| e.to_string())?;
     Ok(thread_id)
