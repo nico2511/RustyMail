@@ -424,23 +424,54 @@ pub(crate) fn row_by_email(
     .ok()
 }
 
+pub(crate) fn sql_text(row: &rusqlite::Row<'_>, idx: usize) -> rusqlite::Result<String> {
+    Ok(row.get::<_, Option<String>>(idx)?.unwrap_or_default())
+}
+
+/// Agrégats SQLite (`SUM`, `MAX`) : NULL ou REAL ne doivent pas faire échouer la ligne.
+pub(crate) fn sql_u32(row: &rusqlite::Row<'_>, idx: usize) -> rusqlite::Result<u32> {
+    if let Ok(v) = row.get::<_, Option<i64>>(idx) {
+        return Ok(v.unwrap_or(0).max(0) as u32);
+    }
+    let v = row.get::<_, Option<f64>>(idx).ok().flatten();
+    Ok(v.unwrap_or(0.0).max(0.0) as u32)
+}
+
+pub(crate) fn sql_flag(row: &rusqlite::Row<'_>, idx: usize) -> rusqlite::Result<bool> {
+    if let Ok(v) = row.get::<_, Option<i64>>(idx) {
+        return Ok(v.unwrap_or(0) != 0);
+    }
+    Ok(false)
+}
+
 pub(crate) fn map_contact_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AddressContactRow> {
     Ok(AddressContactRow {
-        account_id: row.get(0)?,
-        email: row.get(1)?,
-        display_name: row.get(2)?,
-        message_count: row.get::<_, i64>(3)? as u32,
-        last_seen_at: row.get(4)?,
-        last_source: row.get(5)?,
-        is_favorite: row.get::<_, i64>(6)? != 0,
-        notes: row.get(7)?,
-        source: row.get(8)?,
-        updated_at: row.get(9)?,
+        account_id: sql_text(row, 0)?,
+        email: sql_text(row, 1)?,
+        display_name: sql_text(row, 2)?,
+        message_count: sql_u32(row, 3)?,
+        last_seen_at: sql_text(row, 4)?,
+        last_source: sql_text(row, 5)?,
+        is_favorite: sql_flag(row, 6)?,
+        notes: sql_text(row, 7)?,
+        source: sql_text(row, 8)?,
+        updated_at: sql_text(row, 9)?,
     })
 }
 
 pub fn list_address_contacts(
     db_path: &Path,
+    account_id: &str,
+    query: &str,
+    offset: u32,
+    limit: u32,
+) -> Result<ListAddressContactsResult, String> {
+    let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
+    list_address_contacts_conn(&conn, account_id, query, offset, limit)
+}
+
+pub(crate) fn list_address_contacts_conn(
+    conn: &Connection,
     account_id: &str,
     query: &str,
     offset: u32,
@@ -455,7 +486,6 @@ pub fn list_address_contacts(
     }
     let limit = limit.clamp(1, 100);
     let offset = offset;
-    let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
     let q = query.trim().to_ascii_lowercase();
     let like = format!(
         "%{}%",

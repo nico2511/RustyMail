@@ -147,10 +147,16 @@ select {
   color: var(--rail-mute);
 }
 
+/* Écarts de blocs du rail : comptes, outils globaux, dossiers IMAP, personnels. */
+.sidebar-folder-group--accounts,
+.sidebar-folder-group--virtual-local {
+  margin-bottom: 20px;
+}
+
 /* Dernier groupe du rail : en-tête « Personnels », puis le lien Dossiers. */
 .sidebar-personal-entry {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 20px;
+  padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 

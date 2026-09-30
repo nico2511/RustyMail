@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { state } from "./app/state";
 import { localeTag } from "./i18n";
 import { navRenderTrailHtml } from "./navigation";
 import { escapeAttr, escapeHtml } from "./ui/sanitize";
@@ -20,7 +21,7 @@ export type AddressContactListRow = {
 };
 
 /** Normalise la réponse Tauri (nested `row` ou champs aplatis legacy). */
-function contactRowFromItem(item: AddressContactListRow & Partial<AddressContactRow>): AddressContactRow {
+export function contactRowFromItem(item: AddressContactListRow & Partial<AddressContactRow>): AddressContactRow {
   if (item.row?.email) return item.row;
   return {
     accountId: String(item.accountId ?? ""),
@@ -70,6 +71,11 @@ let contactsListOffset = 0;
 let contactsListRows: AddressContactListRow[] = [];
 let contactsListTotal = 0;
 let contactsListLoading = false;
+let contactsListError = "";
+
+function addressBookGlobalScope(): boolean {
+  return Boolean(state.appPrefs.general.addressBookGlobalScope);
+}
 let contactsDetail: ContactDetailDto | null = null;
 let contactsDetailLoading = false;
 let contactsKeywordDraft = "";
@@ -240,6 +246,7 @@ export async function loadContactsList(
   }
   if (opts?.query !== undefined) contactsListQuery = opts.query;
   contactsListLoading = true;
+  contactsListError = "";
   try {
     const res = await invoke<{ items: Array<AddressContactListRow & Partial<AddressContactRow>>; total: number }>(
       "list_address_contacts_scoped_cmd",
@@ -248,6 +255,7 @@ export async function loadContactsList(
         query: contactsListQuery,
         offset: contactsListOffset,
         limit: 60,
+        globalScope: addressBookGlobalScope(),
       }
     );
     const items = (res?.items ?? []).map((item) => ({
@@ -259,6 +267,7 @@ export async function loadContactsList(
     else contactsListRows = [...contactsListRows, ...items];
     contactsListOffset = contactsListRows.length;
   } catch (err) {
+    contactsListError = err instanceof Error ? err.message : String(err ?? "liste indisponible");
     if (contactsListOffset === 0) {
       contactsListRows = [];
       contactsListTotal = 0;
@@ -313,9 +322,23 @@ export function renderContactsListPage(accountLabel: string): string {
     !hasMore && contactsListTotal > 0
       ? `<span class="inbox-end-hint dim">Fin de liste (${contactsListTotal})</span>`
       : "";
+  const sidebarCount = state.addressBookSidebarCount;
+  const scopeLabel = addressBookGlobalScope() ? "global" : "ce compte";
+  const searching = contactsListQuery.trim().length > 0;
+  const listedTotal = searching ? contactsListTotal : Math.max(contactsListTotal, sidebarCount ?? 0);
+  const counterSuggestsRows = !searching && listedTotal > 0 && rows.length === 0;
   const listBody =
     rows.length ?
       rows.map((item) => renderContactListRow(item)).join("")
+    : !contactsListLoading && counterSuggestsRows ?
+      `<div class="inbox-empty">
+          <p class="inbox-empty-title">${listedTotal} contact${listedTotal === 1 ? "" : "s"} (${escapeHtml(scopeLabel)})</p>
+          <p class="inbox-empty-hint dim">${escapeHtml(
+            contactsListError
+              ? `Chargement impossible. ${contactsListError}`
+              : "Le compteur et la liste ne concordent pas. Actualisez le carnet."
+          )}</p>
+        </div>`
     : !contactsListLoading ?
       `<div class="inbox-empty">
           <p class="inbox-empty-title">Aucun contact</p>
@@ -330,7 +353,7 @@ export function renderContactsListPage(accountLabel: string): string {
             ${navRenderTrailHtml("Carnet", escapeHtml, escapeAttr, { navClass: "secondary-view-nav" })}
             <h1 class="inbox-mailbox-title">Carnet</h1>
             <p class="inbox-mailbox-sub">
-              ${rows.length} sur ${contactsListTotal} contact${contactsListTotal === 1 ? "" : "s"}
+              ${rows.length} sur ${listedTotal} contact${listedTotal === 1 ? "" : "s"} (${escapeHtml(scopeLabel)})
               ${contactsListLoading ? " · chargement…" : ""}
               · ${escapeHtml(accountLabel)}
             </p>

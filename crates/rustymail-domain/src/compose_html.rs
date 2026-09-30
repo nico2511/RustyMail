@@ -313,6 +313,11 @@ fn safe_url(value: &str, allow_data_image: bool) -> bool {
     !trimmed.contains(':')
 }
 
+fn inline_image_src(src: &str) -> bool {
+    let lower = src.trim_start().to_ascii_lowercase();
+    lower.starts_with("data:image/") || lower.starts_with("cid:")
+}
+
 fn escape_attr(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -398,7 +403,7 @@ fn plain_from_html(html: &str) -> String {
                         out.push_str("[image: ");
                         out.push_str(alt);
                         out.push(']');
-                    } else if src.trim_start().starts_with("data:image/") {
+                    } else if inline_image_src(src) {
                         out.push_str("[image]");
                     }
                 } else if tag.name == "br" {
@@ -521,6 +526,15 @@ mod tests {
         let plain = compose_html_to_plain(&format!("{COMPOSE_HTML_MARK}{html}"));
         assert!(plain.contains("[image: capture]"));
         assert!(!plain.contains("base64"));
+    }
+
+    #[test]
+    fn cid_image_without_alt_becomes_a_marker() {
+        let plain = compose_html_to_plain(&format!(
+            r#"{COMPOSE_HTML_MARK}<img src="cid:img1-abcd" />"#
+        ));
+        assert!(plain.contains("[image]"));
+        assert!(!plain.contains("cid:"));
     }
 
     #[test]

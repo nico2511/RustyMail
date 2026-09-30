@@ -12,6 +12,7 @@ import {
   type SettingsAiPanelDeps,
 } from "../../../settingsAiPanel";
 import { renderDigestBenchPanel } from "./digestBenchRender";
+import { renderDigestCutPanel } from "./digestCutRender";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { formatNewsletterRuleInput } from "../../lib/newsletterRuleFormat";
 import { settingsExplainHtml } from "../../lib/settingsExplainHtml";
@@ -231,9 +232,11 @@ function renderSettingsAddressBookPanel(): string {
           <table class="address-book-table">
             <thead><tr><th></th><th>Nom</th><th>E-mail</th><th>Notes</th><th></th></tr></thead>
             <tbody>
-              ${rows
-                .map(
-                  (r) => `
+              ${
+                rows.length
+                  ? rows
+                      .map(
+                        (r) => `
                 <tr>
                   <td><button type="button" class="address-book-star${r.isFavorite ? " is-on" : ""}" data-action="address-book-toggle-fav" data-email="${escapeAttr(r.email)}" title="Favori">${r.isFavorite ? "★" : "☆"}</button></td>
                   <td>${escapeHtml(r.displayName || "—")}</td>
@@ -244,8 +247,10 @@ function renderSettingsAddressBookPanel(): string {
                     ${r.source === "manual" ? `<button type="button" class="ghost-button" data-action="address-book-delete" data-email="${escapeAttr(r.email)}">Supprimer</button>` : ""}
                   </td>
                 </tr>`
-                )
-                .join("")}
+                      )
+                      .join("")
+                  : `<tr><td colspan="5" class="dim">Aucun contact.</td></tr>`
+              }
             </tbody>
           </table>
         </div>
@@ -573,7 +578,7 @@ function renderSettingsDeveloperPanel(): string {
     <article class="settings-card surface-sm" aria-labelledby="settings-dev-demo-heading">
       <h3 id="settings-dev-demo-heading" class="thread-kicker settings-form-kicker settings-card__title">Données démo (pro fictif)</h3>
       <p class="dim settings-card__lead">
-        <strong>Essayer</strong> — crée ou réinitialise <code>playground@demo.rustymail.app</code> (conversations pro en local, IMAP factice) pour tester le <strong>Brief d’action</strong>.
+        <strong>Essayer</strong> — crée ou réinitialise <code>playground@demo.rustymail.app</code> (fils pro locaux plus longs : plusieurs participants, liens, tableaux, IMAP factice) pour tester la lecture et le <strong>Brief d’action</strong>.
       </p>
       <p class="dim" style="margin:0 0 4px;font-size:13px;line-height:1.55">
         <strong>Passer à un vrai compte</strong> — supprimez la démo puis ajoutez un compte IMAP dans <strong>Paramètres → Comptes</strong>.
@@ -612,6 +617,7 @@ export function renderSettings() {
   const tabShortcuts = state.settingsTab === "shortcuts";
   const tabDeveloper = state.settingsTab === "developer";
   const tabDigestBench = state.settingsTab === "digestBench";
+  const tabDigestCut = state.settingsTab === "digestCut";
   let settingsBody = "";
   switch (state.settingsTab) {
     case "accounts":
@@ -643,6 +649,9 @@ export function renderSettings() {
       break;
     case "digestBench":
       settingsBody = renderDigestBenchPanel();
+      break;
+    case "digestCut":
+      settingsBody = renderDigestCutPanel();
       break;
     default:
       settingsBody = renderSettingsAccountsPanel();
@@ -679,6 +688,7 @@ export function renderSettings() {
             settingsNavButton("storage", t("settings.tabs.storage"), tabStorage, "SQLite, JSON, modèles"),
             settingsNavButton("shortcuts", t("settings.tabs.shortcuts"), tabShortcuts, "Raccourcis clavier"),
             settingsNavButton("developer", t("settings.tabs.developer"), tabDeveloper, "Dépôt, crates, libs"),
+            settingsNavButton("digestCut", t("settings.tabs.digestCut"), tabDigestCut, "Proposition de zones sur un échantillon"),
             settingsNavButton("digestBench", t("settings.tabs.digestBench"), tabDigestBench, "Découpe digest sur la recherche"),
           ].join(""),
         )}

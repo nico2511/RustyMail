@@ -12,6 +12,7 @@ import { activityTrackingEnabled } from "../../mail/threadActivityTracking";
 import { state } from "../../state";
 import { renderSidebarAiQuickTrigger } from "./aiQuickPanelRender";
 import { renderRailAccountScopeHtml } from "./accountScopeRender";
+import { railImapFoldersVisible } from "../../mail/inboxAccountScope";
 import {
   renderAddressBookSidebarCountPill,
   renderFolderSidebarCountPill,
@@ -27,6 +28,8 @@ export function renderSidebar(): string {
   const personal = folders.filter((mb) => !systemNames.has(mb));
   const personalCount = personal.length;
   const railCollapsed = state.sidebarCollapsed;
+  const multiAccount = state.accounts.length > 1;
+  const showImapFolders = railImapFoldersVisible();
   const avatarLabel = account ? accountShortLabel(account) : "RustyMail";
   const avatarMark = accountMonogram(avatarLabel);
   const imapSection =
@@ -60,7 +63,7 @@ export function renderSidebar(): string {
           }
         </div>
       </div>
-      <nav class="folder-list" aria-label="Folders">
+      <nav class="folder-list${multiAccount ? " folder-list--account-fold" : ""}" aria-label="Folders">
         ${renderRailAccountScopeHtml()}
         ${
           isTauriRuntime() && account
@@ -78,8 +81,10 @@ export function renderSidebar(): string {
             </div>`
             : ""
         }
-        <div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">${escapeHtml(imapSection)}</span></div>
-        <div class="sidebar-folder-group">
+        ${
+          showImapFolders
+            ? `<div class="sidebar-section-label sidebar-section-label--in-nav"><span class="dim">${escapeHtml(imapSection)}</span></div>
+        <div class="sidebar-folder-group sidebar-folder-group--system">
           ${system
             .map(
               ({ kind, name }) => `
@@ -100,7 +105,9 @@ export function renderSidebar(): string {
             <span class="folder-name">Dossiers</span>
             ${personalCount ? `<span class="folder-count">${personalCount}</span>` : ""}
           </button>
-        </div>
+        </div>`
+            : ""
+        }
       </nav>
       ${
         isTauriRuntime() && account

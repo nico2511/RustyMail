@@ -7,7 +7,9 @@ use rusqlite::{params, Connection};
 use rustymail_domain::EntityKind;
 use serde::Serialize;
 
-use crate::address_contacts::{map_contact_row, row_by_email, AddressContactRow};
+use crate::address_contacts::{
+    map_contact_row, row_by_email, sql_flag, sql_text, sql_u32, AddressContactRow,
+};
 use crate::email_util::normalize_email;
 use crate::newsletter::{
     host_of_email, list_newsletter_rules_connection, matches_newsletter_email, NewsletterRule,
@@ -716,7 +718,8 @@ pub fn list_address_contacts_scoped(
     global_scope: bool,
 ) -> Result<ListAddressContactsScopedResult, String> {
     let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
-    let rules = list_newsletter_rules_connection(&conn).map_err(|e| e.to_string())?;
+    // Une règle newsletter illisible ne doit pas vider le carnet : le compteur, lui, ne lit pas cette table.
+    let rules = list_newsletter_rules_connection(&conn).unwrap_or_default();
     let account_id = account_id.trim();
     let limit = limit.clamp(1, 100);
     let q = query.trim().to_ascii_lowercase();
@@ -724,8 +727,8 @@ pub fn list_address_contacts_scoped(
     let (rows, total): (Vec<AddressContactRow>, u32) = if global_scope {
         list_global_contacts(&conn, &q, offset, limit)?
     } else {
-        let inner = crate::address_contacts::list_address_contacts(
-            db_path, account_id, query, offset, limit,
+        let inner = crate::address_contacts::list_address_contacts_conn(
+            &conn, account_id, query, offset, limit,
         )?;
         (inner.items, inner.total)
     };
@@ -788,10 +791,11 @@ fn list_global_contacts(
     let sql = if q.is_empty() {
         "
         SELECT MIN(account_id) AS account_id, email,
-               MAX(CASE WHEN display_name != '' THEN display_name ELSE NULL END) AS display_name,
-               SUM(message_count) AS mc,
-               MAX(last_seen_at), MAX(last_source),
-               MAX(is_favorite), MAX(notes), MAX(source), MAX(updated_at)
+               COALESCE(MAX(CASE WHEN display_name != '' THEN display_name END), '') AS display_name,
+               COALESCE(SUM(message_count), 0) AS mc,
+               COALESCE(MAX(last_seen_at), ''), COALESCE(MAX(last_source), ''),
+               COALESCE(MAX(is_favorite), 0), COALESCE(MAX(notes), ''),
+               COALESCE(MAX(source), ''), COALESCE(MAX(updated_at), '')
         FROM address_contacts
         GROUP BY email
         ORDER BY MAX(is_favorite) DESC, mc DESC, MAX(last_seen_at) DESC, email ASC
@@ -800,10 +804,11 @@ fn list_global_contacts(
     } else {
         "
         SELECT MIN(account_id) AS account_id, email,
-               MAX(CASE WHEN display_name != '' THEN display_name ELSE NULL END) AS display_name,
-               SUM(message_count) AS mc,
-               MAX(last_seen_at), MAX(last_source),
-               MAX(is_favorite), MAX(notes), MAX(source), MAX(updated_at)
+               COALESCE(MAX(CASE WHEN display_name != '' THEN display_name END), '') AS display_name,
+               COALESCE(SUM(message_count), 0) AS mc,
+               COALESCE(MAX(last_seen_at), ''), COALESCE(MAX(last_source), ''),
+               COALESCE(MAX(is_favorite), 0), COALESCE(MAX(notes), ''),
+               COALESCE(MAX(source), ''), COALESCE(MAX(updated_at), '')
         FROM address_contacts
         WHERE email LIKE ?1 ESCAPE '\\'
            OR lower(display_name) LIKE ?1 ESCAPE '\\'
@@ -828,16 +833,16 @@ fn list_global_contacts(
 
 fn map_grouped_contact_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AddressContactRow> {
     Ok(AddressContactRow {
-        account_id: row.get(0)?,
-        email: row.get(1)?,
-        display_name: row.get(2)?,
-        message_count: row.get::<_, i64>(3)? as u32,
-        last_seen_at: row.get(4)?,
-        last_source: row.get(5)?,
-        is_favorite: row.get::<_, i64>(6)? != 0,
-        notes: row.get(7)?,
-        source: row.get(8)?,
-        updated_at: row.get(9)?,
+        account_id: sql_text(row, 0)?,
+        email: sql_text(row, 1)?,
+        display_name: sql_text(row, 2)?,
+        message_count: sql_u32(row, 3)?,
+        last_seen_at: sql_text(row, 4)?,
+        last_source: sql_text(row, 5)?,
+        is_favorite: sql_flag(row, 6)?,
+        notes: sql_text(row, 7)?,
+        source: sql_text(row, 8)?,
+        updated_at: sql_text(row, 9)?,
     })
 }
 
@@ -889,6 +894,92 @@ pub fn contact_message_samples(
         .filter(|b| !b.is_empty())
         .collect::<Vec<_>>()
         .join("\n---\n"))
+}
+
+#[cfg(test)]
+mod list_scope_tests {
+    use super::{count_address_contacts_scoped, list_address_contacts_scoped};
+    use crate::address_contacts::upsert_contact;
+    use crate::open_sqlite_migrated;
+    use std::path::PathBuf;
+
+    fn temp_db() -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("contacts.db");
+        (dir, path)
+    }
+
+    #[test]
+    fn list_matches_count_for_account_and_global_including_blank_names() {
+        let (_dir, path) = temp_db();
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        upsert_contact(
+            &conn,
+            "a1",
+            "bare@example.com",
+            None,
+            "2024-01-01T00:00:00Z",
+            "from",
+        )
+        .expect("bare");
+        upsert_contact(
+            &conn,
+            "a1",
+            "ada@example.com",
+            Some("Ada"),
+            "2024-02-01T00:00:00Z",
+            "from",
+        )
+        .expect("ada");
+        upsert_contact(
+            &conn,
+            "a2",
+            "ada@example.com",
+            Some(""),
+            "2024-02-02T00:00:00Z",
+            "from",
+        )
+        .expect("ada other account");
+        upsert_contact(
+            &conn,
+            "a2",
+            "bob@example.com",
+            Some("Bob"),
+            "2024-03-01T00:00:00Z",
+            "from",
+        )
+        .expect("bob");
+        drop(conn);
+
+        let global_n = count_address_contacts_scoped(&path, "a1", true).expect("count global");
+        let global =
+            list_address_contacts_scoped(&path, "a1", "", 0, 50, true).expect("list global");
+        assert_eq!(global_n, 3u32, "distinct emails across accounts");
+        assert_eq!(global.total, global_n);
+        assert_eq!(global.items.len() as u32, global_n);
+        let emails: Vec<&str> = global.items.iter().map(|i| i.row.email.as_str()).collect();
+        assert!(emails.contains(&"bare@example.com"));
+        assert!(emails.contains(&"ada@example.com"));
+        assert!(emails.contains(&"bob@example.com"));
+        let bare = global
+            .items
+            .iter()
+            .find(|i| i.row.email == "bare@example.com")
+            .expect("bare row");
+        assert_eq!(bare.row.display_name, "");
+
+        let local_n = count_address_contacts_scoped(&path, "a1", false).expect("count local");
+        let local =
+            list_address_contacts_scoped(&path, "a1", "", 0, 50, false).expect("list local");
+        assert_eq!(local_n, 2u32);
+        assert_eq!(local.total, local_n);
+        assert_eq!(local.items.len() as u32, local_n);
+        assert!(local
+            .items
+            .iter()
+            .any(|i| i.row.email == "bare@example.com"));
+        assert!(local.items.iter().all(|i| i.row.email != "bob@example.com"));
+    }
 }
 
 #[cfg(test)]
