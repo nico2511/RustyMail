@@ -179,14 +179,14 @@ fn status_from_prefs(prefs_path: &Path) -> DigestBenchStatus {
     }
 }
 
-fn validate_sender(email: &str) -> Result<(), String> {
+pub(crate) fn validate_sender(email: &str) -> Result<(), String> {
     if email.len() > 320 || email.contains('\0') || email.contains('\n') || email.contains('\r') {
         return Err("expéditeur invalide".to_string());
     }
     Ok(())
 }
 
-fn validate_yaml(yaml: &str) -> Result<(), String> {
+pub(crate) fn validate_yaml(yaml: &str) -> Result<(), String> {
     if yaml.len() > MAX_FIXTURE_YAML {
         return Err("YAML de fixture trop long".to_string());
     }
@@ -196,7 +196,7 @@ fn validate_yaml(yaml: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_html(html: &str) -> Result<(), String> {
+pub(crate) fn validate_html(html: &str) -> Result<(), String> {
     if html.len() > MAX_PREVIEW_HTML {
         return Err("HTML trop long pour l'aperçu".to_string());
     }
