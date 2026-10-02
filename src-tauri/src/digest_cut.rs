@@ -61,8 +61,7 @@ pub fn digest_cut_propose_zones(
 ) -> Result<DigestCutProposal, String> {
     validate_html(&payload.html)?;
     validate_sender(&payload.sender_email)?;
-    let prefs = rustymail_infrastructure::load_app_prefs(&paths.prefs_path)
-        .map_err(|e| format!("prefs : {e}"))?;
+    let prefs = rustymail_infrastructure::load_app_prefs(&paths.prefs_path);
     let lang = prefs.ai.draft_language.trim();
     let lang = if lang.is_empty() { "fr" } else { lang };
     let proposal = if payload.use_llm {
