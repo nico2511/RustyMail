@@ -14,23 +14,40 @@ function briefEvidenceButtons(links: ActionBriefEvidenceLink[]): string {
     .join("");
 }
 
+function emptySectionPlaceholder(partial: boolean): string {
+  return partial
+    ? `<p class="thread-zen-par dim" role="status">Non disponible — JSON tronqué, section absente de la réponse.</p>`
+    : `<p class="thread-zen-par dim">—</p>`;
+}
+
 export function renderActionBriefHtml(b: ActionBriefResult): string {
   const confPct = Math.max(0, Math.min(100, Math.round(Number(b.confidence ?? 0) * 100)));
   const bucket = escapeHtml(String(b.priorityBucket ?? "—"));
   const mode = escapeHtml(String(b.mode ?? ""));
-  const partial = b.outputPartial
-    ? `<p class="thread-zen-par dim" role="status">Brief partiel — la réponse JSON du modèle était incomplète.</p>`
+  const isPartial = Boolean(b.outputPartial);
+  const partialAmb = (b.ambiguities || []).find((a) => a.question?.trim() === "Brief partiel");
+  const partialDetail = partialAmb?.whyItMatters?.trim();
+  const partial = isPartial
+    ? `<div class="inbox-brief-partial" role="status">
+        <p class="thread-zen-par"><strong>Brief partiel — ne pas traiter comme une analyse complète.</strong></p>
+        <p class="thread-zen-par dim">${escapeHtml(
+          partialDetail ||
+            "La réponse JSON du modèle était incomplète et a été tronquée. Les éléments absents ne figurent pas ici.",
+        )}</p>
+      </div>`
     : "";
   const verif = b.verificationRecommended
     ? `<p class="thread-zen-par dim" role="status">Vérification recommandée</p>`
     : "";
   const skills =
     b.executedSkills && b.executedSkills.length ?
-      `<p class="thread-zen-par dim inbox-brief-skills">Pipeline : ${escapeHtml(b.executedSkills.join(" → "))}</p>`
+      `<p class="thread-zen-par dim inbox-brief-skills">Pipeline : ${escapeHtml(b.executedSkills.join(" → "))}${
+        isPartial ? " · sortie coupée avant fin de vérification" : ""
+      }</p>`
     : "";
 
   const sec = (title: string, inner: string) =>
-    `<section class="inbox-brief-section"><div class="thread-kicker">${escapeHtml(title)}</div>${inner}</section>`;
+    `<section class="inbox-brief-section${isPartial ? " inbox-brief-section--partial" : ""}"><div class="thread-kicker">${escapeHtml(title)}</div>${inner}</section>`;
 
   const changesBody =
     (b.changes || [])
@@ -40,7 +57,7 @@ export function renderActionBriefHtml(b: ActionBriefResult): string {
           `<p class="thread-zen-par">${escapeHtml(c.summary || "")}</p>${ev}`,
         );
       })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
+      .join("") || emptySectionPlaceholder(isPartial);
 
   const decisionsBody =
     [...(b.decisions || [])]
@@ -57,7 +74,7 @@ export function renderActionBriefHtml(b: ActionBriefResult): string {
           ${optsHtml}${briefEvidenceButtons(d.evidenceLinks || [])}`,
         );
       })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
+      .join("") || emptySectionPlaceholder(isPartial);
 
   const actionsBody =
     [...(b.recommendedActions || [])]
@@ -71,7 +88,7 @@ export function renderActionBriefHtml(b: ActionBriefResult): string {
           ${briefEvidenceButtons(a.evidenceLinks || [])}`,
         );
       })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
+      .join("") || emptySectionPlaceholder(isPartial);
 
   const risksBody =
     (b.risks || [])
@@ -83,7 +100,7 @@ export function renderActionBriefHtml(b: ActionBriefResult): string {
           ${briefEvidenceButtons(r.evidenceLinks || [])}`,
         );
       })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
+      .join("") || emptySectionPlaceholder(isPartial);
 
   const ambBody =
     (b.ambiguities || [])
@@ -94,10 +111,12 @@ export function renderActionBriefHtml(b: ActionBriefResult): string {
           ${briefEvidenceButtons(a.evidenceLinks || [])}`,
         );
       })
-      .join("") || `<p class="thread-zen-par dim">—</p>`;
+      .join("") || emptySectionPlaceholder(isPartial);
 
   const inner = `
-    <p class="thread-zen-par dim inbox-brief-meta">Confiance ${confPct}% · priorité <strong>${bucket}</strong>${mode ? ` · mode ${mode}` : ""}</p>
+    <p class="thread-zen-par dim inbox-brief-meta">Confiance ${confPct}% · priorité <strong>${bucket}</strong>${mode ? ` · mode ${mode}` : ""}${
+      isPartial ? " · <strong>partiel</strong>" : ""
+    }</p>
     ${partial}
     ${verif}
     ${sec("Ce qui change", changesBody)}
@@ -106,5 +125,5 @@ export function renderActionBriefHtml(b: ActionBriefResult): string {
     ${sec("Risques & engagements", risksBody)}
     ${sec("Ambiguïtés", ambBody)}
     ${skills}`;
-  return renderBriefMailViewShell(inner, { kicker: "Brief d’action" });
+  return renderBriefMailViewShell(inner, { kicker: isPartial ? "Brief d’action (partiel)" : "Brief d’action" });
 }

@@ -24,7 +24,12 @@ function brief(outputPartial: boolean): ActionBriefResult {
 
 describe("renderActionBriefHtml", () => {
   it("signale un brief dont le JSON a été réparé", () => {
-    expect(renderActionBriefHtml(brief(true))).toContain("Brief partiel");
+    const html = renderActionBriefHtml(brief(true));
+    expect(html).toContain("Brief partiel");
+    expect(html).toContain("ne pas traiter comme une analyse complète");
+    expect(html).toContain("Non disponible — JSON tronqué");
+    expect(html).toContain("Brief d’action (partiel)");
     expect(renderActionBriefHtml(brief(false))).not.toContain("Brief partiel");
+    expect(renderActionBriefHtml(brief(false))).not.toContain("JSON tronqué");
   });
 });

@@ -7,4 +7,8 @@ export const micDictationCtx = {
   micStream: null as MediaStream | null,
   micDictationTarget: "compose" as MicDictationTarget,
   micPttKeyHeld: false,
+  /** Empêche un second start pendant getUserMedia / MediaRecorder. */
+  startInFlight: false,
+  /** Empêche un double stop → double invoke Whisper. */
+  stopInFlight: false,
 };

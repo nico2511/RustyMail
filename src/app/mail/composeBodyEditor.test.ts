@@ -165,4 +165,20 @@ describe("éditeur TipTap du compositeur", () => {
     expect(state.composeGrammarSuggestions).toHaveLength(1);
     expect(state.draft?.markdownBody).toContain("bb puis aa");
   });
+
+  it("surligne les suggestions et applique l’occurrence cliquée", async () => {
+    const { refreshComposeGrammarHighlights } = await import("./composeGrammarHighlights");
+    const host = mount("aa puis aa");
+    state.composeGrammarSuggestions = [{ reason: "x", original: "aa", replacement: "bb" }];
+    refreshComposeGrammarHighlights();
+    const marks = host.querySelectorAll(".compose-grammar-mark");
+    expect(marks.length).toBe(2);
+    const second = marks[1] as HTMLElement;
+    expect(second.dataset.plainStart).toBeTruthy();
+    applyComposeGrammarSuggestionAtIndex(0, {
+      start: Number(second.dataset.plainStart),
+      end: Number(second.dataset.plainEnd),
+    });
+    expect(readComposePlainText()).toBe("aa puis bb");
+  });
 });

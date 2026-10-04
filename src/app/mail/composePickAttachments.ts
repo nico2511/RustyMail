@@ -6,6 +6,10 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { markComposeDraftEdited } from "./composeDraftContentKey";
+import {
+  MAX_COMPOSE_ATTACHMENTS,
+  syncComposeAttachmentsHiddenField,
+} from "./composeAttachmentPaths";
 
 export type ComposePickAttachmentsDeps = {
   scheduleDraftRevisionSave: (delayMs?: number) => void;
@@ -29,8 +33,13 @@ export async function pickAttachments(): Promise<void> {
     const picked = await withTimeout(invoke<string[]>("pick_attachment_paths", {}), MAIL_ACTION_TIMEOUT_MS);
     if (!picked.length) return;
     const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...picked]));
+    if (merged.length > MAX_COMPOSE_ATTACHMENTS) {
+      toast.warning(`Maximum ${MAX_COMPOSE_ATTACHMENTS} pièces jointes par message.`);
+      return;
+    }
     state.draft.attachmentPaths = merged;
     markComposeDraftEdited();
+    syncComposeAttachmentsHiddenField(merged);
     toast.success(`${picked.length} pièce(s) jointe(s) ajoutée(s).`);
     render();
     d.scheduleDraftRevisionSave(250);

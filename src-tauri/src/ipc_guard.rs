@@ -21,9 +21,10 @@ const MAX_DICTATION_BASE64_LEN: usize = 32 * 1024 * 1024;
 const MAX_FILE_NAME_LEN: usize = 255;
 const MAX_MIME_TYPE_LEN: usize = 128;
 const MAX_DRAFT_SUBJECT_LEN: usize = 998;
-/// Texte du brouillon une fois les images `data:` extraites en CID.
-/// Un corps sans ces images, réellement plus long, est encore refusé.
-const MAX_DRAFT_BODY_LEN: usize = 512 * 1024;
+/// Corps HTML + images data URL compressées (plafond global).
+const MAX_DRAFT_BODY_LEN: usize = 10 * 1024 * 1024;
+/// Par image intégrée (payload décodé approximatif).
+const MAX_INLINE_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_DRAFT_RECIPIENTS: usize = 200;
 const MAX_DRAFT_ATTACHMENTS: usize = 50;
 const MAX_DRAFT_ATTACHMENT_PATH_LEN: usize = 4_096;
@@ -335,6 +336,43 @@ pub fn validate_dictation_payload(
     Ok(())
 }
 
+fn decoded_data_url_payload_len(data_url: &str) -> usize {
+    let Some((_, b64)) = data_url.split_once(',') else {
+        return data_url.len();
+    };
+    let compact: String = b64.chars().filter(|c| !c.is_whitespace()).collect();
+    let padding = if compact.ends_with("==") {
+        2
+    } else if compact.ends_with('=') {
+        1
+    } else {
+        0
+    };
+    compact.len().saturating_mul(3) / 4 - padding
+}
+
+fn reject_oversized_inline_images(body: &str) -> Result<(), String> {
+    // HTML: src="data:image/...;base64,..."
+    let mut rest = body;
+    while let Some(idx) = rest.find("data:image/") {
+        let slice = &rest[idx..];
+        let end = slice
+            .find(|c: char| c == '"' || c == '\'' || c == ')' || c.is_whitespace())
+            .unwrap_or(slice.len());
+        let url = &slice[..end];
+        if url.contains(";base64,") {
+            let bytes = decoded_data_url_payload_len(url);
+            if bytes > MAX_INLINE_IMAGE_BYTES {
+                return Err(format!(
+                    "draft.markdownBody: image intégrée trop volumineuse (max {MAX_INLINE_IMAGE_BYTES} octets)."
+                ));
+            }
+        }
+        rest = &slice[url.len().max(1)..];
+    }
+    Ok(())
+}
+
 pub fn validate_draft_for_ipc(draft: &Draft) -> Result<(), String> {
     validate_nonempty_trimmed("draft.id", &draft.id.0, MAX_TOKEN_LEN)?;
     reject_nul("draft.subject", &draft.subject)?;
@@ -345,6 +383,7 @@ pub fn validate_draft_for_ipc(draft: &Draft) -> Result<(), String> {
         &draft.markdown_body,
         MAX_DRAFT_BODY_LEN,
     )?;
+    reject_oversized_inline_images(&draft.markdown_body)?;
     if draft.to.len() + draft.cc.len() + draft.bcc.len() > MAX_DRAFT_RECIPIENTS {
         return Err(format!(
             "draft.recipients: trop de destinataires (max {MAX_DRAFT_RECIPIENTS})."
@@ -545,7 +584,7 @@ mod tests {
         let body = "a".repeat(MAX_DRAFT_BODY_LEN + 1);
         let err = validate_draft_for_ipc(&sample_draft(&body)).unwrap_err();
         assert!(err.contains("draft.markdownBody"), "{err}");
-        assert!(err.contains("524288"), "{err}");
+        assert!(err.contains(&MAX_DRAFT_BODY_LEN.to_string()), "{err}");
     }
 
     #[test]

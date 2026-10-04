@@ -18,6 +18,13 @@ const TRANSACTIONAL_RX: &[&str] = &[
     "commande",
     "order",
     "receipt",
+    "ticket",
+    "caisse",
+    "justificatif",
+    "proof of purchase",
+    "achat",
+    "purchase",
+    "billing",
 ];
 
 /// Préfixes courants d’expéditeurs transactionnels (partie locale avant `@`).
@@ -105,6 +112,16 @@ pub fn sender_is_transactional(email: &str, subject: &str) -> bool {
     let sender_signal = local_part_matches_transactional(&local);
     let subject_signal = subject_has_transactional_keywords(subject);
     sender_signal && subject_signal
+}
+
+/// Sujet qui ressemble à un reçu / ticket / facture (protection corbeille Organiser).
+pub fn subject_looks_transactional(subject: &str) -> bool {
+    subject_has_transactional_keywords(subject)
+}
+
+/// Ne pas proposer la corbeille Organiser pour ces fils (reçus, tickets, factures…).
+pub fn protect_from_org_trash(email: &str, subject: &str) -> bool {
+    sender_is_transactional(email, subject) || subject_looks_transactional(subject)
 }
 
 /// Expéditeur « noreply-like » (automatique).
@@ -295,6 +312,15 @@ mod tests {
         assert!(sender_is_transactional(
             "billing@shop.example",
             "Your invoice #42"
+        ));
+    }
+
+    #[test]
+    fn ticket_de_caisse_is_protected_from_org_trash() {
+        assert!(subject_looks_transactional("Votre ticket de caisse — Magasin"));
+        assert!(protect_from_org_trash(
+            "info@magasin.example",
+            "Votre ticket de caisse — Magasin"
         ));
     }
 }

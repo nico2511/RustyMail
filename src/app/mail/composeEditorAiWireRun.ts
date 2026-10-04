@@ -2,7 +2,10 @@ import { composeRewriteStyleFromTone } from "../core/composeTone";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { composeAiGrammar, composeAiRewrite } from "./composeAiWireActions";
-import { applyComposeGrammarSuggestionAtIndex } from "./composeWireActionsRun";
+import {
+  applyComposeGrammarSuggestionAllAtIndex,
+  applyComposeGrammarSuggestionAtIndex,
+} from "./composeWireActionsRun";
 
 export async function tryHandleComposeEditorAiWire(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -24,6 +27,11 @@ export async function tryHandleComposeEditorAiWire(action: string, element?: HTM
     case "compose-grammar-apply": {
       const gi = Number(element?.dataset.grammarI ?? "");
       applyComposeGrammarSuggestionAtIndex(gi);
+      return true;
+    }
+    case "compose-grammar-apply-all": {
+      const gi = Number(element?.dataset.grammarI ?? "");
+      applyComposeGrammarSuggestionAllAtIndex(gi);
       return true;
     }
     default:

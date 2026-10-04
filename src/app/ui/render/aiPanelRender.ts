@@ -324,7 +324,7 @@ export function renderAiPanel() {
             </div>
           `
           : `
-            <div class="details-block details-block-muted">
+            <div class="details-block details-block-empty" role="status">
               <p class="dim" style="margin:0;line-height:1.5;font-size:12px">
                 Les détails du fil et les actions associées sont disponibles après ouverture d’une conversation.
               </p>

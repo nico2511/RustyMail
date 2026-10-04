@@ -14,6 +14,15 @@ export function isInboxLikeMailbox(name: string): boolean {
   return n === "inbox" || /^inbox\b/.test(n) || n.endsWith("/inbox");
 }
 
+/** Gmail « All Mail » / « Tous les messages » — pas un dossier Archive. */
+export function isAllMailLikeMailbox(name: string): boolean {
+  const n = String(name ?? "")
+    .trim()
+    .toLowerCase();
+  if (!n) return false;
+  return n.includes("all mail") || n.includes("tous les messages");
+}
+
 export function mailboxKind(name: string): MailboxKind | null {
   const raw = String(name ?? "").trim();
   if (!raw) return null;
@@ -21,7 +30,9 @@ export function mailboxKind(name: string): MailboxKind | null {
   if (isInboxLikeMailbox(raw)) return "inbox";
   if (/(draft)/.test(n)) return "drafts";
   if (/(sent|sent items|outbox)/.test(n)) return "sent";
-  if (/(archive|all mail|tous les messages)/.test(n)) return "archive";
+  // All Mail n’est pas « Archive » : sinon le rail Gmail affiche tout le corpus.
+  if (isAllMailLikeMailbox(raw)) return null;
+  if (/(archive)/.test(n)) return "archive";
   if (/(junk|spam|indésirable|indesirable)/.test(n)) return "spam";
   if (/(trash|deleted items|deleted|bin|corbeille|poubelle)/.test(n)) return "trash";
   return null;
@@ -70,6 +81,7 @@ export function threadMailboxListLabel(raw: string | undefined): { label: string
   if (full === UNIFIED_INBOX_MAILBOX) {
     return { label: "Tous les comptes", full: UNIFIED_INBOX_MAILBOX };
   }
+  if (isAllMailLikeMailbox(full)) return { label: "Tous les messages", full };
   const k = mailboxKind(full);
   if (k === "inbox") return { label: "Réception", full };
   if (k === "drafts") return { label: "Brouillon", full };
@@ -90,7 +102,7 @@ export function pickSystemMailboxes(all: string[]): Array<{ kind: MailboxKind; n
   const order: MailboxKind[] = ["inbox", "drafts", "sent", "archive", "spam", "trash"];
   const picked: Array<{ kind: MailboxKind; name: string }> = [];
   for (const kind of order) {
-    const match = all.find((mb) => mailboxKind(mb) === kind);
+    const match = all.find((mb) => mailboxKind(mb) === kind && !isAllMailLikeMailbox(mb));
     if (match && !seen.has(match)) {
       seen.add(match);
       picked.push({ kind, name: match });

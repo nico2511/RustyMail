@@ -7,10 +7,13 @@ export type AppShellScrollSnapshot = {
   orgTop: number;
   aiModalTop: number;
   hadAiModal: boolean;
+  settingsBodyTop: number;
+  hadSettingsBody: boolean;
 };
 
 export function snapshotAppShellScroll(): AppShellScrollSnapshot {
   const prevFolderList = document.querySelector<HTMLElement>(".folder-list");
+  const settingsBody = document.querySelector<HTMLElement>(".settings-body");
   return {
     sidebarTop: prevFolderList?.scrollTop ?? 0,
     sidebarLeft: prevFolderList?.scrollLeft ?? 0,
@@ -19,6 +22,8 @@ export function snapshotAppShellScroll(): AppShellScrollSnapshot {
       ? (document.querySelector<HTMLElement>(".settings-ai-modal-body")?.scrollTop ?? 0)
       : 0,
     hadAiModal: Boolean(state.settingsAiModal),
+    settingsBodyTop: state.view === "settings" ? (settingsBody?.scrollTop ?? 0) : 0,
+    hadSettingsBody: state.view === "settings" && Boolean(settingsBody),
   };
 }
 
@@ -38,6 +43,12 @@ export function restoreScrollAfterRender(prev: AppShellScrollSnapshot): void {
   if (nextAiModalBody && prev.aiModalTop > 0) {
     nextAiModalBody.scrollTop = prev.aiModalTop;
   }
+  const nextSettingsBody = prev.hadSettingsBody
+    ? document.querySelector<HTMLElement>(".settings-body")
+    : null;
+  if (nextSettingsBody && prev.settingsBodyTop > 0) {
+    nextSettingsBody.scrollTop = prev.settingsBodyTop;
+  }
   window.requestAnimationFrame(() => {
     navApplyPendingScrollRestore();
     if (nextOrgPanel && prev.orgTop > 0) {
@@ -45,6 +56,9 @@ export function restoreScrollAfterRender(prev: AppShellScrollSnapshot): void {
     }
     if (nextAiModalBody && prev.aiModalTop > 0) {
       nextAiModalBody.scrollTop = prev.aiModalTop;
+    }
+    if (nextSettingsBody && prev.settingsBodyTop > 0) {
+      nextSettingsBody.scrollTop = prev.settingsBodyTop;
     }
   });
 }

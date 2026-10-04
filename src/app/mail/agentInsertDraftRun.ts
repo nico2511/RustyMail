@@ -9,11 +9,11 @@ import type { Draft } from "../types";
 import { appendSchedulingSlotsToDraft } from "./agentSchedulingDraftFormat";
 import {
   computePreview,
-  loadComposeMarkdownIntoEditor,
   resetMarkdownEditorHistory,
   scheduleDraftRevisionSave,
 } from "./composeComposerBridge";
 import { markComposeDraftEdited } from "./composeDraftContentKey";
+import { replaceComposeWithModelText } from "./composeBodyEditor";
 import { draftHasRecipientsExtra } from "./composeDraftRecipients";
 import { startNewDraftSession } from "./composeDraftSession";
 import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
@@ -55,7 +55,8 @@ export async function agentInsertDraftIntoCompose(extra?: string): Promise<void>
     state.draft = replyDraft;
     enterComposeView();
     startNewDraftSession();
-    loadComposeMarkdownIntoEditor(body);
+    // Même chemin TipTap que rewrite/grammar (HTML marqué), pas load markdown brut.
+    replaceComposeWithModelText(body);
     state.composeCcBccOpen = draftHasRecipientsExtra(state.draft);
     state.composeAdvancedOpen = false;
     state.composeLayout = "split";

@@ -1,12 +1,15 @@
 import type { AppPrefs } from "./prefs_defaults";
-import { defaultAppPrefs } from "./prefs_defaults";
 
 export function captureAppearanceFieldsFromDom(target: AppPrefs): void {
-  const d = defaultAppPrefs().general;
+  // Ne mettre à jour un champ que si son contrôle est monté (ex. onglet Apparence).
+  // Sur l’onglet IA, `#prefs-color-scheme` est absent : un fallback sur le défaut
+  // « light » écraserait un thème sombre déjà enregistré (bug « Tester la connexion »).
   const schemeSel = document.querySelector<HTMLSelectElement>("#prefs-color-scheme");
-  const rawScheme = schemeSel?.value?.trim() ?? d.colorScheme ?? "light";
-  target.general.colorScheme =
-    rawScheme === "dark" || rawScheme === "system" || rawScheme === "light" ? rawScheme : "light";
+  if (schemeSel) {
+    const rawScheme = schemeSel.value?.trim() ?? "light";
+    target.general.colorScheme =
+      rawScheme === "dark" || rawScheme === "system" || rawScheme === "light" ? rawScheme : "light";
+  }
 
   const sessionCb = document.querySelector<HTMLInputElement>("#prefs-session-comfort");
   if (sessionCb) target.general.sessionComfort = Boolean(sessionCb.checked);

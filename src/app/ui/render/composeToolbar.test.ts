@@ -93,6 +93,7 @@ describe("barre du compositeur", () => {
 
   it("filet d’état sur le ton choisi", () => {
     const html = renderComposeToolbar({ ...base, tone: "Empathetic" });
+    expect(html).toContain("Réécrire tout de suite en ton");
     const selected = openTag(html, 'data-tone="Empathetic"');
     const other = openTag(html, 'data-tone="Professional"');
     expect(selected).toContain("active");

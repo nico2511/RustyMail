@@ -44,7 +44,11 @@ export async function llmQuickRepliesThreadUi() {
     if (signal.aborted) return;
     state.quickReplySuggestions = res.suggestions ?? [];
     state.aiThreadScope = String(threadId);
-    toast.success("Réponses rapides prêtes.");
+    if (state.quickReplySuggestions.length) {
+      toast.success("Réponses rapides prêtes.");
+    } else {
+      toast.warning("Aucune réponse rapide proposée pour ce fil.");
+    }
     render();
   });
   if (ran === null) return;
