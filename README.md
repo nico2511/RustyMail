@@ -2,11 +2,11 @@
 
 RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI (summaries, rewrite, translation, grammar, dictation, semantic search) runs on-device or over HTTP to OpenRouter / llama-server — never required for core mail.
 
-**0.3.5** builds on TipTap compose and conversational reading with post-usage fixes: Correction apply + live highlights, Gmail Trash/Archive, image/PJ limits, dictation stability, Organiser Affiner, Action Brief partial JSON, split-send, and appearance polish. Free image width and digest-cut mailbox load from [#46](https://github.com/nico2511/RustyMail/pull/46) / [#47](https://github.com/nico2511/RustyMail/pull/47) ship here (version kept at **0.3.5**, not 0.4.0).
+**0.3.6** patches post-usage issues on top of 0.3.5: Organiser empty-folder LLM cards, digest-cut Proposer for real mailbox mail, inline image compression before send, and image size controls via right-click ([#53](https://github.com/nico2511/RustyMail/pull/53)).
 
 ## Screenshots
 
-UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.5 build (compose in the app uses TipTap, not the mockup’s markdown field).
+UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.6 build (compose in the app uses TipTap, not the mockup’s markdown field).
 
 **Inbox** — unified list, charcoal rail, account labels.
 
