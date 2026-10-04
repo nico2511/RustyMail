@@ -267,10 +267,7 @@ fn inject_digest_cut_defaults(value: &mut Value, default_fixture_id: &str, domai
             _ => false,
         };
         if domains_missing {
-            match_obj.insert(
-                "senderDomains".into(),
-                json!([{ "exact": domain }]),
-            );
+            match_obj.insert("senderDomains".into(), json!([{ "exact": domain }]));
         }
     }
 }
@@ -356,9 +353,7 @@ fn validate_digest_cut_dto(dto: &DigestCutDto) -> Result<(), LlmError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        inject_digest_cut_defaults, response_is_empty_json, validate_digest_cut_dto,
-    };
+    use super::{inject_digest_cut_defaults, response_is_empty_json, validate_digest_cut_dto};
     use crate::mail_cleaning::digest_fixtures::proposal::proposal_to_fixture_yaml;
     use crate::mail_cleaning::digest_fixtures::{set_installed_reading_fixture, ZoneAction};
     use serde_json::json;
