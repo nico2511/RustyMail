@@ -59,3 +59,25 @@ impl MailSecuritySignals {
         }
     }
 }
+
+/// Contexte message fourni au LLM sécurité (corps / liens / PJ), en plus des signaux heuristiques.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MailSecurityLlmContext {
+    #[serde(default)]
+    pub subject: String,
+    #[serde(default)]
+    pub from_name: String,
+    #[serde(default)]
+    pub from_email: String,
+    #[serde(default)]
+    pub reply_to: Vec<String>,
+    /// Extrait du corps (texte) — tronqué côté appelant.
+    #[serde(default)]
+    pub body_excerpt: String,
+    #[serde(default)]
+    pub attachment_names: Vec<String>,
+    /// Hôtes de liens visibles (sans schéma), dédupliqués.
+    #[serde(default)]
+    pub link_hosts: Vec<String>,
+}

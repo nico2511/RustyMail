@@ -23,6 +23,8 @@ import {
   LLM_META_REWRITE_TOAST,
 } from "./llmMetaGuard";
 import { withLlmQueue } from "./llmJobQueue";
+import { setPendingDraftRevisionEventKind } from "./composeDraftRevisionEventKind";
+import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 
 function composeAiStillOnSameDraft(sessionId: string | null, sourcePlain: string): boolean {
   return state.view === "compose" && state.draftSessionId === sessionId && readComposePlainText() === sourcePlain;
@@ -59,10 +61,18 @@ export async function composeAiRewrite(styleRaw: string): Promise<void> {
         toast.error(LLM_META_REWRITE_TOAST);
         return;
       }
+      const kind =
+        style.trim().toLowerCase() === "concise"
+          ? "shorten"
+          : ["formal", "casual", "assertive", "polite"].includes(style.trim().toLowerCase())
+            ? "tone"
+            : "rewrite";
+      setPendingDraftRevisionEventKind(kind);
       replaceComposeWithModelText(rewritten);
       toast.success(`Texte réécrit (${styleLabel}).`);
       render();
       void computePreview();
+      scheduleDraftRevisionSave(200);
     } catch (e) {
       if (signal.aborted) return;
       toast.error(tauriErrorMessage(e));

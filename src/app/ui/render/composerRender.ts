@@ -5,6 +5,10 @@ import { renderComposeToolbar } from "./composeToolbarRender";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { composeSourcePlainText } from "../../mail/composeHtmlBody";
 import { summarizeDraftDiffLines } from "../../mail/composeDraftRevisionDiffAlgoRun";
+import {
+  draftRevisionEventKindLabelFr,
+  formatCharsDelta,
+} from "../../mail/composeDraftRevisionEventKind";
 import { grammarOccurrenceCount, retainGrammarSuggestionsInText } from "../../mail/composeGrammarReplace";
 import { state } from "../../state";
 import type { Draft, MicDictationTarget } from "../../types";
@@ -32,7 +36,13 @@ function renderComposerHistoriquePane(): string {
     revs.length ?
       revs
         .map((rev, i) => {
-          const kind = i === 0 ? "Dernier enregistrement" : "Snapshot auto";
+          const eventLabel = draftRevisionEventKindLabelFr(rev.eventKind);
+          const kind = i === 0 ? `${eventLabel} · dernier` : eventLabel;
+          const delta = formatCharsDelta(rev.charsDelta);
+          const heavy =
+            Math.abs(Number(rev.charsDelta ?? 0)) >= 80
+              ? " composer-history-pane__delta--heavy"
+              : "";
           const active = state.draftDiffRevisionId === rev.id;
           return `<li class="composer-history-pane__rev${active ? " is-active" : ""}">
               <button type="button" class="composer-history-pane__icon-action" data-action="compare-draft-revision" data-revision-id="${escapeAttr(rev.id)}" title="Comparer avec le brouillon actuel">
@@ -43,6 +53,7 @@ function renderComposerHistoriquePane(): string {
               </button>
               <span class="composer-history-pane__meta">
                 <span class="composer-history-pane__kind">${escapeHtml(kind)}</span>
+                <span class="composer-history-pane__delta${heavy}" title="Variation de longueur">${escapeHtml(delta)} car.</span>
                 <span class="composer-history-pane__stamp dim">${escapeHtml(renderDeps().formatDraftRevisionStamp(rev.createdAt))}</span>
               </span>
             </li>`;
@@ -113,7 +124,7 @@ function renderComposerHistoriquePane(): string {
       : !state.draftDiffRevisionId && n > 0 && !expanded
         ? `<p class="composer-history-pane__microhint dim">Liste repliée — ouvrir pour choisir une version (⇄ comparer).</p>`
         : n > 0 && !state.draftDiffRevisionId && expanded
-          ? `<p class="composer-history-pane__microhint dim">⇄ comparer · ↩ restaurer · type + horodatage</p>`
+          ? `<p class="composer-history-pane__microhint dim">⇄ comparer · ↩ restaurer · type d’événement · ± caractères</p>`
           : "";
 
   return `<aside class="composer-history-pane" aria-label="Historique du brouillon">

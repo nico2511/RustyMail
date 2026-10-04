@@ -15,9 +15,11 @@ import {
   scheduleDraftRevisionSave,
 } from "./composeComposerBridge";
 import { markComposeDraftEdited } from "./composeDraftContentKey";
+import { setPendingDraftRevisionEventKind } from "./composeDraftRevisionEventKind";
 import { computeDraftDiffAgainstRevision } from "./composeDraftRevisionDiff";
 import { refreshDraftRevisions } from "./composeDraftRevisions";
 import { enterComposeView, syncPreviewOpenFromComposeLayout } from "./composeViewWireActions";
+import { syncComposeAttachmentsHiddenField } from "./composeAttachmentPaths";
 
 export async function restoreDraftRevisionFromWire(revisionId: string): Promise<void> {
   if (!isTauriRuntime()) return;
@@ -41,6 +43,8 @@ export async function restoreDraftRevisionFromWire(revisionId: string): Promise<
       return;
     }
     state.draft = restored;
+    state.draft.attachmentPaths = [...(restored.attachmentPaths ?? [])];
+    syncComposeAttachmentsHiddenField(state.draft.attachmentPaths);
     loadComposeMarkdownIntoEditor(restored.markdownBody);
     enterComposeView({ skipHistory: true });
     state.composeLayout = wasHistoriqueLayout ? "historique" : "split";
@@ -54,6 +58,7 @@ export async function restoreDraftRevisionFromWire(revisionId: string): Promise<
       window.setTimeout(() => void computePreview(), 0);
     }
     markComposeDraftEdited();
+    setPendingDraftRevisionEventKind("restore");
     scheduleDraftRevisionSave(450);
   } catch (error) {
     console.error("draft_revision_restore", error);

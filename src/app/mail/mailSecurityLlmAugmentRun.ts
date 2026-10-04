@@ -5,6 +5,7 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import type { CleanedMessageView, MailSecuritySignals } from "../types";
 import { state } from "../state";
 import { defaultMailSecuritySignals } from "./mailSecurityDefaultsRun";
+import { buildMailSecurityLlmContext } from "./mailSecurityLlmContextRun";
 
 const securityLlmAugmentBusy: Record<string, boolean> = {};
 const securityLlmAugmentCache: Record<string, MailSecuritySignals> = {};
@@ -69,8 +70,9 @@ export function scheduleSecurityLlmAugment(message: CleanedMessageView): void {
   securityLlmAugmentBusy[mid] = true;
   void (async () => {
     try {
+      const context = buildMailSecurityLlmContext(message, state.selectedThread?.subject);
       const augmented = await invoke<MailSecuritySignals>("llm_security_signals_augment", {
-        payload: base,
+        payload: { signals: base, context },
       });
       securityLlmAugmentCache[mid] = augmented;
     } catch {

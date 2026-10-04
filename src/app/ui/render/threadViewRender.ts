@@ -443,8 +443,8 @@ function renderMailSecurityPop(message: CleanedMessageView, opts?: { compact?: b
   const label = ms.severity === "attention" ? t("security.attention") : t("security.suspicion");
   const chipClass =
     ms.severity === "attention" ? "mail-security-hit--attention" : "mail-security-hit--suspicion";
-  const hasLlmHint =
-    Boolean(ms.llmBudget) || (ms.findings?.some((f) => f.kind === "llmIntent") ?? false);
+  // Badge IA seulement s’il y a un finding d’intention réel (pas un budget cosmétique).
+  const hasLlmHint = ms.findings?.some((f) => f.kind === "llmIntent") ?? false;
   const iaPill = hasLlmHint
     ? `<span class="mail-security-ia-pill" title="${escapeAttr(t("security.iaHint"))}">IA</span>`
     : "";

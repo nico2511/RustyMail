@@ -678,14 +678,22 @@ fn draft_revision_save(
     account_id: String,
     session_id: String,
     draft: Draft,
-) -> Result<Option<String>, String> {
+    event_kind: Option<String>,
+) -> Result<rustymail_infrastructure::DraftRevisionSaveResult, String> {
     ipc_guard::validate_account_id(&account_id)?;
     ipc_guard::validate_session_token("sessionId", &session_id)?;
+    let data_dir = paths
+        .db_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
     rustymail_infrastructure::sqlite_draft_revision_save(
         &paths.db_path,
+        &data_dir,
         account_id.trim(),
         session_id.trim(),
         &draft,
+        event_kind.as_deref().unwrap_or("edit"),
         DRAFT_REVISIONS_KEEP_LAST,
     )
 }

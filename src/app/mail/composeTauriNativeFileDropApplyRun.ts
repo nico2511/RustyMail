@@ -5,7 +5,9 @@ import {
   MAX_COMPOSE_ATTACHMENTS,
   syncComposeAttachmentsHiddenField,
 } from "./composeAttachmentPaths";
+import { markComposeDraftEdited } from "./composeDraftContentKey";
 import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
+import { setPendingDraftRevisionEventKind } from "./composeDraftRevisionEventKind";
 
 export function tauriCurrentWebviewLabel(): string | undefined {
   try {
@@ -45,6 +47,8 @@ export function applyNativeDroppedFilePaths(dropped: string[]): void {
     return;
   }
   state.draft.attachmentPaths = merged;
+  markComposeDraftEdited();
+  setPendingDraftRevisionEventKind("attachments");
   syncComposeAttachmentsHiddenField(merged);
   toast.success(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
   render();

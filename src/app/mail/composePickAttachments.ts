@@ -10,6 +10,7 @@ import {
   MAX_COMPOSE_ATTACHMENTS,
   syncComposeAttachmentsHiddenField,
 } from "./composeAttachmentPaths";
+import { setPendingDraftRevisionEventKind } from "./composeDraftRevisionEventKind";
 
 export type ComposePickAttachmentsDeps = {
   scheduleDraftRevisionSave: (delayMs?: number) => void;
@@ -39,6 +40,7 @@ export async function pickAttachments(): Promise<void> {
     }
     state.draft.attachmentPaths = merged;
     markComposeDraftEdited();
+    setPendingDraftRevisionEventKind("attachments");
     syncComposeAttachmentsHiddenField(merged);
     toast.success(`${picked.length} pièce(s) jointe(s) ajoutée(s).`);
     render();
