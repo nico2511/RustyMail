@@ -1,5 +1,5 @@
 import { Editor, Extension } from "@tiptap/core";
-import Image from "@tiptap/extension-image";
+import { ComposeImage, selectComposeImageSrc } from "./composeImage";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Table from "@tiptap/extension-table";
@@ -362,7 +362,7 @@ export function mountComposeBodyEditor(host: HTMLElement): void {
           linkOnPaste: true,
           HTMLAttributes: { rel: "noopener noreferrer" },
         }),
-        Image.configure({ inline: true, allowBase64: true }),
+        ComposeImage.configure({ inline: true, allowBase64: true }),
         Placeholder.configure({ placeholder: "Écrire le message…" }),
         Table.configure({ resizable: false }),
         TableRow,

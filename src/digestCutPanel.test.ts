@@ -1,11 +1,20 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { handleDigestCutAction } from "./app/mail/digestCutActions";
+import { handleDigestCutAction, importDigestCutEmlBase64 } from "./app/mail/digestCutActions";
 import { digestCut } from "./app/mail/digestCutState";
 import { renderDigestCutPanel } from "./app/ui/render/digestCutRender";
+import { state } from "./app/state";
 
 beforeEach(() => {
-  digestCut.sampleLoaded = false;
+  digestCut.sourceKind = "none";
+  digestCut.queryDraft = "";
+  digestCut.searching = false;
+  digestCut.searchError = "";
+  digestCut.threads = [];
+  digestCut.selectedThreadId = null;
+  digestCut.threadSubject = "";
+  digestCut.messages = [];
+  digestCut.selectedMessageId = null;
   digestCut.html = "";
   digestCut.senderEmail = "";
   digestCut.subject = "";
@@ -17,68 +26,135 @@ beforeEach(() => {
   digestCut.previewApplicable = null;
   digestCut.previewHtml = "";
   digestCut.previewError = "";
+  digestCut.showCode = false;
   digestCut.notice = "";
+  state.selectedThread = undefined;
+  state.selectedAccountId = undefined;
+  state.accounts = [];
 });
 
 describe("renderDigestCutPanel", () => {
-  it("exposes propose, zone controls, and no reading enable switch", () => {
+  it("asks for a real mailbox mail and keeps HTML code secondary", () => {
     const html = renderDigestCutPanel();
     expect(html).toContain("Éditeur de découpe");
+    expect(html).toContain('data-action="digest-cut-search"');
+    expect(html).toContain('data-action="digest-cut-open-current"');
+    expect(html).toContain('id="digest-cut-eml"');
     expect(html).toContain('data-action="digest-cut-propose"');
-    expect(html).toContain('data-action="digest-cut-preview"');
-    expect(html).toContain('id="digest-cut-yaml"');
-    expect(html).not.toContain("digest-bench-enable");
+    expect(html).toContain('data-action="digest-cut-refine"');
+    expect(html).toContain("Llama 3.2");
     expect(html).toContain("ne l'active pas en lecture");
+    expect(html).not.toContain("digest-cut-load-sample");
+    expect(html).not.toContain("échantillon");
+    expect(html).not.toContain("Deblock");
+    expect(html).not.toContain('id="digest-cut-yaml"');
   });
 
-  it("renders zone toggles when a proposal exists", () => {
+  it("shows the French explanation and zone controls, and the YAML only when code is open", () => {
+    digestCut.sourceKind = "mailbox";
+    digestCut.subject = "Commande";
+    digestCut.senderEmail = "notes@exemple.fr";
+    digestCut.html = "<p>Bonjour</p>";
     digestCut.proposal = {
-      fixtureId: "deblock-com",
+      fixtureId: "exemple-fr",
       ruleSetVersion: "1",
       source: "heuristic",
+      explanationFr: "L'en-tête est affiché. Le pied est masqué.",
       match: {
-        senderDomains: [{ exact: "deblock.com" }],
-        structureRoot: "div.f-fallback",
-        minChildren: 3,
+        senderDomains: [{ exact: "exemple.fr" }],
+        structureRoot: "div.letter",
+        minChildren: 2,
       },
       zones: {
-        header: { action: "show", anchors: [{ selector: "h3", index: 0 }], rationale: "titre" },
+        header: { action: "show", anchors: [{ selector: "h1", index: 0 }], rationale: "titre" },
         body: { action: "show", anchors: [{ selector: "p", index: 0 }], rationale: "corps" },
-        footer: { action: "hide", anchors: [{ selector: "div", classContains: "warning" }], rationale: "pied" },
+        footer: { action: "hide", anchors: [{ selector: "div", classContains: "footer" }], rationale: "pied" },
       },
     };
     const html = renderDigestCutPanel();
+    expect(html).toContain("en-tête est affiché");
     expect(html).toContain('data-action="digest-cut-zone"');
-    expect(html).toContain("Masquer");
+    expect(html).toContain("En-tête");
+    expect(html).toContain("boîte");
+    expect(html).not.toContain('id="digest-cut-yaml"');
+    digestCut.showCode = true;
+    expect(renderDigestCutPanel()).toContain('id="digest-cut-yaml"');
   });
 });
 
 describe("handleDigestCutAction", () => {
-  it("updates zone action without calling reading enable", async () => {
+  it("updates zone action and the French explanation without enabling reading", async () => {
     digestCut.proposal = {
-      fixtureId: "deblock-com",
+      fixtureId: "exemple-fr",
       ruleSetVersion: "1",
       source: "heuristic",
+      explanationFr: "avant",
       match: {
-        senderDomains: [{ exact: "deblock.com" }],
-        structureRoot: "div.f-fallback",
-        minChildren: 3,
+        senderDomains: [{ exact: "exemple.fr" }],
+        structureRoot: "div.letter",
+        minChildren: 2,
       },
       zones: {
         header: { action: "show", anchors: [] },
         body: { action: "show", anchors: [] },
-        footer: { action: "hide", anchors: [] },
+        footer: { action: "show", anchors: [] },
       },
     };
     document.body.innerHTML = renderDigestCutPanel();
     const invokeMock = vi.fn();
     vi.stubGlobal("__TAURI_INTERNALS__", { invoke: invokeMock });
-    const hide = document.querySelector<HTMLElement>(
-      '[data-zone="footer"][data-zone-action="hide"]',
-    );
+    const hide = document.querySelector<HTMLElement>('[data-zone="footer"][data-zone-action="hide"]');
     expect(await handleDigestCutAction("digest-cut-zone", hide ?? undefined)).toBe(true);
     expect(digestCut.proposal?.zones.footer.action).toBe("hide");
+    expect(digestCut.proposal?.explanationFr).toContain("Pied masqué");
     expect(invokeMock).not.toHaveBeenCalledWith("digest_bench_enable_reading");
     vi.unstubAllGlobals();
+  });
+
+  it("refuses to propose before a mail is loaded", async () => {
+    expect(await handleDigestCutAction("digest-cut-propose")).toBe(true);
+    expect(digestCut.notice).toContain("boîte");
+    expect(digestCut.proposal).toBeNull();
+  });
+
+  it("explains how to open the mail already on screen", async () => {
+    expect(await handleDigestCutAction("digest-cut-open-current")).toBe(true);
+    expect(digestCut.notice).toContain("Ouvrez un mail");
+    expect(digestCut.html).toBe("");
+  });
+
+  it("loads the message currently open in the reader", async () => {
+    state.selectedThread = {
+      id: "t1",
+      subject: "Facture",
+      messages: [
+        {
+          messageId: "m1",
+          sender: "Shop",
+          senderEmail: "notes@exemple.fr",
+          receivedAt: "",
+          sourceText: "",
+          cleanedText: "",
+          htmlBody: "<p>Montant 12 EUR</p>",
+          attachments: [],
+          collapsedQuotes: [],
+          dimmedBlocks: [],
+          tags: [],
+          entities: [],
+        },
+      ],
+      tags: [],
+      entities: [],
+    };
+    expect(await handleDigestCutAction("digest-cut-open-current")).toBe(true);
+    expect(digestCut.sourceKind).toBe("open");
+    expect(digestCut.subject).toBe("Facture");
+    expect(digestCut.html).toContain("Montant 12 EUR");
+  });
+
+  it("does not import an eml outside the desktop app", async () => {
+    await importDigestCutEmlBase64("YQ==");
+    expect(digestCut.notice).toContain(".eml");
+    expect(digestCut.html).toBe("");
   });
 });
