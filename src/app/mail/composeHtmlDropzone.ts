@@ -3,6 +3,8 @@ import {
   syncComposeAttachmentsHiddenField,
 } from "./composeAttachmentPaths";
 import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
+import { setPendingDraftRevisionEventKind } from "./composeDraftRevisionEventKind";
+import { markComposeDraftEdited } from "./composeDraftContentKey";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
@@ -81,6 +83,8 @@ export function bindComposerDropzone(): void {
       return;
     }
     state.draft.attachmentPaths = merged;
+    markComposeDraftEdited();
+    setPendingDraftRevisionEventKind("attachments");
     syncComposeAttachmentsHiddenField(merged);
     toast.success(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
     render();

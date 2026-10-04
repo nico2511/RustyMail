@@ -94,7 +94,12 @@ pub fn propose_digest_cut_zones(
                 );
             }
             Err(e) => {
-                fallback_reason = Some(format!("Le modèle n’a pas produit de découpe : {e}"));
+                fallback_reason = Some(match &e {
+                    LlmError::InputTooLarge { tokens, n_ctx } => format!(
+                        "contexte trop court pour ce mail ({tokens} jetons utilisés / n_ctx={n_ctx}). Augmentez n_ctx dans Paramètres → IA, ou chargez un mail plus court."
+                    ),
+                    other => format!("Le modèle n’a pas produit de découpe : {other}"),
+                });
             }
         }
     } else {
@@ -114,12 +119,16 @@ pub fn propose_digest_cut_zones(
     }
 }
 
-/// Outline + petit extrait HTML. Llama 3.2 / n_ctx courts : trop de HTML = réponse vide (`{`).
-const LLM_HTML_CHARS_MAX: usize = 1_800;
-const LLM_HTML_CHARS_MIN: usize = 0;
-const MIN_OUTPUT_TOKENS: u32 = 768;
-const MAX_OUTPUT_TOKENS: u32 = 2_048;
-const MIN_OUTPUT_ROOM: u32 = 512;
+/// Outline + petit extrait HTML. Llama 3.2 / n_ctx courts : shrink en cascade
+/// (HTML → outline → proposition courante) pour garder de la place à la sortie JSON.
+const LLM_HTML_CHARS_MAX: usize = 1_200;
+const LLM_OUTLINE_CHARS_MAX: usize = 1_400;
+const LLM_OUTLINE_CHARS_MIN: usize = 400;
+const LLM_CURRENT_CHARS_MAX: usize = 900;
+const MIN_OUTPUT_TOKENS: u32 = 512;
+const MAX_OUTPUT_TOKENS: u32 = 1_536;
+/// JSON de découpe typique ~350–700 jetons ; 320 laisse une marge sur n_ctx 2k/4k.
+const MIN_OUTPUT_ROOM: u32 = 320;
 
 fn propose_with_llm(
     engine: &mut LlmEngine,
@@ -128,21 +137,30 @@ fn propose_with_llm(
     output_language: &str,
     current: Option<&DigestCutProposal>,
 ) -> Result<DigestCutProposal, LlmError> {
-    // Outline borné : un gros DOM peut saturer n_ctx autant que le HTML.
-    let outline = truncate_chars(&structure_outline_for_llm(html), 2_500);
+    let outline_full = structure_outline_for_llm(html);
     let system = crate::prompts::system_prompt_for_language("digest_cut", output_language);
     let domain = email_domain(sender_email).unwrap_or_else(|| "example.com".to_string());
     let default_fixture_id = slug_from_domain(&domain);
-    let current_block = match current {
-        Some(proposal) => {
-            let json = serde_json::to_string(proposal).unwrap_or_else(|_| "{}".to_string());
-            format!("\n\nCurrent proposal JSON (keep zone actions unless an anchor cannot exist; keep fixtureId / sender domain):\n{json}\n")
-        }
-        None => String::new(),
-    };
+    let current_slim = current.map(slim_current_proposal_json).unwrap_or_default();
 
     let mut html_budget = LLM_HTML_CHARS_MAX;
+    let mut outline_budget = LLM_OUTLINE_CHARS_MAX;
+    let mut current_budget = if current_slim.is_empty() {
+        0
+    } else {
+        LLM_CURRENT_CHARS_MAX
+    };
+
     let raw = loop {
+        let outline = truncate_chars(&outline_full, outline_budget);
+        let current_block = if current_budget == 0 || current_slim.is_empty() {
+            String::new()
+        } else {
+            let clipped = truncate_chars(&current_slim, current_budget);
+            format!(
+                "\n\nCurrent proposal (slim JSON — keep zone actions / fixtureId / sender domain):\n{clipped}\n"
+            )
+        };
         let user = build_digest_cut_user(
             engine,
             sender_email,
@@ -152,11 +170,15 @@ fn propose_with_llm(
             html_budget,
         );
         let room = output_room_after_prompt(engine, system.as_str(), &user, 64);
-        if room >= MIN_OUTPUT_ROOM || html_budget == LLM_HTML_CHARS_MIN {
+        let fully_shrunk =
+            html_budget == 0 && outline_budget <= LLM_OUTLINE_CHARS_MIN && current_budget == 0;
+        if room >= MIN_OUTPUT_ROOM || fully_shrunk {
             if room < MIN_OUTPUT_ROOM {
-                return Err(LlmError::InvalidJson(format!(
-                    "contexte trop plein pour une découpe JSON (reste {room} jetons ; réduisez le mail ou augmentez n_ctx dans Paramètres → IA)"
-                )));
+                let n_ctx = engine.n_ctx();
+                return Err(LlmError::InputTooLarge {
+                    tokens: (n_ctx.saturating_sub(room)) as usize,
+                    n_ctx,
+                });
             }
             break engine.generate(
                 system.as_str(),
@@ -170,7 +192,23 @@ fn propose_with_llm(
                 ),
             )?;
         }
-        html_budget = html_budget.saturating_sub(600).max(LLM_HTML_CHARS_MIN);
+        // Cascade : d’abord HTML, puis outline, puis proposition courante.
+        if html_budget > 0 {
+            html_budget = html_budget.saturating_sub(400);
+        } else if outline_budget > LLM_OUTLINE_CHARS_MIN {
+            outline_budget = outline_budget
+                .saturating_sub(350)
+                .max(LLM_OUTLINE_CHARS_MIN);
+        } else if current_budget > 0 {
+            current_budget = current_budget.saturating_sub(450);
+        } else {
+            // Sécurité : ne pas boucler.
+            let n_ctx = engine.n_ctx();
+            return Err(LlmError::InputTooLarge {
+                tokens: (n_ctx.saturating_sub(room)) as usize,
+                n_ctx,
+            });
+        }
     };
 
     if response_is_empty_json(&raw) {
@@ -238,6 +276,55 @@ fn build_digest_cut_user(
         current_block,
         html_block
     )
+}
+
+/// Proposition courante allégée : actions + ancres essentielles, sans dump massif.
+fn slim_current_proposal_json(proposal: &DigestCutProposal) -> String {
+    fn slim_zone(zone: &DigestCutZone) -> Value {
+        let anchors: Vec<Value> = zone
+            .anchors
+            .iter()
+            .take(4)
+            .map(|a| {
+                let mut o = serde_json::Map::new();
+                if let Some(sel) = a
+                    .selector
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                {
+                    o.insert("selector".into(), json!(sel));
+                }
+                if let Some(idx) = a.index {
+                    o.insert("index".into(), json!(idx));
+                }
+                if let Some(role) = &a.role {
+                    o.insert("role".into(), json!(role));
+                }
+                Value::Object(o)
+            })
+            .collect();
+        json!({
+            "action": zone.action,
+            "presentation": zone.presentation,
+            "anchors": anchors,
+        })
+    }
+    let value = json!({
+        "fixtureId": proposal.fixture_id,
+        "ruleSetVersion": proposal.rule_set_version,
+        "match": {
+            "senderDomains": proposal.match_.sender_domains,
+            "structureRoot": proposal.match_.structure_root,
+            "minChildren": proposal.match_.min_children,
+        },
+        "zones": {
+            "header": slim_zone(&proposal.zones.header),
+            "body": slim_zone(&proposal.zones.body),
+            "footer": slim_zone(&proposal.zones.footer),
+        },
+    });
+    serde_json::to_string(&value).unwrap_or_else(|_| "{}".into())
 }
 
 fn inject_digest_cut_defaults(value: &mut Value, default_fixture_id: &str, domain: &str) {
@@ -353,7 +440,10 @@ fn validate_digest_cut_dto(dto: &DigestCutDto) -> Result<(), LlmError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{inject_digest_cut_defaults, response_is_empty_json, validate_digest_cut_dto};
+    use super::{
+        inject_digest_cut_defaults, response_is_empty_json, slim_current_proposal_json,
+        validate_digest_cut_dto,
+    };
     use crate::mail_cleaning::digest_fixtures::proposal::proposal_to_fixture_yaml;
     use crate::mail_cleaning::digest_fixtures::{set_installed_reading_fixture, ZoneAction};
     use serde_json::json;
@@ -419,6 +509,23 @@ mod tests {
         assert!(response_is_empty_json("{"));
         assert!(response_is_empty_json("{ }"));
         assert!(!response_is_empty_json(r#"{"fixtureId":"x"}"#));
+    }
+
+    #[test]
+    fn slim_current_keeps_actions_and_caps_anchors() {
+        let proposal = crate::mail_cleaning::digest_fixtures::analyze_html_structure_heuristic(
+            include_str!("../tests/fixtures/deblock/receive_200eur.html"),
+            "support@deblock.com",
+        );
+        let slim = slim_current_proposal_json(&proposal);
+        assert!(slim.contains("fixtureId"));
+        assert!(slim.contains("structureRoot"));
+        assert!(slim.len() < serde_json::to_string(&proposal).unwrap().len() + 8);
+        let v: serde_json::Value = serde_json::from_str(&slim).expect("json");
+        assert!(
+            v["zones"]["header"]["action"].is_string()
+                || v["zones"]["header"]["action"].is_object()
+        );
     }
 
     #[test]

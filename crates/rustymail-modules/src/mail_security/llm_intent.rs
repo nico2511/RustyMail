@@ -8,7 +8,8 @@ use crate::ai_llm_util::{
 use crate::mail_security::gbnf::SECURITY_FINDINGS_GBNF;
 use crate::mail_security::{finalize_security_signals, merge_heuristic_and_llm_findings};
 use rustymail_domain::{
-    MailSecurityFinding, MailSecurityFindingKind, MailSecurityFindingSeverity, MailSecuritySignals,
+    MailSecurityFinding, MailSecurityFindingKind, MailSecurityFindingSeverity,
+    MailSecurityLlmContext, MailSecuritySignals,
 };
 use rustymail_llm::{gen_params_with_grammar, LlmEngine, LlmError};
 
@@ -37,6 +38,50 @@ fn findings_digest(fr: &[MailSecurityFinding]) -> String {
         .map(|f| format!("{} ({:?}) {}", f.code, f.severity, f.message_fr))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn format_mail_context(ctx: &MailSecurityLlmContext) -> String {
+    let reply = if ctx.reply_to.is_empty() {
+        "(aucun)".to_string()
+    } else {
+        ctx.reply_to
+            .iter()
+            .take(6)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let atts = if ctx.attachment_names.is_empty() {
+        "(aucune)".to_string()
+    } else {
+        ctx.attachment_names
+            .iter()
+            .take(12)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let hosts = if ctx.link_hosts.is_empty() {
+        "(aucun)".to_string()
+    } else {
+        ctx.link_hosts
+            .iter()
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let body = truncate_chars(ctx.body_excerpt.trim(), 2_400);
+    format!(
+        "De : {} <{}>\nReply-To : {}\nObjet : {}\nPièces jointes : {}\nHôtes de liens : {}\n\nCorps (extrait) :\n{}",
+        truncate_chars(ctx.from_name.trim(), 120),
+        truncate_chars(ctx.from_email.trim(), 180),
+        truncate_chars(&reply, 400),
+        truncate_chars(ctx.subject.trim(), 240),
+        truncate_chars(&atts, 400),
+        truncate_chars(&hosts, 600),
+        body
+    )
 }
 
 fn valid_llm_finding_code(code: &str) -> bool {
@@ -70,7 +115,44 @@ fn validate_security_pack(pack: &LlmSecurityPack) -> bool {
     pack.findings.iter().all(valid_llm_finding_in)
 }
 
-fn sanitize_llm_findings(raw: Vec<LlmFindingIn>) -> Vec<MailSecurityFinding> {
+fn normalize_msg(s: &str) -> String {
+    s.chars()
+        .flat_map(|c| c.to_lowercase())
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Rejette les reprises cosmétique des messages heuristiques déjà affichés.
+fn llm_message_adds_value(heuristic: &[MailSecurityFinding], message_fr: &str) -> bool {
+    let norm = normalize_msg(message_fr);
+    if norm.chars().count() < 12 {
+        return false;
+    }
+    for h in heuristic {
+        let hn = normalize_msg(&h.message_fr);
+        if hn.is_empty() {
+            continue;
+        }
+        if norm == hn {
+            return false;
+        }
+        if norm.contains(&hn) || hn.contains(&norm) {
+            // Trop proche d’un signal déjà listé.
+            if norm.chars().count().abs_diff(hn.chars().count()) < 40 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn sanitize_llm_findings(
+    raw: Vec<LlmFindingIn>,
+    heuristic: &[MailSecurityFinding],
+) -> Vec<MailSecurityFinding> {
     let mut out = Vec::new();
     for f in raw.into_iter().take(MAX_LLM_FINDINGS) {
         if !valid_llm_finding_in(&f) {
@@ -78,6 +160,9 @@ fn sanitize_llm_findings(raw: Vec<LlmFindingIn>) -> Vec<MailSecurityFinding> {
         }
         let code = f.code.trim();
         let message_fr = f.message_fr.trim();
+        if !llm_message_adds_value(heuristic, message_fr) {
+            continue;
+        }
         out.push(MailSecurityFinding {
             kind: MailSecurityFindingKind::LlmIntent,
             code: code.to_string(),
@@ -90,6 +175,7 @@ fn sanitize_llm_findings(raw: Vec<LlmFindingIn>) -> Vec<MailSecurityFinding> {
 
 pub fn augment_security_with_llm(
     base: MailSecuritySignals,
+    context: &MailSecurityLlmContext,
     engine: &mut LlmEngine,
     prefs_security_on: bool,
     output_language: &str,
@@ -101,11 +187,14 @@ pub fn augment_security_with_llm(
     let heuristic_findings = base.findings.clone();
 
     let sys = crate::prompts::system_prompt_for_language("security_llm", output_language);
-    let digest = truncate_chars(&base.summary_fr, 4_096);
+    let digest = truncate_chars(&base.summary_fr, 2_048);
     let fd = findings_digest(&heuristic_findings);
+    let mail_ctx = format_mail_context(context);
     let user = user_text_for_engine(
         engine,
-        &format!("Synthèse actuelle :\n{digest}\n\nSignaux existants :\n{fd}"),
+        &format!(
+            "Synthèse heuristique :\n{digest}\n\nSignaux existants :\n{fd}\n\nContexte du message :\n{mail_ctx}"
+        ),
     );
 
     let params = gen_params_with_grammar(
@@ -113,8 +202,8 @@ pub fn augment_security_with_llm(
             engine,
             sys.as_str(),
             &user,
-            256,
-            768,
+            320,
+            896,
             SECURITY_FINDINGS_GBNF,
         ),
         SECURITY_FINDINGS_GBNF,
@@ -132,14 +221,13 @@ pub fn augment_security_with_llm(
         sys.as_str(),
         &user,
         None,
-        base.summary_fr.chars().count() > 4_096,
+        base.summary_fr.chars().count() > 2_048 || context.body_excerpt.chars().count() > 2_400,
     );
 
-    let llm_findings = sanitize_llm_findings(pack.findings);
+    let llm_findings = sanitize_llm_findings(pack.findings, &heuristic_findings);
     if llm_findings.is_empty() {
-        let mut out = base;
-        out.llm_budget = Some(budget);
-        return Ok(out);
+        // Rien d’utile ajouté : ne pas revendiquer une contribution IA (pas de llm_budget).
+        return Ok(base);
     }
 
     let merged = merge_heuristic_and_llm_findings(&heuristic_findings, llm_findings);
@@ -260,11 +348,43 @@ mod tests {
     #[test]
     fn sanitize_drops_oversized_message() {
         let long = "é".repeat(MAX_LLM_MESSAGE_FR_CHARS + 1);
-        let kept = sanitize_llm_findings(vec![LlmFindingIn {
-            code: "test_code".into(),
-            severity: MailSecurityFindingSeverity::Info,
-            message_fr: long,
-        }]);
+        let kept = sanitize_llm_findings(
+            vec![LlmFindingIn {
+                code: "test_code".into(),
+                severity: MailSecurityFindingSeverity::Info,
+                message_fr: long,
+            }],
+            &[],
+        );
         assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn sanitize_drops_cosmetic_rephrase() {
+        let base = heuristic_base();
+        let kept = sanitize_llm_findings(
+            vec![LlmFindingIn {
+                code: "many_hyperlinks".into(),
+                severity: MailSecurityFindingSeverity::Attention,
+                message_fr: "Beaucoup de liens (heuristique).".into(),
+            }],
+            &base.findings,
+        );
+        assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn sanitize_keeps_new_intent() {
+        let base = heuristic_base();
+        let kept = sanitize_llm_findings(
+            vec![LlmFindingIn {
+                code: "credential_ask".into(),
+                severity: MailSecurityFindingSeverity::Suspicion,
+                message_fr: "Demande explicite de mot de passe ou de code dans le corps.".into(),
+            }],
+            &base.findings,
+        );
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].code, "credential_ask");
     }
 }

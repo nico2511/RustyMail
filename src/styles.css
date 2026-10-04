@@ -6007,6 +6007,17 @@ button.thread-tag-chip--search:focus-visible {
   letter-spacing: -0.01em;
 }
 
+.composer-history-pane__delta {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--text, #ccc) 72%, transparent);
+}
+
+.composer-history-pane__delta--heavy {
+  font-weight: 700;
+  color: color-mix(in srgb, var(--accent, #6a8) 70%, var(--text, #ccc));
+}
+
 .composer-history-pane__stamp {
   font-size: 11px;
   white-space: nowrap;

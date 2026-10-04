@@ -64,6 +64,17 @@ export type MailSecuritySignals = {
   llmBudget?: TokenBudgetSnapshot | null;
 };
 
+/** Contexte message passé à `llm_security_signals_augment` (corps / liens / PJ). */
+export type MailSecurityLlmContext = {
+  subject: string;
+  fromName: string;
+  fromEmail: string;
+  replyTo: string[];
+  bodyExcerpt: string;
+  attachmentNames: string[];
+  linkHosts: string[];
+};
+
 /** Réponses `llm_translate_*` — camelCase Tauri. */
 export type LlmTranslationResult = {
   sourceMessageId: string;
@@ -144,6 +155,15 @@ export type DraftPreview = {
 export type DraftRevisionListItem = {
   id: string;
   createdAt: string;
+  /** `edit` | `rewrite` | `shorten` | `tone` | `grammar` | `attachments` | `restore` */
+  eventKind?: string;
+  /** Variation de longueur du corps vs la révision précédente. */
+  charsDelta?: number;
+};
+
+export type DraftRevisionSaveResult = {
+  revisionId?: string | null;
+  draft: Draft;
 };
 
 export type SavedDraftListItem = {

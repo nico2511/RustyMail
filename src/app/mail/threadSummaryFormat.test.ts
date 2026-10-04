@@ -113,4 +113,21 @@ describe("zenSummaryHtmlFragments — résumé de fil", () => {
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
   });
+
+  it("ne montre pas une puce sourceMessageIds issue du schéma JSON", () => {
+    const html = zenSummaryHtmlFragments(
+      JSON.stringify({
+        title: "Renouvellement contrat",
+        bullets: [
+          "Proposition de visite le 18 novembre 2026.",
+          "sourceMessageIds",
+          "Paiement sur place lors du passage.",
+        ],
+        sourceMessageIds: ["m1"],
+      }),
+    );
+    expect(html).toContain("18 novembre");
+    expect(html).toContain("Paiement sur place");
+    expect(html).not.toContain("sourceMessageIds");
+  });
 });

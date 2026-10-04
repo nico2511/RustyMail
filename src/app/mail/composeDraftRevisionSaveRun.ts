@@ -5,6 +5,7 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import { withTimeout, tauriErrorMessage } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { state } from "../state";
+import type { DraftRevisionSaveResult } from "../types";
 import { draftPayloadForRust } from "./composeDraftPayload";
 import {
   draftHasMeaningfulContent,
@@ -14,9 +15,11 @@ import {
   rememberDraftContentSaved,
   shouldAutosaveDraftRevision,
 } from "./composeDraftContentKey";
+import { takePendingDraftRevisionEventKind } from "./composeDraftRevisionEventKind";
 import { persistDraft } from "./composePersistDraft";
 import { refreshDraftRevisions } from "./composeDraftRevisions";
 import { requireComposeDraftLocalSaveDeps } from "./composeDraftLocalSaveContext";
+import { syncComposeAttachmentsHiddenField } from "./composeAttachmentPaths";
 
 export async function upsertSavedDraftSilent(): Promise<boolean> {
   if (!isTauriRuntime()) return false;
@@ -56,25 +59,33 @@ export async function saveDraftRevisionNow(opts?: { force?: boolean }): Promise<
     return false;
   }
   if (!opts?.force && !shouldAutosaveDraftRevision(payload, sessionId)) return false;
+  const eventKind = takePendingDraftRevisionEventKind();
   try {
-    await withTimeout(
-      invoke("draft_revision_save", {
+    const saved = await withTimeout(
+      invoke<DraftRevisionSaveResult>("draft_revision_save", {
         accountId,
         sessionId,
         draft: payload,
+        eventKind,
       }),
       MAIL_ACTION_TIMEOUT_MS,
     );
-    rememberDraftContentSaved(sessionId, payload);
-    const latest = state.draft ? draftPayloadForRust(state.draft) : payload;
-    if (draftRevisionContentKey(latest) !== draftRevisionContentKey(payload)) {
+    const staged = saved?.draft;
+    if (staged && state.draft) {
+      state.draft.attachmentPaths = [...(staged.attachmentPaths ?? [])];
+      syncComposeAttachmentsHiddenField(state.draft.attachmentPaths);
+    }
+    const remembered = staged ? draftPayloadForRust(staged) : payload;
+    rememberDraftContentSaved(sessionId, remembered);
+    const latest = state.draft ? draftPayloadForRust(state.draft) : remembered;
+    if (draftRevisionContentKey(latest) !== draftRevisionContentKey(remembered)) {
       markComposeDraftEdited();
     }
     if (state.composeLayout === "historique") {
       void refreshDraftRevisions(60);
     }
     await upsertSavedDraftSilent();
-    return true;
+    return Boolean(saved?.revisionId);
   } catch (error) {
     console.error("draft_revision_save", error);
     toast.error(`Enregistrement local impossible : ${tauriErrorMessage(error)}`);

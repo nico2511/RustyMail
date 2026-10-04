@@ -313,12 +313,27 @@ export function isRawSummaryJson(text: string): boolean {
 
 export function isNoiseBullet(text: string): boolean {
   const t = text.trim();
-  return (
+  if (
     !t ||
     t.startsWith("(extrait modèle)") ||
     isConversationIndexMarker(t) ||
     isRawSummaryJson(t)
-  );
+  ) {
+    return true;
+  }
+  const lower = t.toLowerCase();
+  // Fuite de schéma JSON / ids techniques dans les puces affichées.
+  if (
+    lower === "sourcemessageids" ||
+    lower.startsWith("sourcemessageids") ||
+    lower.includes('"sourcemessageids"') ||
+    lower.includes("source_message_ids") ||
+    lower.includes("[message_id=") ||
+    (lower.includes("message_id") && t.length < 80)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function cleanBulletText(text: string): string {

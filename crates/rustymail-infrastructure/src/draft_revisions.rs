@@ -1,7 +1,8 @@
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use rustymail_domain::{
     compose_body_is_html, compose_body_plain, compose_html_fragment, Draft, EmailAddress,
@@ -14,6 +15,123 @@ use crate::open_sqlite_migrated;
 pub struct DraftRevisionListItem {
     pub id: String,
     pub created_at: String,
+    /// `edit` | `rewrite` | `shorten` | `tone` | `grammar` | `attachments` | …
+    #[serde(default = "default_event_kind")]
+    pub event_kind: String,
+    /// Variation de longueur du corps vs la révision précédente (caractères visibles).
+    #[serde(default)]
+    pub chars_delta: i64,
+}
+
+fn default_event_kind() -> String {
+    "edit".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftRevisionSaveResult {
+    pub revision_id: Option<String>,
+    pub draft: Draft,
+}
+
+fn sanitize_event_kind(raw: &str) -> String {
+    let t = raw.trim().to_ascii_lowercase();
+    match t.as_str() {
+        "rewrite" | "shorten" | "tone" | "grammar" | "attachments" | "restore" | "edit" => t,
+        _ if !t.is_empty()
+            && t.len() <= 32
+            && t.chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') =>
+        {
+            t
+        }
+        _ => "edit".to_string(),
+    }
+}
+
+fn visible_body_chars(body: &str) -> i64 {
+    compose_body_plain(body).chars().count() as i64
+}
+
+fn draft_attachments_dir(data_dir: &Path, account_id: &str, session_id: &str) -> PathBuf {
+    data_dir
+        .join("draft_attachments")
+        .join(account_id.trim())
+        .join(session_id.trim())
+}
+
+fn safe_file_stem(name: &str) -> String {
+    let base = Path::new(name)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+    let cleaned: String = base
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if cleaned.is_empty() {
+        "file".into()
+    } else {
+        cleaned.chars().take(120).collect()
+    }
+}
+
+/// Copie les PJ hors du coffre local vers `data_dir/draft_attachments/…` pour qu’elles
+/// survivent à la réouverture du brouillon (chemins utilisateur volatils).
+pub fn stage_draft_attachments(
+    data_dir: impl AsRef<Path>,
+    account_id: &str,
+    session_id: &str,
+    draft: &Draft,
+) -> Result<Draft, String> {
+    let mut out = draft.clone();
+    if out.attachment_paths.is_empty() {
+        return Ok(out);
+    }
+    let dest_root = draft_attachments_dir(data_dir.as_ref(), account_id, session_id);
+    fs::create_dir_all(&dest_root).map_err(|e| format!("dossier PJ brouillon: {e}"))?;
+    let dest_canon = dest_root
+        .canonicalize()
+        .unwrap_or_else(|_| dest_root.clone());
+
+    let mut staged = Vec::with_capacity(out.attachment_paths.len());
+    for (i, raw) in out.attachment_paths.iter().enumerate() {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let src = PathBuf::from(trimmed);
+        if !src.is_file() {
+            // Fichier disparu : on ne bloque pas l’enregistrement du corps.
+            continue;
+        }
+        let src_canon = src.canonicalize().map_err(|e| format!("PJ: {e}"))?;
+        if src_canon.starts_with(&dest_canon) {
+            staged.push(src_canon.to_string_lossy().to_string());
+            continue;
+        }
+        let fname = safe_file_stem(
+            src.file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("attachment"),
+        );
+        let dest = dest_root.join(format!("{i:02}_{fname}"));
+        fs::copy(&src_canon, &dest).map_err(|e| format!("copie PJ « {fname} »: {e}"))?;
+        let dest_s = dest
+            .canonicalize()
+            .unwrap_or(dest)
+            .to_string_lossy()
+            .to_string();
+        staged.push(dest_s);
+    }
+    out.attachment_paths = staged;
+    Ok(out)
 }
 
 fn now_rfc3339_secs() -> String {
@@ -124,14 +242,16 @@ fn purge_old_revisions(
 }
 
 /// Enregistre une révision si le contenu a changé depuis la dernière (dédup par `content_hash`).
-/// Retourne `Ok(Some(revision_id))` si une nouvelle révision est créée, `Ok(None)` si ignorée.
+/// Les PJ sont copiées sous `data_dir/draft_attachments/…` avant persistance.
 pub fn sqlite_draft_revision_save(
     db_path: impl AsRef<Path>,
+    data_dir: impl AsRef<Path>,
     account_id: &str,
     session_id: &str,
     draft: &Draft,
+    event_kind: &str,
     keep_last: usize,
-) -> Result<Option<String>, String> {
+) -> Result<DraftRevisionSaveResult, String> {
     let account_norm = account_id.trim();
     if account_norm.is_empty() {
         return Err("account_id vide".to_string());
@@ -140,41 +260,59 @@ pub fn sqlite_draft_revision_save(
     if session_norm.is_empty() {
         return Err("session_id vide".to_string());
     }
-    if !draft_has_revision_content(draft) {
-        return Ok(None);
+
+    let staged = stage_draft_attachments(data_dir.as_ref(), account_norm, session_norm, draft)?;
+    if !draft_has_revision_content(&staged) {
+        return Ok(DraftRevisionSaveResult {
+            revision_id: None,
+            draft: staged,
+        });
     }
 
     let connection = open_sqlite_migrated(db_path.as_ref()).map_err(|e| e.to_string())?;
 
-    let content_hash = content_hash_for_draft(draft);
-    let last_hash: Option<String> = connection
+    let content_hash = content_hash_for_draft(&staged);
+    let last: Option<(String, String)> = connection
         .query_row(
             "
-            SELECT content_hash
+            SELECT content_hash, payload_json
             FROM draft_revisions
             WHERE account_id = ?1 AND session_id = ?2
             ORDER BY created_at DESC
             LIMIT 1
             ",
             params![account_norm, session_norm],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
         .map_err(|e| e.to_string())?;
 
-    if last_hash.as_deref() == Some(content_hash.as_str()) {
-        return Ok(None);
+    if last.as_ref().map(|(h, _)| h.as_str()) == Some(content_hash.as_str()) {
+        return Ok(DraftRevisionSaveResult {
+            revision_id: None,
+            draft: staged,
+        });
     }
+
+    let prev_chars = last
+        .as_ref()
+        .and_then(|(_, json)| serde_json::from_str::<Draft>(json).ok())
+        .map(|d| visible_body_chars(&d.markdown_body))
+        .unwrap_or(0);
+    let chars_delta = visible_body_chars(&staged.markdown_body) - prev_chars;
+    let kind = sanitize_event_kind(event_kind);
 
     let rev_id = format!("drv-{}", uuid::Uuid::new_v4().simple());
     let created_at = now_rfc3339_secs();
-    let payload_json = serde_json::to_string(draft).map_err(|e| e.to_string())?;
+    let payload_json = serde_json::to_string(&staged).map_err(|e| e.to_string())?;
 
     connection
         .execute(
             "
-            INSERT INTO draft_revisions (id, account_id, session_id, created_at, content_hash, payload_json)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            INSERT INTO draft_revisions (
+              id, account_id, session_id, created_at, content_hash, payload_json, event_kind, chars_delta
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             ",
             params![
                 rev_id,
@@ -182,13 +320,18 @@ pub fn sqlite_draft_revision_save(
                 session_norm,
                 created_at,
                 content_hash,
-                payload_json
+                payload_json,
+                kind,
+                chars_delta
             ],
         )
         .map_err(|e| e.to_string())?;
 
     purge_old_revisions(&connection, account_norm, session_norm, keep_last)?;
-    Ok(Some(rev_id))
+    Ok(DraftRevisionSaveResult {
+        revision_id: Some(rev_id),
+        draft: staged,
+    })
 }
 
 pub fn sqlite_draft_revision_list(
@@ -204,7 +347,7 @@ pub fn sqlite_draft_revision_list(
     let mut stmt = connection
         .prepare(
             "
-            SELECT id, created_at
+            SELECT id, created_at, event_kind, chars_delta
             FROM draft_revisions
             WHERE account_id = ?1 AND session_id = ?2
             ORDER BY created_at DESC
@@ -220,6 +363,10 @@ pub fn sqlite_draft_revision_list(
                 Ok(DraftRevisionListItem {
                     id: row.get(0)?,
                     created_at: row.get(1)?,
+                    event_kind: row
+                        .get::<_, Option<String>>(2)?
+                        .unwrap_or_else(default_event_kind),
+                    chars_delta: row.get::<_, Option<i64>>(3)?.unwrap_or(0),
                 })
             },
         )

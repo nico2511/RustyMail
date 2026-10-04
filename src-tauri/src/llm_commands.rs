@@ -2,8 +2,9 @@
 
 use rustymail_application::ai;
 use rustymail_domain::{
-    ActionBriefResult, AssistUserPrefs, FluxAffinerResult, FluxAffinerSample, MailSecuritySignals,
-    RewriteStyle, SearchQuery, ThreadListItem, ThreadQaAnswer, TranslationResult,
+    ActionBriefResult, AssistUserPrefs, FluxAffinerResult, FluxAffinerSample,
+    MailSecurityLlmContext, MailSecuritySignals, RewriteStyle, SearchQuery, ThreadListItem,
+    ThreadQaAnswer, TranslationResult,
 };
 use rustymail_infrastructure::{
     ai_feature_enabled, llama_server_api_key_get, llm_gguf_cached, load_app_prefs,
@@ -766,22 +767,36 @@ pub async fn llm_inbox_digest(
     .map_err(|e| format!("digest join: {e}"))?
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LlmSecurityAugmentPayload {
+    pub signals: MailSecuritySignals,
+    #[serde(default)]
+    pub context: MailSecurityLlmContext,
+}
+
 fn llm_security_signals_augment_compute(
     paths: &AppPaths,
-    payload: MailSecuritySignals,
+    payload: LlmSecurityAugmentPayload,
 ) -> Result<MailSecuritySignals, String> {
     let prefs = load_app_prefs(&paths.prefs_path);
     llm_gate_feature(&prefs, paths, AiFeature::SecurityLlm)?;
     let mut engine = build_llm_engine(&prefs, paths)?;
     let lang = prefs.general.mother_language.as_str();
-    llm_intent::augment_security_with_llm(payload, &mut engine, true, lang)
-        .map_err(|e| e.to_string())
+    llm_intent::augment_security_with_llm(
+        payload.signals,
+        &payload.context,
+        &mut engine,
+        true,
+        lang,
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn llm_security_signals_augment(
     paths: State<'_, AppPaths>,
-    payload: MailSecuritySignals,
+    payload: LlmSecurityAugmentPayload,
 ) -> Result<MailSecuritySignals, String> {
     let paths = Clone::clone(&*paths);
     tauri::async_runtime::spawn_blocking(move || {

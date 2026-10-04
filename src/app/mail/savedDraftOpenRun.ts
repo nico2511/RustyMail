@@ -21,6 +21,7 @@ import { refreshDraftRevisions } from "./composeDraftRevisions";
 import { startNewDraftSession } from "./composeDraftSession";
 import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
 import { enterComposeView } from "./composeViewWireActions";
+import { syncComposeAttachmentsHiddenField } from "./composeAttachmentPaths";
 
 export async function openSavedDraftById(savedDraftId: string): Promise<void> {
   const sdid = savedDraftId.trim();
@@ -45,6 +46,7 @@ export async function openSavedDraftById(savedDraftId: string): Promise<void> {
     state.savedDraftRecordId = res.savedDraftId;
     state.draft = res.draft;
     state.draft.sendHtml = true;
+    state.draft.attachmentPaths = [...(res.draft.attachmentPaths ?? [])];
     state.composeCcBccOpen = draftHasRecipientsExtra(res.draft);
     state.composeAdvancedOpen = false;
     state.composeLayout = "historique";
@@ -55,9 +57,9 @@ export async function openSavedDraftById(savedDraftId: string): Promise<void> {
     state.preview = undefined;
     state.composeMessage = "";
     render();
+    syncComposeAttachmentsHiddenField(state.draft.attachmentPaths);
     window.setTimeout(() => void computePreview(), 0);
     void refreshDraftRevisions(60);
-    scheduleDraftRevisionSave(350);
   } catch (error) {
     console.error("saved_draft_open", error);
     toast.error(tauriErrorMessage(error));

@@ -207,7 +207,8 @@ pub use draft_revisions::{
     sqlite_draft_orphan_session_open, sqlite_draft_orphan_sessions_list,
     sqlite_draft_orphan_sessions_purge_stale, sqlite_draft_revision_get,
     sqlite_draft_revision_list, sqlite_draft_revision_purge_session, sqlite_draft_revision_save,
-    DraftRevisionListItem, OrphanDraftSessionItem,
+    stage_draft_attachments, DraftRevisionListItem, DraftRevisionSaveResult,
+    OrphanDraftSessionItem,
 };
 pub use inline_compose_images::{extract_inline_data_images, InlineImagePart};
 pub use saved_drafts::{
@@ -1184,7 +1185,9 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
             session_id TEXT NOT NULL,
             created_at TEXT NOT NULL,
             content_hash TEXT NOT NULL,
-            payload_json TEXT NOT NULL
+            payload_json TEXT NOT NULL,
+            event_kind TEXT NOT NULL DEFAULT 'edit',
+            chars_delta INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_draft_revisions_session_created_at
           ON draft_revisions(account_id, session_id, created_at);
@@ -1386,6 +1389,14 @@ fn migrate_messages_fts(connection: &Connection) -> Result<(), rusqlite::Error> 
         [],
     );
     let _ = connection.execute("ALTER TABLE threads ADD COLUMN mail_type TEXT", []);
+    let _ = connection.execute(
+        "ALTER TABLE draft_revisions ADD COLUMN event_kind TEXT NOT NULL DEFAULT 'edit'",
+        [],
+    );
+    let _ = connection.execute(
+        "ALTER TABLE draft_revisions ADD COLUMN chars_delta INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
     Ok(())
 }
 

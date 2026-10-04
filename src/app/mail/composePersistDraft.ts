@@ -1,6 +1,9 @@
 import { flushComposeEditorToState } from "./composeBodyEditor";
 import { draftBodyIdentity } from "./composeDraftContentKey";
-import { attachmentPathsFromHiddenField } from "./composeAttachmentPaths";
+import {
+  attachmentPathsFromHiddenField,
+  syncComposeAttachmentsHiddenField,
+} from "./composeAttachmentPaths";
 import { applyComposeRecipientsFromDom } from "./composeRecipientChipsWire";
 import { state } from "../state";
 
@@ -20,8 +23,14 @@ export function persistDraft(): void {
     shell?.querySelector<HTMLInputElement>("#compose-attachments") ??
     document.querySelector<HTMLInputElement>("#compose-attachments");
   if (attachmentsField) {
-    // Source de vérité au save : le champ caché (aligné pick / drop / remove).
-    state.draft.attachmentPaths = attachmentPathsFromHiddenField(attachmentsField.value);
+    const fromField = attachmentPathsFromHiddenField(attachmentsField.value);
+    const fromState = (state.draft.attachmentPaths ?? []).map((p) => p.trim()).filter(Boolean);
+    // Ne pas écraser des PJ en mémoire si le champ caché est vide (re-render / course).
+    if (fromField.length === 0 && fromState.length > 0) {
+      syncComposeAttachmentsHiddenField(fromState);
+    } else {
+      state.draft.attachmentPaths = fromField;
+    }
   }
   state.draft.sendHtml = true;
   applyComposeRecipientsFromDom(state.draft);

@@ -148,10 +148,25 @@ fn looks_like_raw_summary_json(text: &str) -> bool {
 
 fn bullet_is_noise(text: &str) -> bool {
     let t = text.trim();
-    t.is_empty()
+    if t.is_empty()
         || t.starts_with("(extrait modèle)")
         || is_conversation_index_marker(t)
         || looks_like_raw_summary_json(t)
+    {
+        return true;
+    }
+    let lower = t.to_ascii_lowercase();
+    // Fuite de schéma JSON / ids techniques dans les puces affichées.
+    if lower == "sourcemessageids"
+        || lower.starts_with("sourcemessageids")
+        || lower.contains("\"sourcemessageids\"")
+        || lower.contains("source_message_ids")
+        || lower.contains("[message_id=")
+        || (lower.contains("message_id") && t.chars().count() < 80)
+    {
+        return true;
+    }
+    false
 }
 
 fn json_key_positions(text: &str, key: &str) -> Vec<usize> {
