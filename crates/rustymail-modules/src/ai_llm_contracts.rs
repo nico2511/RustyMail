@@ -578,6 +578,33 @@ pub fn salvage_translation_text(source: &str, output: &str) -> Option<String> {
 }
 
 pub const MAIL_BODY_META_ERR: &str = "Le modèle a renvoyé une consigne (format JSON, message système) au lieu du message. Le texte n’a pas été modifié.";
+pub const MAIL_BODY_ECHO_ERR: &str = "Le modèle a reformulé le mail reçu au lieu de rédiger une réponse. Réessayez ou écrivez à la main.";
+
+fn significant_words(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| w.chars().count() >= 5)
+        .map(str::to_string)
+        .collect()
+}
+
+/// Vrai si le brouillon reprend surtout le corps du fil (réécriture / prise de rôle de l’expéditeur).
+pub fn draft_echoes_inbound(source: &str, draft: &str) -> bool {
+    let draft_words = significant_words(draft);
+    if draft_words.len() < 18 {
+        return false;
+    }
+    let source_words: std::collections::HashSet<_> = significant_words(source).into_iter().collect();
+    if source_words.len() < 12 {
+        return false;
+    }
+    let overlap = draft_words
+        .iter()
+        .filter(|w| source_words.contains(w.as_str()))
+        .count();
+    let ratio = overlap as f32 / draft_words.len() as f32;
+    ratio >= 0.62
+}
 
 /// Corps de mail produit par un modèle : refuse consigne, refus ou méta absents de la source.
 pub fn ensure_mail_body_output(source: &str, output: &str) -> Result<String, LlmError> {
@@ -591,6 +618,15 @@ pub fn ensure_mail_body_output(source: &str, output: &str) -> Result<String, Llm
         return Err(LlmError::Msg(MAIL_BODY_META_ERR.into()));
     }
     Ok(text.to_string())
+}
+
+/// Brouillon de réponse : mêmes gardes que `ensure_mail_body_output`, plus anti-réécriture du mail reçu.
+pub fn ensure_reply_draft_output(source: &str, output: &str) -> Result<String, LlmError> {
+    let text = ensure_mail_body_output(source, output)?;
+    if draft_echoes_inbound(source, &text) {
+        return Err(LlmError::Msg(MAIL_BODY_ECHO_ERR.into()));
+    }
+    Ok(text)
 }
 
 /// Rejette les sorties hors bornes avant normalisation métier.
@@ -1064,6 +1100,22 @@ mod tests {
             None
         )
         .is_err());
+    }
+
+    #[test]
+    fn draft_echo_detects_inbound_rewrite() {
+        let inbound = "Cher(e) client(e),\n\nVotre contrat d'entretien de chaudière est en renouvellement. \
+Nous vous proposons de faire le nettoyage de votre appareil à gaz le mercredi 18 novembre 2026 le matin. \
+Si ce jour ne vous convient pas, veuillez nous contacter pour fixer un nouveau rendez-vous. \
+Le montant du renouvellement est de 138 euros, payable sur place.\n\nCordialement,\nACTION DEPANNAGE";
+        let rewrite = "Cher(e) client(e),\n\nVotre contrat d'entretien de chaudière est en renouvellement. \
+Nous vous proposons de faire le nettoyage de votre appareil à gaz le mercredi 18 novembre 2026. \
+Si ce jour ne vous convient pas, veuillez nous contacter pour fixer un nouveau rendez-vous.\n\nCordialement.";
+        let real_reply = "Bonjour,\n\nLe mercredi 18 novembre le matin me convient. Merci de confirmer l'heure précise.\n\nCordialement";
+        assert!(draft_echoes_inbound(inbound, rewrite));
+        assert!(!draft_echoes_inbound(inbound, real_reply));
+        assert!(ensure_reply_draft_output(inbound, rewrite).is_err());
+        assert!(ensure_reply_draft_output(inbound, real_reply).is_ok());
     }
 
     #[test]

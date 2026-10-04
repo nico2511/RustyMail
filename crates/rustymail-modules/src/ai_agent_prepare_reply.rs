@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::ai_assist_facts::facts_block_for_draft;
 use crate::ai_assist_thread::facts_support_scheduling;
-use crate::ai_llm_contracts::{ensure_mail_body_output, introduces_llm_meta};
+use crate::ai_llm_contracts::{ensure_reply_draft_output, introduces_llm_meta};
 use crate::ai_llm_util::{
-    budget_report, cancelled_llm_err, gen_params_json_for_prompt, gen_params_text_echo_for_prompt,
+    budget_report, cancelled_llm_err, gen_params_json_for_prompt, gen_params_text_for_prompt,
     parse_model_json, truncate_chars,
 };
 use rustymail_domain::{AssistFactsSnapshot, AssistUserPrefs};
@@ -93,7 +93,11 @@ fn draft_reply_prompts(
     let mut system = crate::prompts::system_prompt_for_language("agent_draft", &lang);
     system = system.replace("{draft_language}", draft_language.trim());
     let system = format!("{system}{scheduling_note}");
-    let user = format!("Contexte fil :\n{ctx}{hint}");
+    let user = format!(
+        "Rôle : tu es le destinataire du fil (propriétaire de la boîte). Rédige ta réponse au dernier expéditeur.\n\
+Interdiction : ne reformule pas leur message, ne signe pas à leur place, ne réécris pas leur lettre.\n\
+Contexte fil :\n{ctx}{hint}"
+    );
     (system.trim().to_string(), user)
 }
 
@@ -116,17 +120,11 @@ pub fn agent_draft_reply_streaming(
         prior_facts,
     );
     let mut streamed = String::new();
+    // Budget de réponse courte (pas un echo de la longueur du fil — sinon le modèle réécrit le mail).
     let raw = engine.generate_streaming(
         system.as_str(),
         &user,
-        &gen_params_text_echo_for_prompt(
-            engine,
-            system.as_str(),
-            &user,
-            thread_context,
-            1024,
-            8192,
-        ),
+        &gen_params_text_for_prompt(engine, system.as_str(), &user, 320, 1_200),
         |piece| -> ControlFlow<Result<(), Infallible>> {
             if cancelled.load(Ordering::Relaxed) {
                 return ControlFlow::Break(Ok(()));
@@ -142,7 +140,7 @@ pub fn agent_draft_reply_streaming(
     if let Some(e) = cancelled_llm_err(cancelled) {
         return Err(e);
     }
-    let draft = ensure_mail_body_output(thread_context, raw.trim())?;
+    let draft = ensure_reply_draft_output(thread_context, raw.trim())?;
     let draft: String = draft.chars().take(8000).collect();
     let _ = budget_report(
         engine.n_ctx(),
