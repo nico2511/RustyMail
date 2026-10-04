@@ -134,7 +134,7 @@ export async function composeAiGrammar(): Promise<void> {
         state.composeGrammarSuggestions = usable;
         toast(
           n
-            ? `${n} suggestion(s) — voir le panneau Correction entre la barre d’outils et le texte.`
+            ? `${n} suggestion(s) — surlignées dans le texte (clic pour corriger) et panneau Correction.`
             : "Aucune suggestion.",
         );
       }

@@ -339,7 +339,8 @@ select {
 .inbox-appbar {
   gap: 8px;
   padding: 12px 18px 8px;
-  border-bottom: 1px solid var(--border);
+  /* Pas de trait sous les filtres rapides : le panneau liste porte déjà sa bordure. */
+  border-bottom: none;
 }
 
 .inbox-mailbox-title {
@@ -468,7 +469,7 @@ select {
 }
 
 .composer-mail-shell .compose-tiptap {
-  min-height: 280px;
+  min-height: 0;
   height: 100%;
   overflow: auto;
   padding: 0;

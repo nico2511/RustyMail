@@ -24,12 +24,16 @@ use crate::ImapSession;
 /// Ordre de préférence pour la corbeille (noms IMAP fréquents).
 const TRASH_CANDIDATES: &[&str] = &[
     "[Gmail]/Trash",
+    "[Google Mail]/Trash",
     "INBOX/Trash",
+    "INBOX.Trash",
     "Trash",
     "Deleted Messages",
+    "Deleted Items",
     "Deleted",
     "Bin",
     "Poubelle",
+    "Corbeille",
 ];
 
 /// Ordre de préférence pour l’archivage (Gmail: All Mail, sinon Archive).
@@ -104,12 +108,9 @@ pub fn pick_trash_folder(list: &[String]) -> Option<String> {
             }
         }
     }
+    // Fallback aligné sur `is_trash_like_mailbox` (FR/EN + suffixes Gmail / Google Mail).
     for name in list {
-        let l = name.to_ascii_lowercase();
-        if l.contains("trash") {
-            return Some(name.clone());
-        }
-        if l.contains("bin") && !l.contains("inbox") {
+        if is_trash_like_mailbox(name) {
             return Some(name.clone());
         }
     }
@@ -1141,5 +1142,34 @@ mod archive_pick_tests {
     fn prefers_inbox_archive_on_dot_server() {
         let list = vec!["Archive".to_string(), "INBOX.Archive".to_string()];
         assert_eq!(pick_archive_folder(&list).as_deref(), Some("INBOX.Archive"));
+    }
+}
+
+mod trash_pick_tests {
+    use super::pick_trash_folder;
+
+    #[test]
+    fn prefers_gmail_trash() {
+        let list = vec![
+            "INBOX".to_string(),
+            "[Gmail]/Trash".to_string(),
+            "Spam".to_string(),
+        ];
+        assert_eq!(pick_trash_folder(&list).as_deref(), Some("[Gmail]/Trash"));
+    }
+
+    #[test]
+    fn accepts_google_mail_trash_alias() {
+        let list = vec!["INBOX".to_string(), "[Google Mail]/Trash".to_string()];
+        assert_eq!(
+            pick_trash_folder(&list).as_deref(),
+            Some("[Google Mail]/Trash")
+        );
+    }
+
+    #[test]
+    fn accepts_french_corbeille() {
+        let list = vec!["INBOX".to_string(), "Corbeille".to_string()];
+        assert_eq!(pick_trash_folder(&list).as_deref(), Some("Corbeille"));
     }
 }

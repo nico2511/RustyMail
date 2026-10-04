@@ -34,13 +34,15 @@ export async function onThreadMove(
     toast.warning("Configurez d’abord un compte IMAP.");
     return;
   }
+  const row = state.threads.find((t) => t.id === threadId);
+  const accountId = row?.accountId?.trim() || account.id;
   const mailbox = mailboxOverride?.trim() || sourceMailboxForThread(threadId);
   const cmd = kind === "trash" ? "move_thread_trash" : "move_thread_archive";
   const prev = optimisticRemoveThreadFromList(threadId);
   const d = requireThreadListActionsDeps();
   try {
     const msg = await withTimeout(
-      invoke<string>(cmd, { accountId: account.id, mailbox, threadId }),
+      invoke<string>(cmd, { accountId, mailbox, threadId }),
       MAIL_ACTION_TIMEOUT_MS,
     );
     toast(msg);

@@ -31,8 +31,8 @@
       "storage": "Stockage",
       "shortcuts": "Raccourcis",
       "developer": "Développeur",
-      "digestBench": "Banc d'essai",
-      "digestCut": "Éditeur de découpe"
+      "digestBench": "Banc d'essai (fixtures)",
+      "digestCut": "Éditeur de découpe (mails)"
     },
     "general": {
       "languageHeading": "Langue",
@@ -73,14 +73,14 @@
     },
     "appearance": {
       "heading": "Apparence",
-      "explain": "Thème clair productivité : rail charbon, surface blanche, accent cuivre. Le mode sombre garde le cuivre. Contraste+ renforce l’encre, en clair comme en sombre. La session crème et l’accent lavande ne changent plus l’interface (limitation temporaire).",
+      "explain": "Thème clair productivité : rail charbon, surface blanche, accent cuivre. Le mode sombre garde le cuivre. Contraste+ renforce l’encre, en clair comme en sombre.",
       "colorScheme": "Thème",
       "schemeLight": "Clair",
       "schemeDark": "Sombre",
       "schemeSystem": "Système",
-      "sessionComfort": "Session douce — sans effet (crème retirée)",
+      "sessionComfort": "Session douce",
       "contrastPlus": "Contraste+",
-      "accentLavender": "Accent lavande — sans effet (retiré)",
+      "accentLavender": "Accent lavande",
       "aiPanelWidth": "Largeur panneau droit (px)",
       "save": "Enregistrer l’apparence"
     },

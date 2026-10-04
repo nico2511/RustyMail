@@ -139,20 +139,36 @@ fn map_suggested_action(raw: &str) -> Option<OrgSuggestedAction> {
 }
 
 /// Parse et valide le JSON d’orientation. Les ids hors catalogue sont retirés.
-/// Une action au verbe inconnu est ignorée ; les alias (`delete`, `mark_as_read`, …) sont normalisés.
-/// Un diagnostic absent ou hors contrat est une erreur : aucun texte de repli n’est fabriqué.
+/// Une action au verbe inconnu ou hors bornes est ignorée ; les alias (`delete`, `mark_as_read`, …) sont normalisés.
+/// Un diagnostic absent est une erreur : aucun texte inventé ; un diagnostic trop long est tronqué.
 pub fn parse_org_orientation_json(
     raw: &str,
     valid_thread_ids: &HashSet<String>,
 ) -> Result<ParsedOrgOrientation, LlmError> {
+    use crate::ai_llm_contracts::{normalize_org_diagnosis, repair_short_org_diagnosis};
+
     let parsed: LlmOrgOrientationResponse = parse_model_json(raw)?;
-    let diagnosis = parsed.diagnosis.trim().to_string();
-    let recommendations: Vec<String> = parsed
+    let mut recommendations: Vec<String> = parsed
         .recommendations
         .iter()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+        .take(6)
         .collect();
+    let mut diagnosis = normalize_org_diagnosis(&parsed.diagnosis);
+    if diagnosis.is_empty() {
+        return Err(LlmError::Msg("Orientation : diagnostic manquant.".into()));
+    }
+    if recommendations.is_empty() {
+        let snippet: String = diagnosis.chars().take(120).collect();
+        if !snippet.trim().is_empty() {
+            recommendations.push(snippet);
+        }
+    }
+    // Réparation locale uniquement à partir du contenu déjà produit par le modèle.
+    if let Some(repaired) = repair_short_org_diagnosis(&diagnosis, &recommendations) {
+        diagnosis = repaired;
+    }
     let actionable: Vec<&LlmOrgActionRow> = parsed
         .actions
         .iter()
@@ -174,10 +190,18 @@ pub fn parse_org_orientation_json(
     }
 
     let mut actions = Vec::new();
-    for (i, row) in actionable.into_iter().enumerate().take(5) {
+    for (i, row) in actionable.into_iter().enumerate() {
+        if actions.len() >= 5 {
+            break;
+        }
         let Some(suggested_action) = map_suggested_action(&row.suggested_action) else {
             continue;
         };
+        let title = row.title.trim();
+        let rationale = row.rationale.trim();
+        if title.chars().count() < 2 || rationale.chars().count() < 4 {
+            continue;
+        }
         let refs: Vec<OrgThreadRef> = row
             .thread_ids
             .iter()
@@ -209,8 +233,8 @@ pub fn parse_org_orientation_json(
             id: format!("llm-{i}"),
             kind: OrgProposalKind::LlmCluster,
             section: "range".to_string(),
-            title: row.title.trim().to_string(),
-            rationale: row.rationale.trim().to_string(),
+            title: title.to_string(),
+            rationale: rationale.to_string(),
             thread_ids: refs.iter().map(|r| r.thread_id.clone()).collect(),
             thread_refs: refs,
             suggested_action,
@@ -311,6 +335,36 @@ Note : ceci n’est pas une seconde action.
         let msg = err.to_string();
         assert!(!msg.to_lowercase().contains("boîte est en ordre"));
         assert!(!msg.contains("Orientation prête"));
+    }
+
+    #[test]
+    fn orientation_truncates_long_diagnosis_instead_of_failing() {
+        let long = "A".repeat(1300);
+        let raw = format!(
+            r#"{{"diagnosis":"{long}","recommendations":["Archiver le lot lu."],"actions":[]}}"#
+        );
+        let parsed = parse_org_orientation_json(&raw, &ids(&[])).expect("truncated ok");
+        assert!(parsed.orientation.diagnosis.chars().count() <= 1200);
+        assert!(parsed.orientation.diagnosis.ends_with('…'));
+    }
+
+    #[test]
+    fn orientation_repairs_short_diagnosis_from_recommendation() {
+        let raw = r#"{"diagnosis":"Court.","recommendations":["Archiver les newsletters déjà lues."],"actions":[]}"#;
+        let parsed = parse_org_orientation_json(raw, &ids(&[])).expect("repaired");
+        assert!(parsed.orientation.diagnosis.chars().count() >= 8);
+        assert!(parsed.orientation.diagnosis.contains("Court"));
+    }
+
+    #[test]
+    fn orientation_drops_bad_action_keeps_good_sibling() {
+        let raw = r#"{"diagnosis":"Des publicités lues encombrent l’inbox depuis des semaines.","recommendations":["Jeter les pubs.","Garder les factures."],"actions":[{"title":"x","rationale":"okkk","threadIds":["t-ads"],"searchKeywords":[],"suggestedAction":"archive","targetMailbox":null},{"title":"Jeter les pubs","rationale":"Ces fils n’ont plus d’intérêt.","threadIds":["t-ads"],"searchKeywords":[],"suggestedAction":"trash","targetMailbox":null}]}"#;
+        let parsed = parse_org_orientation_json(raw, &ids(&["t-ads"])).expect("partial ok");
+        assert_eq!(parsed.actions.len(), 1);
+        assert_eq!(
+            parsed.actions[0].suggested_action,
+            OrgSuggestedAction::Trash
+        );
     }
 
     #[test]

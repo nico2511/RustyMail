@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use rustymail_domain::{AssistFactsSnapshot, AssistMode};
+use rustymail_domain::{AssistFactsSnapshot, AssistMode, AssistSkill};
 use rustymail_domain::{ThreadQaAnswer, TranslationResult};
 use rustymail_infrastructure::{load_app_prefs, sqlite_ai_cache_put, AiFeature};
 use rustymail_modules::ai_agent_prepare_reply::{AgentDraftResult, AgentIntentResult};
@@ -372,12 +372,14 @@ pub async fn llm_stream_agent_prepare_draft(
     assist_mode: Option<AssistMode>,
     prior_facts: Option<AssistFactsSnapshot>,
     force_draft: Option<bool>,
+    enabled_skills: Option<Vec<AssistSkill>>,
 ) -> Result<(), String> {
     crate::ipc_guard::validate_thread_id(&thread_id)?;
     crate::ipc_guard::validate_job_id(&job_id)?;
     let account_id = account_id.unwrap_or_default();
     let assist_mode = assist_mode.unwrap_or(AssistMode::Deep);
     let force_draft = force_draft.unwrap_or(false);
+    let enabled_skills = enabled_skills.unwrap_or_default();
     let paths = Clone::clone(&*paths);
     let job_id = job_id.trim().to_string();
     let thread_id = thread_id.trim().to_string();
@@ -389,8 +391,11 @@ pub async fn llm_stream_agent_prepare_draft(
         let prefs = load_app_prefs(&paths.prefs_path);
         llm_gate_feature(&prefs, &paths, AiFeature::AgentPrepareReply)?;
         let mut engine = build_llm_engine(&prefs, &paths)?;
-        let request =
+        let mut request =
             default_assist_request(thread_id.as_str(), account_id.as_str(), &prefs, assist_mode);
+        if !enabled_skills.is_empty() {
+            request.enabled_skills = enabled_skills;
+        }
         let thread = assist_thread_context_with_engine(&paths, thread_id.as_str(), &engine)?;
         let (draft, run_step) = run_assist_draft_streaming(
             &mut engine,

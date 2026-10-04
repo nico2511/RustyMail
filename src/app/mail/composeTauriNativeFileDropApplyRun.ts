@@ -1,6 +1,11 @@
+import { render } from "../dispatch";
 import { toast } from "../lib/toast";
 import { state } from "../state";
-import { attachmentPathsJoinedForHiddenField } from "./composeAttachmentPaths";
+import {
+  MAX_COMPOSE_ATTACHMENTS,
+  syncComposeAttachmentsHiddenField,
+} from "./composeAttachmentPaths";
+import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 
 export function tauriCurrentWebviewLabel(): string | undefined {
   try {
@@ -35,8 +40,13 @@ export function applyNativeDroppedFilePaths(dropped: string[]): void {
     return;
   }
   const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...dropped]));
+  if (merged.length > MAX_COMPOSE_ATTACHMENTS) {
+    toast.warning(`Maximum ${MAX_COMPOSE_ATTACHMENTS} pièces jointes par message.`);
+    return;
+  }
   state.draft.attachmentPaths = merged;
-  const attachmentsField = document.querySelector<HTMLInputElement>("#compose-attachments");
-  if (attachmentsField) attachmentsField.value = attachmentPathsJoinedForHiddenField(merged);
+  syncComposeAttachmentsHiddenField(merged);
   toast.success(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
+  render();
+  scheduleDraftRevisionSave(250);
 }

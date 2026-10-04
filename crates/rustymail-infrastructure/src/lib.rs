@@ -18,6 +18,7 @@ mod auto_archive;
 mod contact_detail;
 mod demo_playground;
 mod draft_revisions;
+mod eml_preview;
 mod folder_ops;
 mod imap;
 mod imap_tombstones;
@@ -97,6 +98,7 @@ pub use dictation::{
     translate_to_draft_language, DICTATION_KEYRING_USERNAME,
 };
 pub use email_util::normalize_email;
+pub use eml_preview::{parse_eml_base64, parse_eml_bytes, EmlCutSource};
 pub use hf_download::{download_hf_file_if_needed, hf_resolve_url};
 pub use llama_server::{
     llama_server_api_key_clear, llama_server_api_key_get, llama_server_api_key_present,
@@ -150,7 +152,8 @@ pub use imap_tombstones::{
 };
 pub use mail_classify::{
     apply_mail_type_tag, apply_mail_type_tag_csv, classify_mail_type, mail_type_db_value,
-    priority_score_for_thread, sender_is_noreply_like, sender_is_transactional,
+    priority_score_for_thread, protect_from_org_trash, sender_is_noreply_like,
+    sender_is_transactional, subject_looks_transactional,
 };
 pub use mail_ops::{
     empty_trash_mailbox, is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive,

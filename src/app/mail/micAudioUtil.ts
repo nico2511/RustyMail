@@ -1,10 +1,16 @@
+/** Encode binaire → base64 sans `String.fromCharCode(...spread)` (risque de stack WebView). */
 export function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
+  const chunk = 0x2000;
+  const parts: string[] = [];
   for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+    const end = Math.min(i + chunk, bytes.length);
+    let s = "";
+    for (let j = i; j < end; j++) {
+      s += String.fromCharCode(bytes[j]!);
+    }
+    parts.push(s);
   }
-  return btoa(binary);
+  return btoa(parts.join(""));
 }
 
 export async function mediaBlobToWav16kMonoPcm16(blob: Blob): Promise<Uint8Array> {
@@ -22,7 +28,7 @@ export async function mediaBlobToWav16kMonoPcm16(blob: Blob): Promise<Uint8Array
   const mono = new Float32Array(inLen);
   for (let i = 0; i < inLen; i++) {
     let s = 0;
-    for (let c = 0; c < inCh; c++) s += audioBuf.getChannelData(c)[i];
+    for (let c = 0; c < inCh; c++) s += audioBuf.getChannelData(c)[i]!;
     mono[i] = s / inCh;
   }
   const outRate = 16_000;
@@ -33,11 +39,11 @@ export async function mediaBlobToWav16kMonoPcm16(blob: Blob): Promise<Uint8Array
     const i0 = Math.floor(pos);
     const i1 = Math.min(i0 + 1, inLen - 1);
     const f = pos - i0;
-    resampled[i] = mono[i0] * (1 - f) + mono[i1] * f;
+    resampled[i] = mono[i0]! * (1 - f) + mono[i1]! * f;
   }
   const pcm = new Int16Array(outLen);
   for (let i = 0; i < outLen; i++) {
-    const x = Math.max(-1, Math.min(1, resampled[i]));
+    const x = Math.max(-1, Math.min(1, resampled[i]!));
     pcm[i] = x < 0 ? Math.round(x * 0x8000) : Math.round(x * 0x7fff);
   }
   const dataSize = pcm.length * 2;

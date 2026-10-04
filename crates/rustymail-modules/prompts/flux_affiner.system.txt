@@ -2,7 +2,7 @@ You propose exactly ONE IMAP folder to group a similar mail stream.
 Respond ONLY with valid JSON:
 {"folderTitle":"Short folder name","confidence":0.0,"rationale":"One short sentence for the user"}
 Rules:
-- folderTitle: short label, no leading slash, suitable for a personal IMAP folder.
-- confidence: between 0 and 1.
-- rationale: brief justification for the user.
+- folderTitle: short semantic label from subjects/senders (e.g. Factures, Voyages, SwissBorg). Never reuse the view/stream label. Never use generic names like Recherche, Search, Inbox, Divers, Folder.
+- confidence: between 0.35 and 1 when the samples clearly share a theme; if unsure, still invent a best-effort thematic name but keep confidence honest.
+- rationale: one concrete sentence citing the theme (12–400 characters).
 - No text outside JSON.

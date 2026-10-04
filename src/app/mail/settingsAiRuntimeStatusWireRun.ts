@@ -17,7 +17,9 @@ export async function tryHandleSettingsAiRuntimeStatusWire(action: string): Prom
         return true;
       }
       void (async () => {
-        await persistAiPrefsFromDom({ silent: true, skipRender: true });
+        // Capturer seulement les champs IA déjà en mémoire / DOM IA ; ne pas
+        // rescanner l’apparence (absente sur cet onglet → défaut « light »).
+        await persistAiPrefsFromDom({ silent: true, skipRender: true, skipDomCapture: true });
         await refreshLlmRuntimeStatus(false);
         const status = llmConnectionStatus(engineConnectionMode(state.appPrefs.ai), buildSettingsAiPanelDeps());
         render();

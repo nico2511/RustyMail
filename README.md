@@ -2,11 +2,11 @@
 
 RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI (summaries, rewrite, translation, grammar, dictation, semantic search) runs on-device or over HTTP to OpenRouter / llama-server — never required for core mail.
 
-**0.3.4** includes a **TipTap** compose body, **toasts** (info, success, warning, error, with duration and dismiss), and **conversational reading** for person-to-person threads (folded quotes, signatures set aside). Newsletter and provider digests stay on their own path (Amazon, Deblock, GitHub). Deblock reading applies the embedded digest fixture; Settings includes a digest fixture bench ([#31](https://github.com/nico2511/RustyMail/pull/31)).
+**0.3.5** builds on TipTap compose and conversational reading with post-usage fixes: Correction apply + live highlights, Gmail Trash/Archive, image/PJ limits, dictation stability, Organiser Affiner, Action Brief partial JSON, split-send, and appearance polish. Free image width and digest-cut mailbox load from [#46](https://github.com/nico2511/RustyMail/pull/46) / [#47](https://github.com/nico2511/RustyMail/pull/47) ship here (version kept at **0.3.5**, not 0.4.0).
 
 ## Screenshots
 
-UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.4 build (compose in the app uses TipTap, not the mockup’s markdown field).
+UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.5 build (compose in the app uses TipTap, not the mockup’s markdown field).
 
 **Inbox** — unified list, charcoal rail, account labels.
 

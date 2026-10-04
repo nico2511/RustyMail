@@ -881,8 +881,84 @@ fn org_action_allowed(action: &str) -> bool {
     normalize_org_suggested_action(action).is_some()
 }
 
-/// Rejette une orientation hors contrat (diagnostic, recommandations, bornes d’une action reconnue).
-/// Une action au `suggestedAction` inconnu est ignorée : elle ne fait pas échouer l’orientation.
+/// Tronque un diagnostic trop long (caractères Unicode). Ne invente pas de texte.
+pub fn normalize_org_diagnosis(diagnosis: &str) -> String {
+    let trimmed = diagnosis.trim();
+    let n = trimmed.chars().count();
+    if n <= MAX_ORG_DIAGNOSIS_CHARS {
+        return trimmed.to_string();
+    }
+    let keep = MAX_ORG_DIAGNOSIS_CHARS.saturating_sub(1);
+    let mut out: String = trimmed.chars().take(keep).collect();
+    out.push('…');
+    out
+}
+
+/// Si le diagnostic est trop court, le complète avec le début de la 1ʳᵉ recommandation
+/// (contenu déjà produit par le modèle — pas un texte inventé).
+pub fn repair_short_org_diagnosis(diagnosis: &str, recommendations: &[String]) -> Option<String> {
+    let d = diagnosis.trim();
+    let n = d.chars().count();
+    if n == 0 {
+        return None;
+    }
+    if n >= MIN_ORG_DIAGNOSIS_CHARS {
+        return Some(normalize_org_diagnosis(d));
+    }
+    let rec = recommendations
+        .iter()
+        .map(|s| s.trim())
+        .find(|s| !s.is_empty())?;
+    let combined = format!("{d} — {rec}");
+    let repaired = normalize_org_diagnosis(&combined);
+    if repaired.chars().count() < MIN_ORG_DIAGNOSIS_CHARS {
+        return None;
+    }
+    Some(repaired)
+}
+
+fn org_action_shape_ok(action: &OrgOrientationActionShape<'_>) -> bool {
+    if !org_action_allowed(action.suggested_action) {
+        return false;
+    }
+    let title_n = action.title.trim().chars().count();
+    if title_n < 2 || title_n > MAX_ORG_ACTION_TITLE_CHARS {
+        return false;
+    }
+    let rationale_n = action.rationale.trim().chars().count();
+    if rationale_n < 4 || rationale_n > MAX_ORG_ACTION_RATIONALE_CHARS {
+        return false;
+    }
+    if action.thread_ids.len() > MAX_ORG_ACTION_THREAD_IDS {
+        return false;
+    }
+    if action
+        .thread_ids
+        .iter()
+        .any(|id| id.trim().chars().count() > MAX_ORG_ACTION_THREAD_ID_CHARS)
+    {
+        return false;
+    }
+    if action.search_keywords.len() > MAX_ORG_ACTION_KEYWORDS {
+        return false;
+    }
+    if action
+        .search_keywords
+        .iter()
+        .any(|k| k.trim().chars().count() > MAX_ORG_ACTION_KEYWORD_CHARS)
+    {
+        return false;
+    }
+    if let Some(mb) = action.target_mailbox {
+        if mb.trim().chars().count() > MAX_ORG_TARGET_MAILBOX_CHARS {
+            return false;
+        }
+    }
+    true
+}
+
+/// Rejette une orientation hors contrat (diagnostic, recommandations).
+/// Une action au `suggestedAction` inconnu **ou** hors bornes est ignorée : elle ne fait pas échouer l’orientation.
 /// Le contrat autorise `actions: []` ; aucun diagnostic de repli n’est inventé.
 pub fn validate_org_orientation_shape(
     diagnosis: &str,
@@ -910,65 +986,14 @@ pub fn validate_org_orientation_shape(
             )));
         }
     }
-    let recognized = actions
+    let recognized_ok = actions
         .iter()
-        .filter(|action| org_action_allowed(action.suggested_action))
+        .filter(|action| org_action_shape_ok(action))
         .count();
-    if recognized > MAX_ORG_ACTIONS {
+    if recognized_ok > MAX_ORG_ACTIONS {
         return Err(err_msg(format!(
             "Orientation : trop d’actions (max {MAX_ORG_ACTIONS})."
         )));
-    }
-    for (i, action) in actions.iter().enumerate() {
-        if !org_action_allowed(action.suggested_action) {
-            // Verbe hors enum V2 : on ignore cette action (diagnostic et actions valides conservés).
-            continue;
-        }
-        let title_n = action.title.trim().chars().count();
-        if title_n < 2 || title_n > MAX_ORG_ACTION_TITLE_CHARS {
-            return Err(err_msg(format!(
-                "Orientation : titre d’action {i} hors bornes."
-            )));
-        }
-        let rationale_n = action.rationale.trim().chars().count();
-        if rationale_n < 4 || rationale_n > MAX_ORG_ACTION_RATIONALE_CHARS {
-            return Err(err_msg(format!(
-                "Orientation : justification d’action {i} hors bornes."
-            )));
-        }
-        if action.thread_ids.len() > MAX_ORG_ACTION_THREAD_IDS {
-            return Err(err_msg(format!(
-                "Orientation : trop de threadIds (action {i}, max {MAX_ORG_ACTION_THREAD_IDS})."
-            )));
-        }
-        if action
-            .thread_ids
-            .iter()
-            .any(|id| id.trim().chars().count() > MAX_ORG_ACTION_THREAD_ID_CHARS)
-        {
-            return Err(err_msg(format!(
-                "Orientation : threadId trop long (action {i})."
-            )));
-        }
-        if action.search_keywords.len() > MAX_ORG_ACTION_KEYWORDS {
-            return Err(err_msg(format!(
-                "Orientation : trop de searchKeywords (action {i})."
-            )));
-        }
-        if action
-            .search_keywords
-            .iter()
-            .any(|k| k.trim().chars().count() > MAX_ORG_ACTION_KEYWORD_CHARS)
-        {
-            return Err(err_msg("Orientation : mot-clé trop long.".to_string()));
-        }
-        if let Some(mb) = action.target_mailbox {
-            if mb.trim().chars().count() > MAX_ORG_TARGET_MAILBOX_CHARS {
-                return Err(err_msg(format!(
-                    "Orientation : targetMailbox trop long (action {i})."
-                )));
-            }
-        }
     }
     Ok(())
 }
@@ -1144,12 +1169,13 @@ mod tests {
             &[unknown(), aliased()],
         )
         .is_ok());
+        // Action reconnue hors bornes : ignorée (comme un verbe inconnu), orientation OK.
         assert!(validate_org_orientation_shape(
             "La boîte contient surtout des newsletters lues.",
             &recs,
             &[aliased(), broken],
         )
-        .is_err());
+        .is_ok());
     }
 
     #[test]

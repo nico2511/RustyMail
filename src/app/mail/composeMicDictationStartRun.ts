@@ -1,12 +1,12 @@
 import type { MicActionOpts } from "../types";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
-import { render } from "../dispatch";
 import { state } from "../state";
 import { micPermissionErrorMessage, requestMicStream } from "./micStreamAccess";
 import { micTargetFromView } from "./composeMicDictationApplyRun";
 import { micDictationCtx } from "./composeMicDictationContext";
 import { stopMicDictationAndTranscribe } from "./composeMicDictationStopRun";
+import { patchMicButtonsDom } from "./composeMicUiPatch";
 
 export function validateDictationCanStart(): boolean {
   if (!isTauriRuntime()) {
@@ -38,14 +38,18 @@ export function validateDictationCanStart(): boolean {
 }
 
 export async function startMicDictationRecording(opts?: MicActionOpts): Promise<void> {
+  if (micDictationCtx.startInFlight || state.micState !== "idle") return;
+  micDictationCtx.startInFlight = true;
   micDictationCtx.micDictationTarget = micTargetFromView(opts?.target);
-  if (!validateDictationCanStart()) return;
+  if (!validateDictationCanStart()) {
+    micDictationCtx.startInFlight = false;
+    return;
+  }
   try {
     micDictationCtx.micStream = await requestMicStream();
     if (opts?.fromPushToTalk && !micDictationCtx.micPttKeyHeld) {
       micDictationCtx.micStream.getTracks().forEach((t) => t.stop());
       micDictationCtx.micStream = null;
-      render();
       return;
     }
     micDictationCtx.micChunks.length = 0;
@@ -61,26 +65,28 @@ export async function startMicDictationRecording(opts?: MicActionOpts): Promise<
       micDictationCtx.micStream.getTracks().forEach((t) => t.stop());
       micDictationCtx.micStream = null;
       micDictationCtx.micMediaRecorder = null;
-      render();
       return;
     }
     micDictationCtx.micMediaRecorder.start(250);
     state.micState = "recording";
     state.micSeconds = 0;
     const maxRec = state.appPrefs.ai.whisperMaxRecordSeconds;
+    // Pas de `render()` ici : un remount TipTap chaque seconde tue WebView + MediaRecorder.
     micDictationCtx.micTimer = window.setInterval(() => {
       state.micSeconds += 1;
       if (maxRec > 0 && state.micSeconds >= maxRec) {
         void stopMicDictationAndTranscribe();
-        return;
       }
-      render();
     }, 1000);
-    render();
+    patchMicButtonsDom();
   } catch (e) {
     toast.error(micPermissionErrorMessage(e));
     micDictationCtx.micStream?.getTracks().forEach((t) => t.stop());
     micDictationCtx.micStream = null;
     micDictationCtx.micMediaRecorder = null;
+    state.micState = "idle";
+    patchMicButtonsDom();
+  } finally {
+    micDictationCtx.startInFlight = false;
   }
 }

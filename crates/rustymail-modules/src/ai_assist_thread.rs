@@ -475,17 +475,26 @@ pub fn run_assist_phase(
                 ambiguities: Vec::new(),
                 confidence: 1.0,
             });
-            let check = consistency_check_with_llm(
+            match consistency_check_with_llm(
                 engine,
                 thread_context,
                 &facts,
                 draft,
                 &request.user_prefs,
-            )?;
-            result.consistency_issues = check.issues;
-            result.safety_flags = check.safety_flags;
-            if !check.aligned {
-                result.safety_flags.push("consistency_warning".into());
+            ) {
+                Ok(check) => {
+                    result.consistency_issues = check.issues;
+                    result.safety_flags = check.safety_flags;
+                    if !check.aligned {
+                        result.safety_flags.push("consistency_warning".into());
+                    }
+                }
+                Err(e) if AssistSkill::ConsistencyCheck.fallback_on_error() => {
+                    let run_step = error_step(skill_id, started, &e);
+                    result.run_steps.push(run_step.clone());
+                    return Ok(AssistPhaseOutput { result, run_step });
+                }
+                Err(e) => return Err(e),
             }
         }
         AssistPhase::ToneAdapt => {

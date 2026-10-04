@@ -190,6 +190,37 @@ describe("applyComposeGrammarSuggestionAtIndex", () => {
     expect(state.composeGrammarSuggestions).toHaveLength(1);
   });
 
+  it("applique sur un corps HTML TipTap (pas un no-op)", () => {
+    const html = `<!--rustymail-html--><p>salu moi c'est nicolas</p>`;
+    state.composeBody = html;
+    state.composeCanonicalBody = html;
+    state.draft = emptyDraft(html);
+    state.composeGrammarSuggestions = [
+      { reason: "x", original: "salu moi c'est nicolas", replacement: "Bonjour, je m'appelle Nicolas" },
+    ];
+    paintShell();
+
+    applyComposeGrammarSuggestionAtIndex(0);
+
+    expect(bodyValue()).toBe("Bonjour, je m'appelle Nicolas");
+    expect(toastText()).toContain("Remplacement appliqué");
+  });
+
+  it("remplace toutes les occurrences via apply-all", async () => {
+    const { applyComposeGrammarSuggestionAllAtIndex } = await import("./composeWireGrammarRun");
+    state.composeBody = "aa puis aa";
+    state.composeCanonicalBody = state.composeBody;
+    state.draft = emptyDraft(state.composeBody);
+    state.composeGrammarSuggestions = [{ reason: "x", original: "aa", replacement: "bb" }];
+    paintShell();
+
+    applyComposeGrammarSuggestionAllAtIndex(0);
+
+    expect(bodyValue()).toBe("bb puis bb");
+    expect(toastText()).toContain("Remplacements appliqués");
+    expect(state.composeGrammarSuggestions).toBeNull();
+  });
+
   it("retrouve l’extrait malgré une apostrophe typographique", async () => {
     state.composeBody = "salu moi c'est nicolas";
     state.composeCanonicalBody = state.composeBody;

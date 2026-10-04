@@ -4,6 +4,7 @@
 
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use rustymail_infrastructure::{download_hf_file_if_needed, hf_resolve_url};
 
@@ -11,6 +12,9 @@ use hound::{SampleFormat, WavSpec};
 use transcribe_rs::accel::{set_whisper_accelerator, WhisperAccelerator, GPU_DEVICE_AUTO};
 use transcribe_rs::whisper_cpp::{WhisperEngine, WhisperInferenceParams, WhisperLoadParams};
 use transcribe_rs::TranscribeError;
+
+/// Sérialise le chargement + l’inférence whisper.cpp (pas thread-safe / RAM lourde).
+static WHISPER_TRANSCRIBE_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -327,6 +331,10 @@ pub fn transcribe_whisper_wav_bytes_typed(
     wav: &[u8],
     prefs: &rustymail_infrastructure::AiPrefs,
 ) -> Result<String, WhisperError> {
+    let _guard = WHISPER_TRANSCRIBE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
     // `catch_unwind` n'intercepte pas `abort()` / `std::terminate` de whisper.cpp
     // (WHISPER_ASSERT, `wstring_convert` sur certains chemins Windows).
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

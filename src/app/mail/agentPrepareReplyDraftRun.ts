@@ -41,6 +41,7 @@ export async function agentRunDraftStream(signal: AbortSignal): Promise<boolean>
       priorIntent: s.intent ?? null,
       priorFacts: s.facts ?? null,
       forceDraft: s.forceDraft,
+      enabledSkills: s.enabledSkills?.length ? s.enabledSkills : undefined,
     },
     signal,
     onChunk: (acc) => {

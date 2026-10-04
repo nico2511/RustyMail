@@ -6,9 +6,9 @@ use crate::ai_llm_util::{
     gen_params_json_for_prompt, parse_model_json, truncate_chars, untrusted_mail_for_engine,
 };
 use crate::mail_cleaning::digest_fixtures::proposal::{
-    analyze_html_structure_heuristic, proposal_to_fixture_yaml, structure_outline_for_llm,
-    DigestCutAnchor, DigestCutMatch, DigestCutProposal, DigestCutZone, DigestCutZones,
-    DomainRuleDto, ProposalSource,
+    analyze_html_structure_heuristic, french_explanation, proposal_to_fixture_yaml,
+    structure_outline_for_llm, DigestCutAnchor, DigestCutMatch, DigestCutProposal, DigestCutZone,
+    DigestCutZones, DomainRuleDto, ProposalSource,
 };
 use crate::mail_cleaning::digest_fixtures::{AnchorRole, ZoneAction, ZonePresentation};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -18,6 +18,8 @@ use rustymail_llm::{LlmEngine, LlmError};
 struct DigestCutDto {
     fixture_id: String,
     rule_set_version: String,
+    #[serde(default)]
+    explanation_fr: String,
     #[serde(rename = "match")]
     match_: DigestCutMatchDto,
     zones: DigestCutZonesDto,
@@ -50,38 +52,90 @@ struct DigestCutZoneDto {
     rationale: Option<String>,
 }
 
-/// Propose des zones : heuristique DOM d'abord, modèle optionnel si disponible.
+/// Résultat d'une proposition. `from_model` est faux si le moteur manque ou si le JSON est refusé.
+pub struct DigestCutModelOutcome {
+    pub proposal: DigestCutProposal,
+    pub from_model: bool,
+    /// Raison courte quand `from_model` est faux (UI).
+    pub fallback_reason: Option<String>,
+}
+
+/// Propose des zones. Sans moteur, ou si le JSON est refusé : heuristique, ou la proposition
+/// déjà ajustée par l'utilisateur quand elle est fournie.
+///
+/// Le prompt est calibré pour un modèle local de la classe Llama 3.2 (contexte court).
 pub fn propose_digest_cut_zones(
     engine: Option<&mut LlmEngine>,
     html: &str,
     sender_email: &str,
     output_language: &str,
-) -> DigestCutProposal {
-    let fallback = analyze_html_structure_heuristic(html, sender_email);
+    current: Option<&DigestCutProposal>,
+) -> DigestCutModelOutcome {
+    let fallback = current
+        .cloned()
+        .unwrap_or_else(|| analyze_html_structure_heuristic(html, sender_email));
+    let mut fallback_reason: Option<String> = None;
     if let Some(engine) = engine {
-        if let Ok(llm) = propose_with_llm(engine, html, sender_email, output_language) {
-            if proposal_to_fixture_yaml(&llm).is_ok() {
-                return llm;
+        match propose_with_llm(engine, html, sender_email, output_language, current) {
+            Ok(llm) => {
+                if proposal_to_fixture_yaml(&llm).is_ok() {
+                    return DigestCutModelOutcome {
+                        proposal: llm,
+                        from_model: true,
+                        fallback_reason: None,
+                    };
+                }
+                fallback_reason = Some(
+                    "Le modèle a répondu, mais la proposition JSON/YAML a été refusée.".into(),
+                );
+            }
+            Err(e) => {
+                fallback_reason = Some(format!("Le modèle n’a pas produit de découpe : {e}"));
             }
         }
+    } else {
+        fallback_reason = Some(
+            "Aucun moteur IA joignable pour la découpe (Paramètres → IA : mode + Tester la connexion)."
+                .into(),
+        );
     }
-    fallback
+    let mut proposal = fallback;
+    if proposal.explanation_fr.trim().is_empty() {
+        proposal.explanation_fr = french_explanation(&proposal);
+    }
+    DigestCutModelOutcome {
+        proposal,
+        from_model: false,
+        fallback_reason,
+    }
 }
+
+/// HTML clip kept small for Llama 3.2 (local Ollama `llama3.2` or llama-server).
+const LLM_HTML_CHARS: usize = 6_000;
 
 fn propose_with_llm(
     engine: &mut LlmEngine,
     html: &str,
     sender_email: &str,
     output_language: &str,
+    current: Option<&DigestCutProposal>,
 ) -> Result<DigestCutProposal, LlmError> {
     let outline = structure_outline_for_llm(html);
-    let clipped = truncate_chars(html, 24_000);
+    let clipped = truncate_chars(html, LLM_HTML_CHARS);
     let system = crate::prompts::system_prompt_for_language("digest_cut", output_language);
+    let current_block = match current {
+        Some(proposal) => {
+            let json = serde_json::to_string(proposal).unwrap_or_else(|_| "{}".to_string());
+            format!("\n\nCurrent proposal JSON (keep zone actions and fixtureId unless an anchor cannot exist):\n{json}\n")
+        }
+        None => String::new(),
+    };
     let user = format!(
-        "Sender email (for domain matching only): {}\n\nDOM outline (tags/classes/order):\n{}\n\n{}",
+        "Sender email (for domain matching only): {}\n\nDOM outline (tags/classes/order):\n{}\n{}{}",
         sender_email.trim(),
         outline,
-        untrusted_mail_for_engine(engine, "digest-cut-sample-html", &clipped)
+        current_block,
+        untrusted_mail_for_engine(engine, "digest-cut-mail-html", &clipped)
     );
     let raw = engine.generate(
         system.as_str(),
@@ -90,7 +144,7 @@ fn propose_with_llm(
     )?;
     let dto: DigestCutDto = parse_model_json(&raw)?;
     validate_digest_cut_dto(&dto)?;
-    Ok(DigestCutProposal {
+    let mut proposal = DigestCutProposal {
         fixture_id: dto.fixture_id.trim().to_string(),
         rule_set_version: dto.rule_set_version.trim().to_string(),
         source: ProposalSource::Llm,
@@ -104,7 +158,17 @@ fn propose_with_llm(
             body: zone_from_dto(dto.zones.body),
             footer: zone_from_dto(dto.zones.footer),
         },
-    })
+        explanation_fr: clip_explanation(dto.explanation_fr),
+    };
+    if proposal.explanation_fr.is_empty() {
+        proposal.explanation_fr = french_explanation(&proposal);
+    }
+    Ok(proposal)
+}
+
+fn clip_explanation(value: String) -> String {
+    let collapsed = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    collapsed.chars().take(500).collect()
 }
 
 fn zone_from_dto(zone: DigestCutZoneDto) -> DigestCutZone {
@@ -145,16 +209,23 @@ fn validate_digest_cut_dto(dto: &DigestCutDto) -> Result<(), LlmError> {
     if dto.match_.min_children == 0 || dto.match_.min_children > 64 {
         return Err(LlmError::InvalidJson("minChildren".into()));
     }
+    if dto
+        .explanation_fr
+        .to_ascii_lowercase()
+        .contains("ignore all")
+    {
+        return Err(LlmError::InvalidJson("explanationFr".into()));
+    }
     for zone in [&dto.zones.header, &dto.zones.body, &dto.zones.footer] {
+        if let Some(r) = &zone.rationale {
+            if r.to_ascii_lowercase().contains("ignore all") {
+                return Err(LlmError::InvalidJson("rationale".into()));
+            }
+        }
         for anchor in &zone.anchors {
             if let Some(sel) = &anchor.selector {
                 if sel.contains('>') || sel.contains(' ') {
                     return Err(LlmError::InvalidJson("selector".into()));
-                }
-            }
-            if let Some(r) = &zone.rationale {
-                if r.to_ascii_lowercase().contains("ignore all") {
-                    return Err(LlmError::InvalidJson("rationale".into()));
                 }
             }
             if anchor.role == Some(AnchorRole::Title) && anchor.selector.is_none() {
@@ -176,6 +247,7 @@ mod tests {
         let dto = super::DigestCutDto {
             fixture_id: "bad id".into(),
             rule_set_version: "1".into(),
+            explanation_fr: String::new(),
             match_: super::DigestCutMatchDto {
                 sender_domains: vec![],
                 structure_root: "div".into(),
