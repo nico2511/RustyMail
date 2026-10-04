@@ -7,7 +7,9 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { syncComposeAttachmentsHiddenField } from "./composeAttachmentPaths";
+import { loadComposeMarkdownIntoEditor } from "./composeComposerBridge";
 import { draftPayloadForRust } from "./composeDraftPayload";
+import { ensureInlineImagesWithinLimit } from "./composeInlineImageLimits";
 import { persistDraft } from "./composePersistDraft";
 import {
   finishComposeAfterSuccessfulSend,
@@ -30,6 +32,20 @@ export async function confirmAndExecuteSplitSend(): Promise<void> {
     return;
   }
   persistDraft();
+  const ensured = await ensureInlineImagesWithinLimit(state.draft.markdownBody ?? "");
+  if (!ensured.ok) {
+    state.splitSendConfirm = null;
+    state.composeMessage = ensured.error;
+    toast.warning(ensured.error);
+    render();
+    return;
+  }
+  if (ensured.compressed > 0 && ensured.body !== (state.draft.markdownBody ?? "")) {
+    state.draft.markdownBody = ensured.body;
+    state.composeCanonicalBody = ensured.body;
+    loadComposeMarkdownIntoEditor(ensured.body);
+    persistDraft();
+  }
   const draftOutbound = draftPayloadForRust(state.draft);
   const plan = state.splitSendConfirm;
   const n = plan?.chunks.length ?? 0;

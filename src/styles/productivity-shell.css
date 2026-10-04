@@ -574,6 +574,144 @@ select {
   border-radius: 6px;
 }
 
+/* Image TipTap : largeur respectée (inline-block) + poignées ; taille via clic droit. */
+.composer-mail-shell .compose-tiptap .compose-image {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+  line-height: 0;
+  margin: 0.75em 0;
+}
+
+.composer-mail-shell .compose-tiptap .compose-image__img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  border-radius: 6px;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.composer-mail-shell .compose-tiptap .compose-image.is-selected .compose-image__img {
+  outline: 2px solid color-mix(in srgb, var(--accent, #b87333) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.composer-mail-shell .compose-tiptap .compose-image__handle {
+  position: absolute;
+  z-index: 2;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--surface, #fff);
+  border: 1.5px solid var(--accent, #b87333);
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+}
+
+.composer-mail-shell .compose-tiptap .compose-image.is-selected .compose-image__handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.composer-mail-shell .compose-tiptap .compose-image__handle--nw {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+
+.composer-mail-shell .compose-tiptap .compose-image__handle--ne {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+
+.composer-mail-shell .compose-tiptap .compose-image__handle--sw {
+  bottom: -5px;
+  left: -5px;
+  cursor: nesw-resize;
+}
+
+.composer-mail-shell .compose-tiptap .compose-image__handle--se {
+  bottom: -5px;
+  right: -5px;
+  cursor: nwse-resize;
+}
+
+.compose-image-size-menu {
+  position: fixed;
+  z-index: 10050;
+  min-width: 220px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #d8d2c8);
+  background: var(--surface, #fff);
+  color: var(--ink, #1c1916);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 16%);
+  font: 13px/1.35 var(--font-ui, system-ui, sans-serif);
+}
+
+.compose-image-size-menu__title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #6b645a);
+}
+
+.compose-image-size-menu__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.compose-image-size-menu__preset {
+  appearance: none;
+  border: 1px solid var(--border, #d8d2c8);
+  background: color-mix(in srgb, var(--surface, #fff) 88%, var(--bg, #f4f1ea));
+  color: inherit;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.compose-image-size-menu__preset:hover {
+  border-color: color-mix(in srgb, var(--accent, #b87333) 55%, var(--border, #d8d2c8));
+}
+
+.compose-image-size-menu__preset.is-active {
+  border-color: var(--accent, #b87333);
+  background: color-mix(in srgb, var(--accent, #b87333) 16%, var(--surface, #fff));
+}
+
+.compose-image-size-menu__slider-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.compose-image-size-menu__slider {
+  width: 100%;
+  accent-color: var(--accent, #b87333);
+}
+
+.compose-image-size-menu__readout {
+  min-width: 3.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted, #6b645a);
+  font-size: 12px;
+}
+
 .composer-mail-shell .compose-tiptap table,
 .composer-mail-shell .composer-body > .preview table {
   border-collapse: collapse;

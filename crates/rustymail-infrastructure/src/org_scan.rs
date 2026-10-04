@@ -229,6 +229,13 @@ pub fn hydrate_llm_proposals(
             out.push(proposal);
             continue;
         }
+        // deleteMailbox n’agit que sur des dossiers vides (`mailbox:…`).
+        // Le catalogue LLM ne fournit que des threadIds → hydrater par id/mots-clés
+        // affiche un mail (ex. notif CI) sous « Supprimer le dossier vide ».
+        // Les dossiers vides sont déjà portés par `scan_empty_mailboxes` (heuristique).
+        if proposal.suggested_action == OrgSuggestedAction::DeleteMailbox {
+            continue;
+        }
         let mut keywords = std::mem::take(&mut proposal.llm_search_keywords);
         // Ne pas hydrater une corbeille via des mots-clés de reçus / tickets.
         if proposal.suggested_action == OrgSuggestedAction::Trash {
@@ -1397,6 +1404,81 @@ mod tests {
         assert!(proposals
             .iter()
             .all(|p| p.explain_signals.iter().any(|s| s.starts_with("keywords:"))));
+    }
+
+    #[test]
+    fn hydrate_drops_llm_delete_mailbox_instead_of_binding_mails() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("org.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        insert_account(&conn, "acc-a");
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags)
+             VALUES ('t-ci', 'acc-a', 'INBOX', 'm1', 'PR run failed', '')",
+            [],
+        )
+        .expect("thread");
+        conn.execute(
+            "INSERT INTO messages (id, thread_id, account_id, mailbox, imap_uid, sender_name, sender_email, subject, received_at, body, is_read, position)
+             VALUES ('t-ci', 't-ci', 'acc-a', 'INBOX', 1, 'GitHub', 'notifications@github.com', 'PR run failed', '2026-01-01', '', 1, 0)",
+            [],
+        )
+        .expect("message");
+        let mut valid = HashSet::new();
+        valid.insert("t-ci".into());
+        let llm_delete = OrgProposal {
+            id: "llm-delete-mb".into(),
+            kind: OrgProposalKind::EmptyMailbox,
+            section: "structure".into(),
+            title: "Supprimer le dossier vide".into(),
+            rationale: "Dossier vide".into(),
+            thread_refs: vec![OrgThreadRef {
+                thread_id: "t-ci".into(),
+                mailbox: "INBOX".into(),
+                subject: "PR run failed".into(),
+                ..Default::default()
+            }],
+            thread_ids: vec!["t-ci".into()],
+            suggested_action: OrgSuggestedAction::DeleteMailbox,
+            target_mailbox: None,
+            confidence: 0.8,
+            source: OrgProposalSource::Llm,
+            total_count: 1,
+            applicable: true,
+            llm_search_keywords: vec!["dossier".into(), "vide".into()],
+            explain_rule_id: None,
+            explain_signals: vec![],
+            unsubscribe_links: vec![],
+        };
+        let llm_archive = OrgProposal {
+            id: "llm-archive".into(),
+            kind: OrgProposalKind::TransactionalNotification,
+            section: "range".into(),
+            title: "Archiver notifs".into(),
+            rationale: "GitHub".into(),
+            thread_refs: vec![OrgThreadRef {
+                thread_id: "t-ci".into(),
+                mailbox: "INBOX".into(),
+                subject: "PR run failed".into(),
+                ..Default::default()
+            }],
+            thread_ids: vec!["t-ci".into()],
+            suggested_action: OrgSuggestedAction::Archive,
+            target_mailbox: None,
+            confidence: 0.7,
+            source: OrgProposalSource::Llm,
+            total_count: 1,
+            applicable: true,
+            llm_search_keywords: vec![],
+            explain_rule_id: None,
+            explain_signals: vec![],
+            unsubscribe_links: vec![],
+        };
+        let out = hydrate_llm_proposals(&conn, "acc-a", &valid, vec![llm_delete, llm_archive]);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].id, "llm-archive");
+        assert_eq!(out[0].suggested_action, OrgSuggestedAction::Archive);
+        assert!(out[0].thread_refs.iter().any(|r| r.thread_id == "t-ci"));
     }
 
     #[test]

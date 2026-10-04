@@ -244,8 +244,8 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
     } else {
       const why = view.fallbackReason?.trim();
       digestCut.notice = why
-        ? `${why} Proposition de repli à partir de la structure HTML.`
-        : "Le modèle n'a pas fourni de découpe. Proposition de repli à partir de la structure. Vérifiez Paramètres → IA → Tester la connexion (même moteur).";
+        ? `Découpe structurelle (repli). Le modèle n'a pas renvoyé un JSON exploitable — ${why}`
+        : "Découpe structurelle (repli). Le modèle n'a pas fourni de découpe. Vérifiez Paramètres → IA → Tester la connexion.";
     }
     await previewDigestCut();
   } catch (error) {
