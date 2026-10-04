@@ -7,6 +7,7 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { state } from "../state";
 import { captureDigestBenchDom, digestBench, type DigestBenchCompare } from "./digestBenchState";
+import { loadDigestCutMail } from "./digestCutActions";
 
 type BenchStatus = {
   accepted: boolean;
@@ -246,6 +247,32 @@ export function markDigestBenchRole(messageId: string, role: "sample" | "validat
   render();
 }
 
+export function sendSelectedBenchMailToCutEditor(): void {
+  captureDigestBenchDom();
+  const message = digestBench.messages.find((item) => item.id === digestBench.selectedMessageId);
+  if (!message) {
+    digestBench.notice = "Ouvrez un message de la recherche, puis découpez-le.";
+    render();
+    return;
+  }
+  if (!message.html.trim()) {
+    digestBench.notice = "Ce message n'a pas de HTML. Choisissez un autre message du fil.";
+    render();
+    return;
+  }
+  loadDigestCutMail({
+    sourceKind: "mailbox",
+    html: message.html,
+    senderEmail: message.senderEmail,
+    subject: digestBench.threadSubject || message.sender,
+    messageId: message.id,
+    notice: "Message chargé depuis le banc. Proposez la découpe pour une explication en français.",
+  });
+  state.settingsTab = "digestCut";
+  state.view = "settings";
+  render();
+}
+
 export async function handleDigestBenchAction(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
     case "digest-bench-search":
@@ -262,6 +289,9 @@ export async function handleDigestBenchAction(action: string, element?: HTMLElem
       return true;
     case "digest-bench-validation":
       markDigestBenchRole(element?.dataset.messageId ?? "", "validation");
+      return true;
+    case "digest-bench-cut":
+      sendSelectedBenchMailToCutEditor();
       return true;
     case "digest-bench-preview": {
       const id = digestBench.selectedMessageId;

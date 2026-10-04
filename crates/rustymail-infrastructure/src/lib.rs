@@ -62,6 +62,7 @@ mod ai_features;
 mod app_prefs;
 mod dictation;
 mod email_util;
+mod eml_preview;
 mod hf_download;
 mod llama_server;
 mod llm_singleton;
@@ -96,6 +97,7 @@ pub use dictation::{
     translate_to_draft_language, DICTATION_KEYRING_USERNAME,
 };
 pub use email_util::normalize_email;
+pub use eml_preview::{parse_eml_base64, parse_eml_bytes, EmlCutSource};
 pub use hf_download::{download_hf_file_if_needed, hf_resolve_url};
 pub use llama_server::{
     llama_server_api_key_clear, llama_server_api_key_get, llama_server_api_key_present,

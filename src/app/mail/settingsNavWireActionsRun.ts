@@ -14,6 +14,7 @@ import { refreshAddressBookList } from "./addressBookWireActions";
 import { syncAiEngineSettingsTabFromPrefs } from "./settingsLlmRuntime";
 import { refreshDigestBenchStatus } from "./digestBenchActions";
 import { captureDigestBenchDom } from "./digestBenchState";
+import { captureDigestCutDom } from "./digestCutState";
 import {
   ensureValidSelectedMailbox,
   openSettingsView,
@@ -56,7 +57,8 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
         tab === "storage" ||
         tab === "shortcuts" ||
         tab === "developer" ||
-        tab === "digestBench"
+        tab === "digestBench" ||
+        tab === "digestCut"
       ) {
         if (state.view !== "settings") {
           state.view = "settings";
@@ -71,6 +73,9 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
         }
         if (state.settingsTab === "digestBench" && tab !== "digestBench") {
           captureDigestBenchDom();
+        }
+        if (state.settingsTab === "digestCut" && tab !== "digestCut") {
+          captureDigestCutDom();
         }
         state.settingsTab = tab;
         if (tab === "ai") syncAiEngineSettingsTabFromPrefs();
