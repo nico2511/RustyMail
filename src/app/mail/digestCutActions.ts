@@ -25,6 +25,7 @@ type MailView = {
 type ProposeView = {
   proposal: DigestCutProposal;
   fromModel: boolean;
+  fallbackReason?: string | null;
 };
 
 type YamlView = { yaml: string };
@@ -237,9 +238,15 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
       view.proposal.explanationFr = explainZonesFr(view.proposal);
     }
     await syncYamlFromProposal();
-    digestCut.notice = view.fromModel
-      ? "Proposition du modèle local. Lisez l'explication, puis ajustez les zones. Le prompt est calibré pour Llama 3.2."
-      : "Le modèle local n'a pas répondu. Proposition à partir de la structure, en français. Llama 3.2 se règle dans Paramètres → IA.";
+    if (view.fromModel) {
+      digestCut.notice =
+        "Proposition du modèle local. Lisez l'explication, puis ajustez les zones. Même moteur que Paramètres → IA.";
+    } else {
+      const why = view.fallbackReason?.trim();
+      digestCut.notice = why
+        ? `${why} Proposition de repli à partir de la structure HTML.`
+        : "Le modèle n'a pas fourni de découpe. Proposition de repli à partir de la structure. Vérifiez Paramètres → IA → Tester la connexion (même moteur).";
+    }
     await previewDigestCut();
   } catch (error) {
     digestCut.notice = tauriErrorMessage(error);
@@ -267,8 +274,8 @@ export function setDigestCutZoneAction(zone: DigestCutZoneName, action: DigestCu
   if (!digestCut.proposal) return;
   digestCut.proposal.zones[zone].action = action;
   digestCut.proposal.explanationFr = explainZonesFr(digestCut.proposal);
+  // Un seul remount via preview (évite un double reset de scroll settings).
   void syncYamlFromProposal().then(() => previewDigestCut());
-  render();
 }
 
 export function toggleDigestCutCode(): void {

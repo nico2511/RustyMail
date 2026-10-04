@@ -344,6 +344,30 @@ textarea {
   font-size: 10px;
   padding: 1px 6px;
 }
+.inbox-brief-partial {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--danger, #b33) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger, #b33) 10%, var(--elevated, var(--surface)));
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.inbox-brief-partial .thread-zen-par {
+  margin: 0 0 6px;
+}
+
+.inbox-brief-partial .thread-zen-par:last-child {
+  margin-bottom: 0;
+}
+
+.inbox-brief-section--partial .thread-kicker::after {
+  content: " · partiel";
+  font-weight: 500;
+  opacity: 0.7;
+}
+
 .inbox-brief-banner {
   border-radius: var(--radius-md);
   padding: 12px 14px;
@@ -406,6 +430,12 @@ textarea {
 .details-block-muted {
   padding: 14px 16px 18px;
   border-top: 1px solid var(--border-weak);
+}
+
+/* État vide Détails : pas de second trait sous le header du panneau. */
+.details-block-empty {
+  padding: 14px 16px 18px;
+  border-top: none;
 }
 
 .details-row {
@@ -4690,6 +4720,11 @@ button.thread-tag-chip--search:focus-visible {
   color: rgba(200, 92, 92, 0.9);
 }
 
+.draft-diff__line--heavy {
+  font-weight: 600;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
 .draft-diff__empty {
   margin: 0;
   font-size: 11px;
@@ -5935,10 +5970,45 @@ button.thread-tag-chip--search:focus-visible {
   border-color: rgba(120, 119, 117, 0.3);
 }
 
-.composer-history-pane__stamp {
+.composer-history-pane__meta {
   margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  min-width: 0;
+}
+
+.composer-history-pane__kind {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.composer-history-pane__stamp {
   font-size: 11px;
   white-space: nowrap;
+}
+
+.composer-history-pane__rev.is-active {
+  background: color-mix(in srgb, var(--accent, #6a8) 12%, transparent);
+  border-radius: 6px;
+}
+
+.composer-history-pane__diff-stats {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.composer-history-pane__diff-add {
+  color: rgba(108, 200, 138, 0.95);
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-history-pane__diff-del {
+  color: rgba(200, 92, 92, 0.95);
+  font-variant-numeric: tabular-nums;
 }
 
 .composer-history-pane__empty {
@@ -8322,9 +8392,28 @@ button.thread-tag-chip--search:focus-visible {
   border-radius: var(--radius-md, 10px);
   border: 1px solid var(--border-weak);
   background: var(--elevated);
-  max-height: none;
-  overflow: visible;
+  max-height: min(28vh, 220px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--carved-sm);
+}
+
+.compose-correction-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.compose-correction-count {
+  margin-left: 8px;
+  font-size: 11px;
+  min-height: 26px;
+  padding: 2px 8px;
+  vertical-align: middle;
 }
 
 .compose-correction-panel__head {
@@ -8346,12 +8435,6 @@ button.thread-tag-chip--search:focus-visible {
   font-size: 11px;
   padding: 4px 10px;
   min-height: 30px;
-}
-
-.compose-correction-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .compose-correction-item {
@@ -8395,6 +8478,20 @@ button.thread-tag-chip--search:focus-visible {
 .compose-correction-del {
   text-decoration: line-through;
   opacity: 0.85;
+}
+
+/* Surbrillance live TipTap — clic = appliquer la suggestion. */
+.compose-tiptap__surface .compose-grammar-mark {
+  background: color-mix(in srgb, var(--accent, #c47a4a) 22%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--accent, #c47a4a) 75%, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.compose-tiptap__surface .compose-grammar-mark:hover {
+  background: color-mix(in srgb, var(--accent, #c47a4a) 36%, transparent);
 }
 
 @media (max-width: 520px) {

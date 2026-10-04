@@ -151,7 +151,8 @@ pub use imap_tombstones::{
 };
 pub use mail_classify::{
     apply_mail_type_tag, apply_mail_type_tag_csv, classify_mail_type, mail_type_db_value,
-    priority_score_for_thread, sender_is_noreply_like, sender_is_transactional,
+    priority_score_for_thread, protect_from_org_trash, sender_is_noreply_like,
+    sender_is_transactional, subject_looks_transactional,
 };
 pub use mail_ops::{
     empty_trash_mailbox, is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive,

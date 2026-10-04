@@ -7,6 +7,40 @@ export function splitDraftDiffLines(input: string): string[] {
     .split("\n");
 }
 
+/** Stats lisibles pour l’historique (lignes + caractères). */
+export function summarizeDraftDiffLines(lines: DraftDiffLine[]): {
+  addedLines: number;
+  removedLines: number;
+  addedChars: number;
+  removedChars: number;
+  label: string;
+} {
+  let addedLines = 0;
+  let removedLines = 0;
+  let addedChars = 0;
+  let removedChars = 0;
+  for (const line of lines) {
+    const n = line.text.length;
+    if (line.kind === "add") {
+      addedLines += 1;
+      addedChars += n;
+    } else if (line.kind === "del") {
+      removedLines += 1;
+      removedChars += n;
+    }
+  }
+  const totalChanged = addedChars + removedChars;
+  const label =
+    totalChanged === 0
+      ? "Aucune différence"
+      : totalChanged >= 400
+        ? "Gros changement"
+        : totalChanged >= 80
+          ? "Changement notable"
+          : "Petit ajustement";
+  return { addedLines, removedLines, addedChars, removedChars, label };
+}
+
 export function myersDiffDraftLines(a: string[], b: string[]): DraftDiffLine[] {
   const n = a.length;
   const m = b.length;

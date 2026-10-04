@@ -47,6 +47,8 @@ pub struct DigestCutEmlPayload {
 pub struct DigestCutProposeView {
     pub proposal: DigestCutProposal,
     pub from_model: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,8 +93,13 @@ pub fn digest_cut_propose_zones(
                 lang,
                 current,
             ),
-            Err(_) => {
-                propose_digest_cut_zones(None, &payload.html, &payload.sender_email, lang, current)
+            Err(e) => {
+                let mut out =
+                    propose_digest_cut_zones(None, &payload.html, &payload.sender_email, lang, current);
+                out.fallback_reason = Some(format!(
+                    "Moteur IA indisponible pour la découpe : {e}. Même chemin que Paramètres → IA → Tester la connexion."
+                ));
+                out
             }
         }
     } else {
@@ -101,6 +108,7 @@ pub fn digest_cut_propose_zones(
     Ok(DigestCutProposeView {
         proposal: outcome.proposal,
         from_model: outcome.from_model,
+        fallback_reason: outcome.fallback_reason,
     })
 }
 

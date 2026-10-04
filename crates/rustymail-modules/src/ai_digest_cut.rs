@@ -56,6 +56,8 @@ struct DigestCutZoneDto {
 pub struct DigestCutModelOutcome {
     pub proposal: DigestCutProposal,
     pub from_model: bool,
+    /// Raison courte quand `from_model` est faux (UI).
+    pub fallback_reason: Option<String>,
 }
 
 /// Propose des zones. Sans moteur, ou si le JSON est refusé : heuristique, ou la proposition
@@ -72,15 +74,30 @@ pub fn propose_digest_cut_zones(
     let fallback = current
         .cloned()
         .unwrap_or_else(|| analyze_html_structure_heuristic(html, sender_email));
+    let mut fallback_reason: Option<String> = None;
     if let Some(engine) = engine {
-        if let Ok(llm) = propose_with_llm(engine, html, sender_email, output_language, current) {
-            if proposal_to_fixture_yaml(&llm).is_ok() {
-                return DigestCutModelOutcome {
-                    proposal: llm,
-                    from_model: true,
-                };
+        match propose_with_llm(engine, html, sender_email, output_language, current) {
+            Ok(llm) => {
+                if proposal_to_fixture_yaml(&llm).is_ok() {
+                    return DigestCutModelOutcome {
+                        proposal: llm,
+                        from_model: true,
+                        fallback_reason: None,
+                    };
+                }
+                fallback_reason = Some(
+                    "Le modèle a répondu, mais la proposition JSON/YAML a été refusée.".into(),
+                );
+            }
+            Err(e) => {
+                fallback_reason = Some(format!("Le modèle n’a pas produit de découpe : {e}"));
             }
         }
+    } else {
+        fallback_reason = Some(
+            "Aucun moteur IA joignable pour la découpe (Paramètres → IA : mode + Tester la connexion)."
+                .into(),
+        );
     }
     let mut proposal = fallback;
     if proposal.explanation_fr.trim().is_empty() {
@@ -89,6 +106,7 @@ pub fn propose_digest_cut_zones(
     DigestCutModelOutcome {
         proposal,
         from_model: false,
+        fallback_reason,
     }
 }
 

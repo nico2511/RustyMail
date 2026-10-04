@@ -32,7 +32,7 @@
       "shortcuts": "Shortcuts",
       "developer": "Developer",
       "digestBench": "Fixture bench",
-      "digestCut": "Cut editor"
+      "digestCut": "Cut editor (live mail)"
     },
     "general": {
       "languageHeading": "Language",
@@ -73,14 +73,14 @@
     },
     "appearance": {
       "heading": "Appearance",
-      "explain": "Productivity light theme: charcoal rail, white surface, copper accent. Dark mode keeps copper. Contrast+ strengthens ink in both light and dark. The cream session and lavender accent no longer change the interface (temporary limitation).",
+      "explain": "Productivity light theme: charcoal rail, white surface, copper accent. Dark mode keeps copper. Contrast+ strengthens ink in both light and dark.",
       "colorScheme": "Theme",
       "schemeLight": "Light",
       "schemeDark": "Dark",
       "schemeSystem": "System",
-      "sessionComfort": "Soft session — no effect (cream removed)",
+      "sessionComfort": "Soft session",
       "contrastPlus": "Contrast+",
-      "accentLavender": "Lavender accent — no effect (removed)",
+      "accentLavender": "Lavender accent",
       "aiPanelWidth": "Right panel width (px)",
       "save": "Save appearance"
     },

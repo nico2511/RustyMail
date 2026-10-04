@@ -7,8 +7,11 @@ import { rewriteDictatedSegmentWithTone } from "./composeDictationRewrite";
 import { bytesToBase64, mediaBlobToWav16kMonoPcm16 } from "./micAudioUtil";
 import { applyDictationToTarget } from "./composeMicDictationApplyRun";
 import { micDictationCtx } from "./composeMicDictationContext";
+import { patchMicButtonsDom } from "./composeMicUiPatch";
 
 export async function stopMicDictationAndTranscribe(): Promise<void> {
+  if (micDictationCtx.stopInFlight) return;
+  micDictationCtx.stopInFlight = true;
   if (micDictationCtx.micTimer) {
     window.clearInterval(micDictationCtx.micTimer);
     micDictationCtx.micTimer = undefined;
@@ -17,7 +20,8 @@ export async function stopMicDictationAndTranscribe(): Promise<void> {
   if (!micDictationCtx.micMediaRecorder) {
     state.micState = "idle";
     state.micSeconds = 0;
-    render();
+    patchMicButtonsDom();
+    micDictationCtx.stopInFlight = false;
     return;
   }
   state.micState = "processing";
@@ -25,6 +29,7 @@ export async function stopMicDictationAndTranscribe(): Promise<void> {
     state.composeMessage =
       "Whisper : téléchargement du modèle HF au premier usage si besoin — patientez.";
   }
+  // Un seul remount à l’arrêt (pas pendant l’enregistrement).
   render();
   try {
     const blob: Blob = await new Promise((resolve, reject) => {
@@ -35,6 +40,12 @@ export async function stopMicDictationAndTranscribe(): Promise<void> {
         micDictationCtx.micStream = null;
         resolve(new Blob(micDictationCtx.micChunks, { type: rec.mimeType || "audio/webm" }));
       };
+      if (rec.state === "inactive") {
+        micDictationCtx.micStream?.getTracks().forEach((t) => t.stop());
+        micDictationCtx.micStream = null;
+        resolve(new Blob(micDictationCtx.micChunks, { type: rec.mimeType || "audio/webm" }));
+        return;
+      }
       rec.stop();
     });
     micDictationCtx.micMediaRecorder = null;
@@ -48,7 +59,7 @@ export async function stopMicDictationAndTranscribe(): Promise<void> {
       audioWavBase64 = bytesToBase64(wavBytes);
       if (micDictationCtx.micDictationTarget === "compose") {
         state.composeMessage = "Transcription Whisper en cours…";
-        render();
+        patchMicButtonsDom();
       }
     }
     let text = await withTimeout(
@@ -60,7 +71,7 @@ export async function stopMicDictationAndTranscribe(): Promise<void> {
           mimeType: blob.type || "audio/webm",
         },
       }),
-      120_000,
+      180_000,
     );
     if (
       micDictationCtx.micDictationTarget === "compose" &&
@@ -68,7 +79,7 @@ export async function stopMicDictationAndTranscribe(): Promise<void> {
       text.trim()
     ) {
       state.composeMessage = "Réécriture du texte dicté…";
-      render();
+      patchMicButtonsDom();
       text = await rewriteDictatedSegmentWithTone(text);
     }
     applyDictationToTarget(text, micDictationCtx.micDictationTarget);
@@ -78,8 +89,10 @@ export async function stopMicDictationAndTranscribe(): Promise<void> {
     const errMsg = tauriErrorMessage(e);
     if (micDictationCtx.micDictationTarget === "compose") state.composeMessage = errMsg;
     toast.error(errMsg);
+  } finally {
+    state.micState = "idle";
+    state.micSeconds = 0;
+    micDictationCtx.stopInFlight = false;
+    render();
   }
-  state.micState = "idle";
-  state.micSeconds = 0;
-  render();
 }

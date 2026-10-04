@@ -959,7 +959,7 @@ fn llm_affiner_flux_compute(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or("Recherche");
+        .unwrap_or("Flux courant");
     let lang = prefs.general.mother_language.as_str();
     ai_flux_affiner::affiner_flux_with_llm(
         &mut engine,

@@ -1,4 +1,8 @@
-import { attachmentPathsJoinedForHiddenField } from "./composeAttachmentPaths";
+import {
+  MAX_COMPOSE_ATTACHMENTS,
+  syncComposeAttachmentsHiddenField,
+} from "./composeAttachmentPaths";
+import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
@@ -72,11 +76,15 @@ export function bindComposerDropzone(): void {
       return;
     }
     const merged = Array.from(new Set([...(state.draft.attachmentPaths ?? []), ...dropped]));
+    if (merged.length > MAX_COMPOSE_ATTACHMENTS) {
+      toast.warning(`Maximum ${MAX_COMPOSE_ATTACHMENTS} pièces jointes par message.`);
+      return;
+    }
     state.draft.attachmentPaths = merged;
-    const attachmentsField = document.querySelector<HTMLInputElement>("#compose-attachments");
-    if (attachmentsField) attachmentsField.value = attachmentPathsJoinedForHiddenField(merged);
+    syncComposeAttachmentsHiddenField(merged);
     toast.success(`${dropped.length} pièce(s) jointe(s) ajoutée(s).`);
     render();
+    scheduleDraftRevisionSave(250);
   };
 
   shell.addEventListener("dragenter", onDragEnter, { signal });

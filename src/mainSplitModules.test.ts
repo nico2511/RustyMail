@@ -3,6 +3,7 @@ import {
   LOCAL_SAVED_DRAFTS_MAILBOX,
   mailboxKind,
   mailboxesAllowedForMove,
+  pickSystemMailboxes,
   preferredInboxMailboxName,
   savedDraftIdFromThreadId,
 } from "./mailboxKinds";
@@ -29,6 +30,16 @@ describe("mailboxKinds", () => {
     expect(mailboxKind("INBOX")).toBe("inbox");
     expect(mailboxKind("[Gmail]/Trash")).toBe("trash");
     expect(mailboxKind("Sent Items")).toBe("sent");
+  });
+
+  it("ne classe pas Gmail All Mail comme Archive", () => {
+    expect(mailboxKind("[Gmail]/All Mail")).toBeNull();
+    expect(mailboxKind("Archive")).toBe("archive");
+    expect(pickSystemMailboxes(["INBOX", "[Gmail]/All Mail", "Archive", "[Gmail]/Trash"]).map((x) => x.name)).toEqual([
+      "INBOX",
+      "Archive",
+      "[Gmail]/Trash",
+    ]);
   });
 
   it("exclut trash/sent des cibles de move", () => {

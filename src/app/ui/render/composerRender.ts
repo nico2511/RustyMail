@@ -4,6 +4,7 @@ import { iconSvg } from "../../lib/iconSvg";
 import { renderComposeToolbar } from "./composeToolbarRender";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { composeSourcePlainText } from "../../mail/composeHtmlBody";
+import { summarizeDraftDiffLines } from "../../mail/composeDraftRevisionDiffAlgoRun";
 import { grammarOccurrenceCount, retainGrammarSuggestionsInText } from "../../mail/composeGrammarReplace";
 import { state } from "../../state";
 import type { Draft, MicDictationTarget } from "../../types";
@@ -30,17 +31,22 @@ function renderComposerHistoriquePane(): string {
   const rows =
     revs.length ?
       revs
-        .map(
-          (rev) => `<li class="composer-history-pane__rev">
+        .map((rev, i) => {
+          const kind = i === 0 ? "Dernier enregistrement" : "Snapshot auto";
+          const active = state.draftDiffRevisionId === rev.id;
+          return `<li class="composer-history-pane__rev${active ? " is-active" : ""}">
               <button type="button" class="composer-history-pane__icon-action" data-action="compare-draft-revision" data-revision-id="${escapeAttr(rev.id)}" title="Comparer avec le brouillon actuel">
                 ⇄
               </button>
               <button type="button" class="composer-history-pane__icon-action" data-action="restore-draft-revision" data-revision-id="${escapeAttr(rev.id)}" title="Restaurer cette version">
                 ↩
               </button>
-              <span class="composer-history-pane__stamp dim">${escapeHtml(renderDeps().formatDraftRevisionStamp(rev.createdAt))}</span>
-            </li>`
-        )
+              <span class="composer-history-pane__meta">
+                <span class="composer-history-pane__kind">${escapeHtml(kind)}</span>
+                <span class="composer-history-pane__stamp dim">${escapeHtml(renderDeps().formatDraftRevisionStamp(rev.createdAt))}</span>
+              </span>
+            </li>`;
+        })
         .join("")
     : "";
 
@@ -50,6 +56,21 @@ function renderComposerHistoriquePane(): string {
           n ? rows : `<li class="composer-history-pane__empty dim">Pas encore de snapshot (éditez quelques secondes puis revenez).</li>`
         }</ul>`
       : "";
+
+  const diffStats =
+    !state.draftDiffLoading && state.draftDiffRevisionId && state.draftDiffLines.length
+      ? summarizeDraftDiffLines(state.draftDiffLines)
+      : null;
+  const diffStatsHtml = diffStats
+    ? `<p class="composer-history-pane__diff-stats">
+        <strong>${escapeHtml(diffStats.label)}</strong>
+        <span class="dim"> · </span>
+        <span class="composer-history-pane__diff-add">+${diffStats.addedChars}</span>
+        <span class="dim"> / </span>
+        <span class="composer-history-pane__diff-del">−${diffStats.removedChars}</span>
+        <span class="dim"> car. · +${diffStats.addedLines}/−${diffStats.removedLines} lignes</span>
+      </p>`
+    : "";
 
   const comparisonBlock =
     state.draftDiffRevisionId
@@ -63,6 +84,7 @@ function renderComposerHistoriquePane(): string {
               ${state.draftDiffView === "preview" ? "Diff" : "Aperçu"}
             </button>
           </div>
+          ${diffStatsHtml}
           ${
             state.draftDiffLoading
               ? `<p class="composer-history-pane__microhint dim">Chargement…</p>`
@@ -78,7 +100,11 @@ function renderComposerHistoriquePane(): string {
                               ? "draft-diff__line draft-diff__line--del"
                               : "draft-diff__line";
                         const prefix = l.kind === "add" ? "+" : l.kind === "del" ? "-" : " ";
-                        return `<span class="${cls}">${escapeHtml(prefix)} ${escapeHtml(l.text)}</span>`;
+                        const heavy =
+                          (l.kind === "add" || l.kind === "del") && l.text.length >= 80
+                            ? " draft-diff__line--heavy"
+                            : "";
+                        return `<span class="${cls}${heavy}">${escapeHtml(prefix)} ${escapeHtml(l.text)}</span>`;
                       })
                       .join("\n")}</pre>`
                   : `<p class="composer-history-pane__microhint dim">Aucune différence.</p>`
@@ -87,7 +113,7 @@ function renderComposerHistoriquePane(): string {
       : !state.draftDiffRevisionId && n > 0 && !expanded
         ? `<p class="composer-history-pane__microhint dim">Liste repliée — ouvrir pour choisir une version (⇄ comparer).</p>`
         : n > 0 && !state.draftDiffRevisionId && expanded
-          ? `<p class="composer-history-pane__microhint dim">⇄ comparer · ↩ restaurer</p>`
+          ? `<p class="composer-history-pane__microhint dim">⇄ comparer · ↩ restaurer · type + horodatage</p>`
           : "";
 
   return `<aside class="composer-history-pane" aria-label="Historique du brouillon">
@@ -154,11 +180,15 @@ export function renderComposer() {
                 occurrences > 1
                   ? `Remplacer la première des ${occurrences} occurrences`
                   : "Remplacer cette occurrence dans le texte";
+              const countBtn =
+                occurrences > 1
+                  ? `<button type="button" class="ghost-button compose-correction-count" data-action="compose-grammar-apply-all" data-grammar-i="${i}" title="Remplacer les ${occurrences} occurrences">${occurrences}×</button>`
+                  : "";
               return `
             <li class="compose-correction-item" role="listitem">
               <div class="compose-correction-item__main">
                 <p class="compose-correction-reason dim">${escapeHtml(g.reason)}</p>
-                <p class="compose-correction-diff"><span class="compose-correction-del">${escapeHtml(g.original)}</span> → <strong>${escapeHtml(g.replacement)}</strong></p>
+                <p class="compose-correction-diff"><span class="compose-correction-del">${escapeHtml(g.original)}</span> → <strong>${escapeHtml(g.replacement)}</strong>${countBtn}</p>
               </div>
               <button type="button" class="ghost-button compose-correction-apply" data-action="compose-grammar-apply" data-grammar-i="${i}" title="${escapeAttr(applyTitle)}">Appliquer</button>
             </li>`;

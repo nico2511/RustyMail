@@ -356,20 +356,74 @@ fn dto_to_result(
     result
 }
 
+fn brief_partial_missing_sections(result: &ActionBriefResult) -> Vec<&'static str> {
+    let mut missing = Vec::new();
+    if result.changes.is_empty() {
+        missing.push("changements");
+    }
+    if result.decisions.is_empty() {
+        missing.push("décisions");
+    }
+    if result.recommended_actions.is_empty() {
+        missing.push("actions recommandées");
+    }
+    if result.risks.is_empty() {
+        missing.push("risques");
+    }
+    if result
+        .ambiguities
+        .iter()
+        .all(|a| a.question.trim() == "Brief partiel")
+    {
+        // Ambiguïtés métier absentes (hors bandeau technique).
+        missing.push("ambiguïtés métier");
+    }
+    if result.evidence_links.is_empty()
+        && result.changes.iter().all(|c| c.evidence_links.is_empty())
+        && result.decisions.iter().all(|d| d.evidence_links.is_empty())
+        && result
+            .recommended_actions
+            .iter()
+            .all(|a| a.evidence_links.is_empty())
+    {
+        missing.push("liens de preuve");
+    }
+    missing
+}
+
 fn stamp_output_partial(result: &mut ActionBriefResult) {
     result.output_partial = true;
     result.verification_recommended = true;
     result.confidence = result.confidence.min(0.45);
+    let missing = brief_partial_missing_sections(result);
+    let missing_clause = if missing.is_empty() {
+        "Certaines listes peuvent être incomplètes.".to_string()
+    } else {
+        format!("Sections absentes ou vides après coupure : {}.", missing.join(", "))
+    };
+    let why = format!(
+        "La réponse JSON du modèle était incomplète et a été tronquée. {missing_clause} \
+         Pipeline : signal_extractor_llm → prioritizer_rust_v1 → action_planner_llm → verifier_evidence_filter. \
+         Ce brief n’est pas une sortie complète."
+    );
     let already = result
         .ambiguities
         .iter()
         .any(|a| a.question.trim() == "Brief partiel");
-    if !already {
+    if already {
+        if let Some(a) = result
+            .ambiguities
+            .iter_mut()
+            .find(|a| a.question.trim() == "Brief partiel")
+        {
+            a.why_it_matters = why;
+        }
+    } else {
         result.ambiguities.insert(
             0,
             ActionBriefAmbiguity {
                 question: "Brief partiel".into(),
-                why_it_matters: "La réponse JSON du modèle était incomplète et a été tronquée. Les éléments absents de cette réponse ne figurent pas ici.".into(),
+                why_it_matters: why,
                 evidence_links: vec![],
             },
         );
@@ -848,5 +902,9 @@ mod brief_context_tests {
         assert!(brief.confidence <= 0.45);
         assert_eq!(brief.ambiguities[0].question, "Brief partiel");
         assert!(brief.ambiguities[0].why_it_matters.contains("incomplète"));
+        assert!(brief.ambiguities[0].why_it_matters.contains("Sections absentes"));
+        assert!(brief.ambiguities[0]
+            .why_it_matters
+            .contains("action_planner_llm"));
     }
 }

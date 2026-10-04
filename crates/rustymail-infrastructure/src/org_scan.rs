@@ -16,6 +16,7 @@ use crate::newsletter::{list_newsletter_rules_connection, matches_newsletter_ema
 use crate::open_sqlite_migrated;
 use crate::org_consolidate::scan_duplicate_threads;
 use crate::org_mailbox_structure::analyze_mailbox_structure;
+use crate::mail_classify::protect_from_org_trash;
 use crate::org_retag::{effective_thread_mailbox, sender_is_transactional, thread_tags_stale};
 use rustymail_llm::LlmEngine;
 use rustymail_modules::ai_org_proposals::org_orientation_with_llm;
@@ -183,6 +184,38 @@ fn thread_exists(conn: &Connection, account_id: &str, thread_id: &str) -> bool {
     .is_ok()
 }
 
+fn org_trash_keyword_blocked(kw: &str) -> bool {
+    let k = kw.trim().to_ascii_lowercase();
+    [
+        "receipt",
+        "facture",
+        "invoice",
+        "ticket",
+        "caisse",
+        "commande",
+        "order",
+        "paiement",
+        "payment",
+        "reçu",
+        "recu",
+        "justificatif",
+        "billing",
+        "achat",
+        "purchase",
+    ]
+    .iter()
+    .any(|b| k == *b || k.contains(b))
+}
+
+fn filter_trash_protected_refs(refs: Vec<OrgThreadRef>) -> Vec<OrgThreadRef> {
+    refs.into_iter()
+        .filter(|r| {
+            let email = r.sender_email.as_deref().unwrap_or("");
+            !protect_from_org_trash(email, &r.subject)
+        })
+        .collect()
+}
+
 /// Résout les fils des cartes LLM (ids du modèle, mots-clés, enrichissement SQLite).
 pub fn hydrate_llm_proposals(
     conn: &Connection,
@@ -196,7 +229,11 @@ pub fn hydrate_llm_proposals(
             out.push(proposal);
             continue;
         }
-        let keywords = std::mem::take(&mut proposal.llm_search_keywords);
+        let mut keywords = std::mem::take(&mut proposal.llm_search_keywords);
+        // Ne pas hydrater une corbeille via des mots-clés de reçus / tickets.
+        if proposal.suggested_action == OrgSuggestedAction::Trash {
+            keywords.retain(|k| !org_trash_keyword_blocked(k));
+        }
         let mut refs: Vec<OrgThreadRef> = proposal
             .thread_refs
             .into_iter()
@@ -206,13 +243,26 @@ pub fn hydrate_llm_proposals(
         if refs.is_empty() {
             let search_kws =
                 infer_llm_search_keywords(&proposal.title, &proposal.rationale, &keywords);
-            refs = search_threads_by_keywords(conn, account_id, &search_kws, SAMPLE_LIMIT);
+            let search_kws: Vec<String> = if proposal.suggested_action == OrgSuggestedAction::Trash {
+                search_kws
+                    .into_iter()
+                    .filter(|k| !org_trash_keyword_blocked(k))
+                    .collect()
+            } else {
+                search_kws
+            };
+            if !search_kws.is_empty() {
+                refs = search_threads_by_keywords(conn, account_id, &search_kws, SAMPLE_LIMIT);
+            }
         }
         refs = refs
             .into_iter()
             .map(|r| enrich_thread_ref(conn, account_id, r))
             .filter(|r| thread_exists(conn, account_id, &r.thread_id))
             .collect();
+        if proposal.suggested_action == OrgSuggestedAction::Trash {
+            refs = filter_trash_protected_refs(refs);
+        }
         if refs.is_empty() {
             continue;
         }

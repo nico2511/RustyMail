@@ -134,7 +134,7 @@ export function renderComposeToolbar(props: ComposeToolbarProps): string {
   const tonesHtml = tones
     .map((tone) => {
       const active = tone === props.tone;
-      return `<button type="button" role="radio" class="tone-button${active ? " active" : ""}" data-tone="${escapeAttr(tone)}" aria-checked="${active ? "true" : "false"}" tabindex="${active ? "0" : "-1"}" title="Ton ${escapeAttr(toneLabelsFr[tone])} — réécriture et dictée">${escapeHtml(toneLabelsFr[tone])}</button>`;
+      return `<button type="button" role="radio" class="tone-button${active ? " active" : ""}" data-tone="${escapeAttr(tone)}" aria-checked="${active ? "true" : "false"}" tabindex="${active ? "0" : "-1"}" title="Réécrire tout de suite en ton ${escapeAttr(toneLabelsFr[tone])} (dictée aussi)">${escapeHtml(toneLabelsFr[tone])}</button>`;
     })
     .join("");
 

@@ -108,6 +108,7 @@ export function renderSplitSendDialog(): string {
   const plan = state.splitSendConfirm;
   if (!plan || !plan.chunks.length) return "";
   const n = plan.chunks.length;
+  const multi = n > 1;
   const targetMo = (plan.serverTargetBytes / (1024 * 1024)).toFixed(0);
   const budgetMo = (plan.budgetBytes / (1024 * 1024)).toFixed(1);
   const warnHtml =
@@ -136,17 +137,22 @@ export function renderSplitSendDialog(): string {
       return `<li class="split-send-chunk-row"><span class="dim">Mail ${i + 1}/${n}</span> — ${names} — <strong>${formatAttachmentSizeKb(ch.totalBytes)}</strong>${tag}</li>`;
     })
     .join("");
+  const title = multi ? `Envoi en ${n} parties` : "Pièce jointe volumineuse";
+  const intro = multi
+    ? `Les pièces jointes dépassent ~${budgetMo} Mo par message (limite côté serveur souvent ~${targetMo} Mo une fois encodées).
+            Le message sera découpé en <strong>${n} e-mails</strong> dans la même conversation (réponses chaînées).`
+    : `Une ou plusieurs pièces jointes dépassent ~${budgetMo} Mo (cible serveur ~${targetMo} Mo une fois encodées). L’envoi peut être refusé — confirmez pour tenter quand même.`;
+  const confirmLabel = multi ? `Envoyer en ${n} parties` : "Envoyer quand même";
   return `
     <div class="modal-backdrop" data-action="cancel-split-send">
       <div class="modal surface-elevated split-send-modal modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="split-send-title">
         <div class="modal-header">
-          <strong id="split-send-title">Envoi en ${n} parties</strong>
+          <strong id="split-send-title">${title}</strong>
           <button type="button" class="icon-pill" data-action="cancel-split-send" aria-label="Fermer">${iconSvg("close")}</button>
         </div>
         <div class="modal-body split-send-modal-body">
           <p class="dim" style="margin:0 0 10px;font-size:13px">
-            Les pièces jointes dépassent ~${budgetMo} Mo par message (limite côté serveur souvent ~${targetMo} Mo une fois encodées).
-            Le message sera découpé en <strong>${n} e-mails</strong> dans la même conversation (réponses chaînées).
+            ${intro}
           </p>
           ${warnHtml}
           <p class="dim" style="margin:0 0 6px;font-size:12px">Répartition proposée :</p>
@@ -154,7 +160,7 @@ export function renderSplitSendDialog(): string {
         </div>
         <div class="modal-footer">
           <button type="button" class="ghost-button" data-action="cancel-split-send">Annuler</button>
-          <button type="button" class="primary-button" data-action="confirm-split-send">Envoyer en ${n} parties</button>
+          <button type="button" class="primary-button" data-action="confirm-split-send">${confirmLabel}</button>
         </div>
       </div>
     </div>

@@ -37,14 +37,16 @@ export async function agentPrepareReplyStart(): Promise<void> {
     toast.warning(t("toast.enableAgentInSettings"));
     return;
   }
+  // Lire le mode avant reset session (stopAgentTelemetry ne vide pas la session).
+  const assistMode: AssistMode = state.agentSession?.assistMode ?? "deep";
+  const enabledSkills = defaultEnabledSkillIds(assistMode);
   await stopAgentTelemetry();
   state.aiOpen = true;
-  const assistMode: AssistMode = "deep";
   state.agentSession = {
     threadId: tid,
     accountId,
     assistMode,
-    enabledSkills: defaultEnabledSkillIds(assistMode),
+    enabledSkills,
     step: "analyzeIntent",
     draft: "",
     slots: [],
@@ -62,7 +64,7 @@ export async function agentPrepareReplyStart(): Promise<void> {
   render();
   await withLlmQueue("Assistant réponse (1/3)", async (signal) => {
     try {
-      const base = buildAssistPayload(tid, accountId, assistMode);
+      const base = buildAssistPayload(tid, accountId, assistMode, enabledSkills);
       const res = await invoke<AssistResult>("llm_assist_thread_phase", {
         payload: {
           ...base,

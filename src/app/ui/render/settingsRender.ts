@@ -293,13 +293,7 @@ function renderSettingsAppearancePanel(): string {
   const ai = state.appPrefs.ai;
   const g = state.appPrefs.general;
   const scheme = g.colorScheme ?? "light";
-  const sessionComfort = g.sessionComfort !== false;
   const contrastPlus = Boolean(g.contrastPlus);
-  const accentLavender = Boolean(g.accentLavender);
-  const darkEffective =
-    scheme === "dark" ||
-    (scheme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const modDisabled = darkEffective ? " disabled" : "";
   return wrapSettingsPage(`
     <div class="settings-card settings-appearance surface-sm">
       <h2 class="thread-kicker settings-form-kicker" style="margin:0 0 10px">${escapeHtml(t("settings.appearance.heading"))}</h2>
@@ -313,21 +307,9 @@ function renderSettingsAppearancePanel(): string {
         </select>
       </div>
       <div class="settings-form-row">
-        <label class="settings-form-check">
-          <input type="checkbox" id="prefs-session-comfort"${sessionComfort ? " checked" : ""}${modDisabled} />
-          <span class="settings-form-check-text">${escapeHtml(t("settings.appearance.sessionComfort"))}</span>
-        </label>
-      </div>
-      <div class="settings-form-row">
-        <label class="settings-form-check">
-          <input type="checkbox" id="prefs-contrast-plus"${contrastPlus ? " checked" : ""}${modDisabled} />
+        <label class="settings-form-check" for="prefs-contrast-plus">
+          <input type="checkbox" id="prefs-contrast-plus"${contrastPlus ? " checked" : ""} />
           <span class="settings-form-check-text">${escapeHtml(t("settings.appearance.contrastPlus"))}</span>
-        </label>
-      </div>
-      <div class="settings-form-row">
-        <label class="settings-form-check">
-          <input type="checkbox" id="prefs-accent-lavender"${accentLavender ? " checked" : ""}${modDisabled} />
-          <span class="settings-form-check-text">${escapeHtml(t("settings.appearance.accentLavender"))}</span>
         </label>
       </div>
       <div class="settings-form-row">
@@ -684,8 +666,18 @@ export function renderSettings() {
             settingsNavButton("storage", t("settings.tabs.storage"), tabStorage, "SQLite, JSON, modèles"),
             settingsNavButton("shortcuts", t("settings.tabs.shortcuts"), tabShortcuts, "Raccourcis clavier"),
             settingsNavButton("developer", t("settings.tabs.developer"), tabDeveloper, "Dépôt, crates, libs"),
-            settingsNavButton("digestCut", t("settings.tabs.digestCut"), tabDigestCut, "Découpe d'un mail de la boîte"),
-            settingsNavButton("digestBench", t("settings.tabs.digestBench"), tabDigestBench, "Découpe digest sur la recherche"),
+            settingsNavButton(
+              "digestCut",
+              t("settings.tabs.digestCut"),
+              tabDigestCut,
+              "Outil 1/2 — découpe d’un vrai mail (boîte / .eml) + proposition LLM",
+            ),
+            settingsNavButton(
+              "digestBench",
+              t("settings.tabs.digestBench"),
+              tabDigestBench,
+              "Outil 2/2 — banc d’essai sur fixtures YAML (recherche → puis « Découper ce mail »)",
+            ),
           ].join(""),
         )}
       </nav>

@@ -17,7 +17,8 @@ export async function maybePromptSplitSendPlan(draftOutbound: Draft): Promise<bo
       invoke<SplitPlan>("plan_split_send", { draft: draftOutbound }),
       MAIL_ACTION_TIMEOUT_MS,
     );
-    if (plan.chunks.length > 1) {
+    // Multi-parties, ou un seul lot oversized (sinon SMTP silencieux sans avertissement).
+    if (plan.chunks.length > 1 || plan.hasOversized) {
       state.splitSendConfirm = plan;
       state.composeMessage = "";
       render();
@@ -26,9 +27,10 @@ export async function maybePromptSplitSendPlan(draftOutbound: Draft): Promise<bo
   } catch (error) {
     console.error("plan_split_send", error);
     state.composeMessage = "";
-    toast.error(tauriErrorMessage(error));
+    // Ne pas bloquer l’envoi normal : SMTP/IPC signaleront le même problème si réel.
+    toast.warning(`Découpage PJ indisponible — tentative d’envoi classique. ${tauriErrorMessage(error)}`);
     render();
-    return true;
+    return false;
   }
   state.composeMessage = "";
   return false;

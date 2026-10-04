@@ -21,8 +21,11 @@ import {
   unwrapComposeHtml,
 } from "./composeHtmlBody";
 import { syncStaleComposeGrammarSuggestions } from "./composeGrammarPanelSync";
+import { ComposeGrammarHighlights } from "./composeGrammarHighlights";
 import { schedulePreviewUpdate } from "./composeDraftPreview";
 import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
+import { prepareInlineImageFromFile } from "./composeInlineImageLimits";
+import { toast } from "../lib/toast";
 
 const BLOCK_SEPARATOR = "\n\n";
 
@@ -224,41 +227,96 @@ async function promptLink(from: number, to: number): Promise<void> {
   next.chain().focus().setTextSelection({ from: start, to: end }).setLink({ href }).run();
 }
 
-async function promptImage(from: number, to: number): Promise<void> {
-  const ed = getComposeBodyEditor();
-  const selected = ed ? ed.state.doc.textBetween(from, to, " ").trim() : "";
-  const url = await openTextPromptModal({
-    title: "Insérer une image",
-    label: "URL de l’image",
-    defaultValue: "https://",
-  });
-  if (url == null) return;
-  const src = safeImageSrc(url);
-  if (!src) return;
+function placeImageInEditor(src: string, alt: string, from: number, to: number): void {
   const next = getComposeBodyEditor();
   if (!next) return;
   const max = next.state.doc.content.size;
   const start = Math.max(0, Math.min(from, max));
   const end = Math.max(start, Math.min(to, max));
-  const alt = selected || "image";
   const chain = next.chain().focus();
   if (start !== end) chain.deleteRange({ from: start, to: end });
   chain.setImage({ src, alt }).run();
   selectComposeImageSrc(next, src);
 }
 
+function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    let settled = false;
+    const finish = (file: File | null) => {
+      if (settled) return;
+      settled = true;
+      try {
+        input.remove();
+      } catch {
+        /* déjà retiré */
+      }
+      resolve(file);
+    };
+    input.addEventListener("change", () => finish(input.files?.[0] ?? null));
+    input.addEventListener("cancel", () => finish(null));
+    document.body.appendChild(input);
+    input.click();
+    // Fallback si l’événement `cancel` n’existe pas (focus retour après dialogue).
+    window.setTimeout(() => {
+      if (settled) return;
+      window.addEventListener(
+        "focus",
+        () => {
+          window.setTimeout(() => {
+            if (!settled) finish(input.files?.[0] ?? null);
+          }, 350);
+        },
+        { once: true },
+      );
+    }, 0);
+  });
+}
+
+async function promptImage(from: number, to: number): Promise<void> {
+  const ed = getComposeBodyEditor();
+  const selected = ed ? ed.state.doc.textBetween(from, to, " ").trim() : "";
+  const file = await pickImageFile();
+  if (file) {
+    const prepared = await prepareInlineImageFromFile(file);
+    if (!prepared.ok) {
+      toast.warning(prepared.error);
+      return;
+    }
+    placeImageInEditor(prepared.dataUrl, selected || prepared.alt, from, to);
+    return;
+  }
+  const url = await openTextPromptModal({
+    title: "Insérer une image",
+    label: "URL de l’image (ou annulez puis choisissez un fichier via le sélecteur)",
+    defaultValue: "https://",
+  });
+  if (url == null) return;
+  const src = safeImageSrc(url);
+  if (!src) {
+    toast.warning("URL d’image invalide.");
+    return;
+  }
+  placeImageInEditor(src, selected || "image", from, to);
+}
+
 function insertImageFile(file: File): void {
-  const reader = new FileReader();
-  reader.onload = () => {
-    const dataUrl = typeof reader.result === "string" ? reader.result : "";
-    if (!dataUrl.startsWith("data:image/")) return;
+  void (async () => {
+    const prepared = await prepareInlineImageFromFile(file);
+    if (!prepared.ok) {
+      toast.warning(prepared.error);
+      return;
+    }
     const ed = getComposeBodyEditor();
     if (!ed) return;
     const stamp = new Date().toLocaleString();
-    ed.chain().focus().setImage({ src: dataUrl, alt: `Capture ${stamp}` }).run();
-    selectComposeImageSrc(ed, dataUrl);
-  };
-  reader.readAsDataURL(file);
+    ed.chain().focus().setImage({ src: prepared.dataUrl, alt: prepared.alt || `Capture ${stamp}` }).run();
+    selectComposeImageSrc(ed, prepared.dataUrl);
+  })();
 }
 
 export function destroyComposeBodyEditor(): void {
@@ -310,6 +368,7 @@ export function mountComposeBodyEditor(host: HTMLElement): void {
         TableHeader,
         TableCell,
         ComposeLinkKeys,
+        ComposeGrammarHighlights,
       ],
       content: composeSourceToEditorHtml(source),
       editorProps: {
