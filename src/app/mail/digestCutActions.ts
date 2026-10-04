@@ -242,10 +242,15 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
       digestCut.notice =
         "Proposition du modèle local. Lisez l'explication, puis ajustez les zones. Même moteur que Paramètres → IA.";
     } else {
-      const why = view.fallbackReason?.trim();
-      digestCut.notice = why
-        ? `Découpe structurelle (repli). Le modèle n'a pas renvoyé un JSON exploitable — ${why}`
-        : "Découpe structurelle (repli). Le modèle n'a pas fourni de découpe. Vérifiez Paramètres → IA → Tester la connexion.";
+      const why = view.fallbackReason?.trim() ?? "";
+      if (/contexte trop|n_ctx/i.test(why)) {
+        digestCut.notice = `Découpe structurelle (repli). ${why}`;
+      } else if (why) {
+        digestCut.notice = `Découpe structurelle (repli). Le modèle n'a pas renvoyé un JSON exploitable — ${why}`;
+      } else {
+        digestCut.notice =
+          "Découpe structurelle (repli). Le modèle n'a pas fourni de découpe. Vérifiez Paramètres → IA → Tester la connexion.";
+      }
     }
     await previewDigestCut();
   } catch (error) {
