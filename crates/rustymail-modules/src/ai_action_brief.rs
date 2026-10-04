@@ -399,7 +399,10 @@ fn stamp_output_partial(result: &mut ActionBriefResult) {
     let missing_clause = if missing.is_empty() {
         "Certaines listes peuvent être incomplètes.".to_string()
     } else {
-        format!("Sections absentes ou vides après coupure : {}.", missing.join(", "))
+        format!(
+            "Sections absentes ou vides après coupure : {}.",
+            missing.join(", ")
+        )
     };
     let why = format!(
         "La réponse JSON du modèle était incomplète et a été tronquée. {missing_clause} \
@@ -902,7 +905,9 @@ mod brief_context_tests {
         assert!(brief.confidence <= 0.45);
         assert_eq!(brief.ambiguities[0].question, "Brief partiel");
         assert!(brief.ambiguities[0].why_it_matters.contains("incomplète"));
-        assert!(brief.ambiguities[0].why_it_matters.contains("Sections absentes"));
+        assert!(brief.ambiguities[0]
+            .why_it_matters
+            .contains("Sections absentes"));
         assert!(brief.ambiguities[0]
             .why_it_matters
             .contains("action_planner_llm"));

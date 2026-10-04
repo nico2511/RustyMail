@@ -94,8 +94,13 @@ pub fn digest_cut_propose_zones(
                 current,
             ),
             Err(e) => {
-                let mut out =
-                    propose_digest_cut_zones(None, &payload.html, &payload.sender_email, lang, current);
+                let mut out = propose_digest_cut_zones(
+                    None,
+                    &payload.html,
+                    &payload.sender_email,
+                    lang,
+                    current,
+                );
                 out.fallback_reason = Some(format!(
                     "Moteur IA indisponible pour la découpe : {e}. Même chemin que Paramètres → IA → Tester la connexion."
                 ));

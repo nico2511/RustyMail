@@ -98,7 +98,9 @@ pub fn validate_flux_affiner_result(
         );
     }
     if existing_mailboxes.iter().any(|m| fold_label(m) == folded) {
-        return Err("Ce dossier existe déjà — choisissez un autre nom ou déplacez sans créer.".into());
+        return Err(
+            "Ce dossier existe déjà — choisissez un autre nom ou déplacez sans créer.".into(),
+        );
     }
     if result.confidence < MIN_AFFINER_CONFIDENCE {
         return Err(format!(

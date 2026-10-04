@@ -11,12 +11,12 @@ use rustymail_domain::{
 
 use crate::app_prefs::{load_app_prefs, prefs_path_from_db_dir};
 use crate::build_thread_from_row;
+use crate::mail_classify::protect_from_org_trash;
 use crate::mail_ops::is_trash_like_mailbox;
 use crate::newsletter::{list_newsletter_rules_connection, matches_newsletter_email};
 use crate::open_sqlite_migrated;
 use crate::org_consolidate::scan_duplicate_threads;
 use crate::org_mailbox_structure::analyze_mailbox_structure;
-use crate::mail_classify::protect_from_org_trash;
 use crate::org_retag::{effective_thread_mailbox, sender_is_transactional, thread_tags_stale};
 use rustymail_llm::LlmEngine;
 use rustymail_modules::ai_org_proposals::org_orientation_with_llm;
@@ -243,7 +243,8 @@ pub fn hydrate_llm_proposals(
         if refs.is_empty() {
             let search_kws =
                 infer_llm_search_keywords(&proposal.title, &proposal.rationale, &keywords);
-            let search_kws: Vec<String> = if proposal.suggested_action == OrgSuggestedAction::Trash {
+            let search_kws: Vec<String> = if proposal.suggested_action == OrgSuggestedAction::Trash
+            {
                 search_kws
                     .into_iter()
                     .filter(|k| !org_trash_keyword_blocked(k))

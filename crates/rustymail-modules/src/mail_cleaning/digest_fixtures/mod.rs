@@ -18,7 +18,7 @@ pub use model::{
     parse_fixture, AnchorRole, DigestFixture, FixtureError, ZoneAction, ZonePresentation,
 };
 pub use proposal::{
-    analyze_html_structure_heuristic, empty_or_invalid_proposal_does_not_apply,
+    analyze_html_structure_heuristic, empty_or_invalid_proposal_does_not_apply, french_explanation,
     proposal_to_fixture_yaml, structure_outline_for_llm, DigestCutProposal, ProposalSource,
 };
 

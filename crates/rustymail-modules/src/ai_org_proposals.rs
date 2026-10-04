@@ -361,7 +361,10 @@ Note : ceci n’est pas une seconde action.
         let raw = r#"{"diagnosis":"Des publicités lues encombrent l’inbox depuis des semaines.","recommendations":["Jeter les pubs.","Garder les factures."],"actions":[{"title":"x","rationale":"okkk","threadIds":["t-ads"],"searchKeywords":[],"suggestedAction":"archive","targetMailbox":null},{"title":"Jeter les pubs","rationale":"Ces fils n’ont plus d’intérêt.","threadIds":["t-ads"],"searchKeywords":[],"suggestedAction":"trash","targetMailbox":null}]}"#;
         let parsed = parse_org_orientation_json(raw, &ids(&["t-ads"])).expect("partial ok");
         assert_eq!(parsed.actions.len(), 1);
-        assert_eq!(parsed.actions[0].suggested_action, OrgSuggestedAction::Trash);
+        assert_eq!(
+            parsed.actions[0].suggested_action,
+            OrgSuggestedAction::Trash
+        );
     }
 
     #[test]

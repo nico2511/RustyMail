@@ -317,7 +317,9 @@ mod tests {
 
     #[test]
     fn ticket_de_caisse_is_protected_from_org_trash() {
-        assert!(subject_looks_transactional("Votre ticket de caisse — Magasin"));
+        assert!(subject_looks_transactional(
+            "Votre ticket de caisse — Magasin"
+        ));
         assert!(protect_from_org_trash(
             "info@magasin.example",
             "Votre ticket de caisse — Magasin"
