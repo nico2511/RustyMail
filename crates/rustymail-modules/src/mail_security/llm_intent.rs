@@ -221,8 +221,7 @@ pub fn augment_security_with_llm(
         sys.as_str(),
         &user,
         None,
-        base.summary_fr.chars().count() > 2_048
-            || context.body_excerpt.chars().count() > 2_400,
+        base.summary_fr.chars().count() > 2_048 || context.body_excerpt.chars().count() > 2_400,
     );
 
     let llm_findings = sanitize_llm_findings(pack.findings, &heuristic_findings);
@@ -381,8 +380,7 @@ mod tests {
             vec![LlmFindingIn {
                 code: "credential_ask".into(),
                 severity: MailSecurityFindingSeverity::Suspicion,
-                message_fr: "Demande explicite de mot de passe ou de code dans le corps."
-                    .into(),
+                message_fr: "Demande explicite de mot de passe ou de code dans le corps.".into(),
             }],
             &base.findings,
         );

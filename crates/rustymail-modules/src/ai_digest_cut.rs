@@ -170,9 +170,8 @@ fn propose_with_llm(
             html_budget,
         );
         let room = output_room_after_prompt(engine, system.as_str(), &user, 64);
-        let fully_shrunk = html_budget == 0
-            && outline_budget <= LLM_OUTLINE_CHARS_MIN
-            && current_budget == 0;
+        let fully_shrunk =
+            html_budget == 0 && outline_budget <= LLM_OUTLINE_CHARS_MIN && current_budget == 0;
         if room >= MIN_OUTPUT_ROOM || fully_shrunk {
             if room < MIN_OUTPUT_ROOM {
                 let n_ctx = engine.n_ctx();
@@ -288,7 +287,12 @@ fn slim_current_proposal_json(proposal: &DigestCutProposal) -> String {
             .take(4)
             .map(|a| {
                 let mut o = serde_json::Map::new();
-                if let Some(sel) = a.selector.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                if let Some(sel) = a
+                    .selector
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                {
                     o.insert("selector".into(), json!(sel));
                 }
                 if let Some(idx) = a.index {
@@ -518,7 +522,10 @@ mod tests {
         assert!(slim.contains("structureRoot"));
         assert!(slim.len() < serde_json::to_string(&proposal).unwrap().len() + 8);
         let v: serde_json::Value = serde_json::from_str(&slim).expect("json");
-        assert!(v["zones"]["header"]["action"].is_string() || v["zones"]["header"]["action"].is_object());
+        assert!(
+            v["zones"]["header"]["action"].is_string()
+                || v["zones"]["header"]["action"].is_object()
+        );
     }
 
     #[test]

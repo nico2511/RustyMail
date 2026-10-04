@@ -207,7 +207,8 @@ pub use draft_revisions::{
     sqlite_draft_orphan_session_open, sqlite_draft_orphan_sessions_list,
     sqlite_draft_orphan_sessions_purge_stale, sqlite_draft_revision_get,
     sqlite_draft_revision_list, sqlite_draft_revision_purge_session, sqlite_draft_revision_save,
-    stage_draft_attachments, DraftRevisionListItem, DraftRevisionSaveResult, OrphanDraftSessionItem,
+    stage_draft_attachments, DraftRevisionListItem, DraftRevisionSaveResult,
+    OrphanDraftSessionItem,
 };
 pub use inline_compose_images::{extract_inline_data_images, InlineImagePart};
 pub use saved_drafts::{

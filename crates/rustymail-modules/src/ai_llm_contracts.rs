@@ -594,7 +594,8 @@ pub fn draft_echoes_inbound(source: &str, draft: &str) -> bool {
     if draft_words.len() < 18 {
         return false;
     }
-    let source_words: std::collections::HashSet<_> = significant_words(source).into_iter().collect();
+    let source_words: std::collections::HashSet<_> =
+        significant_words(source).into_iter().collect();
     if source_words.len() < 12 {
         return false;
     }
