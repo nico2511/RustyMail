@@ -657,7 +657,7 @@ fn deblock_sender_domains(domain: &str) -> Vec<DomainRuleDto> {
     }]
 }
 
-fn slug_from_domain(domain: &str) -> String {
+pub(crate) fn slug_from_domain(domain: &str) -> String {
     let slug = domain
         .trim()
         .to_ascii_lowercase()
@@ -687,7 +687,7 @@ fn anchor(
     }
 }
 
-fn email_domain(email: &str) -> Option<String> {
+pub(crate) fn email_domain(email: &str) -> Option<String> {
     let at = email.rfind('@')?;
     let domain = email[at + 1..].trim().to_ascii_lowercase();
     if domain.is_empty() || domain.contains('@') {

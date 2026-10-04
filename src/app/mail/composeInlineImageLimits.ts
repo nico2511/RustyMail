@@ -1,8 +1,10 @@
 /** Limites des images intégrées (data URL) dans le corps du composeur. */
 
 export const MAX_INLINE_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_EDGE_PX = 1600;
-const JPEG_QUALITIES = [0.82, 0.72, 0.6, 0.48];
+/** Au-delà : on recompresse (JPEG) même si encore sous le plafond IPC. */
+export const TARGET_INLINE_IMAGE_BYTES = 1_500_000;
+const EDGE_PX_STEPS = [1600, 1280, 1024, 800, 640];
+const JPEG_QUALITIES = [0.82, 0.72, 0.6, 0.48, 0.36];
 
 export function estimateDataUrlDecodedBytes(dataUrl: string): number {
   const comma = dataUrl.indexOf(",");
@@ -12,24 +14,108 @@ export function estimateDataUrlDecodedBytes(dataUrl: string): number {
   return Math.max(0, Math.floor((b64.length * 3) / 4) - padding);
 }
 
-function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+/** Data URLs `data:image/…;base64,…` présents dans le corps (HTML ou markdown). */
+export function listInlineDataImageUrls(body: string): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < body.length) {
+    const idx = body.indexOf("data:image/", i);
+    if (idx < 0) break;
+    let end = idx;
+    while (end < body.length) {
+      const c = body[end]!;
+      if (c === '"' || c === "'" || c === ")" || c === " " || c === "\n" || c === "\r" || c === "\t") {
+        break;
+      }
+      end += 1;
+    }
+    const url = body.slice(idx, end);
+    if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(url)) {
+      out.push(url);
+    }
+    i = Math.max(end, idx + 1);
+  }
+  return out;
+}
+
+function loadImageFromObjectUrl(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Image illisible"));
-    };
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Image illisible"));
     img.src = url;
   });
 }
 
+async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    return await loadImageFromObjectUrl(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function loadImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
+  return loadImageFromObjectUrl(dataUrl);
+}
+
 function canvasToJpegDataUrl(canvas: HTMLCanvasElement, quality: number): string {
   return canvas.toDataURL("image/jpeg", quality);
+}
+
+function drawScaled(img: HTMLImageElement, edgePx: number): HTMLCanvasElement | null {
+  const nw = img.naturalWidth || 1;
+  const nh = img.naturalHeight || 1;
+  const scale = Math.min(1, edgePx / Math.max(nw, nh));
+  const w = Math.max(1, Math.round(nw * scale));
+  const h = Math.max(1, Math.round(nh * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas;
+}
+
+async function compressImageElement(
+  img: HTMLImageElement,
+  alt: string,
+): Promise<{ ok: true; dataUrl: string; alt: string } | { ok: false; error: string }> {
+  let best = "";
+  let bestBytes = Number.POSITIVE_INFINITY;
+  for (const edge of EDGE_PX_STEPS) {
+    const canvas = drawScaled(img, edge);
+    if (!canvas) return { ok: false, error: "Compression d’image indisponible." };
+    for (const q of JPEG_QUALITIES) {
+      const dataUrl = canvasToJpegDataUrl(canvas, q);
+      const bytes = estimateDataUrlDecodedBytes(dataUrl);
+      if (bytes < bestBytes) {
+        best = dataUrl;
+        bestBytes = bytes;
+      }
+      if (bytes <= TARGET_INLINE_IMAGE_BYTES) {
+        return { ok: true, dataUrl, alt };
+      }
+    }
+  }
+  if (best && bestBytes <= MAX_INLINE_IMAGE_BYTES) {
+    return { ok: true, dataUrl: best, alt };
+  }
+  return {
+    ok: false,
+    error: `Image intégrée trop volumineuse (max ${MAX_INLINE_IMAGE_BYTES} octets, obtenu ~${Number.isFinite(bestBytes) ? bestBytes : "?"}). Réduisez la résolution ou joignez-la en pièce jointe.`,
+  };
+}
+
+async function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(new Error("Lecture impossible"));
+    reader.readAsDataURL(file);
+  });
 }
 
 /**
@@ -43,45 +129,90 @@ export async function prepareInlineImageFromFile(
     return { ok: false, error: "Ce fichier n’est pas une image." };
   }
   try {
-    const img = await loadImageFromFile(file);
-    const scale = Math.min(1, MAX_EDGE_PX / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
-    const w = Math.max(1, Math.round((img.naturalWidth || 1) * scale));
-    const h = Math.max(1, Math.round((img.naturalHeight || 1) * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return { ok: false, error: "Compression d’image indisponible." };
-    ctx.drawImage(img, 0, 0, w, h);
-
-    // GIF / PNG avec transparence : tenter le data URL brut s’il est déjà sous plafond.
+    const alt = file.name || "image";
+    // Petites images déjà sous la cible : garder le format d’origine (transparence PNG/GIF).
     if (file.type === "image/png" || file.type === "image/gif" || file.type === "image/webp") {
-      const raw = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-        reader.onerror = () => reject(new Error("Lecture impossible"));
-        reader.readAsDataURL(file);
-      });
-      if (raw.startsWith("data:image/") && estimateDataUrlDecodedBytes(raw) <= MAX_INLINE_IMAGE_BYTES) {
-        return { ok: true, dataUrl: raw, alt: file.name || "image" };
+      const raw = await readFileAsDataUrl(file);
+      if (raw.startsWith("data:image/") && estimateDataUrlDecodedBytes(raw) <= TARGET_INLINE_IMAGE_BYTES) {
+        return { ok: true, dataUrl: raw, alt };
+      }
+    } else if (file.type === "image/jpeg" || file.type === "image/jpg") {
+      const raw = await readFileAsDataUrl(file);
+      if (raw.startsWith("data:image/") && estimateDataUrlDecodedBytes(raw) <= TARGET_INLINE_IMAGE_BYTES) {
+        return { ok: true, dataUrl: raw, alt };
       }
     }
-
-    let best = "";
-    for (const q of JPEG_QUALITIES) {
-      const dataUrl = canvasToJpegDataUrl(canvas, q);
-      best = dataUrl;
-      if (estimateDataUrlDecodedBytes(dataUrl) <= MAX_INLINE_IMAGE_BYTES) {
-        return { ok: true, dataUrl, alt: file.name || "image" };
-      }
-    }
-
-    const bytes = estimateDataUrlDecodedBytes(best);
-    return {
-      ok: false,
-      error: `Image intégrée trop volumineuse (max ${MAX_INLINE_IMAGE_BYTES} octets, obtenu ~${bytes}). Réduisez la résolution ou joignez-la en pièce jointe.`,
-    };
+    const img = await loadImageFromFile(file);
+    return compressImageElement(img, alt);
   } catch {
     return { ok: false, error: "Impossible de préparer cette image." };
   }
+}
+
+/** Compresse un data URL déjà présent dans le brouillon (collage HTML, ancien brouillon…). */
+export async function prepareInlineImageFromDataUrl(
+  dataUrl: string,
+  alt = "image",
+): Promise<{ ok: true; dataUrl: string; alt: string } | { ok: false; error: string }> {
+  if (!/^data:image\/(?:png|jpe?g|gif|webp|bmp);base64,/i.test(dataUrl.trim())) {
+    return { ok: false, error: "Image intégrée illisible." };
+  }
+  const bytes = estimateDataUrlDecodedBytes(dataUrl);
+  if (bytes <= TARGET_INLINE_IMAGE_BYTES) {
+    return { ok: true, dataUrl, alt };
+  }
+  try {
+    const img = await loadImageFromDataUrl(dataUrl);
+    return compressImageElement(img, alt);
+  } catch {
+    return { ok: false, error: "Impossible de compresser cette image intégrée." };
+  }
+}
+
+/**
+ * Avant envoi / sauvegarde IPC : recompresse chaque data URL trop lourde.
+ * Met à jour le corps si au moins une image a été réduite.
+ */
+export async function ensureInlineImagesWithinLimit(
+  body: string,
+): Promise<{ ok: true; body: string; compressed: number } | { ok: false; error: string }> {
+  const urls = listInlineDataImageUrls(body);
+  if (urls.length === 0) return { ok: true, body, compressed: 0 };
+
+  let next = body;
+  let compressed = 0;
+  // Dédupliquer : même data URL réutilisée plusieurs fois.
+  const unique = [...new Set(urls)];
+  for (const url of unique) {
+    const bytes = estimateDataUrlDecodedBytes(url);
+    if (bytes <= TARGET_INLINE_IMAGE_BYTES) continue;
+    const prepared = await prepareInlineImageFromDataUrl(url);
+    if (!prepared.ok) {
+      if (bytes > MAX_INLINE_IMAGE_BYTES) {
+        return { ok: false, error: prepared.error };
+      }
+      // Sous le plafond dur mais compression impossible : laisser passer.
+      continue;
+    }
+    if (prepared.dataUrl !== url) {
+      next = next.split(url).join(prepared.dataUrl);
+      compressed += 1;
+    }
+    if (estimateDataUrlDecodedBytes(prepared.dataUrl) > MAX_INLINE_IMAGE_BYTES) {
+      return {
+        ok: false,
+        error: `Image intégrée trop volumineuse (max ${MAX_INLINE_IMAGE_BYTES} octets). Joignez-la en pièce jointe.`,
+      };
+    }
+  }
+
+  for (const url of listInlineDataImageUrls(next)) {
+    if (estimateDataUrlDecodedBytes(url) > MAX_INLINE_IMAGE_BYTES) {
+      return {
+        ok: false,
+        error: `Image intégrée trop volumineuse (max ${MAX_INLINE_IMAGE_BYTES} octets). Joignez-la en pièce jointe.`,
+      };
+    }
+  }
+  return { ok: true, body: next, compressed };
 }

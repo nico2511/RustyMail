@@ -1,14 +1,16 @@
 //! Proposition IA de zones pour l'éditeur de découpe digest (hors `clean_message`).
 
 use serde::Deserialize;
+use serde_json::{json, Value};
 
 use crate::ai_llm_util::{
-    gen_params_json_for_prompt, parse_model_json, truncate_chars, untrusted_mail_for_engine,
+    gen_params_json_for_prompt, output_room_after_prompt, parse_model_json, truncate_chars,
+    untrusted_mail_for_engine,
 };
 use crate::mail_cleaning::digest_fixtures::proposal::{
-    analyze_html_structure_heuristic, french_explanation, proposal_to_fixture_yaml,
-    structure_outline_for_llm, DigestCutAnchor, DigestCutMatch, DigestCutProposal, DigestCutZone,
-    DigestCutZones, DomainRuleDto, ProposalSource,
+    analyze_html_structure_heuristic, email_domain, french_explanation, proposal_to_fixture_yaml,
+    slug_from_domain, structure_outline_for_llm, DigestCutAnchor, DigestCutMatch,
+    DigestCutProposal, DigestCutZone, DigestCutZones, DomainRuleDto, ProposalSource,
 };
 use crate::mail_cleaning::digest_fixtures::{AnchorRole, ZoneAction, ZonePresentation};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -16,7 +18,9 @@ use rustymail_llm::{LlmEngine, LlmError};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DigestCutDto {
+    #[serde(default)]
     fixture_id: String,
+    #[serde(default)]
     rule_set_version: String,
     #[serde(default)]
     explanation_fr: String,
@@ -110,8 +114,12 @@ pub fn propose_digest_cut_zones(
     }
 }
 
-/// HTML clip kept small for Llama 3.2 (local Ollama `llama3.2` or llama-server).
-const LLM_HTML_CHARS: usize = 6_000;
+/// Outline + petit extrait HTML. Llama 3.2 / n_ctx courts : trop de HTML = réponse vide (`{`).
+const LLM_HTML_CHARS_MAX: usize = 1_800;
+const LLM_HTML_CHARS_MIN: usize = 0;
+const MIN_OUTPUT_TOKENS: u32 = 768;
+const MAX_OUTPUT_TOKENS: u32 = 2_048;
+const MIN_OUTPUT_ROOM: u32 = 512;
 
 fn propose_with_llm(
     engine: &mut LlmEngine,
@@ -120,29 +128,63 @@ fn propose_with_llm(
     output_language: &str,
     current: Option<&DigestCutProposal>,
 ) -> Result<DigestCutProposal, LlmError> {
-    let outline = structure_outline_for_llm(html);
-    let clipped = truncate_chars(html, LLM_HTML_CHARS);
+    // Outline borné : un gros DOM peut saturer n_ctx autant que le HTML.
+    let outline = truncate_chars(&structure_outline_for_llm(html), 2_500);
     let system = crate::prompts::system_prompt_for_language("digest_cut", output_language);
+    let domain = email_domain(sender_email).unwrap_or_else(|| "example.com".to_string());
+    let default_fixture_id = slug_from_domain(&domain);
     let current_block = match current {
         Some(proposal) => {
             let json = serde_json::to_string(proposal).unwrap_or_else(|_| "{}".to_string());
-            format!("\n\nCurrent proposal JSON (keep zone actions and fixtureId unless an anchor cannot exist):\n{json}\n")
+            format!("\n\nCurrent proposal JSON (keep zone actions unless an anchor cannot exist; keep fixtureId / sender domain):\n{json}\n")
         }
         None => String::new(),
     };
-    let user = format!(
-        "Sender email (for domain matching only): {}\n\nDOM outline (tags/classes/order):\n{}\n{}{}",
-        sender_email.trim(),
-        outline,
-        current_block,
-        untrusted_mail_for_engine(engine, "digest-cut-mail-html", &clipped)
-    );
-    let raw = engine.generate(
-        system.as_str(),
-        &user,
-        &gen_params_json_for_prompt(engine, system.as_str(), &user, 256, 2_048),
-    )?;
-    let dto: DigestCutDto = parse_model_json(&raw)?;
+
+    let mut html_budget = LLM_HTML_CHARS_MAX;
+    let raw = loop {
+        let user = build_digest_cut_user(
+            engine,
+            sender_email,
+            &outline,
+            &current_block,
+            html,
+            html_budget,
+        );
+        let room = output_room_after_prompt(engine, system.as_str(), &user, 64);
+        if room >= MIN_OUTPUT_ROOM || html_budget == LLM_HTML_CHARS_MIN {
+            if room < MIN_OUTPUT_ROOM {
+                return Err(LlmError::InvalidJson(format!(
+                    "contexte trop plein pour une découpe JSON (reste {room} jetons ; réduisez le mail ou augmentez n_ctx dans Paramètres → IA)"
+                )));
+            }
+            break engine.generate(
+                system.as_str(),
+                &user,
+                &gen_params_json_for_prompt(
+                    engine,
+                    system.as_str(),
+                    &user,
+                    MIN_OUTPUT_TOKENS,
+                    MAX_OUTPUT_TOKENS,
+                ),
+            )?;
+        }
+        html_budget = html_budget.saturating_sub(600).max(LLM_HTML_CHARS_MIN);
+    };
+
+    if response_is_empty_json(&raw) {
+        return Err(LlmError::InvalidJson(
+            "réponse vide ou tronquée (aucun objet de découpe). Vérifiez Paramètres → IA → Tester la connexion, puis réessayez Proposer."
+                .into(),
+        ));
+    }
+
+    let mut value: Value = parse_model_json(&raw)?;
+    inject_digest_cut_defaults(&mut value, &default_fixture_id, &domain);
+    let dto: DigestCutDto = serde_json::from_value(value).map_err(|e| {
+        LlmError::InvalidJson(format!("objet de découpe incomplet après lecture : {e}"))
+    })?;
     validate_digest_cut_dto(&dto)?;
     let mut proposal = DigestCutProposal {
         fixture_id: dto.fixture_id.trim().to_string(),
@@ -160,10 +202,83 @@ fn propose_with_llm(
         },
         explanation_fr: clip_explanation(dto.explanation_fr),
     };
+    if proposal.fixture_id.is_empty() {
+        proposal.fixture_id = default_fixture_id;
+    }
+    if proposal.rule_set_version.is_empty() {
+        proposal.rule_set_version = "1".into();
+    }
     if proposal.explanation_fr.is_empty() {
         proposal.explanation_fr = french_explanation(&proposal);
     }
     Ok(proposal)
+}
+
+fn build_digest_cut_user(
+    engine: &LlmEngine,
+    sender_email: &str,
+    outline: &str,
+    current_block: &str,
+    html: &str,
+    html_budget: usize,
+) -> String {
+    let html_block = if html_budget == 0 {
+        String::new()
+    } else {
+        let clipped = truncate_chars(html, html_budget);
+        format!(
+            "\n{}",
+            untrusted_mail_for_engine(engine, "digest-cut-mail-html", &clipped)
+        )
+    };
+    format!(
+        "Sender email (for domain matching and fixtureId slug only): {}\n\nDOM outline (tags/classes/order — primary signal):\n{}{}{}",
+        sender_email.trim(),
+        outline,
+        current_block,
+        html_block
+    )
+}
+
+fn inject_digest_cut_defaults(value: &mut Value, default_fixture_id: &str, domain: &str) {
+    let Some(obj) = value.as_object_mut() else {
+        return;
+    };
+    let fixture_missing = match obj.get("fixtureId") {
+        Some(Value::String(s)) => s.trim().is_empty(),
+        Some(Value::Null) | None => true,
+        _ => false,
+    };
+    if fixture_missing {
+        obj.insert("fixtureId".into(), json!(default_fixture_id));
+    }
+    let version_missing = match obj.get("ruleSetVersion") {
+        Some(Value::String(s)) => s.trim().is_empty(),
+        Some(Value::Null) | None => true,
+        _ => false,
+    };
+    if version_missing {
+        obj.insert("ruleSetVersion".into(), json!("1"));
+    }
+    if let Some(Value::Object(match_obj)) = obj.get_mut("match") {
+        let domains_missing = match match_obj.get("senderDomains") {
+            Some(Value::Array(a)) => a.is_empty(),
+            Some(Value::Null) | None => true,
+            _ => false,
+        };
+        if domains_missing {
+            match_obj.insert("senderDomains".into(), json!([{ "exact": domain }]));
+        }
+    }
+}
+
+fn response_is_empty_json(raw: &str) -> bool {
+    let t = raw.trim();
+    if t.is_empty() {
+        return true;
+    }
+    let compact: String = t.chars().filter(|c| !c.is_whitespace()).collect();
+    compact == "{" || compact == "{}" || compact == "[" || compact == "[]"
 }
 
 fn clip_explanation(value: String) -> String {
@@ -238,9 +353,10 @@ fn validate_digest_cut_dto(dto: &DigestCutDto) -> Result<(), LlmError> {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_digest_cut_dto;
+    use super::{inject_digest_cut_defaults, response_is_empty_json, validate_digest_cut_dto};
     use crate::mail_cleaning::digest_fixtures::proposal::proposal_to_fixture_yaml;
     use crate::mail_cleaning::digest_fixtures::{set_installed_reading_fixture, ZoneAction};
+    use serde_json::json;
 
     #[test]
     fn invalid_llm_shape_is_rejected_before_yaml() {
@@ -295,5 +411,35 @@ mod tests {
         let yaml = proposal_to_fixture_yaml(&proposal).expect("yaml");
         assert!(yaml.contains("id: deblock-com"));
         assert!(crate::mail_cleaning::digest_fixtures::installed_reading_fixture_id().is_none());
+    }
+
+    #[test]
+    fn empty_json_response_is_detected() {
+        assert!(response_is_empty_json(""));
+        assert!(response_is_empty_json("{"));
+        assert!(response_is_empty_json("{ }"));
+        assert!(!response_is_empty_json(r#"{"fixtureId":"x"}"#));
+    }
+
+    #[test]
+    fn defaults_fill_fixture_id_for_mailbox_mails() {
+        let mut value = json!({
+            "match": {
+                "structureRoot": "div.main",
+                "minChildren": 2
+            },
+            "zones": {
+                "header": { "action": "show", "anchors": [] },
+                "body": { "action": "show", "anchors": [] },
+                "footer": { "action": "hide", "anchors": [] }
+            },
+            "explanationFr": "En-tête affiché."
+        });
+        inject_digest_cut_defaults(&mut value, "github-com", "github.com");
+        assert_eq!(value["fixtureId"], "github-com");
+        assert_eq!(value["ruleSetVersion"], "1");
+        assert_eq!(value["match"]["senderDomains"][0]["exact"], "github.com");
+        let dto: super::DigestCutDto = serde_json::from_value(value).expect("dto");
+        assert!(validate_digest_cut_dto(&dto).is_ok());
     }
 }

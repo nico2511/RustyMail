@@ -1,5 +1,5 @@
 /**
- * Image du compositeur : largeur libre (curseur + poignées) et trois raccourcis.
+ * Image du compositeur : poignées de redimensionnement + menu taille au clic droit.
  * La largeur est sérialisée en `width` et en `style` inline, pour les clients mail.
  */
 import Image from "@tiptap/extension-image";
@@ -19,6 +19,29 @@ export const COMPOSE_IMAGE_WIDTH_PRESETS = [
 export type ComposeImageResizeEdge = "nw" | "ne" | "sw" | "se";
 
 const RESIZE_EDGES: readonly ComposeImageResizeEdge[] = ["nw", "ne", "sw", "se"];
+
+let openSizeMenu: HTMLElement | null = null;
+
+function closeComposeImageSizeMenu(): void {
+  if (!openSizeMenu) return;
+  openSizeMenu.remove();
+  openSizeMenu = null;
+  window.removeEventListener("pointerdown", onGlobalPointerClose, true);
+  window.removeEventListener("keydown", onGlobalKeyClose, true);
+  window.removeEventListener("scroll", closeComposeImageSizeMenu, true);
+  window.removeEventListener("blur", closeComposeImageSizeMenu);
+}
+
+function onGlobalPointerClose(event: PointerEvent): void {
+  if (!openSizeMenu) return;
+  const target = event.target;
+  if (target instanceof Node && openSizeMenu.contains(target)) return;
+  closeComposeImageSizeMenu();
+}
+
+function onGlobalKeyClose(event: KeyboardEvent): void {
+  if (event.key === "Escape") closeComposeImageSizeMenu();
+}
 
 export function parseComposeImageWidth(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -61,13 +84,17 @@ export function writeComposeImageWidth(editor: Editor, pos: number, width: numbe
   const node = editor.state.doc.nodeAt(pos);
   if (!node || node.type.name !== "image") return false;
   const next = width == null ? null : clampComposeImageWidth(width);
-  if (parseComposeImageWidth(node.attrs.width) === next) return false;
-  editor.view.dispatch(
-    editor.state.tr.setNodeMarkup(pos, undefined, {
-      ...node.attrs,
-      width: next,
-    }),
-  );
+  if (parseComposeImageWidth(node.attrs.width) === next) return true;
+  const tr = editor.state.tr.setNodeMarkup(pos, undefined, {
+    ...node.attrs,
+    width: next,
+  });
+  try {
+    tr.setSelection(NodeSelection.create(tr.doc, pos));
+  } catch {
+    /* position invalide après mutation */
+  }
+  editor.view.dispatch(tr);
   return true;
 }
 
@@ -90,11 +117,119 @@ export function selectComposeImageSrc(editor: Editor, src: string): void {
   if (pos >= 0) editor.commands.setNodeSelection(pos);
 }
 
+function resolveImagePos(editor: Editor, getPos: () => number | undefined): number | null {
+  const sel = editor.state.selection;
+  if (sel instanceof NodeSelection && sel.node.type.name === "image") {
+    return sel.from;
+  }
+  const pos = getPos();
+  return typeof pos === "number" ? pos : null;
+}
+
 type DragState = {
   startX: number;
   startWidth: number;
   edge: ComposeImageResizeEdge;
 };
+
+function openSizeMenuAt(opts: {
+  clientX: number;
+  clientY: number;
+  currentWidth: number | null;
+  renderedWidth: number;
+  onCommit: (width: number | null) => void;
+  onPreview: (width: number | null) => void;
+}): void {
+  closeComposeImageSizeMenu();
+  const menu = document.createElement("div");
+  menu.className = "compose-image-size-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "Taille de l’image");
+
+  const title = document.createElement("div");
+  title.className = "compose-image-size-menu__title";
+  title.textContent = "Taille";
+  menu.appendChild(title);
+
+  const presetsRow = document.createElement("div");
+  presetsRow.className = "compose-image-size-menu__presets";
+  for (const preset of COMPOSE_IMAGE_WIDTH_PRESETS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "compose-image-size-menu__preset";
+    button.dataset.composeImageWidth = String(preset.px);
+    button.textContent = preset.label;
+    button.title = `${preset.px} px`;
+    button.setAttribute("role", "menuitem");
+    if (opts.currentWidth === preset.px) button.classList.add("is-active");
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      opts.onCommit(preset.px);
+      closeComposeImageSizeMenu();
+    });
+    presetsRow.appendChild(button);
+  }
+  const original = document.createElement("button");
+  original.type = "button";
+  original.className = "compose-image-size-menu__preset";
+  original.dataset.composeImageWidth = "auto";
+  original.textContent = "Origine";
+  original.title = "Taille d’origine";
+  original.setAttribute("role", "menuitem");
+  if (opts.currentWidth == null) original.classList.add("is-active");
+  original.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    opts.onCommit(null);
+    closeComposeImageSizeMenu();
+  });
+  presetsRow.appendChild(original);
+  menu.appendChild(presetsRow);
+
+  const sliderRow = document.createElement("div");
+  sliderRow.className = "compose-image-size-menu__slider-row";
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.className = "compose-image-size-menu__slider";
+  slider.min = String(COMPOSE_IMAGE_MIN_PX);
+  slider.max = String(COMPOSE_IMAGE_MAX_PX);
+  slider.step = "1";
+  const sliderStart = opts.currentWidth ?? clampComposeImageWidth(opts.renderedWidth || 320);
+  slider.value = String(sliderStart);
+  slider.setAttribute("aria-label", "Largeur en pixels");
+  const readout = document.createElement("span");
+  readout.className = "compose-image-size-menu__readout";
+  readout.textContent = opts.currentWidth == null ? "Auto" : `${opts.currentWidth} px`;
+  slider.addEventListener("input", () => {
+    const next = clampComposeImageWidth(Number(slider.value));
+    readout.textContent = `${next} px`;
+    opts.onPreview(next);
+  });
+  slider.addEventListener("change", () => {
+    opts.onCommit(clampComposeImageWidth(Number(slider.value)));
+  });
+  sliderRow.appendChild(slider);
+  sliderRow.appendChild(readout);
+  menu.appendChild(sliderRow);
+
+  document.body.appendChild(menu);
+  openSizeMenu = menu;
+
+  const pad = 8;
+  const rect = menu.getBoundingClientRect();
+  let left = opts.clientX;
+  let top = opts.clientY;
+  if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad;
+  if (top + rect.height > window.innerHeight - pad) top = window.innerHeight - rect.height - pad;
+  menu.style.left = `${Math.max(pad, left)}px`;
+  menu.style.top = `${Math.max(pad, top)}px`;
+
+  window.addEventListener("pointerdown", onGlobalPointerClose, true);
+  window.addEventListener("keydown", onGlobalKeyClose, true);
+  window.addEventListener("scroll", closeComposeImageSizeMenu, true);
+  window.addEventListener("blur", closeComposeImageSizeMenu);
+}
 
 export const ComposeImage = Image.extend({
   atom: true,
@@ -140,44 +275,6 @@ export const ComposeImage = Image.extend({
         return handle;
       });
 
-      const chrome = document.createElement("span");
-      chrome.className = "compose-image__chrome";
-      chrome.setAttribute("contenteditable", "false");
-      root.appendChild(chrome);
-
-      const presets = COMPOSE_IMAGE_WIDTH_PRESETS.map((preset) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "compose-image__preset";
-        button.dataset.composeImageWidth = String(preset.px);
-        button.textContent = preset.label;
-        button.title = `${preset.px} px`;
-        chrome.appendChild(button);
-        return button;
-      });
-
-      const original = document.createElement("button");
-      original.type = "button";
-      original.className = "compose-image__preset";
-      original.dataset.composeImageWidth = "auto";
-      original.textContent = "Origine";
-      original.title = "Taille d’origine";
-      chrome.appendChild(original);
-
-      const slider = document.createElement("input");
-      slider.type = "range";
-      slider.className = "compose-image__slider";
-      slider.min = String(COMPOSE_IMAGE_MIN_PX);
-      slider.max = String(COMPOSE_IMAGE_MAX_PX);
-      slider.step = "1";
-      slider.setAttribute("aria-label", "Taille de l’image");
-      chrome.appendChild(slider);
-
-      const readout = document.createElement("span");
-      readout.className = "compose-image__readout";
-      readout.setAttribute("aria-hidden", "true");
-      chrome.appendChild(readout);
-
       const explicitWidth = () => parseComposeImageWidth(current.attrs.width);
 
       const renderFrame = (width: number | null) => {
@@ -191,22 +288,6 @@ export const ComposeImage = Image.extend({
         img.removeAttribute("width");
         img.style.height = "auto";
         img.style.maxWidth = "100%";
-        const sliderPx = width ?? composeImageDragStartWidth(img.getBoundingClientRect().width, null);
-        slider.max = String(Math.max(COMPOSE_IMAGE_MAX_PX, sliderPx));
-        if (document.activeElement !== slider) slider.value = String(sliderPx);
-        slider.setAttribute("aria-valuenow", slider.value);
-        slider.setAttribute("aria-valuemin", slider.min);
-        slider.setAttribute("aria-valuemax", slider.max);
-        slider.setAttribute("aria-valuetext", width == null ? "Taille d’origine" : `${width} pixels`);
-        readout.textContent = width == null ? "Auto" : `${width} px`;
-        for (const button of presets) {
-          const active = Number(button.dataset.composeImageWidth) === width;
-          button.classList.toggle("is-active", active);
-          button.setAttribute("aria-pressed", active ? "true" : "false");
-        }
-        const originActive = width == null;
-        original.classList.toggle("is-active", originActive);
-        original.setAttribute("aria-pressed", originActive ? "true" : "false");
         root.classList.toggle("is-selected", selected && editor.isEditable);
       };
 
@@ -227,8 +308,8 @@ export const ComposeImage = Image.extend({
       };
 
       const commit = (width: number | null) => {
-        const pos = getPos();
-        if (typeof pos !== "number") return;
+        const pos = resolveImagePos(editor, getPos);
+        if (pos == null) return;
         writeComposeImageWidth(editor, pos, width);
       };
 
@@ -255,8 +336,9 @@ export const ComposeImage = Image.extend({
       const startDrag = (edge: ComposeImageResizeEdge, event: PointerEvent) => {
         event.preventDefault();
         event.stopPropagation();
-        const pos = getPos();
-        if (typeof pos === "number") {
+        closeComposeImageSizeMenu();
+        const pos = resolveImagePos(editor, getPos);
+        if (pos != null) {
           const selection = editor.state.selection;
           const already = selection instanceof NodeSelection && selection.from === pos;
           if (!already) editor.commands.setNodeSelection(pos);
@@ -280,24 +362,28 @@ export const ComposeImage = Image.extend({
         });
       }
 
-      for (const button of [...presets, original]) {
-        button.addEventListener("mousedown", (event) => event.preventDefault());
-        button.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const raw = button.dataset.composeImageWidth;
-          commit(raw === "auto" || raw == null ? null : clampComposeImageWidth(Number(raw)));
+      const openMenu = (event: Event) => {
+        if (!editor.isEditable) return;
+        if (!(event instanceof MouseEvent)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const pos = resolveImagePos(editor, getPos);
+        if (pos != null) editor.commands.setNodeSelection(pos);
+        openSizeMenuAt({
+          clientX: event.clientX,
+          clientY: event.clientY,
+          currentWidth: explicitWidth(),
+          renderedWidth: img.getBoundingClientRect().width,
+          onPreview: (width) => renderFrame(width),
+          onCommit: (width) => {
+            commit(width);
+            paint();
+          },
         });
-      }
+      };
 
-      slider.addEventListener("input", () => {
-        const next = clampComposeImageWidth(Number(slider.value));
-        renderFrame(next);
-        commit(next);
-      });
-      slider.addEventListener("change", () => {
-        commit(clampComposeImageWidth(Number(slider.value)));
-      });
+      root.addEventListener("contextmenu", openMenu);
+      img.addEventListener("contextmenu", openMenu);
 
       paint();
 
@@ -315,18 +401,21 @@ export const ComposeImage = Image.extend({
         },
         deselectNode: () => {
           selected = false;
+          closeComposeImageSizeMenu();
           paint();
         },
         stopEvent: (event: Event) => {
           const target = event.target;
           if (!(target instanceof Element)) return false;
-          return Boolean(target.closest(".compose-image__chrome, .compose-image__handle"));
+          if (event.type === "contextmenu") return true;
+          return Boolean(target.closest(".compose-image__handle"));
         },
         ignoreMutation: () => true,
         destroy: () => {
           alive = false;
           drag = null;
           dragging = false;
+          closeComposeImageSizeMenu();
           window.removeEventListener("pointermove", onMove);
           window.removeEventListener("pointerup", endDrag);
           window.removeEventListener("pointercancel", endDrag);

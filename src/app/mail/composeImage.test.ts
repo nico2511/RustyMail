@@ -108,7 +108,7 @@ describe("taille libre d’une image du compositeur", () => {
     expect(composeImageDragStartWidth(180, 200)).toBe(180);
   });
 
-  it("insère une image sans largeur forcée", () => {
+  it("insère une image sans largeur forcée ni chrome permanent", () => {
     mount("");
     const editor = getComposeBodyEditor();
     expect(editor).toBeTruthy();
@@ -118,9 +118,11 @@ describe("taille libre d’une image du compositeur", () => {
     expect(html).toContain(SRC);
     expect(html).not.toContain('width="');
     expect(html).not.toContain("compose-image");
+    expect(document.querySelector(".compose-image__slider")).toBeNull();
+    expect(document.querySelector(".compose-image-size-menu")).toBeNull();
   });
 
-  it("écrit la largeur du curseur dans le HTML et la retrouve au rechargement", () => {
+  it("ouvre le menu taille au clic droit et applique le curseur", () => {
     mount("");
     const editor = getComposeBodyEditor()!;
     editor.chain().focus().setImage({ src: SRC, alt: "photo" }).run();
@@ -128,10 +130,16 @@ describe("taille libre d’une image du compositeur", () => {
     editor.commands.setNodeSelection(pos);
     expect(editor.state.selection).toBeInstanceOf(NodeSelection);
     expect(document.querySelector(".compose-image.is-selected")).toBeTruthy();
-    expect(document.querySelector('input.compose-image__slider[aria-label="Taille de l’image"]')).toBeTruthy();
     expect(document.querySelectorAll(".compose-image__handle")).toHaveLength(4);
 
-    const slider = document.querySelector<HTMLInputElement>(".compose-image__slider");
+    const root = document.querySelector<HTMLElement>(".compose-image");
+    expect(root).toBeTruthy();
+    root!.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 40, clientY: 40 }),
+    );
+    const menu = document.querySelector<HTMLElement>(".compose-image-size-menu");
+    expect(menu).toBeTruthy();
+    const slider = menu!.querySelector<HTMLInputElement>(".compose-image-size-menu__slider");
     expect(slider).toBeTruthy();
     slider!.value = "275";
     slider!.dispatchEvent(new Event("input", { bubbles: true }));
@@ -141,6 +149,7 @@ describe("taille libre d’une image du compositeur", () => {
     expect(html).toContain('width="275"');
     expect(html).toContain("width: 275px; height: auto; max-width: 100%;");
     expect(state.composeCanonicalBody).toContain('width="275"');
+    expect(root!.style.width).toBe("275px");
 
     const stored = state.composeCanonicalBody;
     destroyComposeBodyEditor();
@@ -154,23 +163,32 @@ describe("taille libre d’une image du compositeur", () => {
     expect(readComposeEditorHtml()).toContain('width="275"');
   });
 
-  it("applique un raccourci puis revient à la taille d’origine", () => {
+  it("applique un raccourci du menu puis revient à la taille d’origine", () => {
     mount("");
     const editor = getComposeBodyEditor()!;
     editor.chain().focus().setImage({ src: SRC, alt: "photo" }).run();
     editor.commands.setNodeSelection(imagePos(editor));
+    const root = document.querySelector<HTMLElement>(".compose-image")!;
+    root.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 20, clientY: 20 }),
+    );
     const preset = COMPOSE_IMAGE_WIDTH_PRESETS[1]!;
-    const button = document.querySelector<HTMLButtonElement>(`[data-compose-image-width="${preset.px}"]`);
+    const button = document.querySelector<HTMLButtonElement>(
+      `.compose-image-size-menu [data-compose-image-width="${preset.px}"]`,
+    );
     expect(button?.textContent).toBe(preset.label);
-    button?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
     button?.click();
     expect(readComposeEditorHtml()).toContain(`width="${preset.px}"`);
-    expect(button?.classList.contains("is-active")).toBe(true);
+    expect(root.style.width).toBe(`${preset.px}px`);
 
-    document.querySelector<HTMLButtonElement>('[data-compose-image-width="auto"]')?.click();
+    root.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 24, clientY: 24 }),
+    );
+    document.querySelector<HTMLButtonElement>('.compose-image-size-menu [data-compose-image-width="auto"]')?.click();
     const html = readComposeEditorHtml();
     expect(html).not.toContain('width="');
     expect(html).not.toContain("width:");
+    expect(root.style.width).toBe("");
   });
 
   it("sélectionne l’image qui vient d’être insérée", () => {

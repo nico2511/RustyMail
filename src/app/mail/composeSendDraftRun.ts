@@ -1,13 +1,16 @@
 import { currentAccount } from "../core/accountContext";
 import { toast } from "../lib/toast";
+import { render } from "../dispatch";
 import { state } from "../state";
 import { draftPayloadForRust } from "./composeDraftPayload";
+import { ensureInlineImagesWithinLimit } from "./composeInlineImageLimits";
 import { persistDraft } from "./composePersistDraft";
 import { invokeSendDraft } from "./composeSendDraftInvokeRun";
 import { maybePromptSplitSendPlan } from "./composeSendDraftPlanRun";
 import {
   registerComposeSendDraftRunDeps,
 } from "./composeSendDraftFinishRun";
+import { loadComposeMarkdownIntoEditor } from "./composeComposerBridge";
 
 export type { ComposeSendDraftRunDeps } from "./composeSendDraftFinishRun";
 export { registerComposeSendDraftRunDeps };
@@ -28,6 +31,19 @@ export async function sendDraft(): Promise<void> {
   if (!state.draft.subject?.trim()) {
     toast.warning("Renseignez l’objet du message.");
     return;
+  }
+  const ensured = await ensureInlineImagesWithinLimit(state.draft.markdownBody ?? "");
+  if (!ensured.ok) {
+    state.composeMessage = ensured.error;
+    toast.warning(ensured.error);
+    render();
+    return;
+  }
+  if (ensured.compressed > 0 && ensured.body !== (state.draft.markdownBody ?? "")) {
+    state.draft.markdownBody = ensured.body;
+    state.composeCanonicalBody = ensured.body;
+    loadComposeMarkdownIntoEditor(ensured.body);
+    persistDraft();
   }
   const accountId = currentAccount()?.id ?? null;
   const draftOutbound = draftPayloadForRust(state.draft);
