@@ -36,16 +36,19 @@ beforeEach(() => {
 });
 
 describe("renderDigestCutPanel", () => {
-  it("asks for a real mailbox mail and keeps HTML code secondary", () => {
+  it("shows a clear 3-step flow and keeps HTML code secondary", () => {
     const html = renderDigestCutPanel();
     expect(html).toContain("Éditeur de découpe");
+    expect(html).toContain("digest-cut__steps");
+    expect(html).toContain("Choisir");
+    expect(html).toContain("Proposer");
+    expect(html).toContain("Ajuster");
     expect(html).toContain('data-action="digest-cut-search"');
     expect(html).toContain('data-action="digest-cut-open-current"');
     expect(html).toContain('id="digest-cut-eml"');
     expect(html).toContain('data-action="digest-cut-propose"');
     expect(html).toContain('data-action="digest-cut-refine"');
-    expect(html).toContain("Llama 3.2");
-    expect(html).toContain("ne l'active pas en lecture");
+    expect(html).toContain("ne change pas la lecture réelle");
     expect(html).not.toContain("digest-cut-load-sample");
     expect(html).not.toContain("échantillon");
     expect(html).not.toContain("Deblock");
@@ -77,11 +80,13 @@ describe("renderDigestCutPanel", () => {
     expect(html).toContain("en-tête est affiché");
     expect(html).toContain('data-action="digest-cut-zone"');
     expect(html).toContain("En-tête");
-    expect(html).toContain("boîte");
-    expect(html).toContain("Ancres :");
+    expect(html).toContain("depuis la boîte");
+    expect(html).toContain("Repères :");
     expect(html).toContain("h1[0]");
     expect(html).toContain('data-action="digest-cut-paint-zone"');
+    expect(html).toContain("Pointer dans le mail");
     expect(html).toContain('aria-pressed="true">Afficher');
+    expect(html).toContain("Voir l’aperçu");
     expect(html).not.toContain('id="digest-cut-yaml"');
     digestCut.showCode = true;
     expect(renderDigestCutPanel()).toContain('id="digest-cut-yaml"');

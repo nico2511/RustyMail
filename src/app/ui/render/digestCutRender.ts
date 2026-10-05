@@ -5,6 +5,7 @@ import {
   digestCut,
   formatAnchorSummary,
   type DigestCutSourceKind,
+  type DigestCutZoneAction,
   type DigestCutZoneName,
 } from "../../mail/digestCutState";
 
@@ -14,17 +15,58 @@ const ZONE_LABEL: Record<DigestCutZoneName, string> = {
   footer: "Pied",
 };
 
+const ZONE_COLOR: Record<DigestCutZoneName, string> = {
+  header: "header",
+  body: "body",
+  footer: "footer",
+};
+
+const ACTION_LABEL: Record<DigestCutZoneAction, string> = {
+  show: "Affiché",
+  hide: "Masqué",
+  collapse: "Replié",
+};
+
 function sourceLabel(kind: DigestCutSourceKind): string {
   switch (kind) {
     case "mailbox":
-      return "boîte";
+      return "depuis la boîte";
     case "open":
-      return "mail ouvert";
+      return "mail déjà ouvert";
     case "eml":
       return "fichier .eml";
     default:
-      return "aucun mail";
+      return "";
   }
+}
+
+function currentStep(): 1 | 2 | 3 {
+  if (!digestCut.html.trim()) return 1;
+  if (!digestCut.proposal) return 2;
+  return 3;
+}
+
+function stepsNav(active: 1 | 2 | 3): string {
+  const items: Array<{ n: 1 | 2 | 3; label: string; hint: string }> = [
+    { n: 1, label: "Choisir", hint: "Un mail réel" },
+    { n: 2, label: "Proposer", hint: "3 zones auto" },
+    { n: 3, label: "Ajuster", hint: "Puis aperçu" },
+  ];
+  return `<ol class="digest-cut__steps" aria-label="Étapes de l’éditeur de découpe">
+    ${items
+      .map((item) => {
+        const state =
+          item.n === active ? "is-active" : item.n < active ? "is-done" : "is-todo";
+        return `<li class="digest-cut__step ${state}">
+          <span class="digest-cut__step-num" aria-hidden="true">${item.n}</span>
+          <span class="digest-cut__step-text">
+            <strong>${escapeHtml(item.label)}</strong>
+            <small>${escapeHtml(item.hint)}</small>
+          </span>
+        </li>`;
+      })
+      .join("")}
+  </ol>`;
 }
 
 function zoneRow(name: DigestCutZoneName): string {
@@ -35,31 +77,38 @@ function zoneRow(name: DigestCutZoneName): string {
   const pressed = (value: string) => (action === value ? "true" : "false");
   const paintPressed = digestCut.paintZone === name ? "true" : "false";
   const label = ZONE_LABEL[name];
-  return `<section class="digest-cut__zone">
-    <h4 class="digest-cut__zone-title">${escapeHtml(label)}</h4>
-    <p class="digest-cut__zone-anchors dim">Ancres : ${escapeHtml(anchors)}</p>
+  const color = ZONE_COLOR[name];
+  return `<section class="digest-cut__zone digest-cut__zone--${color}">
+    <div class="digest-cut__zone-head">
+      <h4 class="digest-cut__zone-title">
+        <span class="digest-cut__zone-swatch" aria-hidden="true"></span>
+        ${escapeHtml(label)}
+        <span class="digest-cut__zone-state dim">${escapeHtml(ACTION_LABEL[action])}</span>
+      </h4>
+    </div>
     ${rationale ? `<p class="digest-cut__zone-rationale">${escapeHtml(rationale)}</p>` : ""}
+    <p class="digest-cut__zone-anchors dim" title="Repères techniques dans le HTML">Repères : ${escapeHtml(anchors)}</p>
     <div class="digest-cut__zone-actions" role="group" aria-label="${escapeAttr(`Zone ${label}`)}">
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="show" aria-pressed="${pressed("show")}">Afficher</button>
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="hide" aria-pressed="${pressed("hide")}">Masquer</button>
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="collapse" aria-pressed="${pressed("collapse")}">Replier</button>
-      <button type="button" class="ghost-button digest-cut__zone-btn digest-cut__paint-btn" data-action="digest-cut-paint-zone" data-zone="${name}" aria-pressed="${paintPressed}" title="Cliquer dans le mail pour ancrer cette zone">Peindre</button>
+      <button type="button" class="ghost-button digest-cut__zone-btn digest-cut__paint-btn" data-action="digest-cut-paint-zone" data-zone="${name}" aria-pressed="${paintPressed}" title="Puis cliquez un bloc dans le mail à gauche">Pointer dans le mail</button>
     </div>
   </section>`;
 }
 
 function previewPane(): string {
-  if (digestCut.previewing) return `<p class="dim">Aperçu découpe…</p>`;
+  if (digestCut.previewing) return `<p class="dim">Calcul de l’aperçu…</p>`;
   if (digestCut.previewError) {
     return `<p class="digest-bench__warn">${escapeHtml(digestCut.previewError)}</p>`;
   }
   if (digestCut.previewApplicable === false) {
-    return `<p class="digest-bench__warn">La découpe ne tient pas sur ce mail : le domaine ou les ancres ne matchent pas. La lecture resterait générique.</p>`;
+    return `<p class="digest-bench__warn">Cette découpe ne colle pas à ce mail (domaine ou repères). La lecture resterait normale.</p>`;
   }
   if (digestCut.previewApplicable && digestCut.previewHtml) {
     return sanitizeEmailHtml(digestCut.previewHtml).html;
   }
-  return `<p class="dim">Lancez l'aperçu pour voir la lecture coupée.</p>`;
+  return `<p class="digest-cut__empty-hint">Cliquez <strong>Voir l’aperçu</strong> pour comparer avec le mail d’origine.</p>`;
 }
 
 function threadList(): string {
@@ -91,36 +140,124 @@ function messageList(): string {
       </li>`;
     })
     .join("");
-  return `<h4 class="digest-bench__thread-title">${escapeHtml(digestCut.threadSubject || "(sans objet)")}</h4><ul class="digest-bench__list">${messages}</ul>`;
+  return `<p class="digest-cut__subhead">Messages du fil — choisissez celui à découper</p>
+    <h4 class="digest-bench__thread-title">${escapeHtml(digestCut.threadSubject || "(sans objet)")}</h4>
+    <ul class="digest-bench__list">${messages}</ul>`;
 }
 
 function codeBlock(): string {
   if (!digestCut.showCode) return "";
   const raw = digestCut.html.trim() ? escapeHtml(digestCut.html) : "Aucun HTML chargé.";
   return `<div class="digest-cut__code">
-    <label class="digest-bench__label" for="digest-cut-yaml">YAML (secondaire)</label>
+    <label class="digest-bench__label" for="digest-cut-yaml">Détails techniques (YAML)</label>
     <textarea id="digest-cut-yaml" class="digest-bench__yaml" spellcheck="false">${escapeHtml(digestCut.yaml)}</textarea>
-    <p class="digest-bench__fine dim">Code du mail chargé. La lecture rendue est au-dessus. Rien n'est écrit dans le registre de lecture.</p>
+    <p class="digest-bench__fine dim">Réservé au réglage fin. Rien n’est activé en lecture depuis cet écran.</p>
     <pre class="digest-cut__source">${raw}</pre>
   </div>`;
 }
 
 function paintBar(): string {
-  if (!digestCut.html.trim()) return "";
+  if (!digestCut.html.trim() || !digestCut.proposal) return "";
   const pick = digestCut.paintPick;
   const zone = digestCut.paintZone;
+  if (!zone && !pick) {
+    return `<div class="digest-cut__paint-bar digest-cut__paint-bar--idle">
+      <p class="digest-cut__paint-title">Pointer un bloc dans le mail</p>
+      <p class="digest-bench__fine dim">Sur une zone ci-dessus, cliquez <strong>Pointer dans le mail</strong>, puis un bloc (logo, tableau, pied…). Le contour coloré montre ce qui est ciblé.</p>
+    </div>`;
+  }
   const zoneHint = zone ? ZONE_LABEL[zone] : "aucune";
   return `<div class="digest-cut__paint-bar">
-    <p class="digest-bench__fine">Sélection visuelle : activez <strong>Peindre</strong> sur une zone, puis cliquez dans le mail (tables, sections, blocs). Étendre au parent si besoin.</p>
-    <p class="digest-cut__paint-status dim">Zone active : ${escapeHtml(zoneHint)}${pick ? ` · sélection : ${escapeHtml(pick.label)}` : ""}</p>
+    <p class="digest-cut__paint-title">Sélection en cours</p>
+    <p class="digest-cut__paint-status">Zone : <strong>${escapeHtml(zoneHint)}</strong>${
+      pick ? ` · bloc : ${escapeHtml(pick.label)}` : " · cliquez dans le mail à gauche"
+    }</p>
     <div class="digest-cut__actions">
-      <button type="button" class="ghost-button" data-action="digest-cut-paint-expand" ${pick ? "" : "disabled"}>Étendre au parent</button>
+      <button type="button" class="ghost-button" data-action="digest-cut-paint-expand" ${pick ? "" : "disabled"}>Élargir au parent</button>
       <button type="button" class="ghost-button" data-action="digest-cut-paint-assign" data-zone="header" ${pick ? "" : "disabled"}>→ En-tête</button>
       <button type="button" class="ghost-button" data-action="digest-cut-paint-assign" data-zone="body" ${pick ? "" : "disabled"}>→ Corps</button>
       <button type="button" class="ghost-button" data-action="digest-cut-paint-assign" data-zone="footer" ${pick ? "" : "disabled"}>→ Pied</button>
-      <button type="button" class="ghost-button" data-action="digest-cut-paint-clear">Effacer sélection</button>
+      <button type="button" class="ghost-button" data-action="digest-cut-paint-clear">Annuler</button>
     </div>
   </div>`;
+}
+
+function pickSection(loaded: boolean): string {
+  const summary = loaded
+    ? `<div class="digest-cut__mail-chip">
+        <strong>${escapeHtml(digestCut.subject || "(sans objet)")}</strong>
+        <span class="dim">${escapeHtml(digestCut.senderEmail || "expéditeur inconnu")}${
+          sourceLabel(digestCut.sourceKind) ? ` · ${escapeHtml(sourceLabel(digestCut.sourceKind))}` : ""
+        }</span>
+      </div>`
+    : `<p class="digest-cut__empty-hint">Pas encore de mail. Cherchez un domaine de votre boîte, reprenez le mail ouvert, ou importez un <code>.eml</code>.</p>`;
+
+  return `<section class="digest-cut__card" aria-labelledby="digest-cut-step1">
+    <header class="digest-cut__card-head">
+      <h4 id="digest-cut-step1" class="digest-cut__card-title"><span class="digest-cut__card-n">1</span> Choisir un mail</h4>
+      ${loaded ? `<span class="digest-cut__badge digest-cut__badge--ok">Prêt</span>` : `<span class="digest-cut__badge">En attente</span>`}
+    </header>
+    ${summary}
+    <label class="digest-bench__label" for="digest-cut-query">Chercher dans la boîte</label>
+    <div class="digest-bench__search">
+      <input id="digest-cut-query" class="digest-bench__input" type="search" value="${escapeAttr(digestCut.queryDraft)}" placeholder="@exemple.fr" />
+      <button type="button" class="primary-button" data-action="digest-cut-search">${digestCut.searching ? "Recherche…" : "Chercher"}</button>
+    </div>
+    <p class="digest-bench__fine dim">Ex. <code>@exemple.fr</code> — tous les dossiers du compte. Puis cliquez un résultat.</p>
+    <div class="digest-cut__actions">
+      <button type="button" class="ghost-button" data-action="digest-cut-open-current">Utiliser le mail déjà ouvert</button>
+      <label class="ghost-button digest-cut__file">Importer un .eml
+        <input id="digest-cut-eml" type="file" accept=".eml,message/rfc822" hidden />
+      </label>
+    </div>
+    ${digestCut.searchError ? `<p class="digest-bench__warn">${escapeHtml(digestCut.searchError)}</p>` : ""}
+    ${digestCut.threads.length ? `<p class="digest-cut__subhead">Résultats — ouvrez un fil</p><ul class="digest-bench__list">${threadList()}</ul>` : ""}
+    ${messageList()}
+  </section>`;
+}
+
+function proposeSection(loaded: boolean): string {
+  const busy = digestCut.proposing ? "disabled" : "";
+  const ready = Boolean(digestCut.proposal);
+  return `<section class="digest-cut__card${loaded ? "" : " digest-cut__card--disabled"}" aria-labelledby="digest-cut-step2">
+    <header class="digest-cut__card-head">
+      <h4 id="digest-cut-step2" class="digest-cut__card-title"><span class="digest-cut__card-n">2</span> Proposer la découpe</h4>
+      ${ready ? `<span class="digest-cut__badge digest-cut__badge--ok">Fait</span>` : `<span class="digest-cut__badge">${loaded ? "À faire" : "Bloqué"}</span>`}
+    </header>
+    <p class="digest-bench__fine">L’app découpe le mail en <strong>en-tête</strong>, <strong>corps</strong> et <strong>pied</strong>, et explique le choix en français.</p>
+    <div class="digest-cut__actions">
+      <button type="button" class="primary-button" data-action="digest-cut-propose" ${loaded && !digestCut.proposing ? "" : "disabled"} ${busy}>${digestCut.proposing ? "Proposition…" : ready ? "Reproposer" : "Proposer"}</button>
+      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && !digestCut.proposing ? "" : "disabled"} ${busy} title="Demande au modèle local d’améliorer la découpe">Affiner (IA locale)</button>
+    </div>
+    <p class="digest-bench__fine dim">Rien n’est activé en lecture automatique depuis cet écran.</p>
+  </section>`;
+}
+
+function adjustSection(): string {
+  const hasProposal = Boolean(digestCut.proposal);
+  const explanation = digestCut.proposal?.explanationFr?.trim() ?? "";
+  return `<section class="digest-cut__card${hasProposal ? "" : " digest-cut__card--disabled"}" aria-labelledby="digest-cut-step3">
+    <header class="digest-cut__card-head">
+      <h4 id="digest-cut-step3" class="digest-cut__card-title"><span class="digest-cut__card-n">3</span> Ajuster et comparer</h4>
+      ${hasProposal ? `<span class="digest-cut__badge digest-cut__badge--ok">Ouvert</span>` : `<span class="digest-cut__badge">Après l’étape 2</span>`}
+    </header>
+    ${
+      hasProposal
+        ? `${explanation ? `<p class="digest-cut__explain">${escapeHtml(explanation)}</p>` : ""}
+           <div class="digest-cut__legend" aria-hidden="true">
+             <span class="digest-cut__legend-item digest-cut__legend-item--header">En-tête</span>
+             <span class="digest-cut__legend-item digest-cut__legend-item--body">Corps</span>
+             <span class="digest-cut__legend-item digest-cut__legend-item--footer">Pied</span>
+           </div>
+           <div class="digest-cut__zones">${zoneRow("header")}${zoneRow("body")}${zoneRow("footer")}</div>
+           ${paintBar()}
+           <div class="digest-cut__actions">
+             <button type="button" class="primary-button" data-action="digest-cut-preview">${digestCut.previewing ? "Aperçu…" : "Voir l’aperçu"}</button>
+             <button type="button" class="ghost-button" data-action="digest-cut-toggle-code" aria-pressed="${digestCut.showCode ? "true" : "false"}">${digestCut.showCode ? "Masquer le code" : "Détails techniques"}</button>
+           </div>`
+        : `<p class="digest-cut__empty-hint">Quand une proposition existe, vous réglez ici chaque zone puis comparez à droite.</p>`
+    }
+  </section>`;
 }
 
 export function renderDigestCutPanel(): string {
@@ -128,52 +265,28 @@ export function renderDigestCutPanel(): string {
   const sanitized = loaded ? sanitizeEmailHtml(digestCut.html).html : "";
   const rendered = loaded
     ? decorateMailHtmlForCut(sanitized)
-    : `<p class="dim">Choisissez un mail pour le voir ici.</p>`;
-  const status = loaded
-    ? `${digestCut.subject || "(sans objet)"} · ${digestCut.senderEmail || "expéditeur inconnu"} · ${sourceLabel(digestCut.sourceKind)}`
-    : "Aucun mail chargé. La recherche lit votre boîte ; aucun exemple n'est proposé à votre place.";
-  const explanation = digestCut.proposal?.explanationFr?.trim() ?? "";
-  const busy = digestCut.proposing ? "disabled" : "";
+    : `<p class="digest-cut__empty-hint">Le mail choisi apparaît ici.</p>`;
   const paintClass = digestCut.paintZone ? " digest-cut__mail-source--painting" : "";
+  const step = currentStep();
+
   return `<div class="settings-page digest-cut">
-    <article class="settings-card surface-sm">
+    <article class="settings-card surface-sm digest-cut__shell">
       <h3 class="thread-kicker">Éditeur de découpe</h3>
-      <p class="digest-bench__fine dim">Vous choisissez un mail réel. L'assistant propose trois zones, l'explique en français, et vous ajustez sur le rendu. Le code HTML reste replié. Valider une proposition ne l'active pas en lecture. Affiner interroge le modèle local (prompt calibré pour Llama 3.2).</p>
-      <div class="digest-cut__pick">
-        <label class="digest-bench__label" for="digest-cut-query">Chercher dans la boîte</label>
-        <div class="digest-bench__search">
-          <input id="digest-cut-query" class="digest-bench__input" type="search" value="${escapeAttr(digestCut.queryDraft)}" placeholder="@exemple.fr" />
-          <button type="button" class="primary-button" data-action="digest-cut-search">${digestCut.searching ? "Recherche…" : "Chercher"}</button>
-        </div>
-        <p class="digest-bench__fine dim">Même barre que le courrier, mode lexical, tous dossiers du compte. Ex. <code>@exemple.fr</code> — <code>#dossier:INBOX</code> reste optionnel.</p>
-        <div class="digest-cut__actions">
-          <button type="button" class="ghost-button" data-action="digest-cut-open-current">Mail déjà ouvert</button>
-          <label class="ghost-button digest-cut__file">Importer un .eml
-            <input id="digest-cut-eml" type="file" accept=".eml,message/rfc822" hidden />
-          </label>
-        </div>
-        ${digestCut.searchError ? `<p class="digest-bench__warn">${escapeHtml(digestCut.searchError)}</p>` : ""}
-        ${digestCut.threads.length ? `<ul class="digest-bench__list">${threadList()}</ul>` : ""}
-        ${messageList()}
+      <p class="digest-cut__lead">Découpez un mail HTML en <strong>en-tête</strong>, <strong>corps</strong> et <strong>pied</strong> pour une lecture plus claire. Outil d’essai : ça ne change pas la lecture réelle tant que vous n’activez rien ailleurs.</p>
+      ${stepsNav(step)}
+      ${digestCut.notice ? `<p class="digest-cut__notice" aria-live="polite">${escapeHtml(digestCut.notice)}</p>` : ""}
+      <div class="digest-cut__flow">
+        ${pickSection(loaded)}
+        ${proposeSection(loaded)}
+        ${adjustSection()}
       </div>
-      <p class="digest-bench__status">${escapeHtml(status)}</p>
-      <p class="digest-bench__notice" aria-live="polite">${escapeHtml(digestCut.notice)}</p>
-      <div class="digest-cut__actions">
-        <button type="button" class="primary-button" data-action="digest-cut-propose" ${busy}>Proposer</button>
-        <button type="button" class="ghost-button" data-action="digest-cut-refine" ${busy}>Affiner</button>
-        <button type="button" class="ghost-button" data-action="digest-cut-preview">Aperçu</button>
-        <button type="button" class="ghost-button" data-action="digest-cut-toggle-code" aria-pressed="${digestCut.showCode ? "true" : "false"}">${digestCut.showCode ? "Masquer le code" : "Voir le code"}</button>
-      </div>
-      ${explanation ? `<p class="digest-cut__explain">${escapeHtml(explanation)}</p>` : ""}
-      ${digestCut.proposal ? `<div class="digest-cut__zones">${zoneRow("header")}${zoneRow("body")}${zoneRow("footer")}</div>` : ""}
-      ${paintBar()}
       <div class="digest-cut__preview digest-bench__compare digest-bench__compare--split">
         <section class="digest-bench__pane">
-          <h4 class="digest-bench__pane-title">Mail</h4>
+          <h4 class="digest-bench__pane-title">Mail d’origine${digestCut.paintZone ? " · mode pointeur" : ""}</h4>
           <div class="digest-bench__pane-body mail digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}</div>
         </section>
         <section class="digest-bench__pane">
-          <h4 class="digest-bench__pane-title">Lecture coupée</h4>
+          <h4 class="digest-bench__pane-title">Lecture découpée</h4>
           <div class="digest-bench__pane-body mail">${previewPane()}</div>
         </section>
       </div>
