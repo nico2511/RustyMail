@@ -186,7 +186,7 @@ function renderTreeNode(
   const dragging = mb && state.dragFolder === mb;
 
   const badges = [
-    empty ? `<span class="folder-tree-tag folder-tree-tag--empty">vide</span>` : "",
+    empty ? `<span class="folder-tree-tag folder-tree-tag--empty" title="Aucun message en cache local — non synchronisé ou vide sur le serveur">sans cache</span>` : "",
     auto ? `<span class="folder-tree-tag folder-tree-tag--auto" title="Archivage mémorisé">Auto</span>` : "",
     covered && !ownLocked ? `<span class="folder-tree-tag" title="Un dossier parent est protégé">Couvert</span>` : "",
   ]
@@ -291,7 +291,7 @@ function renderDeleteModal(state: FolderManagerViewState, deps: FolderManagerRen
         <p>Supprimer <strong>${escapeHtml(mb)}</strong> et son contenu ?</p>
         ${
           entry
-            ? `<p class="dim">${entry.threadCount} fil(s), ${entry.messageCount} message(s)${entry.isEmpty ? " — dossier vide en cache" : ""}.</p>`
+            ? `<p class="dim">${entry.threadCount} fil(s), ${entry.messageCount} message(s)${entry.isEmpty ? " — non synchronisé / sans cache local" : ""}.</p>`
             : ""
         }
         <p class="dim">Cette action supprime définitivement les mails du serveur IMAP.</p>

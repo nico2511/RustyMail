@@ -418,6 +418,18 @@ fn validate_digest_cut_dto(dto: &DigestCutDto) -> Result<(), LlmError> {
     {
         return Err(LlmError::InvalidJson("explanationFr".into()));
     }
+    // Une zone affichée sans ancre ne rend rien : le corps doit toujours viser un bloc ;
+    // l'en-tête aussi sauf s'il est masqué (rien à rendre alors).
+    if dto.zones.body.anchors.is_empty() {
+        return Err(LlmError::InvalidJson(
+            "body.anchors vide : au moins une ancre de corps est requise".into(),
+        ));
+    }
+    if dto.zones.header.anchors.is_empty() && dto.zones.header.action != ZoneAction::Hide {
+        return Err(LlmError::InvalidJson(
+            "header.anchors vide : au moins une ancre d'en-tête est requise".into(),
+        ));
+    }
     for zone in [&dto.zones.header, &dto.zones.body, &dto.zones.footer] {
         if let Some(r) = &zone.rationale {
             if r.to_ascii_lowercase().contains("ignore all") {
@@ -536,8 +548,8 @@ mod tests {
                 "minChildren": 2
             },
             "zones": {
-                "header": { "action": "show", "anchors": [] },
-                "body": { "action": "show", "anchors": [] },
+                "header": { "action": "show", "anchors": [{ "selector": "h1", "index": 0 }] },
+                "body": { "action": "show", "anchors": [{ "selector": "p", "index": 0 }] },
                 "footer": { "action": "hide", "anchors": [] }
             },
             "explanationFr": "En-tête affiché."
@@ -547,6 +559,57 @@ mod tests {
         assert_eq!(value["ruleSetVersion"], "1");
         assert_eq!(value["match"]["senderDomains"][0]["exact"], "github.com");
         let dto: super::DigestCutDto = serde_json::from_value(value).expect("dto");
+        assert!(validate_digest_cut_dto(&dto).is_ok());
+    }
+
+    fn dto_from_zones(header: serde_json::Value, body: serde_json::Value) -> super::DigestCutDto {
+        serde_json::from_value(json!({
+            "fixtureId": "example-com",
+            "ruleSetVersion": "1",
+            "match": {
+                "senderDomains": [{ "exact": "example.com" }],
+                "structureRoot": "div.letter",
+                "minChildren": 2
+            },
+            "zones": {
+                "header": header,
+                "body": body,
+                "footer": { "action": "hide", "anchors": [] }
+            }
+        }))
+        .expect("dto")
+    }
+
+    #[test]
+    fn empty_body_anchors_are_rejected() {
+        let dto = dto_from_zones(
+            json!({ "action": "show", "anchors": [{ "selector": "h1", "index": 0 }] }),
+            json!({ "action": "show", "anchors": [] }),
+        );
+        let err = validate_digest_cut_dto(&dto).expect_err("empty body must be rejected");
+        assert!(err.to_string().contains("body.anchors"), "{err}");
+    }
+
+    #[test]
+    fn empty_shown_header_anchors_are_rejected_but_body_ok_when_hidden_header() {
+        let body = json!({ "action": "show", "anchors": [{ "selector": "p", "index": 0 }] });
+        let dto = dto_from_zones(json!({ "action": "show", "anchors": [] }), body.clone());
+        assert!(validate_digest_cut_dto(&dto).is_err());
+        let dto = dto_from_zones(json!({ "action": "hide", "anchors": [] }), body);
+        assert!(validate_digest_cut_dto(&dto).is_ok());
+    }
+
+    #[test]
+    fn prompt_example_has_non_empty_header_and_body_anchors() {
+        let prompt = include_str!("../prompts/digest_cut.system.txt");
+        let start = prompt.find("{\"fixtureId\"").expect("example json");
+        let end = prompt[start..].find('\n').map_or(prompt.len(), |i| start + i);
+        let example: serde_json::Value =
+            serde_json::from_str(prompt[start..end].trim()).expect("example parses");
+        let dto: super::DigestCutDto = serde_json::from_value(example).expect("example dto");
+        assert!(!dto.zones.header.anchors.is_empty());
+        assert!(!dto.zones.body.anchors.is_empty());
+        assert!(!dto.zones.footer.anchors.is_empty());
         assert!(validate_digest_cut_dto(&dto).is_ok());
     }
 }

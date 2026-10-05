@@ -565,7 +565,7 @@ export function renderOrganizationView(
       .map((e) => {
         const indent = "—".repeat(Math.min(4, Math.max(0, e.depth)));
         const kind = e.isSystem ? '<span class="org-tree-tag">système</span>' : "";
-        const empty = e.isEmpty ? '<span class="org-tree-tag org-tree-tag--empty">vide</span>' : "";
+        const empty = e.isEmpty ? '<span class="org-tree-tag org-tree-tag--empty" title="Aucun message en cache local — non synchronisé ou vide sur le serveur">sans cache local</span>' : "";
         return `<tr>
           <td class="org-tree-path"><span class="org-tree-indent">${indent}</span>${mailboxChip(e.mailbox)} ${kind} ${empty}</td>
           <td class="org-tree-num">${e.threadCount}</td>

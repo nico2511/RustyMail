@@ -16,7 +16,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::llm_commands::{
     ai_cache_model_segment, build_llm_engine, llm_gate_feature, open_thread_domain,
-    transcript_for_llm,
+    transcript_for_llm_with_owner, transcript_owner_for_account, TranscriptOwner,
 };
 use crate::AppPaths;
 
@@ -105,10 +105,12 @@ fn severity_rank(s: MailSecuritySeverity) -> u8 {
 fn assist_thread_context(
     view: &rustymail_domain::DiscussionThreadView,
     engine: &rustymail_llm::LlmEngine,
+    owner: &TranscriptOwner,
 ) -> AssistThreadContext {
     let (codes, max) = thread_security_context(view);
     AssistThreadContext {
-        transcript: transcript_for_llm(view, engine),
+        // Transcript annoté : rôle=entrant|sortant, boîte du propriétaire, « vous » = propriétaire.
+        transcript: transcript_for_llm_with_owner(view, engine, owner),
         thread_security_codes: codes,
         thread_security_max: max,
     }
@@ -119,7 +121,7 @@ fn ai_cache_assist_facts_key(
     thread_id: &str,
 ) -> String {
     format!(
-        "assist_facts:v3:{}:{}",
+        "assist_facts:v4:{}:{}",
         ai_cache_model_segment(prefs),
         thread_id.trim()
     )
@@ -222,7 +224,8 @@ fn llm_assist_thread_phase_compute(
     llm_gate_feature(&prefs, paths, AiFeature::AgentPrepareReply)?;
     let mut engine = build_llm_engine(&prefs, paths)?;
     let view = open_thread_domain(&paths.db_path, payload.base.thread_id.trim())?;
-    let thread = assist_thread_context(&view, &engine);
+    let owner = transcript_owner_for_account(&paths.db_path, payload.base.account_id.as_str());
+    let thread = assist_thread_context(&view, &engine, &owner);
     let request = assist_request_from_payload(&payload.base, &prefs);
 
     if payload.phase == AssistPhase::ExtractFacts {
@@ -242,6 +245,7 @@ fn llm_assist_thread_phase_compute(
                 intent: i.intent.clone(),
                 tone_hint: i.tone_hint.clone(),
                 needs_scheduling: i.needs_scheduling,
+                speech_act: i.speech_act.clone(),
             });
             result.plan = Some(assist_routing_plan(
                 &request,
@@ -324,8 +328,10 @@ pub fn default_assist_request(
 pub fn assist_thread_context_with_engine(
     paths: &AppPaths,
     thread_id: &str,
+    account_id: &str,
     engine: &rustymail_llm::LlmEngine,
 ) -> Result<AssistThreadContext, String> {
     let view = open_thread_domain(&paths.db_path, thread_id.trim())?;
-    Ok(assist_thread_context(&view, engine))
+    let owner = transcript_owner_for_account(&paths.db_path, account_id);
+    Ok(assist_thread_context(&view, engine, &owner))
 }

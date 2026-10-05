@@ -3,7 +3,8 @@
 use std::path::Path;
 
 use rustymail_domain::{
-    OrgOrientation, OrgProposal, OrgProposalKind, OrgScanLlmStatus, OrgV2ScanReport,
+    OrgOrientation, OrgProposal, OrgProposalKind, OrgProposalSource, OrgScanLlmStatus,
+    OrgV2ScanReport,
 };
 
 use crate::open_sqlite_migrated;
@@ -25,6 +26,17 @@ const V2_KINDS: &[OrgProposalKind] = &[
 const V2_FOCUS_NOTE: &str = "L’écran affiche l’orientation du LLM : diagnostic, recommandations, actions proposées. \
     Les heuristiques préparent seulement le contexte. Sans modèle joignable, aucune orientation n’est inventée. \
     La normalisation des tags reste dans Organiser (v1).";
+
+const HEURISTIC_FALLBACK_NOTE: &str =
+    "L’orientation n’a proposé aucune action exploitable : suggestions heuristiques affichées à la place.";
+
+/// Carte heuristique à afficher quand le LLM ne fournit aucune action : non vide et soit
+/// applicable, soit informative (arbre de dossiers plat).
+fn heuristic_card_useful(p: &OrgProposal) -> bool {
+    p.source != OrgProposalSource::Llm
+        && p.total_count > 0
+        && (p.applicable || p.kind == OrgProposalKind::FlatMailboxTree)
+}
 
 fn kind_allowed(kind: OrgProposalKind) -> bool {
     V2_KINDS.contains(&kind)
@@ -61,13 +73,26 @@ pub fn org_v2_with_llm_outcome(
     mut report: OrgV2ScanReport,
     orientation: Option<OrgOrientation>,
     actions: Vec<OrgProposal>,
-    llm_status: OrgScanLlmStatus,
+    mut llm_status: OrgScanLlmStatus,
 ) -> Result<OrgV2ScanReport, String> {
     if orientation.is_some() {
         let conn = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
         let (proposals, memory) = filter_proposals_with_memory(&conn, account_id, actions)?;
-        report.proposals = proposals;
-        report.memory = memory;
+        if proposals.is_empty() {
+            // Orientation valide mais sans action exploitable : on garde les cartes heuristiques
+            // utiles (déjà filtrées par la mémoire dans `org_v2_scan_account`) plutôt qu'un écran vide.
+            let fallback: Vec<OrgProposal> = std::mem::take(&mut report.proposals)
+                .into_iter()
+                .filter(heuristic_card_useful)
+                .collect();
+            if !fallback.is_empty() {
+                llm_status.message = Some(HEURISTIC_FALLBACK_NOTE.into());
+            }
+            report.proposals = fallback;
+        } else {
+            report.proposals = proposals;
+            report.memory = memory;
+        }
     } else {
         report.proposals.clear();
     }

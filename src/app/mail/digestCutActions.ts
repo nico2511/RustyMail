@@ -7,6 +7,12 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { state } from "../state";
 import {
+  assignPaintPickToZone,
+  ensurePaintProposalSkeleton,
+  expandCutNode,
+  pickFromMailClick,
+} from "./digestCutPaint";
+import {
   captureDigestCutDom,
   digestCut,
   explainZonesFr,
@@ -45,6 +51,8 @@ function clearCutResult(): void {
   digestCut.previewHtml = "";
   digestCut.previewError = "";
   digestCut.showCode = false;
+  digestCut.paintZone = null;
+  digestCut.paintPick = null;
 }
 
 export function loadDigestCutMail(input: {
@@ -283,6 +291,66 @@ export function setDigestCutZoneAction(zone: DigestCutZoneName, action: DigestCu
   void syncYamlFromProposal().then(() => previewDigestCut());
 }
 
+export function setDigestCutPaintZone(zone: DigestCutZoneName): void {
+  captureDigestCutDom();
+  digestCut.paintZone = digestCut.paintZone === zone ? null : zone;
+  if (digestCut.paintZone) {
+    ensurePaintProposalSkeleton();
+    digestCut.notice = `Peinture « ${zone === "header" ? "En-tête" : zone === "body" ? "Corps" : "Pied"} » : cliquez dans le mail pour choisir le bloc.`;
+  } else {
+    digestCut.notice = "Peinture désactivée.";
+  }
+  render();
+}
+
+export function handleDigestCutMailClick(target: EventTarget | null): void {
+  const root = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
+  if (!root) return;
+  const pick = pickFromMailClick(target, root);
+  if (!pick) return;
+  digestCut.paintPick = pick;
+  if (digestCut.paintZone) {
+    assignPaintPickToZone(digestCut.paintZone);
+    digestCut.proposal!.explanationFr = explainZonesFr(digestCut.proposal!);
+    digestCut.notice = `Bloc assigné à ${digestCut.paintZone === "header" ? "En-tête" : digestCut.paintZone === "body" ? "Corps" : "Pied"}.`;
+    void syncYamlFromProposal().then(() => previewDigestCut());
+    return;
+  }
+  render();
+}
+
+export function expandDigestCutPaintPick(): void {
+  const root = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
+  const pick = digestCut.paintPick;
+  if (!root || !pick) return;
+  const candidates = [...root.querySelectorAll(pick.tag)].filter((el) => {
+    if (!pick.classContains) return true;
+    return (el.getAttribute("class") ?? "").split(/\s+/).includes(pick.classContains);
+  });
+  const el =
+    pick.index != null && pick.index >= 0 && pick.index < candidates.length
+      ? candidates[pick.index]
+      : candidates[0];
+  if (!el?.parentElement) return;
+  const expanded = expandCutNode(el.parentElement, root);
+  const next = pickFromMailClick(expanded, root);
+  if (!next) return;
+  digestCut.paintPick = next;
+  if (digestCut.paintZone) {
+    assignPaintPickToZone(digestCut.paintZone);
+    digestCut.proposal!.explanationFr = explainZonesFr(digestCut.proposal!);
+    void syncYamlFromProposal().then(() => previewDigestCut());
+    return;
+  }
+  render();
+}
+
+export function clearDigestCutPaint(): void {
+  digestCut.paintPick = null;
+  digestCut.paintZone = null;
+  render();
+}
+
 export function toggleDigestCutCode(): void {
   captureDigestCutDom();
   digestCut.showCode = !digestCut.showCode;
@@ -359,6 +427,29 @@ export async function handleDigestCutAction(action: string, element?: HTMLElemen
       if (zone && zoneAction) setDigestCutZoneAction(zone, zoneAction);
       return true;
     }
+    case "digest-cut-paint-zone": {
+      const zone = element?.dataset.zone as DigestCutZoneName | undefined;
+      if (zone) setDigestCutPaintZone(zone);
+      return true;
+    }
+    case "digest-cut-paint-assign": {
+      const zone = element?.dataset.zone as DigestCutZoneName | undefined;
+      if (zone && digestCut.paintPick) {
+        assignPaintPickToZone(zone);
+        if (digestCut.proposal) {
+          digestCut.proposal.explanationFr = explainZonesFr(digestCut.proposal);
+        }
+        digestCut.notice = `Bloc assigné à ${zone === "header" ? "En-tête" : zone === "body" ? "Corps" : "Pied"}.`;
+        void syncYamlFromProposal().then(() => previewDigestCut());
+      }
+      return true;
+    }
+    case "digest-cut-paint-expand":
+      expandDigestCutPaintPick();
+      return true;
+    case "digest-cut-paint-clear":
+      clearDigestCutPaint();
+      return true;
     default:
       return false;
   }

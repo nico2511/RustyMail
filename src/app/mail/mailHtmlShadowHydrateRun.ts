@@ -1,6 +1,7 @@
 import { render } from "../dispatch";
 import { state } from "../state";
 import { openExternalFromMailHref, normalizeMailHrefForOpen } from "./mailLinkOpen";
+import { hydrateCidImagesInMailShadow } from "./mailHtmlCidHydrateRun";
 import {
   pickImgSrcForLightbox,
   resolveSrcForMailImageLightbox,
@@ -51,6 +52,7 @@ export function remountMailHtmlShadow(host: HTMLDivElement): void {
   const isCleanView = host.classList.contains("message-html--clean");
   shadow.innerHTML = buildMailShadowInnerHtml(messageId, readMailHtmlRawFromHost(host), isCleanView);
   bindMailShadowClick(shadow, host);
+  hydrateCidImagesInMailShadow(shadow, messageId);
 }
 
 export function hydrateEmailHtml() {

@@ -73,12 +73,13 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
           border:1px solid rgba(232,228,223,.10);
           cursor:zoom-in
         }
-        .mail img.mail-remote-image-blocked,.mail img.mail-image-blocked{
+        .mail img.mail-remote-image-blocked,.mail img.mail-image-blocked,.mail img.mail-cid-missing{
           min-height:42px;
           padding:10px;
           cursor:default;
           background:rgba(255,255,255,.035);
         }
+        .mail img.mail-cid-pending{opacity:.55}
         .mail code{background:rgba(255,255,255,.065);padding:3px 7px;border-radius:6px;font-size:12px}
         .mail article.rm-digest table,.mail article.rm-deblock-digest table,.mail article.rm-amazon-digest table,.mail article.rm-github-digest table{width:100%;border-collapse:collapse;font-size:inherit}
         .mail article.rm-digest th,.mail article.rm-digest td,

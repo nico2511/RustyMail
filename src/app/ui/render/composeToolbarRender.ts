@@ -123,7 +123,7 @@ export function renderComposeToolbar(props: ComposeToolbarProps): string {
         ${aiButton({
           action: "compose-ai-grammar",
           label: "Correction",
-          title: "Orthographe et formulation — chaque suggestion s’applique une par une",
+          title: "Orthographe de tout le brouillon. Pour une zone : sélectionnez puis clic droit → Corriger la sélection.",
           extra: ` data-compose-cmd="ai:grammar"`,
           spinning: busy === "grammar",
           blocked,
@@ -147,7 +147,7 @@ export function renderComposeToolbar(props: ComposeToolbarProps): string {
         ${aiButton({
           action: "compose-ai-rewrite-selected-tone",
           label: "Réécrire",
-          title: "Réécrit tout le message dans le ton choisi. La dictée utilise le même ton.",
+          title: "Réécrit tout le message dans le ton choisi. Pour une zone : sélection + clic droit.",
           extra: ` data-compose-cmd="ai:rewrite"`,
           spinning: busy === "rewrite",
           blocked,
@@ -155,7 +155,7 @@ export function renderComposeToolbar(props: ComposeToolbarProps): string {
         ${aiButton({
           action: "compose-ai-rewrite",
           label: "Raccourcir",
-          title: "Raccourcit tout le message",
+          title: "Raccourcit tout le message. Pour une zone : sélection + clic droit.",
           extra: ` data-rewrite-style="Concise" data-compose-cmd="ai:shorten"`,
           quiet: true,
           spinning: busy === "shorten",

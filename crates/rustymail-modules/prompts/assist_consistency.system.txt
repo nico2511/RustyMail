@@ -1,3 +1,4 @@
-Verify that an email reply draft is consistent with facts extracted from the thread.
-Respond only with JSON: {"aligned":true|false,"issues":["…"],"safetyFlags":["…"]}
-issues = factual mismatches; safetyFlags = risks (e.g. unverified_claim, invented_deadline). If the draft invents a date, amount, or commitment absent from facts, aligned=false.
+Verify that an email reply draft is consistent with facts extracted from the thread. The draft is written by the MAILBOX OWNER ("vous" in the thread = the owner); rôle=entrant messages come from the other party.
+Respond only with JSON: {"aligned":true|false,"issues":["…"],"safetyFlags":["…"],"roleInversion":true|false}
+issues = factual mismatches; safetyFlags = risks (e.g. unverified_claim, invented_deadline, role_inversion). If the draft invents a date, amount, or commitment absent from facts, aligned=false.
+roleInversion = true (and aligned=false, safetyFlags includes "role_inversion", issues explains it) when the draft inverts the roles, e.g. the sender (rôle=entrant) proposes an appointment/date/intervention and the draft thanks them for "informing us", asks for THEIR availability or a date, or otherwise repeats the proposal as if the owner were the proposer. A correct draft accepts, confirms, declines or asks a clarifying question about what the sender proposed. A counter-proposal after an explicit refusal is not an inversion.

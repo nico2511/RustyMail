@@ -28,6 +28,8 @@ beforeEach(() => {
   digestCut.previewError = "";
   digestCut.showCode = false;
   digestCut.notice = "";
+  digestCut.paintZone = null;
+  digestCut.paintPick = null;
   state.selectedThread = undefined;
   state.selectedAccountId = undefined;
   state.accounts = [];
@@ -76,6 +78,10 @@ describe("renderDigestCutPanel", () => {
     expect(html).toContain('data-action="digest-cut-zone"');
     expect(html).toContain("En-tête");
     expect(html).toContain("boîte");
+    expect(html).toContain("Ancres :");
+    expect(html).toContain("h1[0]");
+    expect(html).toContain('data-action="digest-cut-paint-zone"');
+    expect(html).toContain('aria-pressed="true">Afficher');
     expect(html).not.toContain('id="digest-cut-yaml"');
     digestCut.showCode = true;
     expect(renderDigestCutPanel()).toContain('id="digest-cut-yaml"');

@@ -114,6 +114,8 @@ function resetCut(): void {
   digestCut.previewError = "";
   digestCut.showCode = false;
   digestCut.notice = "";
+  digestCut.paintZone = null;
+  digestCut.paintPick = null;
 }
 
 function shoot(name: string, panelHtml: string): void {

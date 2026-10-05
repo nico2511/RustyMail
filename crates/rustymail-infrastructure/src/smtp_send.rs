@@ -258,22 +258,52 @@ fn image_content_type(mime: &str) -> ContentType {
         .unwrap_or_else(|_| ContentType::parse("application/octet-stream").expect("octet-stream"))
 }
 
-fn attach_inline_images(body: MultiPart, inline_images: &[InlineImagePart]) -> MultiPart {
-    if inline_images.is_empty() {
-        return body;
-    }
-    let mut related = MultiPart::related().multipart(body);
+/// `multipart/related` : HTML racine + images `cid:` (disposition `inline` **sans** filename).
+/// Structure attendue par Thunderbird / mobiles — pas `related` autour de tout l’`alternative`.
+fn html_related_part(html: String, inline_images: &[InlineImagePart]) -> MultiPart {
+    let html_part = SinglePart::builder()
+        .header(ContentType::TEXT_HTML)
+        .body(html);
+    let mut related = MultiPart::related().singlepart(html_part);
     for image in inline_images {
         let content_type = image_content_type(&image.mime_type);
+        // `new_inline` (sans nom) : Content-Disposition: inline — les clients
+        // n’affichent pas la photo comme pièce jointe séparée.
         related = related.singlepart(
-            LettreAttachment::new_inline_with_name(
-                image.content_id.clone(),
-                image.file_name.clone(),
-            )
-            .body(image.bytes.clone(), content_type),
+            LettreAttachment::new_inline(image.content_id.clone())
+                .body(image.bytes.clone(), content_type),
         );
     }
     related
+}
+
+/// Corps sortant : `alternative` [ plain | html ] ou [ plain | related(html+cid) ].
+fn build_body_multipart(
+    draft: &Draft,
+    inline_images: &[InlineImagePart],
+) -> Result<MultiPart, String> {
+    let plain_part = SinglePart::builder()
+        .header(ContentType::TEXT_PLAIN)
+        .body(outbound_plain_body(&draft.markdown_body));
+
+    if !draft.send_html {
+        return Ok(MultiPart::mixed().singlepart(plain_part));
+    }
+
+    let html = markdown_body_to_html(&draft.markdown_body);
+    let alternative = if inline_images.is_empty() {
+        let html_part = SinglePart::builder()
+            .header(ContentType::TEXT_HTML)
+            .body(html);
+        MultiPart::alternative()
+            .singlepart(plain_part)
+            .singlepart(html_part)
+    } else {
+        MultiPart::alternative()
+            .singlepart(plain_part)
+            .multipart(html_related_part(html, inline_images))
+    };
+    Ok(alternative)
 }
 
 fn build_draft_message(
@@ -321,31 +351,14 @@ fn build_draft_message(
     eprintln!("[RustyMail] SMTP Message-ID: {message_id}");
     msg_builder = msg_builder.message_id(Some(message_id.clone()));
 
-    let body_part = if draft.send_html {
-        let html = markdown_body_to_html(&draft.markdown_body);
-        let plain_stripped = outbound_plain_body(&draft.markdown_body);
-        let plain_part = SinglePart::builder()
-            .header(ContentType::TEXT_PLAIN)
-            .body(plain_stripped);
-        let html_part = SinglePart::builder()
-            .header(ContentType::TEXT_HTML)
-            .body(html);
-        MultiPart::alternative()
-            .singlepart(plain_part)
-            .singlepart(html_part)
-    } else {
-        let plain_part = SinglePart::builder()
-            .header(ContentType::TEXT_PLAIN)
-            .body(outbound_plain_body(&draft.markdown_body));
-        MultiPart::mixed().singlepart(plain_part)
-    };
-    let root = attach_inline_images(body_part, inline_images);
+    let body_part = build_body_multipart(draft, inline_images)?;
     let message = if draft.attachment_paths.is_empty() {
         msg_builder
-            .multipart(root)
+            .multipart(body_part)
             .map_err(|e| format!("smtp message build failed: {e}"))?
     } else {
-        let mut mixed = MultiPart::mixed().multipart(root);
+        // PJ fichier hors du related : mixed > alternative[/related] + attachments.
+        let mut mixed = MultiPart::mixed().multipart(body_part);
         let mut pj_bytes_total: usize = 0;
         for raw_path in &draft.attachment_paths {
             let p = std::path::PathBuf::from(raw_path.trim());
@@ -493,13 +506,38 @@ mod compose_html_send_tests {
         let raw = rfc822(&body, true, &parts);
         let lower = raw.to_ascii_lowercase();
         assert!(lower.contains("multipart/related"), "{raw}");
+        assert!(lower.contains("multipart/alternative"), "{raw}");
         assert!(lower.contains("content-id:"), "{raw}");
+        // related doit envelopper le HTML (pas l’alternative) : le Content-ID suit text/html.
+        let related_at = lower
+            .find("multipart/related")
+            .expect("related");
+        let html_at = lower.find("text/html").expect("html");
+        let cid_at = lower.find("content-id:").expect("cid");
+        assert!(
+            related_at < html_at && html_at < cid_at,
+            "expected alternative > related > html > cid image, got structure around related/html/cid\n{raw}"
+        );
         assert!(
             raw.contains(&format!("cid:{}", parts[0].content_id)),
             "{raw}"
         );
-        assert!(raw.contains(&parts[0].content_id), "{raw}");
+        assert!(
+            raw.contains(&format!("<{}>", parts[0].content_id))
+                || raw.contains(&parts[0].content_id),
+            "{raw}"
+        );
         assert!(!raw.contains("data:image"), "{raw}");
+        // Pas de filename → les clients ne listent pas la photo comme PJ.
+        assert!(
+            !lower.contains("content-disposition: inline; filename="),
+            "inline image must not expose a download filename\n{raw}"
+        );
+        assert!(
+            lower.contains("content-disposition: inline\r\n")
+                || lower.contains("content-disposition: inline\n"),
+            "{raw}"
+        );
         assert!(
             raw.contains("[image: capture]") || raw.contains("capture"),
             "{raw}"
