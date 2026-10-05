@@ -90,7 +90,7 @@ export function renderDigestBenchPanel(): string {
         <div class="digest-bench__col">
           <label class="digest-bench__label" for="digest-bench-query">Recherche</label>
           <div class="digest-bench__search">
-            <input id="digest-bench-query" class="digest-bench__input" type="search" value="${escapeAttr(digestBench.queryDraft)}" placeholder="@deblock.com reçu #dossier:INBOX" />
+            <input id="digest-bench-query" class="digest-bench__input" type="search" value="${escapeAttr(digestBench.queryDraft)}" placeholder="@deblock.com" />
             <button type="button" class="primary-button" data-action="digest-bench-search">${digestBench.searching ? "Recherche…" : "Chercher"}</button>
           </div>
           ${digestBench.searchError ? `<p class="digest-bench__warn">${escapeHtml(digestBench.searchError)}</p>` : ""}

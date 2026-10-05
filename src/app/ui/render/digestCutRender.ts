@@ -142,10 +142,10 @@ export function renderDigestCutPanel(): string {
       <div class="digest-cut__pick">
         <label class="digest-bench__label" for="digest-cut-query">Chercher dans la boîte</label>
         <div class="digest-bench__search">
-          <input id="digest-cut-query" class="digest-bench__input" type="search" value="${escapeAttr(digestCut.queryDraft)}" placeholder="@domaine #dossier:INBOX" />
+          <input id="digest-cut-query" class="digest-bench__input" type="search" value="${escapeAttr(digestCut.queryDraft)}" placeholder="@exemple.fr" />
           <button type="button" class="primary-button" data-action="digest-cut-search">${digestCut.searching ? "Recherche…" : "Chercher"}</button>
         </div>
-        <p class="digest-bench__fine dim">Même barre que le courrier, mode lexical. Prenez un domaine au hasard dans votre boîte, par exemple <code>@exemple.fr</code>.</p>
+        <p class="digest-bench__fine dim">Même barre que le courrier, mode lexical, tous dossiers du compte. Ex. <code>@exemple.fr</code> — <code>#dossier:INBOX</code> reste optionnel.</p>
         <div class="digest-cut__actions">
           <button type="button" class="ghost-button" data-action="digest-cut-open-current">Mail déjà ouvert</button>
           <label class="ghost-button digest-cut__file">Importer un .eml

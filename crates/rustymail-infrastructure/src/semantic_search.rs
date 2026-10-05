@@ -1167,47 +1167,28 @@ pub fn sqlite_search_threads_unified(
 
     let mut out: Vec<ThreadListItem> = Vec::new();
     for tid in thread_ids {
-        let row: Option<(String, String, String, String, bool, f32)> =
-            if let Some(mbox) = scope_mailbox {
-                conn.query_row(
-                    "SELECT id, subject, tags, mailbox, COALESCE(is_followed, 0),
-                            COALESCE(security_score, -1)
-                     FROM threads WHERE id = ?1 AND account_id = ?2
-                       AND lower(trim(mailbox)) = lower(trim(?3))",
-                    params![tid, account_id, mbox],
-                    |r| {
-                        Ok((
-                            r.get(0)?,
-                            r.get(1)?,
-                            r.get(2)?,
-                            r.get(3)?,
-                            r.get::<_, i64>(4)? != 0,
-                            r.get::<_, f64>(5)? as f32,
-                        ))
-                    },
-                )
-                .optional()
-                .map_err(|e| e.to_string())?
-            } else {
-                conn.query_row(
-                    "SELECT id, subject, tags, mailbox, COALESCE(is_followed, 0),
-                            COALESCE(security_score, -1)
-                     FROM threads WHERE id = ?1 AND account_id = ?2",
-                    params![tid, account_id],
-                    |r| {
-                        Ok((
-                            r.get(0)?,
-                            r.get(1)?,
-                            r.get(2)?,
-                            r.get(3)?,
-                            r.get::<_, i64>(4)? != 0,
-                            r.get::<_, f64>(5)? as f32,
-                        ))
-                    },
-                )
-                .optional()
-                .map_err(|e| e.to_string())?
-            };
+        // Ne pas re-filtrer sur `threads.mailbox` : les candidats viennent déjà des
+        // `messages` du dossier (un fil peut avoir `threads.mailbox` différent si
+        // des messages existent encore dans le dossier demandé).
+        let row: Option<(String, String, String, String, bool, f32)> = conn
+            .query_row(
+                "SELECT id, subject, tags, mailbox, COALESCE(is_followed, 0),
+                        COALESCE(security_score, -1)
+                 FROM threads WHERE id = ?1 AND account_id = ?2",
+                params![tid, account_id],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get::<_, i64>(4)? != 0,
+                        r.get::<_, f64>(5)? as f32,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
         let Some((id, subject, tags, mailbox, followed, sec_score)) = row else {
             continue;
         };

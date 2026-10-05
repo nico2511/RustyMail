@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { buildDigestBenchSearchQuery } from "../../digestBenchQuery";
-import type { DiscussionThreadView, ThreadListItem } from "../types";
-import { currentAccount } from "../core/accountContext";
+import { resolveDigestSearchAccountId, searchDigestToolThreads } from "../../digestToolSearch";
+import type { DiscussionThreadView } from "../types";
 import { render } from "../dispatch";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage } from "../lib/tauriCommand";
@@ -46,7 +45,7 @@ export async function refreshDigestBenchStatus(): Promise<void> {
 
 export async function searchDigestBench(): Promise<void> {
   captureDigestBenchDom();
-  const accountId = currentAccount()?.id?.trim() || state.selectedAccountId?.trim() || "";
+  const accountId = resolveDigestSearchAccountId();
   if (!accountId) {
     digestBench.searchError = "Choisissez un compte avant de chercher dans la boîte.";
     digestBench.threads = [];
@@ -61,16 +60,14 @@ export async function searchDigestBench(): Promise<void> {
   digestBench.searching = true;
   digestBench.searchError = "";
   render();
-  const query = buildDigestBenchSearchQuery({
-    draft: digestBench.queryDraft,
-    accountId,
-    newsletterRules: state.newsletterRules,
-    archiveRoot: state.appPrefs.general.archiveRoot ?? "Archive",
-  });
   try {
-    digestBench.threads = await invoke<ThreadListItem[]>("search_threads", { query });
+    digestBench.threads = await searchDigestToolThreads({
+      draft: digestBench.queryDraft,
+      newsletterRules: state.newsletterRules,
+      archiveRoot: state.appPrefs.general.archiveRoot ?? "Archive",
+    });
     if (digestBench.threads.length === 0) {
-      digestBench.searchError = "Aucun fil. Le filtre @domaine élargit la liste ; il n'applique pas la découpe.";
+      digestBench.searchError = "Aucun fil. Essayez @domaine sans #dossier, ou un autre compte.";
     }
   } catch (error) {
     digestBench.threads = [];

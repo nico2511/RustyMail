@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { buildDigestBenchSearchQuery } from "../../digestBenchQuery";
-import type { DiscussionThreadView, ThreadListItem } from "../types";
-import { currentAccount } from "../core/accountContext";
+import { resolveDigestSearchAccountId, searchDigestToolThreads } from "../../digestToolSearch";
+import type { DiscussionThreadView } from "../types";
 import { render } from "../dispatch";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage } from "../lib/tauriCommand";
@@ -74,7 +73,7 @@ export function loadDigestCutMail(input: {
 
 export async function searchDigestCutMailbox(): Promise<void> {
   captureDigestCutDom();
-  const accountId = currentAccount()?.id?.trim() || state.selectedAccountId?.trim() || "";
+  const accountId = resolveDigestSearchAccountId();
   if (!accountId) {
     digestCut.searchError = "Choisissez un compte avant de chercher dans la boîte.";
     digestCut.threads = [];
@@ -95,16 +94,15 @@ export async function searchDigestCutMailbox(): Promise<void> {
   digestCut.searching = true;
   digestCut.searchError = "";
   render();
-  const query = buildDigestBenchSearchQuery({
-    draft: digestCut.queryDraft,
-    accountId,
-    newsletterRules: state.newsletterRules,
-    archiveRoot: state.appPrefs.general.archiveRoot ?? "Archive",
-  });
   try {
-    digestCut.threads = await invoke<ThreadListItem[]>("search_threads", { query });
+    digestCut.threads = await searchDigestToolThreads({
+      draft: digestCut.queryDraft,
+      newsletterRules: state.newsletterRules,
+      archiveRoot: state.appPrefs.general.archiveRoot ?? "Archive",
+    });
     if (digestCut.threads.length === 0) {
-      digestCut.searchError = "Aucun fil pour cette recherche. Essayez un autre domaine de votre boîte.";
+      digestCut.searchError =
+        "Aucun fil pour cette recherche. Essayez @domaine sans #dossier, ou un autre compte.";
     }
   } catch (error) {
     digestCut.threads = [];
