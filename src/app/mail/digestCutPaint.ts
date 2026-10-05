@@ -193,21 +193,6 @@ export function ensurePaintProposalSkeleton(): DigestCutProposal {
   return digestCut.proposal;
 }
 
-export function assignPaintPickToZone(zone: DigestCutZoneName): boolean {
-  const pick = digestCut.paintPick;
-  if (!pick) return false;
-  const proposal = ensurePaintProposalSkeleton();
-  proposal.zones[zone].anchors = [paintPickToAnchor(pick)];
-  proposal.zones[zone].rationale = `Sélection visuelle : ${pick.label}`;
-  proposal.source = "heuristic";
-  if (pick.structureRoot?.trim()) {
-    proposal.match.structureRoot = pick.structureRoot.trim();
-    proposal.match.minChildren = Math.max(2, proposal.match.minChildren || 2);
-  }
-  digestCut.paintZone = zone;
-  return true;
-}
-
 /** Surligne les ancres connues + la sélection courante dans un clone DOM. */
 export function decorateMailHtmlForCut(rawHtml: string): string {
   if (!rawHtml.trim()) return rawHtml;
