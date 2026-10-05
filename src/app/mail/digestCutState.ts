@@ -59,6 +59,15 @@ export type DigestCutPaintPick = {
   textContainsAny?: string[];
 };
 
+/** Contrôle local (ou après IA) qu’une zone vise un balisage complet et cohérent. */
+export type DigestCutZoneCheck = {
+  status: "ok" | "warn" | "bad";
+  source: "heuristic" | "llm";
+  completeMarkup: boolean;
+  resolvable: boolean;
+  message: string;
+};
+
 export const digestCut = {
   sourceKind: "none" as DigestCutSourceKind,
   queryDraft: "",
@@ -86,6 +95,14 @@ export const digestCut = {
   paintZone: null as DigestCutZoneName | null,
   /** Nœud sélectionné dans le panneau Mail. */
   paintPick: null as DigestCutPaintPick | null,
+  /** Contrôle du bloc sous le curseur / sélection. */
+  paintCheck: null as DigestCutZoneCheck | null,
+  /** Contrôle par zone après proposition ou assignation. */
+  zoneChecks: {
+    header: null as DigestCutZoneCheck | null,
+    body: null as DigestCutZoneCheck | null,
+    footer: null as DigestCutZoneCheck | null,
+  },
 };
 
 export function formatAnchorSummary(anchors: DigestCutAnchor[]): string {

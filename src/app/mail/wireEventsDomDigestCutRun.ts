@@ -1,4 +1,5 @@
 import { handleDigestCutAction, handleDigestCutMailClick, importDigestCutEmlBase64 } from "./digestCutActions";
+import { snapToCuttableBlock } from "./digestCutValidate";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -52,4 +53,35 @@ export function wireEventsDomDigestCut(signal: AbortSignal): void {
     },
     { signal },
   );
+
+  let hoverEl: Element | null = null;
+  const clearHover = () => {
+    hoverEl?.classList.remove("digest-cut__hover-cand");
+    hoverEl = null;
+  };
+  mail?.addEventListener(
+    "pointermove",
+    (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !mail.contains(event.target)) return;
+      if (event.target.closest("a, button, input, textarea, label")) {
+        clearHover();
+        return;
+      }
+      const next = snapToCuttableBlock(event.target, mail);
+      if (
+        !next ||
+        next.classList.contains("digest-cut__zone-hl") ||
+        next.classList.contains("digest-cut__paint-pick")
+      ) {
+        clearHover();
+        return;
+      }
+      if (next === hoverEl) return;
+      clearHover();
+      next.classList.add("digest-cut__hover-cand");
+      hoverEl = next;
+    },
+    { signal },
+  );
+  mail?.addEventListener("pointerleave", clearHover, { signal });
 }

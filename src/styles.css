@@ -10565,10 +10565,33 @@ button.thread-tag-chip--search:focus-visible {
 .digest-cut__paint-title { margin: 0; font-size: 13px; font-weight: 600; }
 .digest-cut__paint-status { margin: 6px 0 0; font-size: 12px; }
 .digest-cut__mail-source--painting { cursor: crosshair; }
+.digest-cut__hover-cand {
+  outline: 2px dashed color-mix(in srgb, var(--accent, #c45c26) 70%, transparent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--accent, #c45c26) 8%, transparent);
+}
 .digest-cut__zone-hl {
   outline: 2px solid transparent;
   outline-offset: 2px;
   cursor: pointer;
+  position: relative;
+}
+.digest-cut__zone-hl::after {
+  content: attr(data-digest-cut-label);
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: #1c1917;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 2px rgba(28, 25, 23, 0.12);
+  pointer-events: none;
 }
 .digest-cut__zone-hl--header { outline-color: #6b9bd1; background: rgba(107, 155, 209, 0.12); }
 .digest-cut__zone-hl--body { outline-color: #7aaf6b; background: rgba(122, 175, 107, 0.12); }
@@ -10577,6 +10600,41 @@ button.thread-tag-chip--search:focus-visible {
   outline-width: 3px;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #c45c26) 45%, transparent);
 }
+.digest-cut__zone-hl[data-digest-cut-check="bad"] {
+  outline-style: dashed;
+  outline-color: #b91c1c;
+}
+.digest-cut__zone-hl[data-digest-cut-check="warn"] {
+  outline-style: dashed;
+}
 .digest-cut__paint-pick { outline: 2px solid var(--accent, #c45c26); outline-offset: 2px; }
+.digest-cut__check {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.digest-cut__check--ok {
+  color: #166534;
+  background: rgba(22, 101, 52, 0.12);
+}
+.digest-cut__check--warn {
+  color: #92400e;
+  background: rgba(146, 64, 14, 0.12);
+}
+.digest-cut__check--bad {
+  color: #991b1b;
+  background: rgba(153, 27, 27, 0.12);
+}
+.digest-cut__zone-check-msg,
+.digest-cut__paint-check {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+.digest-cut__paint-check.digest-cut__check--ok { color: #166534; }
+.digest-cut__paint-check.digest-cut__check--warn { color: #92400e; }
+.digest-cut__paint-check.digest-cut__check--bad { color: #991b1b; }
 .digest-cut__file { display: inline-flex; align-items: center; cursor: pointer; }
 .digest-cut__code { margin-top: 10px; }

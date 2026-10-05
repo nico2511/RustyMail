@@ -6,14 +6,21 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { state } from "../state";
 import {
-  assignPaintPickToZone,
   ensurePaintProposalSkeleton,
   expandCutNode,
   findElementForPick,
   pickFromElement,
-  pickFromMailClick,
   shrinkCutNode,
 } from "./digestCutPaint";
+import {
+  applyValidatedPickToZone,
+  checkSummaryFr,
+  hasCompleteTagPair,
+  revalidateProposalFromHtml,
+  snapToCuttableBlock,
+  validateElementForZone,
+  validatePaintPick,
+} from "./digestCutValidate";
 import {
   captureDigestCutDom,
   digestCut,
@@ -55,6 +62,12 @@ function clearCutResult(): void {
   digestCut.showCode = false;
   digestCut.paintZone = null;
   digestCut.paintPick = null;
+  digestCut.paintCheck = null;
+  digestCut.zoneChecks = { header: null, body: null, footer: null };
+}
+
+function mailRootEl(): HTMLElement | null {
+  return document.querySelector<HTMLElement>("[data-digest-cut-mail]");
 }
 
 export function loadDigestCutMail(input: {
@@ -246,10 +259,16 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
     if (!view.proposal.explanationFr?.trim()) {
       view.proposal.explanationFr = explainZonesFr(view.proposal);
     }
+    revalidateProposalFromHtml(
+      view.proposal,
+      digestCut.html,
+      view.fromModel ? "llm" : "heuristic",
+    );
     await syncYamlFromProposal();
+    await previewDigestCut();
     if (view.fromModel) {
       digestCut.notice =
-        "Proposition du modèle local. Lisez l'explication, puis ajustez les zones. Même moteur que Paramètres → IA.";
+        "Proposition IA : chaque zone colorée est un bloc HTML complet. Ajustez au clic, puis confirmez.";
     } else {
       const why = view.fallbackReason?.trim() ?? "";
       if (/contexte trop|n_ctx/i.test(why)) {
@@ -258,10 +277,9 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
         digestCut.notice = `Découpe structurelle (repli). Le modèle n'a pas renvoyé un JSON exploitable — ${why}`;
       } else {
         digestCut.notice =
-          "Découpe structurelle (repli). Le modèle n'a pas fourni de découpe. Vérifiez Paramètres → IA → Tester la connexion.";
+          "Découpe structurelle (repli). Blocs complets validés localement. Vérifiez Paramètres → IA pour l’IA.";
       }
     }
-    await previewDigestCut();
   } catch (error) {
     digestCut.notice = tauriErrorMessage(error);
   } finally {
@@ -299,15 +317,25 @@ function zoneLabelFr(zone: DigestCutZoneName): string {
 function applyPaintPickAndPreview(): void {
   const zone = digestCut.paintZone;
   const pick = digestCut.paintPick;
-  if (!zone || !pick) {
+  const root = mailRootEl();
+  if (!zone || !pick || !root) {
     render();
     return;
   }
-  assignPaintPickToZone(zone);
+  ensurePaintProposalSkeleton();
+  const check = applyValidatedPickToZone(zone, pick, root);
+  if (check.status === "bad") {
+    digestCut.notice = `Refusé — ${check.message}`;
+    render();
+    return;
+  }
   if (digestCut.proposal) {
     digestCut.proposal.explanationFr = explainZonesFr(digestCut.proposal);
   }
-  digestCut.notice = `Bloc « ${zoneLabelFr(zone)} » mis à jour.`;
+  digestCut.notice =
+    check.status === "warn"
+      ? `« ${zoneLabelFr(zone)} » : ${checkSummaryFr(check)} — ${check.message}`
+      : `« ${zoneLabelFr(zone)} » ${checkSummaryFr(check).toLowerCase()}.`;
   void syncYamlFromProposal().then(() => previewDigestCut());
 }
 
@@ -316,7 +344,7 @@ export function setDigestCutPaintZone(zone: DigestCutZoneName): void {
   digestCut.paintZone = digestCut.paintZone === zone ? null : zone;
   if (digestCut.paintZone) {
     ensurePaintProposalSkeleton();
-    digestCut.notice = `Cliquez un bloc dans le mail pour « ${zoneLabelFr(zone)} ».`;
+    digestCut.notice = `Survolez le mail, puis cliquez un bloc complet pour « ${zoneLabelFr(zone)} ».`;
   } else {
     digestCut.notice = "Sélection annulée.";
   }
@@ -324,68 +352,88 @@ export function setDigestCutPaintZone(zone: DigestCutZoneName): void {
 }
 
 export function handleDigestCutMailClick(target: EventTarget | null): void {
-  const root = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
+  const root = mailRootEl();
   if (!root || !(target instanceof Element)) return;
 
   const zoneEl = target.closest<HTMLElement>("[data-digest-cut-zone]");
   if (zoneEl && root.contains(zoneEl) && !digestCut.paintZone) {
     const zone = zoneEl.getAttribute("data-digest-cut-zone");
     if (zone === "header" || zone === "body" || zone === "footer") {
-      const pick = pickFromElement(zoneEl, root) ?? pickFromMailClick(zoneEl, root);
+      const snapped = snapToCuttableBlock(zoneEl, root) ?? zoneEl;
+      const pick = pickFromElement(snapped, root);
       if (!pick) return;
       digestCut.paintZone = zone;
       digestCut.paintPick = pick;
-      digestCut.notice = `Zone « ${zoneLabelFr(zone)} » — Plus grand / Plus petit pour ajuster.`;
+      digestCut.paintCheck = validateElementForZone(snapped, root, zone);
+      digestCut.notice = `Zone « ${zoneLabelFr(zone)} » — Plus grand / Plus petit, ou Valider avec l’IA.`;
       render();
       return;
     }
   }
 
-  const pick = pickFromMailClick(target, root);
+  const snapped = snapToCuttableBlock(target, root);
+  if (!snapped) {
+    digestCut.notice = "Cliquez un bloc HTML complet (balise ouverte et fermée), pas un mot isolé.";
+    render();
+    return;
+  }
+  const pick = pickFromElement(snapped, root);
   if (!pick) return;
   digestCut.paintPick = pick;
+  digestCut.paintCheck = validateElementForZone(snapped, root, digestCut.paintZone);
   if (digestCut.paintZone) {
     applyPaintPickAndPreview();
     return;
   }
-  digestCut.notice = "Bloc sélectionné — assignez-le à En-tête, Corps ou Pied, ou ajustez sa taille.";
+  const pair = hasCompleteTagPair(snapped);
+  digestCut.notice = pair.ok
+    ? "Bloc complet sélectionné — assignez-le (→ En-tête / Corps / Pied) ou ajustez sa taille."
+    : pair.message;
   render();
 }
 
 export function expandDigestCutPaintPick(): void {
-  const root = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
+  const root = mailRootEl();
   const pick = digestCut.paintPick;
   if (!root || !pick) return;
   const el = findElementForPick(root, pick);
   if (!el?.parentElement || el.parentElement === root) return;
-  const expanded = expandCutNode(el.parentElement, root);
-  const next = pickFromElement(expanded, root) ?? pickFromMailClick(expanded, root);
+  const expanded = snapToCuttableBlock(el.parentElement, root) ?? expandCutNode(el.parentElement, root);
+  if (!hasCompleteTagPair(expanded).ok) {
+    digestCut.notice = "Impossible d’agrandir sans casser le balisage.";
+    render();
+    return;
+  }
+  const next = pickFromElement(expanded, root);
   if (!next || next.label === pick.label) return;
   digestCut.paintPick = next;
+  digestCut.paintCheck = validatePaintPick(next, root, digestCut.paintZone);
   applyPaintPickAndPreview();
 }
 
 export function shrinkDigestCutPaintPick(): void {
-  const root = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
+  const root = mailRootEl();
   const pick = digestCut.paintPick;
   if (!root || !pick) return;
   const el = findElementForPick(root, pick);
   if (!el) return;
   const shrunk = shrinkCutNode(el, root);
-  if (shrunk === el) {
-    digestCut.notice = "Impossible de réduire davantage.";
+  if (shrunk === el || !hasCompleteTagPair(shrunk).ok) {
+    digestCut.notice = "Impossible de réduire tout en gardant une balise complète.";
     render();
     return;
   }
   const next = pickFromElement(shrunk, root);
   if (!next) return;
   digestCut.paintPick = next;
+  digestCut.paintCheck = validatePaintPick(next, root, digestCut.paintZone);
   applyPaintPickAndPreview();
 }
 
 export function clearDigestCutPaint(): void {
   digestCut.paintPick = null;
   digestCut.paintZone = null;
+  digestCut.paintCheck = null;
   render();
 }
 
@@ -473,12 +521,8 @@ export async function handleDigestCutAction(action: string, element?: HTMLElemen
     case "digest-cut-paint-assign": {
       const zone = element?.dataset.zone as DigestCutZoneName | undefined;
       if (zone && digestCut.paintPick) {
-        assignPaintPickToZone(zone);
-        if (digestCut.proposal) {
-          digestCut.proposal.explanationFr = explainZonesFr(digestCut.proposal);
-        }
-        digestCut.notice = `Bloc assigné à ${zone === "header" ? "En-tête" : zone === "body" ? "Corps" : "Pied"}.`;
-        void syncYamlFromProposal().then(() => previewDigestCut());
+        digestCut.paintZone = zone;
+        applyPaintPickAndPreview();
       }
       return true;
     }

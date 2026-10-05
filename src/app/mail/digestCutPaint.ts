@@ -250,6 +250,14 @@ function markAnchorMatches(
   if (!el) return;
   el.classList.add("digest-cut__zone-hl", `digest-cut__zone-hl--${zone}`);
   el.setAttribute("data-digest-cut-zone", zone);
+  el.setAttribute(
+    "data-digest-cut-label",
+    zone === "header" ? "En-tête" : zone === "body" ? "Corps" : "Pied",
+  );
+  const check = digestCut.zoneChecks[zone];
+  if (check) {
+    el.setAttribute("data-digest-cut-check", check.status);
+  }
   if (digestCut.paintZone === zone) {
     el.classList.add("digest-cut__zone-hl--active");
   }

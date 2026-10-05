@@ -1,6 +1,7 @@
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { sanitizeEmailHtml } from "../../mail/mailEmailHtmlSanitizeCoreRun";
 import { decorateMailHtmlForCut } from "../../mail/digestCutPaint";
+import { checkSummaryFr } from "../../mail/digestCutValidate";
 import {
   digestCut,
   formatAnchorSummary,
@@ -69,6 +70,13 @@ function stepsNav(active: 1 | 2 | 3): string {
   </ol>`;
 }
 
+function zoneCheckBadge(name: DigestCutZoneName): string {
+  const check = digestCut.zoneChecks[name];
+  if (!check) return "";
+  const label = checkSummaryFr(check);
+  return `<span class="digest-cut__check digest-cut__check--${check.status}" title="${escapeAttr(check.message)}">${escapeHtml(label)}</span>`;
+}
+
 function zoneRow(name: DigestCutZoneName): string {
   const zone = digestCut.proposal?.zones[name];
   const action = zone?.action ?? "show";
@@ -78,21 +86,27 @@ function zoneRow(name: DigestCutZoneName): string {
   const paintPressed = digestCut.paintZone === name ? "true" : "false";
   const label = ZONE_LABEL[name];
   const color = ZONE_COLOR[name];
+  const check = digestCut.zoneChecks[name];
   return `<section class="digest-cut__zone digest-cut__zone--${color}">
     <div class="digest-cut__zone-head">
       <h4 class="digest-cut__zone-title">
         <span class="digest-cut__zone-swatch" aria-hidden="true"></span>
         ${escapeHtml(label)}
         <span class="digest-cut__zone-state dim">${escapeHtml(ACTION_LABEL[action])}</span>
+        ${zoneCheckBadge(name)}
       </h4>
     </div>
     ${rationale ? `<p class="digest-cut__zone-rationale">${escapeHtml(rationale)}</p>` : ""}
-    <p class="digest-cut__zone-anchors dim" title="Repères techniques dans le HTML">Repères : ${escapeHtml(anchors)}</p>
+    ${
+      check
+        ? `<p class="digest-cut__zone-check-msg dim">${escapeHtml(check.message)}</p>`
+        : `<p class="digest-cut__zone-anchors dim" title="Repères techniques dans le HTML">Repères : ${escapeHtml(anchors)}</p>`
+    }
     <div class="digest-cut__zone-actions" role="group" aria-label="${escapeAttr(`Zone ${label}`)}">
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="show" aria-pressed="${pressed("show")}">Afficher</button>
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="hide" aria-pressed="${pressed("hide")}">Masquer</button>
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="collapse" aria-pressed="${pressed("collapse")}">Replier</button>
-      <button type="button" class="ghost-button digest-cut__zone-btn digest-cut__paint-btn" data-action="digest-cut-paint-zone" data-zone="${name}" aria-pressed="${paintPressed}" title="Puis cliquez un bloc dans le mail">Changer le bloc</button>
+      <button type="button" class="ghost-button digest-cut__zone-btn digest-cut__paint-btn" data-action="digest-cut-paint-zone" data-zone="${name}" aria-pressed="${paintPressed}" title="Puis cliquez un bloc complet dans le mail">Changer le bloc</button>
     </div>
   </section>`;
 }
@@ -160,18 +174,23 @@ function paintBar(): string {
   if (!digestCut.html.trim() || !digestCut.proposal) return "";
   const pick = digestCut.paintPick;
   const zone = digestCut.paintZone;
+  const check = digestCut.paintCheck;
   if (!zone && !pick) {
     return `<div class="digest-cut__paint-bar digest-cut__paint-bar--idle">
-      <p class="digest-cut__paint-title">Ajuster les zones dans le mail</p>
-      <p class="digest-bench__fine dim">Cliquez un bloc <strong>coloré</strong> à gauche pour le sélectionner, puis <strong>Plus grand</strong> / <strong>Plus petit</strong>. Ou <strong>Changer le bloc</strong> puis un nouveau bloc.</p>
+      <p class="digest-cut__paint-title">Ajuster visuellement</p>
+      <p class="digest-bench__fine dim">Survolez le mail : le cadre suit le <strong>bloc HTML complet</strong>. Cliquez une zone colorée, puis <strong>Plus grand</strong> / <strong>Plus petit</strong>. Chaque choix est contrôlé (balise ouverte/fermée).</p>
     </div>`;
   }
   const zoneHint = zone ? ZONE_LABEL[zone] : "non assignée";
+  const checkLine = check
+    ? `<p class="digest-cut__paint-check digest-cut__check--${check.status}">${escapeHtml(checkSummaryFr(check))} — ${escapeHtml(check.message)}</p>`
+    : "";
   return `<div class="digest-cut__paint-bar">
     <p class="digest-cut__paint-title">Bloc sélectionné</p>
     <p class="digest-cut__paint-status">Zone : <strong>${escapeHtml(zoneHint)}</strong>${
       pick ? ` · ${escapeHtml(pick.label)}` : " · cliquez dans le mail"
     }</p>
+    ${checkLine}
     <div class="digest-cut__actions digest-cut__actions--size">
       <button type="button" class="primary-button digest-cut__size-btn" data-action="digest-cut-paint-expand" ${pick ? "" : "disabled"} title="Inclure le bloc parent">Plus grand</button>
       <button type="button" class="primary-button digest-cut__size-btn" data-action="digest-cut-paint-shrink" ${pick ? "" : "disabled"} title="Restreindre au sous-bloc">Plus petit</button>
@@ -230,7 +249,7 @@ function proposeSection(loaded: boolean): string {
     <p class="digest-bench__fine">L’app découpe le mail en <strong>en-tête</strong>, <strong>corps</strong> et <strong>pied</strong>, et explique le choix en français.</p>
     <div class="digest-cut__actions">
       <button type="button" class="primary-button" data-action="digest-cut-propose" ${loaded && !digestCut.proposing ? "" : "disabled"} ${busy}>${digestCut.proposing ? "Proposition…" : ready ? "Reproposer" : "Proposer"}</button>
-      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && !digestCut.proposing ? "" : "disabled"} ${busy} title="Demande au modèle local d’améliorer la découpe">Affiner (IA locale)</button>
+      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && !digestCut.proposing ? "" : "disabled"} ${busy} title="Le modèle local revérifie chaque zone (balises complètes)">Valider avec l’IA</button>
     </div>
     <p class="digest-bench__fine dim">Rien n’est activé en lecture automatique depuis cet écran.</p>
   </section>`;
