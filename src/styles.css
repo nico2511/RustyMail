@@ -10553,6 +10553,8 @@ button.thread-tag-chip--search:focus-visible {
   font-weight: 600;
 }
 .digest-cut__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.digest-cut__actions--size { margin-top: 10px; }
+.digest-cut__size-btn { min-width: 7.5rem; }
 .digest-cut__paint-bar {
   margin: 12px 0 0;
   padding: 10px 12px;
@@ -10563,10 +10565,18 @@ button.thread-tag-chip--search:focus-visible {
 .digest-cut__paint-title { margin: 0; font-size: 13px; font-weight: 600; }
 .digest-cut__paint-status { margin: 6px 0 0; font-size: 12px; }
 .digest-cut__mail-source--painting { cursor: crosshair; }
-.digest-cut__zone-hl { outline: 2px solid transparent; outline-offset: 2px; }
+.digest-cut__zone-hl {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  cursor: pointer;
+}
 .digest-cut__zone-hl--header { outline-color: #6b9bd1; background: rgba(107, 155, 209, 0.12); }
 .digest-cut__zone-hl--body { outline-color: #7aaf6b; background: rgba(122, 175, 107, 0.12); }
 .digest-cut__zone-hl--footer { outline-color: #c48a4a; background: rgba(196, 138, 74, 0.14); }
+.digest-cut__zone-hl--active {
+  outline-width: 3px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #c45c26) 45%, transparent);
+}
 .digest-cut__paint-pick { outline: 2px solid var(--accent, #c45c26); outline-offset: 2px; }
 .digest-cut__file { display: inline-flex; align-items: center; cursor: pointer; }
 .digest-cut__code { margin-top: 10px; }

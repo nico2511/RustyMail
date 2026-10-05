@@ -92,7 +92,7 @@ function zoneRow(name: DigestCutZoneName): string {
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="show" aria-pressed="${pressed("show")}">Afficher</button>
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="hide" aria-pressed="${pressed("hide")}">Masquer</button>
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="collapse" aria-pressed="${pressed("collapse")}">Replier</button>
-      <button type="button" class="ghost-button digest-cut__zone-btn digest-cut__paint-btn" data-action="digest-cut-paint-zone" data-zone="${name}" aria-pressed="${paintPressed}" title="Puis cliquez un bloc dans le mail à gauche">Pointer dans le mail</button>
+      <button type="button" class="ghost-button digest-cut__zone-btn digest-cut__paint-btn" data-action="digest-cut-paint-zone" data-zone="${name}" aria-pressed="${paintPressed}" title="Puis cliquez un bloc dans le mail">Changer le bloc</button>
     </div>
   </section>`;
 }
@@ -162,18 +162,21 @@ function paintBar(): string {
   const zone = digestCut.paintZone;
   if (!zone && !pick) {
     return `<div class="digest-cut__paint-bar digest-cut__paint-bar--idle">
-      <p class="digest-cut__paint-title">Pointer un bloc dans le mail</p>
-      <p class="digest-bench__fine dim">Sur une zone ci-dessus, cliquez <strong>Pointer dans le mail</strong>, puis un bloc (logo, tableau, pied…). Le contour coloré montre ce qui est ciblé.</p>
+      <p class="digest-cut__paint-title">Ajuster les zones dans le mail</p>
+      <p class="digest-bench__fine dim">Cliquez un bloc <strong>coloré</strong> à gauche pour le sélectionner, puis <strong>Plus grand</strong> / <strong>Plus petit</strong>. Ou <strong>Changer le bloc</strong> puis un nouveau bloc.</p>
     </div>`;
   }
-  const zoneHint = zone ? ZONE_LABEL[zone] : "aucune";
+  const zoneHint = zone ? ZONE_LABEL[zone] : "non assignée";
   return `<div class="digest-cut__paint-bar">
-    <p class="digest-cut__paint-title">Sélection en cours</p>
+    <p class="digest-cut__paint-title">Bloc sélectionné</p>
     <p class="digest-cut__paint-status">Zone : <strong>${escapeHtml(zoneHint)}</strong>${
-      pick ? ` · bloc : ${escapeHtml(pick.label)}` : " · cliquez dans le mail à gauche"
+      pick ? ` · ${escapeHtml(pick.label)}` : " · cliquez dans le mail"
     }</p>
+    <div class="digest-cut__actions digest-cut__actions--size">
+      <button type="button" class="primary-button digest-cut__size-btn" data-action="digest-cut-paint-expand" ${pick ? "" : "disabled"} title="Inclure le bloc parent">Plus grand</button>
+      <button type="button" class="primary-button digest-cut__size-btn" data-action="digest-cut-paint-shrink" ${pick ? "" : "disabled"} title="Restreindre au sous-bloc">Plus petit</button>
+    </div>
     <div class="digest-cut__actions">
-      <button type="button" class="ghost-button" data-action="digest-cut-paint-expand" ${pick ? "" : "disabled"}>Élargir au parent</button>
       <button type="button" class="ghost-button" data-action="digest-cut-paint-assign" data-zone="header" ${pick ? "" : "disabled"}>→ En-tête</button>
       <button type="button" class="ghost-button" data-action="digest-cut-paint-assign" data-zone="body" ${pick ? "" : "disabled"}>→ Corps</button>
       <button type="button" class="ghost-button" data-action="digest-cut-paint-assign" data-zone="footer" ${pick ? "" : "disabled"}>→ Pied</button>
@@ -266,7 +269,8 @@ export function renderDigestCutPanel(): string {
   const rendered = loaded
     ? decorateMailHtmlForCut(sanitized)
     : `<p class="digest-cut__empty-hint">Le mail choisi apparaît ici.</p>`;
-  const paintClass = digestCut.paintZone ? " digest-cut__mail-source--painting" : "";
+  const editing = Boolean(digestCut.proposal && loaded);
+  const paintClass = editing || digestCut.paintZone ? " digest-cut__mail-source--painting" : "";
   const step = currentStep();
 
   return `<div class="settings-page digest-cut">
@@ -282,7 +286,7 @@ export function renderDigestCutPanel(): string {
       </div>
       <div class="digest-cut__preview digest-bench__compare digest-bench__compare--split">
         <section class="digest-bench__pane">
-          <h4 class="digest-bench__pane-title">Mail d’origine${digestCut.paintZone ? " · mode pointeur" : ""}</h4>
+          <h4 class="digest-bench__pane-title">Mail d’origine${editing ? " · cliquez une zone colorée" : ""}</h4>
           <div class="digest-bench__pane-body mail digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}</div>
         </section>
         <section class="digest-bench__pane">

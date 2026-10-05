@@ -69,6 +69,51 @@ export function expandCutNode(start: Element, root: Element): Element {
   return start;
 }
 
+/** Descend d’un cran vers le premier sous-bloc utile (inverse d’élargir). */
+export function shrinkCutNode(start: Element, _root: Element): Element {
+  const kids = structureChildren(start).filter((c) => !SKIP_TAGS.has(c.tagName.toLowerCase()));
+  if (kids.length === 0) return start;
+  for (const kid of kids) {
+    const tag = kid.tagName.toLowerCase();
+    if (tag === "table" || tag === "section" || tag === "article" || tag === "footer" || tag === "header") {
+      return kid;
+    }
+    if (meaningfulClass(kid)) return kid;
+  }
+  return kids[0];
+}
+
+export function findElementForPick(root: HTMLElement, pick: DigestCutPaintPick): Element | null {
+  const scope = (pick.structureRoot && resolveStructureRootEl(root, pick.structureRoot)) || root;
+  const candidates = structureChildren(scope).filter((el) => {
+    if (el.tagName.toLowerCase() !== pick.tag) return false;
+    if (!pick.classContains) return true;
+    return (el.getAttribute("class") ?? "").split(/\s+/).includes(pick.classContains);
+  });
+  if (pick.index != null && pick.index >= 0 && pick.index < candidates.length) {
+    return candidates[pick.index];
+  }
+  return candidates[0] ?? null;
+}
+
+/** Construit un pick depuis un élément déjà choisi (sans remonter). */
+export function pickFromElement(el: Element, mailRoot: HTMLElement): DigestCutPaintPick | null {
+  if (!mailRoot.contains(el) || el === mailRoot) return null;
+  const tag = el.tagName.toLowerCase();
+  if (SKIP_TAGS.has(tag)) return null;
+  const { structureRoot, index, classContains } = indexAmongStructureSiblings(el);
+  const text = (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 48);
+  const label = `${tag}${classContains ? `.${classContains}` : index != null ? `[${index}]` : ""}${text ? ` — ${text}${text.length >= 48 ? "…" : ""}` : ""}`;
+  return {
+    tag,
+    classContains,
+    index,
+    label,
+    structureRoot,
+    textContainsAny: textNeedlesFrom(el),
+  };
+}
+
 /**
  * Index parmi les **enfants directs** du parent (comme le moteur Rust sous structureRoot).
  * Pas un parcours global du panneau mail.
@@ -110,19 +155,7 @@ export function pickFromMailClick(target: EventTarget | null, mailRoot: HTMLElem
   if (!(target instanceof Element) || !mailRoot.contains(target)) return null;
   const expanded = expandCutNode(target, mailRoot);
   if (expanded === mailRoot) return null;
-  const tag = expanded.tagName.toLowerCase();
-  if (SKIP_TAGS.has(tag)) return null;
-  const { structureRoot, index, classContains } = indexAmongStructureSiblings(expanded);
-  const text = (expanded.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 48);
-  const label = `${tag}${classContains ? `.${classContains}` : index != null ? `[${index}]` : ""}${text ? ` — ${text}${text.length >= 48 ? "…" : ""}` : ""}`;
-  return {
-    tag,
-    classContains,
-    index,
-    label,
-    structureRoot,
-    textContainsAny: textNeedlesFrom(expanded),
-  };
+  return pickFromElement(expanded, mailRoot);
 }
 
 export function paintPickToAnchor(pick: DigestCutPaintPick): DigestCutAnchor {
@@ -217,6 +250,9 @@ function markAnchorMatches(
   if (!el) return;
   el.classList.add("digest-cut__zone-hl", `digest-cut__zone-hl--${zone}`);
   el.setAttribute("data-digest-cut-zone", zone);
+  if (digestCut.paintZone === zone) {
+    el.classList.add("digest-cut__zone-hl--active");
+  }
 }
 
 function resolveStructureRootEl(root: HTMLElement, selector: string): Element | null {
@@ -230,16 +266,7 @@ function resolveStructureRootEl(root: HTMLElement, selector: string): Element | 
 }
 
 function markPaintPick(root: HTMLElement, pick: DigestCutPaintPick): void {
-  const scope = (pick.structureRoot && resolveStructureRootEl(root, pick.structureRoot)) || root;
-  const candidates = structureChildren(scope).filter((el) => {
-    if (el.tagName.toLowerCase() !== pick.tag) return false;
-    if (!pick.classContains) return true;
-    return (el.getAttribute("class") ?? "").split(/\s+/).includes(pick.classContains);
-  });
-  const el =
-    pick.index != null && pick.index >= 0 && pick.index < candidates.length
-      ? candidates[pick.index]
-      : candidates[0];
+  const el = findElementForPick(root, pick);
   if (!el) return;
   el.classList.add("digest-cut__paint-pick");
 }

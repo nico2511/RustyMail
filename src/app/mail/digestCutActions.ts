@@ -9,7 +9,10 @@ import {
   assignPaintPickToZone,
   ensurePaintProposalSkeleton,
   expandCutNode,
+  findElementForPick,
+  pickFromElement,
   pickFromMailClick,
+  shrinkCutNode,
 } from "./digestCutPaint";
 import {
   captureDigestCutDom,
@@ -289,31 +292,63 @@ export function setDigestCutZoneAction(zone: DigestCutZoneName, action: DigestCu
   void syncYamlFromProposal().then(() => previewDigestCut());
 }
 
+function zoneLabelFr(zone: DigestCutZoneName): string {
+  return zone === "header" ? "En-tête" : zone === "body" ? "Corps" : "Pied";
+}
+
+function applyPaintPickAndPreview(): void {
+  const zone = digestCut.paintZone;
+  const pick = digestCut.paintPick;
+  if (!zone || !pick) {
+    render();
+    return;
+  }
+  assignPaintPickToZone(zone);
+  if (digestCut.proposal) {
+    digestCut.proposal.explanationFr = explainZonesFr(digestCut.proposal);
+  }
+  digestCut.notice = `Bloc « ${zoneLabelFr(zone)} » mis à jour.`;
+  void syncYamlFromProposal().then(() => previewDigestCut());
+}
+
 export function setDigestCutPaintZone(zone: DigestCutZoneName): void {
   captureDigestCutDom();
   digestCut.paintZone = digestCut.paintZone === zone ? null : zone;
   if (digestCut.paintZone) {
     ensurePaintProposalSkeleton();
-    digestCut.notice = `Peinture « ${zone === "header" ? "En-tête" : zone === "body" ? "Corps" : "Pied"} » : cliquez dans le mail pour choisir le bloc.`;
+    digestCut.notice = `Cliquez un bloc dans le mail pour « ${zoneLabelFr(zone)} ».`;
   } else {
-    digestCut.notice = "Peinture désactivée.";
+    digestCut.notice = "Sélection annulée.";
   }
   render();
 }
 
 export function handleDigestCutMailClick(target: EventTarget | null): void {
   const root = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
-  if (!root) return;
+  if (!root || !(target instanceof Element)) return;
+
+  const zoneEl = target.closest<HTMLElement>("[data-digest-cut-zone]");
+  if (zoneEl && root.contains(zoneEl) && !digestCut.paintZone) {
+    const zone = zoneEl.getAttribute("data-digest-cut-zone");
+    if (zone === "header" || zone === "body" || zone === "footer") {
+      const pick = pickFromElement(zoneEl, root) ?? pickFromMailClick(zoneEl, root);
+      if (!pick) return;
+      digestCut.paintZone = zone;
+      digestCut.paintPick = pick;
+      digestCut.notice = `Zone « ${zoneLabelFr(zone)} » — Plus grand / Plus petit pour ajuster.`;
+      render();
+      return;
+    }
+  }
+
   const pick = pickFromMailClick(target, root);
   if (!pick) return;
   digestCut.paintPick = pick;
   if (digestCut.paintZone) {
-    assignPaintPickToZone(digestCut.paintZone);
-    digestCut.proposal!.explanationFr = explainZonesFr(digestCut.proposal!);
-    digestCut.notice = `Bloc assigné à ${digestCut.paintZone === "header" ? "En-tête" : digestCut.paintZone === "body" ? "Corps" : "Pied"}.`;
-    void syncYamlFromProposal().then(() => previewDigestCut());
+    applyPaintPickAndPreview();
     return;
   }
+  digestCut.notice = "Bloc sélectionné — assignez-le à En-tête, Corps ou Pied, ou ajustez sa taille.";
   render();
 }
 
@@ -321,26 +356,31 @@ export function expandDigestCutPaintPick(): void {
   const root = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
   const pick = digestCut.paintPick;
   if (!root || !pick) return;
-  const candidates = [...root.querySelectorAll(pick.tag)].filter((el) => {
-    if (!pick.classContains) return true;
-    return (el.getAttribute("class") ?? "").split(/\s+/).includes(pick.classContains);
-  });
-  const el =
-    pick.index != null && pick.index >= 0 && pick.index < candidates.length
-      ? candidates[pick.index]
-      : candidates[0];
-  if (!el?.parentElement) return;
+  const el = findElementForPick(root, pick);
+  if (!el?.parentElement || el.parentElement === root) return;
   const expanded = expandCutNode(el.parentElement, root);
-  const next = pickFromMailClick(expanded, root);
-  if (!next) return;
+  const next = pickFromElement(expanded, root) ?? pickFromMailClick(expanded, root);
+  if (!next || next.label === pick.label) return;
   digestCut.paintPick = next;
-  if (digestCut.paintZone) {
-    assignPaintPickToZone(digestCut.paintZone);
-    digestCut.proposal!.explanationFr = explainZonesFr(digestCut.proposal!);
-    void syncYamlFromProposal().then(() => previewDigestCut());
+  applyPaintPickAndPreview();
+}
+
+export function shrinkDigestCutPaintPick(): void {
+  const root = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
+  const pick = digestCut.paintPick;
+  if (!root || !pick) return;
+  const el = findElementForPick(root, pick);
+  if (!el) return;
+  const shrunk = shrinkCutNode(el, root);
+  if (shrunk === el) {
+    digestCut.notice = "Impossible de réduire davantage.";
+    render();
     return;
   }
-  render();
+  const next = pickFromElement(shrunk, root);
+  if (!next) return;
+  digestCut.paintPick = next;
+  applyPaintPickAndPreview();
 }
 
 export function clearDigestCutPaint(): void {
@@ -444,6 +484,9 @@ export async function handleDigestCutAction(action: string, element?: HTMLElemen
     }
     case "digest-cut-paint-expand":
       expandDigestCutPaintPick();
+      return true;
+    case "digest-cut-paint-shrink":
+      shrinkDigestCutPaintPick();
       return true;
     case "digest-cut-paint-clear":
       clearDigestCutPaint();
