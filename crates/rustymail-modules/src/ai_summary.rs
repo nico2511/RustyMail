@@ -112,8 +112,9 @@ fn fit_summary_user(
 ) -> Result<(String, bool), LlmError> {
     let mut max_messages = view.messages.len().min(40).max(1);
     let mut per_message_chars = 4000usize;
-    let original_chars =
-        transcript_for_summary(view, max_messages, per_message_chars).chars().count();
+    let original_chars = transcript_for_summary(view, max_messages, per_message_chars)
+        .chars()
+        .count();
     for _ in 0..16 {
         let transcript = transcript_for_summary(view, max_messages, per_message_chars);
         let user = untrusted_mail_for_engine(engine, "thread-summary", &transcript);
@@ -1098,7 +1099,10 @@ mod tests {
     fn empty_model_output_falls_back_to_heuristic() {
         let summary = parse("");
         assert_eq!(summary.title, "RE: Demande de rendez-vous");
-        assert!(summary.bullets.iter().any(|b| b.contains("souhaite un rendez-vous")));
+        assert!(summary
+            .bullets
+            .iter()
+            .any(|b| b.contains("souhaite un rendez-vous")));
         assert_eq!(summary.budget.strategy, "local_llm_summary:empty_fallback");
     }
 
@@ -1121,7 +1125,10 @@ mod tests {
         let system = summary_system("fr");
         let (user, clipped) =
             fit_summary_user(&engine, system.as_str(), &view).expect("fit summary");
-        assert!(clipped, "le transcript multi-conversations doit être réduit");
+        assert!(
+            clipped,
+            "le transcript multi-conversations doit être réduit"
+        );
         let room = output_room_after_prompt(&engine, system.as_str(), &user, 64);
         assert!(
             room >= MIN_SUMMARY_OUTPUT_ROOM,
