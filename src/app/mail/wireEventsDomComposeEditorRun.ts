@@ -1,4 +1,5 @@
 // @ts-nocheck — DOM wiring; tighten types incrementally.
+import { wireComposeAiContextMenu } from "./composeAiContextMenu";
 import { wireEventsDomComposePreview } from "./wireEventsDomComposePreviewRun";
 import {
   wireEventsDomComposeBodyTextarea,
@@ -11,4 +12,5 @@ export function wireEventsDomComposeEditor(signal: AbortSignal): void {
   wireEventsDomComposeBodyTextarea(signal);
   wireEventsDomComposeEditorFields(signal);
   wireEventsDomComposeMarkdownToolbar(signal);
+  wireComposeAiContextMenu(signal);
 }

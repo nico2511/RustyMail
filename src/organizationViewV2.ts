@@ -47,6 +47,9 @@ export type OrgV2ScanReport = {
 export function orgV2ScanStatusLine(report: OrgV2ScanReport): string {
   if (report.orientation?.diagnosis?.trim()) {
     const n = report.proposals.length;
+    if (n > 0 && report.llmStatus?.proposalCount === 0) {
+      return `${n} suggestion(s) heuristique(s) (aucune action LLM exploitable).`;
+    }
     return n > 0
       ? `${n} action(s) proposée(s) par l’orientation.`
       : "Orientation prête, aucune action groupée.";
@@ -313,6 +316,7 @@ export function renderOrganizationV2View(
                 .join("")}</ul>`
             : ""
         }
+        ${llmMessage ? `<p class="org-orientation-status dim" role="status">${escapeHtml(llmMessage)}</p>` : ""}
       </section>`
     : llmMessage
       ? `<p class="org-orientation-status" role="status">${escapeHtml(llmMessage)}</p>`

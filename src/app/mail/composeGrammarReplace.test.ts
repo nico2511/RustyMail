@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   applyGrammarReplacement,
+  countGrammarOccurrences,
   grammarOccurrenceCount,
   grammarOriginalTooLong,
+  grammarSuggestionTooAmbiguous,
   replacementDropsCriticalPunct,
   replacementDropsWords,
   retainGrammarSuggestionsInText,
@@ -102,5 +104,17 @@ describe("applyGrammarReplacement", () => {
     const g = suggestion("aa", "bb");
     expect(grammarOccurrenceCount("aa aa", "zz", g)).toBe(2);
     expect(grammarOccurrenceCount("rien", "aa aa", g)).toBe(2);
+  });
+
+  it("ne surligne pas chaque « a » dans plastique / mangé", () => {
+    const source = "a mangé troi chosettes en plastik puis du plastique";
+    expect(countGrammarOccurrences(source, suggestion("a", "à"))).toBe(1);
+    expect(applyGrammarReplacement(source, suggestion("a", "à")).text).toBe(
+      "à mangé troi chosettes en plastik puis du plastique",
+    );
+    expect(countGrammarOccurrences("plastique", suggestion("a", "à"))).toBe(0);
+    expect(grammarSuggestionTooAmbiguous("a", "à")).toBe(true);
+    expect(grammarSuggestionTooAmbiguous("plastik", "plastique")).toBe(false);
+    expect(grammarSuggestionTooAmbiguous("a mange", "a mangé")).toBe(false);
   });
 });

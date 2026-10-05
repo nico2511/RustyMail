@@ -44,4 +44,17 @@ describe("navBuildBreadcrumbItems", () => {
     const items = navBuildBreadcrumbItems("Marie");
     expect(items.map((i) => i.label)).toEqual(["Boîte de réception", "Marie"]);
   });
+
+  it("n’agrège pas Paramètres avec les écrans mail après un aller-retour", () => {
+    navPushBackEntry(listSnap());
+    navPushBackEntry({ view: "settings", backLabel: "Paramètres", breadcrumb: ["Paramètres"] });
+    navPushBackEntry({
+      view: "thread",
+      backLabel: "Boîte de réception",
+      breadcrumb: ["Boîte de réception", "Sujet du fil"],
+      selectedThreadId: "t1",
+    });
+    const items = navBuildBreadcrumbItems("Paramètres");
+    expect(items.map((i) => i.label)).toEqual(["Boîte de réception", "Paramètres"]);
+  });
 });

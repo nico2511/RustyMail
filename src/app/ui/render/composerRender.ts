@@ -9,7 +9,11 @@ import {
   draftRevisionEventKindLabelFr,
   formatCharsDelta,
 } from "../../mail/composeDraftRevisionEventKind";
-import { grammarOccurrenceCount, retainGrammarSuggestionsInText } from "../../mail/composeGrammarReplace";
+import {
+  grammarAllowReplaceAll,
+  grammarOccurrenceCount,
+  retainGrammarSuggestionsInText,
+} from "../../mail/composeGrammarReplace";
 import { state } from "../../state";
 import type { Draft, MicDictationTarget } from "../../types";
 import { renderDeps } from "./renderDeps";
@@ -192,7 +196,7 @@ export function renderComposer() {
                   ? `Remplacer la première des ${occurrences} occurrences`
                   : "Remplacer cette occurrence dans le texte";
               const countBtn =
-                occurrences > 1
+                occurrences > 1 && grammarAllowReplaceAll(g.original ?? "")
                   ? `<button type="button" class="ghost-button compose-correction-count" data-action="compose-grammar-apply-all" data-grammar-i="${i}" title="Remplacer les ${occurrences} occurrences">${occurrences}×</button>`
                   : "";
               return `

@@ -84,6 +84,7 @@ export async function agentRunConsistency(signal: AbortSignal): Promise<void> {
   );
   if (signal.aborted || !state.agentSession) return;
   s.consistencyIssues = res.consistencyIssues ?? [];
+  s.rewriteGuidance = res.rewriteGuidance;
   if (res.safetyFlags?.length) {
     s.safetyFlags = [...new Set([...s.safetyFlags, ...res.safetyFlags])];
   }

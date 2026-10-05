@@ -75,10 +75,29 @@ pub enum AssistLlmTier {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AssistFact {
+    /// `request|deadline|actor|obligation|proposal`.
     pub kind: String,
     pub text: String,
     #[serde(default)]
     pub message_ids: Vec<String>,
+    /// Qui porte le fait : `sender` (expéditeur entrant) | `owner` (propriétaire de la boîte) | `third_party`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
+    /// Rôle typé de l’acteur : `proposer` | `invitee` | `requester` | `responder`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_role: Option<String>,
+}
+
+impl AssistFact {
+    pub fn new(kind: impl Into<String>, text: impl Into<String>) -> Self {
+        Self {
+            kind: kind.into(),
+            text: text.into(),
+            message_ids: Vec::new(),
+            actor: None,
+            actor_role: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -150,6 +169,9 @@ pub struct AssistIntentSnapshot {
     pub intent: String,
     pub tone_hint: String,
     pub needs_scheduling: bool,
+    /// Acte de langage dirigé (ex. `sender_proposes_meeting`, `owner_must_propose`). Vide = inconnu.
+    #[serde(default)]
+    pub speech_act: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -219,6 +241,9 @@ pub struct AssistResult {
     pub facts: Option<AssistFactsSnapshot>,
     #[serde(default)]
     pub consistency_issues: Vec<String>,
+    /// Consigne de réécriture du brouillon (ex. inversion de rôle détectée).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rewrite_guidance: Option<String>,
     /// Vrai si le brouillon a été bloqué (clarification requise).
     #[serde(default)]
     pub needs_clarification: bool,
@@ -243,6 +268,7 @@ impl AssistResult {
             slots: Vec::new(),
             facts: None,
             consistency_issues: Vec::new(),
+            rewrite_guidance: None,
             needs_clarification: false,
             plan: None,
             run_steps: Vec::new(),

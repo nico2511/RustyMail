@@ -62,6 +62,17 @@ export function navReset(): void {
   forwardStack.length = 0;
 }
 
+/**
+ * Retire de la pile le premier snapshot de `view` et tout ce qui suit.
+ * Utile pour réentrer dans Paramètres sans agréger mail › Paramètres › mail › …
+ */
+export function navTruncateThroughView(view: AppView): void {
+  const idx = backStack.findIndex((s) => s.view === view);
+  if (idx < 0) return;
+  backStack.length = idx;
+  navClearForward();
+}
+
 export function navClearForward(): void {
   forwardStack.length = 0;
 }
@@ -154,6 +165,12 @@ export function navBuildBreadcrumbItems(currentLabel: string): NavBreadcrumbItem
   const hasSecondaryInStack = backStack.some((s) => SECONDARY_VIEWS.includes(s.view));
   /** Racine boîte seulement s’il y a au moins un écran intermédiaire (sinon le bouton Retour suffit). */
   const needsInboxCrumb = hasSecondaryInStack && backStack.length > 1;
+  const currentIsSettings = currentLabel.trim() === "Paramètres";
+  /** Un seul « Paramètres » vivant : ignorer les segments après le dernier settings du stack. */
+  let lastSettingsIdx = -1;
+  for (let i = 0; i < backStack.length; i++) {
+    if (backStack[i]?.view === "settings") lastSettingsIdx = i;
+  }
 
   const push = (label: string, target: NavBreadcrumbTarget, stackIndex?: number) => {
     const t = label.trim();
@@ -166,9 +183,11 @@ export function navBuildBreadcrumbItems(currentLabel: string): NavBreadcrumbItem
 
   for (let i = 0; i < backStack.length; i++) {
     const snap = backStack[i];
+    if (currentIsSettings && lastSettingsIdx >= 0 && i > lastSettingsIdx) continue;
     for (const label of snap.breadcrumb) {
       if (needsInboxCrumb && snap.view === "list") continue;
       if (label === "Boîte" && needsInboxCrumb) continue;
+      if (label === "Paramètres" && currentIsSettings) continue;
       push(label, "stack", i);
     }
   }

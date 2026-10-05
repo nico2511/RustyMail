@@ -223,6 +223,44 @@ fn excerpt_in_source(source: &str, original: &str) -> bool {
     norm_excerpt(source).contains(&needle)
 }
 
+fn fold_accents(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            'à' | 'á' | 'â' | 'ä' | 'À' | 'Á' | 'Â' | 'Ä' => 'a',
+            'è' | 'é' | 'ê' | 'ë' | 'È' | 'É' | 'Ê' | 'Ë' => 'e',
+            'ì' | 'í' | 'î' | 'ï' | 'Ì' | 'Í' | 'Î' | 'Ï' => 'i',
+            'ò' | 'ó' | 'ô' | 'ö' | 'Ò' | 'Ó' | 'Ô' | 'Ö' => 'o',
+            'ù' | 'ú' | 'û' | 'ü' | 'Ù' | 'Ú' | 'Û' | 'Ü' => 'u',
+            'ÿ' | 'Ÿ' => 'y',
+            'ç' | 'Ç' => 'c',
+            other => other.to_ascii_lowercase(),
+        })
+        .collect()
+}
+
+/// Homophones 1–2 lettres / accent seul sans contexte lexical (ex. « a » → « à »).
+fn suggestion_too_ambiguous(original: &str, replacement: &str) -> bool {
+    let o = original.trim();
+    let r = replacement.trim();
+    if o.is_empty() || r.is_empty() || o == r {
+        return false;
+    }
+    if o.split_whitespace().count() > 1 {
+        return false;
+    }
+    let o_chars = o.chars().count();
+    if o_chars > 2 {
+        return false;
+    }
+    if fold_accents(o) == fold_accents(r) && o != r {
+        return true;
+    }
+    matches!(
+        o.to_ascii_lowercase().as_str(),
+        "a" | "à" | "ou" | "où" | "la" | "là"
+    )
+}
+
 fn content_tokens(s: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = String::new();
@@ -341,6 +379,7 @@ fn sanitize_grammar_suggestions(
             continue;
         }
         if original.chars().count() > MAX_GRAMMAR_ORIGINAL_CHARS
+            || suggestion_too_ambiguous(original, replacement)
             || !excerpt_in_source(source, original)
             || replacement_drops_words(original, replacement)
             || replacement_drops_critical_punct(original, replacement)
@@ -611,5 +650,27 @@ mod tests {
         };
         let kept = sanitize_grammar_suggestions("Bonjour.", vec![swapped]).expect("ok");
         assert_eq!(kept.len(), 1);
+    }
+
+    #[test]
+    fn sanitize_drops_bare_a_to_accent() {
+        let source = "a mangé troi chosettes en plastik";
+        let accent = GrammarSuggestion {
+            offset: 0,
+            length: 1,
+            original: "a".into(),
+            replacement: "à".into(),
+            reason: "usage".into(),
+        };
+        let word = GrammarSuggestion {
+            offset: 0,
+            length: 0,
+            original: "plastik".into(),
+            replacement: "plastique".into(),
+            reason: "orthographe".into(),
+        };
+        let kept = sanitize_grammar_suggestions(source, vec![accent, word]).expect("ok");
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].original, "plastik");
     }
 }

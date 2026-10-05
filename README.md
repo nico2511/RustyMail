@@ -2,11 +2,11 @@
 
 RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI (summaries, rewrite, translation, grammar, dictation, semantic search) runs on-device or over HTTP to OpenRouter / llama-server — never required for core mail.
 
-**0.3.7** ships the follow-up to [#55](https://github.com/nico2511/RustyMail/pull/55) on top of 0.3.6: summary and assistant no longer rewrite the received mail, security findings stay off unless the model adds a real `llmIntent`, saved drafts keep attachments, compose history shows event type and character delta, and digest-cut shrinks context so the model JSON can finish.
+**0.3.8** follows 0.3.7 with post-release fixes: Organiser Rv2 no longer claims an empty mailbox when threads exist, breadcrumbs stop aggregating Settings↔mail, reply assistant guards role inversion, digest-cut gains visual paint + better proposals, grammar rejects bare `a→à` and supports selection/context-menu correction, and inline photos send as proper `multipart/related` (not as file attachments) with CID hydrate on read.
 
 ## Screenshots
 
-UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.7 build (compose in the app uses TipTap, not the mockup’s markdown field).
+UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.8 build (compose in the app uses TipTap, not the mockup’s markdown field).
 
 **Inbox** — unified list, charcoal rail, account labels.
 

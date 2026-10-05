@@ -913,13 +913,22 @@ pub fn sqlite_mailbox_sidebar_counts(
     mailboxes: &[String],
 ) -> Result<Vec<(String, usize, usize)>, rusqlite::Error> {
     let connection = open_sqlite_migrated(db_path.as_ref())?;
+    sidebar_counts_on_connection(&connection, account_id, mailboxes)
+}
+
+/// Même résolution que la barre latérale, sur une connexion déjà ouverte (Organiser inclus).
+pub(crate) fn sidebar_counts_on_connection(
+    connection: &Connection,
+    account_id: &str,
+    mailboxes: &[String],
+) -> Result<Vec<(String, usize, usize)>, rusqlite::Error> {
     let aid = account_id.trim();
-    let stats_rows = query_folder_stats_on_connection(&connection, aid)?;
+    let stats_rows = query_folder_stats_on_connection(connection, aid)?;
     let mut stats_map = std::collections::HashMap::with_capacity(stats_rows.len());
     for (mb, u, t) in stats_rows {
         stats_map.insert(mb, (u, t));
     }
-    let candidates = mailbox_resolution_candidates(&connection, aid)?;
+    let candidates = mailbox_resolution_candidates(connection, aid)?;
     let mut out = Vec::with_capacity(mailboxes.len());
     for mb in mailboxes {
         let resolved = resolve_scoped_mailbox_with_candidates(mb, &candidates);
@@ -2503,7 +2512,12 @@ pub fn inline_attachment_payload_by_content_id(
         "
         SELECT mime_type, content_blob
         FROM message_attachments
-        WHERE message_id = ?1 AND lower(trim(content_id)) = ?2
+        WHERE message_id = ?1
+          AND (
+            lower(trim(content_id)) = ?2
+            OR lower(trim(content_id, '<>')) = ?2
+            OR lower(trim(trim(content_id), '<>')) = ?2
+          )
         ",
         params![message_id.trim(), cid_key.as_str()],
         |row| Ok((row.get(0)?, row.get(1)?)),

@@ -16,7 +16,7 @@ use crate::mail_ops::is_trash_like_mailbox;
 use crate::newsletter::{list_newsletter_rules_connection, matches_newsletter_email};
 use crate::open_sqlite_migrated;
 use crate::org_consolidate::scan_duplicate_threads;
-use crate::org_mailbox_structure::analyze_mailbox_structure;
+use crate::org_mailbox_structure::{analyze_mailbox_structure, format_org_mailbox_overview};
 use crate::org_retag::{effective_thread_mailbox, sender_is_transactional, thread_tags_stale};
 use rustymail_llm::LlmEngine;
 use rustymail_modules::ai_org_proposals::org_orientation_with_llm;
@@ -414,7 +414,17 @@ pub fn org_llm_orientation_for_account(
     let (catalog, mut valid_ids) =
         build_org_llm_thread_catalog(&conn, account_id, LLM_CATALOG_LIMIT)?;
     extend_valid_ids_from_heuristics(&mut valid_ids, heuristic_proposals);
-    let heuristic_context = format_org_heuristic_context(heuristic_proposals);
+    let thread_count = count_account_threads(&conn, account_id)?;
+    let overview = match analyze_mailbox_structure(&conn, account_id) {
+        Ok((structure, _)) => {
+            format_org_mailbox_overview(&conn, account_id, &structure, thread_count)
+        }
+        Err(_) => format!("threadCount={thread_count}"),
+    };
+    let heuristic_context = format!(
+        "{overview}\n{}",
+        format_org_heuristic_context(heuristic_proposals)
+    );
     if catalog.trim().is_empty() && valid_ids.is_empty() {
         return Err("Aucun fil indexé : impossible de produire une orientation.".into());
     }
@@ -429,7 +439,79 @@ pub fn org_llm_orientation_for_account(
         output_language,
     )?;
     let actions = hydrate_llm_proposals(&conn, account_id, &valid_ids, parsed.actions);
-    Ok((parsed.orientation, actions))
+    let mut orientation = parsed.orientation;
+    if thread_count > 0 && orientation_claims_empty_mailbox(&orientation.diagnosis) {
+        // Garde-fou : le cache contient des fils, un « boîte vide » est factuellement faux.
+        orientation.diagnosis = factual_nonempty_diagnosis(&conn, account_id, thread_count);
+    }
+    Ok((orientation, actions))
+}
+
+fn count_account_threads(conn: &Connection, account_id: &str) -> Result<usize, String> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM threads WHERE account_id = ?1",
+        params![account_id],
+        |r| r.get::<_, i64>(0),
+    )
+    .map(|n| n.max(0) as usize)
+    .map_err(|e| e.to_string())
+}
+
+/// Le diagnostic affirme-t-il que la boîte / le compte est vide ?
+pub(crate) fn orientation_claims_empty_mailbox(text: &str) -> bool {
+    let l = text.to_lowercase();
+    [
+        "boîte vide",
+        "boite vide",
+        "boîte est vide",
+        "boite est vide",
+        "boîte de réception est vide",
+        "boite de reception est vide",
+        "compte est vide",
+        "compte vide",
+        "mailbox is empty",
+        "mailbox is currently empty",
+        "inbox is empty",
+        "account is empty",
+        "empty mailbox",
+        "empty inbox",
+        "boîte aux lettres est vide",
+        "boite aux lettres est vide",
+        "boîte aux lettres vide",
+        "boite aux lettres vide",
+    ]
+    .iter()
+    .any(|p| l.contains(p))
+}
+
+/// Diagnostic factuel (compteurs réels) quand le modèle a prétendu à tort une boîte vide.
+fn factual_nonempty_diagnosis(conn: &Connection, account_id: &str, thread_count: usize) -> String {
+    let mut top: Vec<String> = Vec::new();
+    if let Ok((structure, _)) = analyze_mailbox_structure(conn, account_id) {
+        let mut entries: Vec<_> = structure
+            .entries
+            .iter()
+            .filter(|e| e.thread_count > 0)
+            .collect();
+        entries.sort_by(|a, b| {
+            b.thread_count
+                .cmp(&a.thread_count)
+                .then_with(|| a.mailbox.cmp(&b.mailbox))
+        });
+        top = entries
+            .iter()
+            .take(3)
+            .map(|e| format!("{} ({})", e.mailbox, e.thread_count))
+            .collect();
+    }
+    if top.is_empty() {
+        format!("{thread_count} fil(s) indexé(s) localement : la boîte n’est pas vide.")
+    } else {
+        format!(
+            "{thread_count} fil(s) indexé(s) localement : la boîte n’est pas vide. Dossiers principaux : {}.",
+            top.join(", ")
+        )
+    }
 }
 
 /// Actions LLM seules (Organiser v1). L’orientation complète est portée par le scan v2.
@@ -1204,28 +1286,64 @@ fn scan_stale_tags(conn: &Connection, account_id: &str) -> Result<Vec<OrgProposa
 
 fn scan_empty_mailboxes(conn: &Connection, account_id: &str) -> Result<Vec<OrgProposal>, String> {
     let mut stmt = conn
-        .prepare(
-            "SELECT s.mailbox FROM imap_state s WHERE s.account_id = ?1
-             AND NOT EXISTS (
-               SELECT 1 FROM messages m WHERE m.account_id = ?1 AND m.mailbox = s.mailbox
-             )
-             AND NOT EXISTS (
-               SELECT 1 FROM threads t WHERE t.account_id = ?1 AND t.mailbox = s.mailbox
-             )",
-        )
+        .prepare("SELECT mailbox FROM imap_state WHERE account_id = ?1")
         .map_err(|e| e.to_string())?;
-    let mut refs = Vec::new();
-    let rows = stmt
+    let imap_names: Vec<String> = stmt
         .query_map(params![account_id], |r| r.get::<_, String>(0))
-        .map_err(|e| e.to_string())?;
-    for mb in rows.flatten() {
-        if is_protected_mailbox_for_org_delete(&mb) {
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .filter(|mb| !mb.trim().is_empty())
+        .collect();
+
+    // Noms portant au moins un message ou un fil, résolus comme `sqlite_mailbox_sidebar_counts`
+    // (alias `INBOX.Foo` / `Foo`, casse, séparateurs) pour éviter les faux « vides ».
+    let mut candidates =
+        crate::mailbox_resolution_candidates(conn, account_id).map_err(|e| e.to_string())?;
+    let mut populated_raw: Vec<String> = Vec::new();
+    for sql in [
+        "SELECT DISTINCT mailbox FROM messages WHERE account_id = ?1",
+        "SELECT DISTINCT mailbox FROM threads WHERE account_id = ?1",
+    ] {
+        let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+        for mb in stmt
+            .query_map(params![account_id], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .flatten()
+        {
+            if mb.trim().is_empty() {
+                continue;
+            }
+            if !candidates.contains(&mb) {
+                candidates.push(mb.clone());
+            }
+            populated_raw.push(mb);
+        }
+    }
+    let populated: HashSet<String> = populated_raw
+        .iter()
+        .map(|mb| crate::resolve_scoped_mailbox_with_candidates(mb, &candidates))
+        .collect();
+
+    let mut refs = Vec::new();
+    let mut seen_resolved: HashSet<String> = HashSet::new();
+    for mb in imap_names {
+        let resolved = crate::resolve_scoped_mailbox_with_candidates(&mb, &candidates);
+        if populated.contains(&resolved) {
+            continue;
+        }
+        // INBOX et dossiers protégés : 0 message en cache n’est pas un signal « vide ».
+        if is_protected_mailbox_for_org_delete(&mb)
+            || is_protected_mailbox_for_org_delete(&resolved)
+        {
+            continue;
+        }
+        if !seen_resolved.insert(resolved) {
             continue;
         }
         refs.push(OrgThreadRef {
             thread_id: format!("mailbox:{mb}"),
             mailbox: mb,
-            subject: "(dossier vide)".to_string(),
+            subject: "(sans cache local)".to_string(),
             ..Default::default()
         });
     }
@@ -1238,8 +1356,8 @@ fn scan_empty_mailboxes(conn: &Connection, account_id: &str) -> Result<Vec<OrgPr
         "empty-mailboxes",
         OrgProposalKind::EmptyMailbox,
         "structure",
-        "Dossiers vides",
-        "Boîtes IMAP sans message en cache local.",
+        "Dossiers non synchronisés / sans cache local",
+        "Aucun message en cache local : dossier non synchronisé ou vide sur le serveur — vérifiez avant de supprimer.",
         refs,
         OrgSuggestedAction::DeleteMailbox,
         None,
@@ -1285,6 +1403,62 @@ mod tests {
             params![format!("msg-{thread_id}"), thread_id, account_id, received_at],
         )
         .expect("message");
+    }
+
+    #[test]
+    fn detects_empty_mailbox_claims() {
+        assert!(orientation_claims_empty_mailbox(
+            "Votre boîte vide ne nécessite rien."
+        ));
+        assert!(orientation_claims_empty_mailbox("The mailbox is empty."));
+        assert!(!orientation_claims_empty_mailbox(
+            "Aucun message non lu, mais 40 fils dans Projets."
+        ));
+    }
+
+    #[test]
+    fn empty_scan_skips_inbox_and_resolves_aliases() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("org.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        insert_account(&conn, "acc-a");
+        let old =
+            (Utc::now() - Duration::days(120)).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        insert_stale_inbox_thread(&conn, "acc-a", "t1", &old);
+        for mb in [
+            "INBOX",
+            "INBOX.Archive2020",
+            "Perso/Vraiment",
+            "Perso.Vraiment2",
+        ] {
+            conn.execute(
+                "INSERT INTO imap_state (account_id, mailbox, last_uid) VALUES ('acc-a', ?1, 0)",
+                params![mb],
+            )
+            .expect("state");
+        }
+        // Alias : le cache a les messages sous « Perso/Vraiment2 », imap_state sous « Perso.Vraiment2 ».
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags, is_followed)
+             VALUES ('t2', 'acc-a', 'Perso/Vraiment2', 'm2', 'S', '', 0)",
+            [],
+        )
+        .expect("thread");
+        conn.execute(
+            "INSERT INTO messages (id, thread_id, account_id, mailbox, imap_uid, sender_name, sender_email, subject, received_at, body, is_read, position)
+             VALUES ('msg-t2', 't2', 'acc-a', 'Perso/Vraiment2', 1, 'A', 'a@x.com', 'S', '2020-01-01T00:00:00Z', '', 1, 0)",
+            [],
+        )
+        .expect("message");
+        let out = scan_empty_mailboxes(&conn, "acc-a").expect("scan");
+        assert_eq!(out.len(), 1);
+        let names: Vec<&str> = out[0]
+            .thread_refs
+            .iter()
+            .map(|r| r.mailbox.as_str())
+            .collect();
+        assert_eq!(names, vec!["Perso/Vraiment"]);
+        assert!(out[0].title.contains("sans cache local"));
     }
 
     #[test]

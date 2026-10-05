@@ -138,27 +138,86 @@ function offsetSpan(source: string, suggestion: GrammarReplaceInput): Span[] {
   return [{ start: off, end: off + len }];
 }
 
+function isWordCharAt(source: string, index: number): boolean {
+  if (index < 0 || index >= source.length) return false;
+  const ch = source[index]!;
+  return /\p{L}|\p{N}|['’]/u.test(ch);
+}
+
+/** Extrait court / homophone : ne matcher que comme mot entier (évite a→à dans « plastique »). */
+export function grammarNeedleNeedsWordBoundary(needle: string): boolean {
+  const t = needle.trim();
+  if (!t) return false;
+  const chars = [...t];
+  if (chars.length <= 2) return true;
+  if (/\s/.test(t)) return false;
+  return /^(a|à|ou|où|la|là|du|dû|sur|sûr|des|dès)$/i.test(t);
+}
+
+export function spanHasWordBoundary(source: string, start: number, end: number): boolean {
+  return !isWordCharAt(source, start - 1) && !isWordCharAt(source, end);
+}
+
+function filterBounded(source: string, spans: Span[], needle: string): Span[] {
+  if (!grammarNeedleNeedsWordBoundary(needle)) return spans;
+  return spans.filter((span) => spanHasWordBoundary(source, span.start, span.end));
+}
+
+/**
+ * Accents seuls sur 1–2 lettres sans contexte (ex. « a » → « à ») : trop dangereux.
+ * Accepte si l’extrait contient déjà plusieurs mots (contexte).
+ */
+export function grammarSuggestionTooAmbiguous(original: string, replacement: string): boolean {
+  const o = original.trim();
+  const r = replacement.trim();
+  if (!o || !r || o === r) return false;
+  if (/\s/.test(o)) return false;
+  const oChars = [...o];
+  if (oChars.length > 2) return false;
+  const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (fold(o) === fold(r) && o !== r) return true;
+  return /^(a|à|ou|où|la|là)$/i.test(o);
+}
+
+/** N× « tout remplacer » seulement si l’extrait n’est pas un homophone court. */
+export function grammarAllowReplaceAll(original: string): boolean {
+  return !grammarNeedleNeedsWordBoundary(original);
+}
+
 export function findGrammarSpans(source: string, suggestion: GrammarReplaceInput): Span[] {
   const raw = suggestion.original ?? "";
-  const exact = exactSpans(source, raw);
-  if (exact.length) return exact;
   const trimmed = raw.trim();
+  const short = grammarNeedleNeedsWordBoundary(trimmed || raw);
+
+  // Homophones courts : offset/length = position unique (pas de filtre frontière).
+  if (short) {
+    const positioned = offsetSpan(source, suggestion);
+    if (positioned.length) return positioned;
+  }
+
+  const collect = (needle: string): Span[] => {
+    if (!needle) return [];
+    const exact = filterBounded(source, exactSpans(source, needle), needle);
+    if (exact.length) return exact;
+    return filterBounded(source, foldedSpans(source, needle), needle);
+  };
+
+  const exact = collect(raw);
+  if (exact.length) return exact;
   if (trimmed && trimmed !== raw) {
-    const trimmedHits = exactSpans(source, trimmed);
+    const trimmedHits = collect(trimmed);
     if (trimmedHits.length) return trimmedHits;
   }
   const unwrapped = unwrapQuotes(raw);
   if (unwrapped) {
-    const unwrappedHits = exactSpans(source, unwrapped);
+    const unwrappedHits = collect(unwrapped);
     if (unwrappedHits.length) return unwrappedHits;
   }
-  const folded = foldedSpans(source, raw);
-  if (folded.length) return folded;
-  if (unwrapped) {
-    const foldedInner = foldedSpans(source, unwrapped);
-    if (foldedInner.length) return foldedInner;
+  if (!short) {
+    const positioned = offsetSpan(source, suggestion);
+    if (positioned.length) return positioned;
   }
-  return offsetSpan(source, suggestion);
+  return [];
 }
 
 function contentTokens(value: string): string[] {

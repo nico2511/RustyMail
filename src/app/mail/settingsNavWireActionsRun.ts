@@ -15,6 +15,7 @@ import { syncAiEngineSettingsTabFromPrefs } from "./settingsLlmRuntime";
 import { refreshDigestBenchStatus } from "./digestBenchActions";
 import { captureDigestBenchDom } from "./digestBenchState";
 import { captureDigestCutDom } from "./digestCutState";
+import { beginNavigation } from "./appNavigationStack";
 import {
   ensureValidSelectedMailbox,
   openSettingsView,
@@ -61,6 +62,7 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
         tab === "digestCut"
       ) {
         if (state.view !== "settings") {
+          beginNavigation("settings");
           state.view = "settings";
           state.aiOpen = false;
           clearDiscoveredServerSnap();
@@ -92,9 +94,7 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
       void refreshSettingsPathsFromBackend();
       return true;
     case "open-settings-default-account":
-      state.view = "settings";
-      state.settingsTab = "general";
-      render();
+      openSettingsView({ settingsTab: "general" });
       return true;
     default:
       return false;

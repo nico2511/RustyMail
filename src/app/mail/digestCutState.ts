@@ -49,6 +49,16 @@ export type DigestCutMessage = {
   html: string;
 };
 
+export type DigestCutPaintPick = {
+  tag: string;
+  classContains: string | null;
+  index: number | null;
+  label: string;
+  /** Sélecteur du parent (= structureRoot côté moteur Rust). */
+  structureRoot?: string;
+  textContainsAny?: string[];
+};
+
 export const digestCut = {
   sourceKind: "none" as DigestCutSourceKind,
   queryDraft: "",
@@ -72,7 +82,27 @@ export const digestCut = {
   previewError: "",
   showCode: false,
   notice: "",
+  /** Zone en cours de peinture visuelle (null = navigation seule). */
+  paintZone: null as DigestCutZoneName | null,
+  /** Nœud sélectionné dans le panneau Mail. */
+  paintPick: null as DigestCutPaintPick | null,
 };
+
+export function formatAnchorSummary(anchors: DigestCutAnchor[]): string {
+  if (!anchors.length) return "—";
+  return anchors
+    .slice(0, 4)
+    .map((a) => {
+      const bits: string[] = [];
+      if (a.selector) bits.push(a.selector);
+      if (a.classContains) bits.push(`.…${a.classContains}`);
+      if (a.index != null) bits.push(`[${a.index}]`);
+      if (a.role) bits.push(`role=${a.role}`);
+      if (a.textContainsAny?.length) bits.push(`«${a.textContainsAny[0]}»`);
+      return bits.join("") || "?";
+    })
+    .join(", ");
+}
 
 export function captureDigestCutDom(): void {
   const query = document.querySelector<HTMLInputElement>("#digest-cut-query");

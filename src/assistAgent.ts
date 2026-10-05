@@ -33,12 +33,18 @@ export type AssistIntentSnapshot = {
   intent: string;
   toneHint: string;
   needsScheduling: boolean;
+  /** Acte de langage dirigé (ex. `sender_proposes_meeting`, `owner_must_propose`). */
+  speechAct?: string;
 };
 
 export type AssistFact = {
   kind: string;
   text: string;
   messageIds?: string[];
+  /** `sender` | `owner` | `third_party` */
+  actor?: string;
+  /** `proposer` | `invitee` | `requester` | `responder` */
+  actorRole?: string;
 };
 
 export type AssistFactsSnapshot = {
@@ -66,6 +72,8 @@ export type AssistResult = {
   slots?: string[];
   facts?: AssistFactsSnapshot;
   consistencyIssues?: string[];
+  /** Consigne de réécriture (ex. inversion de rôle détectée). */
+  rewriteGuidance?: string;
   needsClarification?: boolean;
   plan?: AssistRoutingPlan;
   runSteps?: AssistRunStep[];
@@ -194,6 +202,8 @@ export function assistStepLabel(step: string): string {
 export function assistSafetyFlagLabel(code: string): string {
   const c = code.trim();
   const known: Record<string, string> = {
+    role_inversion:
+      "Inversion de rôle : l’expéditeur propose, le brouillon le remercie ou lui demande ses disponibilités — réécrire avant d’envoyer",
     consistency_warning: "Écart possible entre le brouillon et les faits du fil",
     unverified_claim: "Affirmation non vérifiée par rapport aux faits",
     invented_deadline: "Échéance ou date non présente dans les faits",

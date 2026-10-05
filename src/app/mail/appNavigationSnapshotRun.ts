@@ -7,6 +7,7 @@ import {
   navPop,
   navPush,
   navReset,
+  navTruncateThroughView,
   readContactsScrollY,
   readListScrollY,
   type NavSnapshot,
@@ -46,15 +47,24 @@ export function captureCurrentNav(): NavSnapshot {
 function shouldPushNavHistory(from: View, to: View): boolean {
   if (from === to) return false;
   const drill =
-    (from === "list" && (to === "thread" || to === "compose" || to === "settings")) ||
-    (from === "contacts" && (to === "contact" || to === "thread" || to === "compose")) ||
-    (from === "contact" && (to === "thread" || to === "compose")) ||
-    (from === "thread" && to === "compose") ||
-    (from === "organization" && to === "thread") ||
-    (from === "list" && to === "contacts") ||
-    (from === "list" && to === "organization") ||
-    (from === "list" && to === "folderManager") ||
-    (from === "list" && to === "settings");
+    (from === "list" &&
+      (to === "thread" ||
+        to === "compose" ||
+        to === "settings" ||
+        to === "contacts" ||
+        to === "organization" ||
+        to === "organizationV2" ||
+        to === "folderManager")) ||
+    (from === "contacts" &&
+      (to === "contact" || to === "thread" || to === "compose" || to === "settings")) ||
+    (from === "contact" && (to === "thread" || to === "compose" || to === "settings")) ||
+    (from === "thread" && (to === "compose" || to === "settings")) ||
+    (from === "compose" && to === "settings") ||
+    (from === "organization" && (to === "thread" || to === "settings")) ||
+    (from === "organizationV2" && (to === "thread" || to === "settings")) ||
+    (from === "folderManager" && (to === "thread" || to === "settings")) ||
+    (from === "settings" &&
+      (to === "thread" || to === "list" || to === "contacts" || to === "organization" || to === "organizationV2" || to === "folderManager"));
   return drill;
 }
 
@@ -65,6 +75,9 @@ export function beginNavigation(to: View, opts?: NavigateOpts): void {
   if (opts?.resetStack) navReset();
   else if (!opts?.skipHistory) {
     const from = state.view;
+    if (to === "settings") {
+      navTruncateThroughView("settings");
+    }
     if (shouldPushNavHistory(from, to)) {
       const snap = captureCurrentNav();
       if (opts?.replaceHistory && navCanGoBack()) {

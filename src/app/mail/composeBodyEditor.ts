@@ -531,6 +531,38 @@ export function replaceComposeWithModelText(text: string): void {
   assignComposeSource(markComposeHtml(composeSourceToEditorHtml(trimmed)));
 }
 
+/** Sélection non vide dans le corps TipTap (texte brut). */
+export function readComposeSelectionPlainText(): string {
+  const ed = getComposeBodyEditor();
+  if (!ed) return "";
+  const { from, to } = ed.state.selection;
+  if (to <= from) return "";
+  return ed.state.doc.textBetween(from, to, BLOCK_SEPARATOR, "\n");
+}
+
+export function hasComposeTextSelection(): boolean {
+  return readComposeSelectionPlainText().trim().length > 0;
+}
+
+/** Remplace uniquement la sélection courante par du texte (conserve le reste du brouillon). */
+export function replaceComposeSelectionWithText(text: string): boolean {
+  const ed = getComposeBodyEditor();
+  if (!ed) return false;
+  const { from, to } = ed.state.selection;
+  if (to <= from) return false;
+  const insert = text.replace(/\u00a0/g, " ");
+  ignore += 1;
+  try {
+    ed.chain().focus().insertContentAt({ from, to }, insert).run();
+    persistFromEditor(ed);
+    dirty = true;
+    scheduleAfterEdit();
+  } finally {
+    ignore -= 1;
+  }
+  return true;
+}
+
 function assignComposeSource(source: string): void {
   const prev = state.composeCanonicalBody || state.composeBody || "";
   state.composeCanonicalBody = source;

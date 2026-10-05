@@ -396,7 +396,12 @@ pub async fn llm_stream_agent_prepare_draft(
         if !enabled_skills.is_empty() {
             request.enabled_skills = enabled_skills;
         }
-        let thread = assist_thread_context_with_engine(&paths, thread_id.as_str(), &engine)?;
+        let thread = assist_thread_context_with_engine(
+            &paths,
+            thread_id.as_str(),
+            account_id.as_str(),
+            &engine,
+        )?;
         let (draft, run_step) = run_assist_draft_streaming(
             &mut engine,
             &request,

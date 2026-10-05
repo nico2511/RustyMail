@@ -256,11 +256,13 @@ export type State = {
     assistMode: AssistMode;
     enabledSkills: AssistSkillId[];
     step: "analyzeIntent" | "extractFacts" | "clarification" | "draftReply" | "suggestSlots";
-    intent?: { intent: string; toneHint: string; needsScheduling: boolean };
+    intent?: { intent: string; toneHint: string; needsScheduling: boolean; speechAct?: string };
     facts?: AssistFactsSnapshot;
     clarificationQuestions: string[];
     confidence?: number;
     consistencyIssues: string[];
+    /** Consigne de réécriture issue du contrôle de cohérence (inversion de rôle, etc.). */
+    rewriteGuidance?: string;
     safetyFlags: string[];
     forceDraft: boolean;
     draft: string;

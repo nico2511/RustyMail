@@ -8,8 +8,11 @@ export function navSnapshotLabelsForView(view: View): { backLabel: string; bread
   switch (view) {
     case "list":
       return { backLabel: navMailboxSegment(), breadcrumb: [navMailboxSegment()] };
-    case "thread":
-      return { backLabel: navMailboxSegment(), breadcrumb: [navMailboxSegment()] };
+    case "thread": {
+      const subj = state.selectedThread?.subject?.trim();
+      const fil = subj ? (subj.length > 36 ? `${subj.slice(0, 33)}…` : subj) : "Fil";
+      return { backLabel: navMailboxSegment(), breadcrumb: [navMailboxSegment(), fil] };
+    }
     case "contacts":
       return { backLabel: "Carnet", breadcrumb: ["Carnet"] };
     case "contact": {

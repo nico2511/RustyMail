@@ -5,14 +5,14 @@ import { state } from "../state";
 import { beginNavigation } from "./appNavigationStack";
 import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 
-export function openSettingsView(): void {
-  beginNavigation("settings", { resetStack: true });
+export function openSettingsView(opts?: { settingsTab?: typeof state.settingsTab }): void {
+  beginNavigation("settings");
   state.view = "settings";
   state.accountModalOpen = false;
   state.inboxAccountMenuOpen = false;
   state.aiOpen = false;
   clearThreadAiSummaryState();
-  state.settingsTab = "accounts";
+  state.settingsTab = opts?.settingsTab ?? "accounts";
   clearDiscoveredServerSnap();
   state.settingsSelectedAccountId =
     state.selectedAccountId && state.accounts.some((a) => a.id === state.selectedAccountId)

@@ -220,6 +220,66 @@ pub(crate) fn transcript_for_llm(
     redact_user_content_if_needed(engine, &out)
 }
 
+/// Propriétaire de la boîte pour annoter le transcript (rôle entrant/sortant).
+#[derive(Debug, Clone, Default)]
+pub(crate) struct TranscriptOwner {
+    /// Adresse du compte courant (`account_id`), si résolue.
+    pub mailbox: Option<String>,
+    /// Toutes les adresses de comptes configurés (un message envoyé depuis l’une d’elles est « sortant »).
+    pub addresses: Vec<String>,
+}
+
+pub(crate) fn transcript_owner_for_account(
+    db_path: &std::path::Path,
+    account_id: &str,
+) -> TranscriptOwner {
+    let accounts = rustymail_infrastructure::load_accounts(db_path).unwrap_or_default();
+    let account_id = account_id.trim();
+    let mailbox = accounts
+        .iter()
+        .find(|a| !account_id.is_empty() && a.id.0 == account_id)
+        .or(if accounts.len() == 1 {
+            accounts.first()
+        } else {
+            None
+        })
+        .map(|a| a.email.trim().to_string())
+        .filter(|e| !e.is_empty());
+    let addresses = accounts
+        .iter()
+        .map(|a| a.email.trim().to_string())
+        .collect();
+    TranscriptOwner { mailbox, addresses }
+}
+
+/// Transcript annoté pour l’assistant de réponse : rôle=entrant|sortant, adresse de la boîte,
+/// et rappel que « vous » = le propriétaire (évite l’inversion de rôle dans le brouillon).
+pub(crate) fn transcript_for_llm_with_owner(
+    view: &rustymail_domain::DiscussionThreadView,
+    engine: &LlmEngine,
+    owner: &TranscriptOwner,
+) -> String {
+    use rustymail_modules::ai_assist_thread::{
+        transcript_message_header, transcript_owner_preamble, transcript_role,
+    };
+    let mailbox = owner.mailbox.as_deref();
+    let mut out = transcript_owner_preamble(mailbox);
+    for m in view.messages.iter().take(40) {
+        let role = transcript_role(m.sender_email.as_str(), m.sender.as_str(), &owner.addresses);
+        out.push_str(&transcript_message_header(
+            m.message_id.as_str(),
+            role,
+            mailbox,
+            m.sender.as_str(),
+            m.received_at.as_str(),
+        ));
+        out.push('\n');
+        out.push_str(&clip_chars(m.cleaned_text.as_str(), 4000));
+        out.push_str("\n\n");
+    }
+    redact_user_content_if_needed(engine, &out)
+}
+
 fn score_thread_for_brief(t: &ThreadListItem) -> i32 {
     let mut s = 0i32;
     if t.unread {

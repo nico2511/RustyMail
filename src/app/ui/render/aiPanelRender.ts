@@ -149,8 +149,16 @@ function renderAgentPrepareReplyPanelHtml(): string {
   const safetyBlock =
     s.safetyFlags.length || s.consistencyIssues.length ?
       `<div class="agent-panel__warnings">${[
+        ...s.safetyFlags
+          .filter((f) => f === "role_inversion")
+          .map((f) => `<p class="agent-warn agent-warn--blocking" role="alert"><strong>⛔ ${escapeHtml(assistSafetyFlagLabel(f))}</strong></p>`),
+        ...(s.rewriteGuidance?.trim() ?
+          [`<p class="agent-warn">✎ ${escapeHtml(s.rewriteGuidance.trim())}</p>`]
+        : []),
         ...s.consistencyIssues.map((i) => `<p class="agent-warn">⚠ ${escapeHtml(i)}</p>`),
-        ...s.safetyFlags.map((f) => `<p class="agent-warn dim">${escapeHtml(assistSafetyFlagLabel(f))}</p>`),
+        ...s.safetyFlags
+          .filter((f) => f !== "role_inversion")
+          .map((f) => `<p class="agent-warn dim">${escapeHtml(assistSafetyFlagLabel(f))}</p>`),
       ].join("")}</div>`
     : "";
   const draftBlock =

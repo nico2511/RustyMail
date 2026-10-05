@@ -121,8 +121,19 @@ fn root_children<'a>(doc: &'a Html, fixture: &DigestFixture) -> Option<Vec<Eleme
     Some(children)
 }
 
-fn child_elements(root: ElementRef<'_>) -> Vec<ElementRef<'_>> {
-    root.children().filter_map(ElementRef::wrap).collect()
+/// Blocs enfants d'une racine. Pour un `table`, on traverse `thead/tbody/tfoot`
+/// (le parseur HTML en insère toujours un) : les blocs sont alors les `tr`.
+pub(super) fn child_elements(root: ElementRef<'_>) -> Vec<ElementRef<'_>> {
+    let is_table = root.value().name() == "table";
+    let mut out = Vec::new();
+    for child in root.children().filter_map(ElementRef::wrap) {
+        if is_table && matches!(child.value().name(), "thead" | "tbody" | "tfoot") {
+            out.extend(child.children().filter_map(ElementRef::wrap));
+        } else {
+            out.push(child);
+        }
+    }
+    out
 }
 
 fn render_zone(zone: &ZoneSpec, children: &[ElementRef<'_>], kind: ZoneKind) -> Option<String> {

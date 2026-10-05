@@ -120,6 +120,7 @@ pub fn render_org_orientation_user_prompt(
     format!(
         "Account: {account_label}\n\
          {decisions}\
+         Hard rule: the context begins with threadCount and the top folders. If threadCount > 0, never say or imply the mailbox, inbox or account is empty (\"boîte vide\"). Folders marked \"non synchronisé / sans cache local\" are not synchronised locally, not empty: never call them empty. Always give useful, concrete suggestions based on the folders and candidates.\n\
          Heuristic candidates are context only. Write the orientation from them; do not echo the list as the diagnosis.\n\
          {heuristics}\n\
          Thread catalog (threadId;mailbox;sender;subject) — one line per thread:\n\
@@ -465,6 +466,8 @@ Note : ceci n’est pas une seconde action.
             .expect("end");
         assert!(prompt[start..end].contains("applied ×3 | move → Finance"));
         assert!(prompt.contains("thread-new"));
+        assert!(prompt.contains("threadCount > 0, never say or imply"));
+        assert!(prompt.contains("sans cache local"));
         let empty = render_org_orientation_user_prompt(&local, "acc", "heur", "thread-new", "");
         assert!(!empty.contains("prior-decisions"));
 

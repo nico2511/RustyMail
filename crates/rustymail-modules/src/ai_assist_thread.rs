@@ -14,7 +14,9 @@ use crate::ai_agent_prepare_reply::{
     agent_draft_reply_streaming, agent_prepare_reply_step, AgentDraftResult, AgentIntentResult,
     AgentPrepareReplyStep,
 };
-use crate::ai_assist_facts::{consistency_check_with_llm, extract_facts_with_llm};
+use crate::ai_assist_facts::{
+    consistency_check_with_llm, extract_facts_with_llm, SPEECH_ACT_SENDER_PROPOSES_MEETING,
+};
 use crate::ai_assist_skills::{
     adapt_draft_tone_with_llm, extract_action_items_with_llm, merge_recommendations,
     risk_flags_from_thread_security,
@@ -25,6 +27,84 @@ pub struct AssistThreadContext {
     pub transcript: String,
     pub thread_security_codes: Vec<String>,
     pub thread_security_max: Option<MailSecuritySeverity>,
+}
+
+/// Rôle d’un message vu du propriétaire de la boîte.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TranscriptRole {
+    /// Reçu d’un tiers (le propriétaire est le destinataire).
+    Incoming,
+    /// Envoyé par le propriétaire de la boîte.
+    Outgoing,
+}
+
+impl TranscriptRole {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Incoming => "entrant",
+            Self::Outgoing => "sortant",
+        }
+    }
+}
+
+fn bare_email(raw: &str) -> String {
+    let t = raw.trim();
+    let inner = match (t.rfind('<'), t.rfind('>')) {
+        (Some(a), Some(b)) if a < b => &t[a + 1..b],
+        _ => t,
+    };
+    inner.trim().to_ascii_lowercase()
+}
+
+/// `Sortant` si l’expéditeur est l’une des adresses du propriétaire (comptes configurés), sinon `Entrant`.
+pub fn transcript_role(
+    sender_email: &str,
+    sender_display: &str,
+    owner_addresses: &[String],
+) -> TranscriptRole {
+    let from_field = bare_email(sender_email);
+    let candidate = if from_field.contains('@') {
+        from_field
+    } else {
+        bare_email(sender_display)
+    };
+    if !candidate.is_empty() && owner_addresses.iter().any(|a| bare_email(a) == candidate) {
+        TranscriptRole::Outgoing
+    } else {
+        TranscriptRole::Incoming
+    }
+}
+
+/// En-tête de transcript : explicite qui est « vous » (le propriétaire de la boîte).
+pub fn transcript_owner_preamble(mailbox: Option<&str>) -> String {
+    let mailbox = mailbox.map(str::trim).filter(|m| !m.is_empty());
+    let who = match mailbox {
+        Some(m) => format!("Boîte du propriétaire : {m}. "),
+        None => String::new(),
+    };
+    format!(
+        "[Annotations — {who}« vous » = le propriétaire de la boîte (c’est lui qui rédige la réponse). \
+rôle=entrant : message reçu d’un tiers ; rôle=sortant : message envoyé par le propriétaire.]\n\n"
+    )
+}
+
+/// Ligne d’en-tête d’un message du transcript (rôle + boîte + expéditeur).
+pub fn transcript_message_header(
+    message_id: &str,
+    role: TranscriptRole,
+    mailbox: Option<&str>,
+    sender: &str,
+    received_at: &str,
+) -> String {
+    let mailbox = mailbox
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+        .map(|m| format!(" boîte={m}"))
+        .unwrap_or_default();
+    format!(
+        "[message_id={message_id}] rôle={}{mailbox} de {sender} ({received_at}) :",
+        role.label()
+    )
 }
 
 /// Skills activés par défaut si `enabled_skills` est vide.
@@ -117,6 +197,18 @@ pub fn should_run_slot_skill(
     }
     let needs = intent.map(|i| i.needs_scheduling).unwrap_or(false);
     if !needs {
+        return false;
+    }
+    // L’expéditeur a déjà proposé le créneau : ne pas proposer de créneaux à sa place
+    // (speech_act ou faits typés sender/proposer|proposal — même logique que l’inversion de rôle).
+    if intent.is_some_and(|i| i.speech_act == SPEECH_ACT_SENDER_PROPOSES_MEETING)
+        || facts.is_some_and(|f| {
+            f.facts.iter().any(|fact| {
+                fact.actor.as_deref() == Some("sender")
+                    && (fact.actor_role.as_deref() == Some("proposer") || fact.kind == "proposal")
+            })
+        })
+    {
         return false;
     }
     if !facts_support_scheduling(facts) {
@@ -242,6 +334,7 @@ fn intent_snapshot(i: &AgentIntentResult) -> AssistIntentSnapshot {
         intent: i.intent.clone(),
         tone_hint: i.tone_hint.clone(),
         needs_scheduling: i.needs_scheduling,
+        speech_act: i.speech_act.clone(),
     }
 }
 
@@ -478,6 +571,7 @@ pub fn run_assist_phase(
             match consistency_check_with_llm(
                 engine,
                 thread_context,
+                prior_intent,
                 &facts,
                 draft,
                 &request.user_prefs,
@@ -485,6 +579,7 @@ pub fn run_assist_phase(
                 Ok(check) => {
                     result.consistency_issues = check.issues;
                     result.safety_flags = check.safety_flags;
+                    result.rewrite_guidance = check.rewrite_guidance;
                     if !check.aligned {
                         result.safety_flags.push("consistency_warning".into());
                     }
@@ -684,11 +779,7 @@ mod tests {
     fn clarification_when_low_confidence() {
         let r = base_request();
         let facts = AssistFactsSnapshot {
-            facts: vec![AssistFact {
-                kind: "request".into(),
-                text: "Devis".into(),
-                message_ids: vec![],
-            }],
+            facts: vec![AssistFact::new("request", "Devis")],
             ambiguities: vec![],
             confidence: 0.4,
         };
@@ -702,8 +793,57 @@ mod tests {
             intent: "Question".into(),
             tone_hint: "neutre".into(),
             needs_scheduling: false,
+            speech_act: String::new(),
         };
         assert!(!should_run_slot_skill(&r, Some(&intent), "", None));
+    }
+
+    #[test]
+    fn slots_skipped_when_sender_already_proposes_meeting() {
+        let r = base_request();
+        let intent = AssistIntentSnapshot {
+            intent: "Le prestataire propose le nettoyage de la chaudière".into(),
+            tone_hint: "neutre".into(),
+            needs_scheduling: true,
+            speech_act: SPEECH_ACT_SENDER_PROPOSES_MEETING.into(),
+        };
+        let facts = AssistFactsSnapshot {
+            facts: vec![AssistFact::new(
+                "proposal",
+                "Rendez-vous proposé le mercredi 18 novembre le matin.",
+            )],
+            ambiguities: vec![],
+            confidence: 0.9,
+        };
+        assert!(!should_run_slot_skill(&r, Some(&intent), "", Some(&facts)));
+        let owner_proposes = AssistIntentSnapshot {
+            speech_act: "owner_must_propose".into(),
+            ..intent
+        };
+        assert!(should_run_slot_skill(
+            &r,
+            Some(&owner_proposes),
+            "",
+            Some(&facts)
+        ));
+        // Speech act manquant / faux, mais faits typés sender → toujours skip.
+        let mut sender_fact = AssistFact::new(
+            "proposal",
+            "Rendez-vous proposé le mercredi 18 novembre le matin.",
+        );
+        sender_fact.actor = Some("sender".into());
+        sender_fact.actor_role = Some("proposer".into());
+        let facts_typed = AssistFactsSnapshot {
+            facts: vec![sender_fact],
+            ambiguities: vec![],
+            confidence: 0.9,
+        };
+        assert!(!should_run_slot_skill(
+            &r,
+            Some(&owner_proposes),
+            "",
+            Some(&facts_typed)
+        ));
     }
 
     #[test]
@@ -713,24 +853,61 @@ mod tests {
             intent: "Suivi devis".into(),
             tone_hint: "neutre".into(),
             needs_scheduling: true,
+            speech_act: String::new(),
         };
         let facts = AssistFactsSnapshot {
             facts: vec![
-                AssistFact {
-                    kind: "request".into(),
-                    text: "Transmettre le devis validé au client.".into(),
-                    message_ids: vec![],
-                },
-                AssistFact {
-                    kind: "deadline".into(),
-                    text: "Campagne e-mail prévue jeudi matin.".into(),
-                    message_ids: vec![],
-                },
+                AssistFact::new("request", "Transmettre le devis validé au client."),
+                AssistFact::new("deadline", "Campagne e-mail prévue jeudi matin."),
             ],
             ambiguities: vec![],
             confidence: 0.9,
         };
         assert!(!should_run_slot_skill(&r, Some(&intent), "", Some(&facts)));
+    }
+
+    #[test]
+    fn transcript_role_matches_owner_addresses() {
+        let owner = vec!["Nico@Example.com".to_string()];
+        assert_eq!(
+            transcript_role("nico@example.com", "Nico", &owner),
+            TranscriptRole::Outgoing
+        );
+        assert_eq!(
+            transcript_role("", "Nico <NICO@example.com>", &owner),
+            TranscriptRole::Outgoing
+        );
+        assert_eq!(
+            transcript_role("contact@action-depannage.fr", "ACTION DEPANNAGE", &owner),
+            TranscriptRole::Incoming
+        );
+        assert_eq!(transcript_role("", "", &owner), TranscriptRole::Incoming);
+        assert_eq!(
+            transcript_role("a@b.fr", "A", &[]),
+            TranscriptRole::Incoming
+        );
+    }
+
+    #[test]
+    fn transcript_annotations_name_role_mailbox_and_owner() {
+        let pre = transcript_owner_preamble(Some("nico@example.com"));
+        assert!(pre.contains("nico@example.com"));
+        assert!(pre.contains("« vous » = le propriétaire"));
+        assert!(pre.contains("rôle=entrant"));
+        assert!(pre.contains("rôle=sortant"));
+        let head = transcript_message_header(
+            "m1",
+            TranscriptRole::Incoming,
+            Some("nico@example.com"),
+            "ACTION DEPANNAGE",
+            "2026-10-01",
+        );
+        assert!(head.starts_with(
+            "[message_id=m1] rôle=entrant boîte=nico@example.com de ACTION DEPANNAGE"
+        ));
+        let no_box = transcript_message_header("m2", TranscriptRole::Outgoing, None, "Moi", "d");
+        assert!(no_box.contains("rôle=sortant de Moi"));
+        assert!(!transcript_owner_preamble(None).contains("Boîte du propriétaire"));
     }
 
     #[test]

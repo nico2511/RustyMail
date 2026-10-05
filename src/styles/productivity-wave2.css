@@ -531,7 +531,8 @@ body.clarity-dark {
 .thread-reading .message.thread-msg--folded {
   align-items: center;
   margin-bottom: 4px;
-  padding: 2px 4px;
+  /* Padding gauche : la boule d’avatar ne doit pas coller au fond hover. */
+  padding: 4px 8px 4px 10px;
   border-radius: 6px;
 }
 

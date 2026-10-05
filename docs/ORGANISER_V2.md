@@ -16,6 +16,9 @@ Le moteur est celui des Paramètres → IA : OpenRouter, llama-server ou **Ollam
 | Apply | Archive `Archive/AAAA/MM-mois` selon les préférences, corbeille, déplacement, suppression de dossiers vides. |
 | Confirmations | Corbeille : modale + case + jeton `bulk-trash-org`. Dossiers vides : modale + case + jeton `delete-mailbox`. Archive / déplacement : confirmation avant le lot. |
 | Sans LLM | Message explicite. File d’actions vide. |
+| Contexte LLM (Rv2) | Le prompt commence par `threadCount`, les dossiers principaux (fils / non lus, noms résolus comme la barre latérale via `sidebar_counts_on_connection`) et la règle dure : `threadCount > 0` ⇒ ne jamais dire que la boîte est vide. Garde-fou : si le diagnostic affirme tout de même « boîte vide » alors que des fils existent, il est remplacé par un constat chiffré. |
+| Dossiers sans cache | Un dossier sans message en cache est libellé « non synchronisé / sans cache local » (pas « boîte vide »). INBOX et dossiers protégés (`is_protected_mailbox_for_org_delete`) sont exclus du signal. La détection passe par `resolve_scoped_mailbox_with_candidates` (alias `INBOX.Foo` / `Foo`, casse, séparateurs) pour éviter les faux vides. |
+| Repli heuristique | Orientation LLM valide mais sans action exploitable (après hydratation et mémoire) : les cartes heuristiques V2 utiles s’affichent à la place d’un écran vide, avec une note. Sans orientation (LLM absent / en erreur) : toujours aucune carte inventée. |
 | Undo | Un apply V2 en plusieurs paquets partage un `batchId`. L’annulation ne marque le lot fait que pour les fils réellement revenus en arrière. |
 
 L’action d’une carte porte sur **tous** les fils détectés (plafond de scan 500). L’écran n’en liste qu’un échantillon et le signale.

@@ -100,10 +100,32 @@ pub fn analyze_html_structure_heuristic(html: &str, sender_email: &str) -> Diges
             generic_proposal_from_outline(&build_structure_outline(&working), sender_email)
         })
     });
+    ensure_shown_zones_have_anchors(&mut proposal);
     if proposal.explanation_fr.trim().is_empty() {
         proposal.explanation_fr = french_explanation(&proposal);
     }
     proposal
+}
+
+/// Un corps (ou un en-tête affiché) sans ancre ne rend rien : dernier filet de sécurité.
+fn ensure_shown_zones_have_anchors(proposal: &mut DigestCutProposal) {
+    if proposal.zones.body.anchors.is_empty() {
+        proposal.zones.body.anchors = vec![anchor("p", Some(0), None, None)];
+        proposal
+            .zones
+            .body
+            .rationale
+            .get_or_insert_with(|| "Premier paragraphe de substance.".to_string());
+    }
+    if proposal.zones.header.anchors.is_empty() && proposal.zones.header.action != ZoneAction::Hide
+    {
+        proposal.zones.header.anchors = vec![anchor("h1", Some(0), None, Some(AnchorRole::Title))];
+        proposal
+            .zones
+            .header
+            .rationale
+            .get_or_insert_with(|| "Premier titre repéré dans la racine.".to_string());
+    }
 }
 
 pub fn structure_outline_for_llm(html: &str) -> String {
@@ -265,6 +287,7 @@ fn prepared_html(html: &str) -> String {
     }
 }
 
+/// Sous-chaînes (minuscules ASCII) cherchées dans `class` / `id` d'un bloc.
 const FOOTER_NEEDLES: &[&str] = &[
     "footer",
     "unsub",
@@ -273,7 +296,51 @@ const FOOTER_NEEDLES: &[&str] = &[
     "warning",
     "pied",
     "mention",
+    "copyright",
+    "desabon",
+    "desinscri",
+    "optout",
+    "opt-out",
+    "privacy",
+    "gdpr",
+    "rgpd",
 ];
+
+/// Sous-chaînes (minuscules) cherchées dans le texte visible d'un bloc court :
+/// signature typique de pied marketing quand les classes ne disent rien.
+const FOOTER_TEXT_NEEDLES: &[&str] = &[
+    "unsubscribe",
+    "désabonn",
+    "desabonn",
+    "se désinscrire",
+    "désinscri",
+    "desinscri",
+    "mentions légales",
+    "mentions legales",
+    "copyright",
+    "©",
+    "all rights reserved",
+    "tous droits réservés",
+    "ne plus recevoir",
+    "no longer wish to receive",
+    "politique de confidentialité",
+    "privacy policy",
+    "manage your preferences",
+    "gérer vos préférences",
+];
+
+/// Un pied de page est court : au-delà, un « unsubscribe » est probablement dans le corps.
+const FOOTER_TEXT_MAX_CHARS: usize = 900;
+const MAX_BODY_ANCHORS: usize = 6;
+const MAX_FOOTER_ANCHORS: usize = 3;
+const MAX_UNWRAP_DEPTH: usize = 24;
+
+/// Plan de découpe des blocs enfants d'une racine (indices dans `children`).
+struct ChildPlan {
+    header: usize,
+    body: Vec<usize>,
+    footer: Vec<usize>,
+}
 
 fn generic_proposal_from_dom(html: &str, sender_email: &str) -> Option<DigestCutProposal> {
     let document = Html::parse_fragment(html);
@@ -282,15 +349,37 @@ fn generic_proposal_from_dom(html: &str, sender_email: &str) -> Option<DigestCut
     if children.len() < 2 {
         return None;
     }
-    let (header_i, body_i, footer_i) = classify_children(&children);
+    let plan = classify_children(&children);
+    let header_i = plan.header;
+    let body_i = plan.body[0];
     let header_text = node_text(&children[header_i]);
     let body_text = node_text(&children[body_i]);
     let domain = email_domain(sender_email).unwrap_or_else(|| "example.com".to_string());
-    let footer = match footer_i {
+    let body_anchors = dedup_anchors(
+        plan.body
+            .iter()
+            .map(|index| anchor_for_child(&children, *index))
+            .collect(),
+    );
+    let body_rationale = if plan.body.len() > 1 {
+        format!(
+            "Le passage « {} » et {} autre(s) bloc(s) du message.",
+            quote_clip(&body_text),
+            plan.body.len() - 1
+        )
+    } else {
+        format!("Le passage « {} ».", quote_clip(&body_text))
+    };
+    let footer = match plan.footer.first().copied() {
         Some(index) => DigestCutZone {
             action: ZoneAction::Hide,
             presentation: None,
-            anchors: vec![anchor_for_child(&children, index)],
+            anchors: dedup_anchors(
+                plan.footer
+                    .iter()
+                    .map(|i| anchor_for_child(&children, *i))
+                    .collect(),
+            ),
             details_heading: None,
             row_selector: None,
             rationale: Some(format!(
@@ -334,10 +423,10 @@ fn generic_proposal_from_dom(html: &str, sender_email: &str) -> Option<DigestCut
             body: DigestCutZone {
                 action: ZoneAction::Show,
                 presentation: Some(ZonePresentation::AsIs),
-                anchors: vec![anchor_for_child(&children, body_i)],
+                anchors: body_anchors,
                 details_heading: None,
                 row_selector: None,
-                rationale: Some(format!("Le passage « {} ».", quote_clip(&body_text))),
+                rationale: Some(body_rationale),
             },
             footer,
         },
@@ -345,12 +434,62 @@ fn generic_proposal_from_dom(html: &str, sender_email: &str) -> Option<DigestCut
     })
 }
 
+/// Descend à travers les enveloppes triviales (`div > div`, `table > tbody > tr > td > table`…)
+/// jusqu'à l'élément qui porte vraiment plusieurs blocs de texte.
+///
+/// Avec exactement deux blocs dont l'un est un gros conteneur (≥ 3 blocs) et l'autre n'est pas
+/// un pied, on descend aussi dans le conteneur (cas préheader + conteneur).
+fn unwrap_trivial_wrappers(start: ElementRef<'_>) -> ElementRef<'_> {
+    let mut current = start;
+    for _ in 0..MAX_UNWRAP_DEPTH {
+        let textual = textual_children(current);
+        match textual.len() {
+            1 => current = textual[0],
+            2 => {
+                let big = textual
+                    .iter()
+                    .copied()
+                    .filter(|kid| textual_children(*kid).len() >= 3)
+                    .max_by_key(|kid| textual_children(*kid).len());
+                let Some(big) = big else { break };
+                let other_is_footer = textual
+                    .iter()
+                    .any(|kid| kid.id() != big.id() && looks_like_footer_block(*kid));
+                if other_is_footer {
+                    break;
+                }
+                current = big;
+            }
+            _ => break,
+        }
+    }
+    current
+}
+
+fn textual_children(el: ElementRef<'_>) -> Vec<ElementRef<'_>> {
+    direct_children(el)
+        .into_iter()
+        .filter(|kid| !node_text(kid).is_empty())
+        .collect()
+}
+
 fn pick_structure_root(doc: &Html) -> Option<(String, ElementRef<'_>)> {
+    let unwrapped = unwrap_trivial_wrappers(doc.root_element());
+    if !matches!(unwrapped.value().name(), "html" | "head" | "body")
+        && textual_children(unwrapped).len() >= 2
+    {
+        if let Some(selector) = unique_selector(doc, unwrapped) {
+            return Some((selector, unwrapped));
+        }
+    }
     let star = Selector::parse("*").ok()?;
     let mut ranked: Vec<(i32, ElementRef<'_>)> = Vec::new();
     for el in doc.select(&star) {
         let name = el.value().name();
-        if matches!(name, "html" | "head" | "script" | "style") {
+        if matches!(
+            name,
+            "html" | "head" | "body" | "script" | "style" | "thead" | "tbody" | "tfoot"
+        ) {
             continue;
         }
         let kids = direct_children(el);
@@ -405,8 +544,9 @@ fn selector_hits_first(doc: &Html, selector: &str, el: ElementRef<'_>) -> bool {
         .is_some_and(|hit| hit.id() == el.id())
 }
 
+/// Mêmes blocs que le moteur d'application (un `table` expose ses `tr`).
 fn direct_children(el: ElementRef<'_>) -> Vec<ElementRef<'_>> {
-    el.children().filter_map(ElementRef::wrap).collect()
+    super::apply::child_elements(el)
 }
 
 fn node_text(el: &ElementRef<'_>) -> String {
@@ -418,7 +558,8 @@ fn node_text(el: &ElementRef<'_>) -> String {
         .join(" ")
 }
 
-fn classify_children(children: &[ElementRef<'_>]) -> (usize, usize, Option<usize>) {
+/// Répartit les blocs : un en-tête, au moins un bloc de corps (jamais vide), des blocs de pied.
+fn classify_children(children: &[ElementRef<'_>]) -> ChildPlan {
     let textual: Vec<usize> = children
         .iter()
         .enumerate()
@@ -426,33 +567,51 @@ fn classify_children(children: &[ElementRef<'_>]) -> (usize, usize, Option<usize
         .map(|(index, _)| index)
         .collect();
     if textual.is_empty() {
-        return (0, 0, None);
+        return ChildPlan {
+            header: 0,
+            body: vec![0],
+            footer: vec![],
+        };
     }
     let header = textual
         .iter()
         .copied()
         .find(|index| is_heading(children[*index]))
         .unwrap_or(textual[0]);
-    let footer_marked = textual
+    // Les derniers blocs « pied » (classe/id ou texte), dans l'ordre du document.
+    let mut footer: Vec<usize> = textual
         .iter()
         .copied()
-        .rev()
-        .find(|index| looks_like_footer(children[*index]) && *index != header);
-    let body = textual
-        .iter()
-        .copied()
-        .find(|index| *index != header && Some(*index) != footer_marked)
-        .or_else(|| textual.iter().copied().find(|index| *index != header))
-        .unwrap_or(header);
-    let footer = if let Some(index) = footer_marked {
-        (index != header && index != body).then_some(index)
-    } else if textual.len() >= 3 {
+        .filter(|index| *index != header && looks_like_footer_block(children[*index]))
+        .collect();
+    if footer.len() > MAX_FOOTER_ANCHORS {
+        footer = footer.split_off(footer.len() - MAX_FOOTER_ANCHORS);
+    }
+    if footer.is_empty() && textual.len() >= 3 {
         let last = *textual.last().unwrap_or(&header);
-        (last != header && last != body).then_some(last)
-    } else {
-        None
-    };
-    (header, body, footer)
+        if last != header {
+            footer.push(last);
+        }
+    }
+    let mut body: Vec<usize> = textual
+        .iter()
+        .copied()
+        .filter(|index| *index != header && !footer.contains(index))
+        .take(MAX_BODY_ANCHORS)
+        .collect();
+    if body.is_empty() {
+        // Jamais de corps vide : on réaffecte le premier pied, sinon l'en-tête.
+        if footer.is_empty() {
+            body.push(header);
+        } else {
+            body.push(footer.remove(0));
+        }
+    }
+    ChildPlan {
+        header,
+        body,
+        footer,
+    }
 }
 
 fn is_heading(el: ElementRef<'_>) -> bool {
@@ -464,6 +623,39 @@ fn looks_like_footer(el: ElementRef<'_>) -> bool {
     let id = el.value().attr("id").unwrap_or("");
     let blob = format!("{class} {id}").to_ascii_lowercase();
     FOOTER_NEEDLES.iter().any(|needle| blob.contains(needle))
+}
+
+/// Détection par texte (désabonnement, mentions légales, copyright, « ne plus recevoir »…)
+/// sur un bloc court.
+fn looks_like_footer_text(el: ElementRef<'_>) -> bool {
+    let text = node_text(&el);
+    if text.is_empty() || text.chars().count() > FOOTER_TEXT_MAX_CHARS {
+        return false;
+    }
+    let folded = text.to_lowercase();
+    FOOTER_TEXT_NEEDLES
+        .iter()
+        .any(|needle| folded.contains(needle))
+}
+
+fn looks_like_footer_block(el: ElementRef<'_>) -> bool {
+    looks_like_footer(el) || looks_like_footer_text(el)
+}
+
+fn dedup_anchors(anchors: Vec<DigestCutAnchor>) -> Vec<DigestCutAnchor> {
+    let mut out: Vec<DigestCutAnchor> = Vec::with_capacity(anchors.len());
+    for a in anchors {
+        let dup = out.iter().any(|b| {
+            a.selector == b.selector
+                && a.class_contains == b.class_contains
+                && a.index == b.index
+                && a.text_contains_any == b.text_contains_any
+        });
+        if !dup {
+            out.push(a);
+        }
+    }
+    out
 }
 
 fn anchor_for_child(children: &[ElementRef<'_>], index: usize) -> DigestCutAnchor {
@@ -900,6 +1092,78 @@ mod tests {
         assert!(cut.contains("Votre commande est confirmée"));
         assert!(cut.contains("Le colis part demain matin."));
         assert!(!cut.contains("désinscription"));
+    }
+
+    const NESTED_TABLE_MARKETING: &str = r#"<table class="wrapper"><tbody><tr><td>
+<table class="content"><tbody>
+<tr><td><h1>Soldes d'été</h1></td></tr>
+<tr><td><p>Profitez de -30% sur toute la collection.</p></td></tr>
+<tr><td><p>Livraison offerte dès 50 euros.</p></td></tr>
+<tr><td>Pour vous désabonner, cliquez ici. © 2026 Boutique</td></tr>
+</tbody></table>
+</td></tr></tbody></table>"#;
+
+    #[test]
+    fn nested_table_marketing_gets_real_header_body_footer_children() {
+        let proposal = analyze_html_structure_heuristic(NESTED_TABLE_MARKETING, "news@boutique.fr");
+        assert_eq!(proposal.match_.structure_root, "table.content");
+        assert!(!proposal.zones.header.anchors.is_empty());
+        assert!(
+            proposal.zones.body.anchors.len() >= 2,
+            "{:?}",
+            proposal.zones.body.anchors
+        );
+        assert!(!proposal.zones.footer.anchors.is_empty());
+        assert!(proposal
+            .zones
+            .body
+            .anchors
+            .iter()
+            .all(|a| a.selector.as_deref() == Some("tr")));
+        let yaml = proposal_to_fixture_yaml(&proposal).expect("yaml");
+        let preview = preview_candidate_fixture(&yaml, NESTED_TABLE_MARKETING, "news@boutique.fr");
+        assert!(preview.applicable, "{:?}", preview.error);
+        let cut = preview.html.expect("html");
+        assert!(cut.contains("Soldes d&#39;été") || cut.contains("Soldes d'été"));
+        assert!(cut.contains("-30%"));
+        assert!(cut.contains("Livraison offerte"));
+        assert!(!cut.contains("désabonner"));
+    }
+
+    #[test]
+    fn single_child_div_wrappers_are_unwrapped_and_text_footer_detected() {
+        let html = r#"<div class="outer"><div class="inner">
+<div class="row"><h2>Bienvenue</h2></div>
+<div class="row"><p>Merci de votre inscription.</p></div>
+<div class="row"><p>Pour ne plus recevoir nos messages, répondez STOP.</p></div>
+</div></div>"#;
+        let proposal = analyze_html_structure_heuristic(html, "hello@service.fr");
+        assert_eq!(proposal.match_.structure_root, "div.inner");
+        assert!(!proposal.zones.body.anchors.is_empty());
+        assert_eq!(proposal.zones.footer.anchors.len(), 1);
+        let yaml = proposal_to_fixture_yaml(&proposal).expect("yaml");
+        let preview = preview_candidate_fixture(&yaml, html, "hello@service.fr");
+        assert!(preview.applicable, "{:?}", preview.error);
+        let cut = preview.html.expect("html");
+        assert!(cut.contains("Merci de votre inscription."));
+        assert!(!cut.contains("ne plus recevoir"));
+    }
+
+    #[test]
+    fn heuristic_never_leaves_body_anchors_empty() {
+        let classless_nested = "<table><tbody><tr><td><table><tbody>\
+<tr><td>Titre</td></tr><tr><td>Texte du message</td></tr>\
+</tbody></table></td></tr></tbody></table>";
+        for html in [
+            classless_nested,
+            "<p>seul</p>",
+            "<div></div>",
+            NESTED_TABLE_MARKETING,
+        ] {
+            let proposal = analyze_html_structure_heuristic(html, "a@b.fr");
+            assert!(!proposal.zones.body.anchors.is_empty(), "{html}");
+            assert!(!proposal.zones.header.anchors.is_empty(), "{html}");
+        }
     }
 
     #[test]
