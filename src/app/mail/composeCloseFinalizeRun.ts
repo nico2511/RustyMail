@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { render } from "../dispatch";
 import { state } from "../state";
@@ -17,7 +17,7 @@ export async function finalizeCloseComposeFromUser(): Promise<void> {
   const payload = draft ? draftPayloadForRust(draft) : null;
   const needsPrompt = Boolean(
     isTauriRuntime() &&
-      currentAccount()?.id?.trim() &&
+      composeSendAccount()?.id?.trim() &&
       sessionId &&
       payload &&
       draftCloseNeedsSavePrompt(payload, sessionId),
@@ -33,7 +33,7 @@ export async function finalizeCloseComposeFromUser(): Promise<void> {
   }
   const hasSnapshot = Boolean(payload && sessionId && draftSavedContentMatches(sessionId, payload));
   if (isTauriRuntime() && sessionId && !state.savedDraftRecordId && !hasSnapshot) {
-    const accountId = currentAccount()?.id?.trim() ?? "";
+    const accountId = composeSendAccount()?.id?.trim() ?? "";
     if (accountId && sessionId) {
       void invoke("draft_revision_purge_session", { accountId, sessionId }).catch(() => {});
     }

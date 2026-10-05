@@ -95,11 +95,19 @@ pub struct AgentStepResult {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct IntentDto {
+    /// Peut manquer si le JSON LLM est tronqué après réparation.
+    #[serde(default)]
     intent: String,
+    #[serde(default = "default_tone_hint")]
     tone_hint: String,
+    #[serde(default)]
     needs_scheduling: bool,
     #[serde(default)]
     speech_act: String,
+}
+
+fn default_tone_hint() -> String {
+    "neutral".into()
 }
 
 #[derive(Deserialize)]
@@ -230,12 +238,18 @@ pub fn agent_prepare_reply_step(
                 &gen_params_json_for_prompt(engine, system.as_str(), &user, 256, 768),
             )?;
             let dto: IntentDto = parse_model_json(&raw)?;
+            let intent: String = dto.intent.trim().chars().take(600).collect();
+            if intent.is_empty() {
+                return Err(LlmError::InvalidJson(
+                    "intention vide après parsing (réponse modèle inutilisable).".into(),
+                ));
+            }
             Ok(AgentStepResult {
                 step,
                 intent: Some(AgentIntentResult {
-                    intent: dto.intent.trim().chars().take(600).collect(),
+                    intent,
                     tone_hint: if dto.tone_hint.trim().is_empty() {
-                        "neutre".into()
+                        default_tone_hint()
                     } else {
                         dto.tone_hint.trim().chars().take(40).collect()
                     },
@@ -305,6 +319,7 @@ pub fn agent_prepare_reply_step(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai_llm_util::parse_model_json;
     use rustymail_domain::AssistFact;
 
     fn intent(act: &str) -> AgentIntentResult {
@@ -335,6 +350,27 @@ mod tests {
             serde_json::from_str(r#"{"intent":"x","toneHint":"neutral","needsScheduling":false}"#)
                 .unwrap();
         assert_eq!(i.speech_act, "");
+    }
+
+    #[test]
+    fn intent_dto_tolerates_truncated_json_missing_tone_hint() {
+        // Truncation mid-`intent` after repair → missing toneHint / needsScheduling / speechAct.
+        let partial = r#"{"intent":"ACTION DEPANNAGE propose le renouvellement du contrat"#;
+        let dto: IntentDto = parse_model_json(partial).expect("repaired intent");
+        assert!(!dto.intent.is_empty());
+        assert_eq!(dto.tone_hint, "neutral");
+        assert!(!dto.needs_scheduling);
+        assert!(dto.speech_act.is_empty());
+    }
+
+    #[test]
+    fn intent_dto_keeps_short_fields_when_intent_truncated() {
+        let partial = r#"{"toneHint":"formal","needsScheduling":true,"speechAct":"sender_proposes_meeting","intent":"Le prestataire propose une intervention le"#;
+        let dto: IntentDto = parse_model_json(partial).expect("repaired intent");
+        assert_eq!(dto.tone_hint, "formal");
+        assert!(dto.needs_scheduling);
+        assert_eq!(dto.speech_act, "sender_proposes_meeting");
+        assert!(dto.intent.contains("prestataire"));
     }
 
     #[test]

@@ -1,3 +1,4 @@
+import { ensureComposeSendAccountId } from "../core/composeSendAccount";
 import { state } from "../state";
 import { draftHasMeaningfulContent, resetDraftContentMemory } from "./composeDraftContentKey";
 import { clearComposeGrammarUi } from "./composeGrammarPanelSync";
@@ -9,7 +10,7 @@ export function newDraftSessionId(): string {
   return `ds-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function startNewDraftSession(): void {
+export function startNewDraftSession(opts?: { sendAccountId?: string | null }): void {
   resetDraftContentMemory();
   clearComposeGrammarUi();
   state.draftSessionId = newDraftSessionId();
@@ -23,6 +24,7 @@ export function startNewDraftSession(): void {
   state.draftDiffOtherBody = "";
   state.draftRevisionPreview = null;
   state.draftVersionsListExpanded = false;
+  ensureComposeSendAccountId(opts?.sendAccountId);
 }
 
 export function composeDraftHasMeaningfulContent(): boolean {

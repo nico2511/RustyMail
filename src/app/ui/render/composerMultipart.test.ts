@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
+import type { Account } from "../../../accountSetup";
+import { DEMO_PLAYGROUND_ACCOUNT_ID } from "../../core/demoAccount";
 import { state } from "../../state";
 import type { Draft } from "../../types";
 import { renderComposer } from "./composerRender";
@@ -22,6 +24,16 @@ function emptyDraft(): Draft {
   };
 }
 
+function account(id: string, email: string, displayName = ""): Account {
+  return {
+    id,
+    displayName,
+    email,
+    imap: { host: "imap.example", port: 993, security: "Tls", allowInvalidTls: false },
+    smtp: { host: "smtp.example", port: 587, security: "StartTls", allowInvalidTls: false },
+  };
+}
+
 beforeEach(() => {
   registerRenderDeps({
     draftHasRecipientsExtra: () => false,
@@ -38,6 +50,9 @@ beforeEach(() => {
   state.composeBody = "Bonjour";
   state.composeCanonicalBody = "Bonjour";
   state.draft = emptyDraft();
+  state.accounts = [];
+  state.selectedAccountId = undefined;
+  state.composeSendAccountId = undefined;
 });
 
 describe("renderComposer", () => {
@@ -64,5 +79,28 @@ describe("renderComposer", () => {
     expect(html).not.toContain("Correction de texte");
     expect(html).not.toContain("Salu je mappel nicola");
     expect(state.composeGrammarSuggestions).toBeNull();
+  });
+
+  it("affiche De seulement avec au moins deux comptes hors démo", () => {
+    state.accounts = [
+      account(DEMO_PLAYGROUND_ACCOUNT_ID, DEMO_PLAYGROUND_ACCOUNT_ID, "Démo"),
+      account("a1", "a@example.com", "Alice"),
+    ];
+    state.selectedAccountId = "a1";
+    state.composeSendAccountId = "a1";
+    expect(renderComposer()).not.toContain("compose-from-account");
+
+    state.accounts = [
+      account(DEMO_PLAYGROUND_ACCOUNT_ID, DEMO_PLAYGROUND_ACCOUNT_ID, "Démo"),
+      account("a1", "a@example.com", "Alice"),
+      account("b1", "b@example.com", "Bob"),
+    ];
+    state.composeSendAccountId = "b1";
+    const html = renderComposer();
+    expect(html).toContain('id="compose-from-account"');
+    expect(html).toContain(">De<");
+    expect(html).toContain('value="a1"');
+    expect(html).toContain('value="b1" selected');
+    expect(html).not.toContain(`value="${DEMO_PLAYGROUND_ACCOUNT_ID}"`);
   });
 });

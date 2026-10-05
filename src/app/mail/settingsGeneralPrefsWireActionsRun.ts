@@ -2,6 +2,7 @@ import { DEFAULT_ACCOUNT_PROMPT_DISMISS_KEY } from "../lib/appUiConstants";
 import { render } from "../dispatch";
 import { toast } from "../lib/toast";
 import { tauriErrorMessage } from "../lib/tauriCommand";
+import { state } from "../state";
 import { persistGeneralPrefsFromDom } from "./settingsGeneralPrefsPersistRun";
 import { persistDefaultAccountId, switchActiveAccount } from "./settingsWireActions";
 import {
@@ -42,6 +43,11 @@ export async function tryHandleSettingsGeneralPrefsWire(action: string, _element
     }
     case "save-general-prefs":
       void persistGeneralPrefsFromDom();
+      return true;
+    case "desktop-update-open":
+      state.view = "settings";
+      state.settingsTab = "general";
+      render();
       return true;
     case "desktop-update-check":
       void checkForDesktopUpdate();

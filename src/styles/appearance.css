@@ -112,13 +112,21 @@ body.clarity-dark .ai-quick-panel-backdrop {
 }
 
 /*
- * HTML expéditeur : le shadow DOM conserve le rendu message ;
- * le conteneur app reste fond clair pour lisibilité des mails externes.
+ * HTML expéditeur : papier de lecture (pas le blanc cru) pour rester
+ * lisible sans plaque trop dure sur le chrome sombre.
  */
 body.clarity-dark .message-html {
-  background: #ffffff;
-  color: #16191e;
-  border: 1px solid var(--border-weak);
+  background: #ebe6dc;
+  color: #1a1d22;
+  border: 1px solid color-mix(in srgb, #ebe6dc 72%, var(--border-weak));
+  /* Padding réel aussi dans le shadow (:host) — ici pour le cadre papier. */
+  padding: 20px 24px 24px;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+body.clarity-dark .message-html.message-html--clean {
+  background: #e4dfd4;
 }
 
 body.clarity-dark .message-html-caption {

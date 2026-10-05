@@ -1,4 +1,4 @@
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
@@ -45,7 +45,7 @@ export async function sendDraft(): Promise<void> {
     loadComposeMarkdownIntoEditor(ensured.body);
     persistDraft();
   }
-  const accountId = currentAccount()?.id ?? null;
+  const accountId = composeSendAccount()?.id ?? null;
   const draftOutbound = draftPayloadForRust(state.draft);
   if (await maybePromptSplitSendPlan(draftOutbound)) return;
   await invokeSendDraft(accountId, draftOutbound);

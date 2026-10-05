@@ -2,11 +2,11 @@
 
 RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI (summaries, rewrite, translation, grammar, dictation, semantic search) runs on-device or over HTTP to OpenRouter / llama-server — never required for core mail.
 
-**0.3.8** follows 0.3.7 with post-release fixes: Organiser Rv2 no longer claims an empty mailbox when threads exist, breadcrumbs stop aggregating Settings↔mail, reply assistant guards role inversion, digest-cut gains visual paint + better proposals, grammar rejects bare `a→à` and supports selection/context-menu correction, and inline photos send as proper `multipart/related` (not as file attachments) with CID hydrate on read.
+**0.3.9** follows 0.3.8: multi-account compose « De » (send + draft save on the same account), toolbar dictate/IA row, summary LLM context fit + empty fallback, status footer / UI polish, demo account helpers.
 
 ## Screenshots
 
-UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.8 build (compose in the app uses TipTap, not the mockup’s markdown field).
+UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.9 build (compose in the app uses TipTap, not the mockup’s markdown field).
 
 **Inbox** — unified list, charcoal rail, account labels.
 

@@ -1,4 +1,6 @@
 // @ts-nocheck — DOM wiring; tighten types incrementally.
+import { sendableAccounts } from "../core/composeSendAccount";
+import { state } from "../state";
 import { sendQuickReply } from "./composeSendQuickReply";
 import { markComposeDraftEdited } from "./composeDraftContentKey";
 import { scheduleDraftRevisionSave, bindComposerDropzone } from "./composeComposerBridge";
@@ -9,6 +11,15 @@ export function wireEventsDomComposeEditorFields(signal: AbortSignal): void {
     () => {
       markComposeDraftEdited();
       scheduleDraftRevisionSave();
+    },
+    { signal },
+  );
+  document.querySelector<HTMLSelectElement>("#compose-from-account")?.addEventListener(
+    "change",
+    (event) => {
+      const id = String((event.target as HTMLSelectElement).value ?? "").trim();
+      if (!id || !sendableAccounts().some((a) => a.id === id)) return;
+      state.composeSendAccountId = id;
     },
     { signal },
   );

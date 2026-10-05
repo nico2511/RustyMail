@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { SplitPlan, SplitSendResult } from "../types";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
@@ -50,7 +50,7 @@ export async function confirmAndExecuteSplitSend(): Promise<void> {
   const plan = state.splitSendConfirm;
   const n = plan?.chunks.length ?? 0;
   state.splitSendConfirm = null;
-  const accountId = currentAccount()?.id ?? null;
+  const accountId = composeSendAccount()?.id ?? null;
   // 90s par partie, sans plafond artificiel à 12 (beaucoup de PJ moyennes).
   const splitTimeout = MAIL_ACTION_TIMEOUT_MS * Math.max(1, n || 1);
   try {

@@ -1517,6 +1517,14 @@ body.clarity-dark {
   border: 1px solid var(--border-weak);
 }
 
+.compose-toolbar__trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
 .compose-toolbar__cluster {
   gap: 6px 8px;
 }
@@ -1722,7 +1730,7 @@ body.clarity-dark .compose-toolbar__go:hover:not(:disabled) {
 .composer-mail-shell .compose-toolbar .compose-toolbar__dictate {
   width: auto;
   height: 32px;
-  margin-left: auto;
+  margin-left: 0;
   padding: 0 12px 0 8px;
   border-radius: 999px;
   display: inline-flex;
@@ -1780,7 +1788,7 @@ body.clarity-dark .compose-toolbar__go:hover:not(:disabled) {
 }
 
 @media (max-width: 720px) {
-  .composer-mail-shell .compose-toolbar .compose-toolbar__dictate {
+  .compose-toolbar__trailing {
     margin-left: 0;
   }
 

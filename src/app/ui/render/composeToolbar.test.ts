@@ -67,12 +67,17 @@ describe("barre du compositeur", () => {
     expect(html).not.toContain("compose-ai-rewrite");
   });
 
-  it("place les réponses rapides dans Écrire seulement si l’option est active", () => {
+  it("place réponses et dictée sur la barre IA, à droite", () => {
     expect(renderComposeToolbar(base)).not.toContain("llm-quick-replies-compose");
     const html = renderComposeToolbar({ ...base, quickRepliesEnabled: true, rewriteEnabled: false, grammarEnabled: false });
     expect(html).toContain('data-action="llm-quick-replies-compose"');
     expect(html).toContain('data-compose-cmd="ai:replies"');
+    expect(html).toContain("compose-toolbar__trailing");
     expect(html).not.toContain(">Transformer<");
+    const aiRow = html.match(/compose-toolbar__row--ai[\s\S]*?<\/div>\s*<\/div>/)?.[0] ?? "";
+    expect(aiRow).toContain("llm-quick-replies-compose");
+    expect(aiRow).toContain('data-action="mic"');
+    expect(html.indexOf("compose-toolbar__row--ai")).toBeLessThan(html.indexOf("llm-quick-replies-compose"));
   });
 
   it("marque l’action en cours et désactive les autres", () => {

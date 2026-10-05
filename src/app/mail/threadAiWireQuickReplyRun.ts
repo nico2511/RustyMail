@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { isAiFeatureEnabled } from "../../aiFeatures";
+import { currentAccount } from "../core/accountContext";
 import { COMPOSE_REPLIES_JOB } from "../core/composeAiJobs";
 import { LLM_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
@@ -29,6 +30,7 @@ export async function llmQuickRepliesThreadUi() {
     return;
   }
   if (!isTauriRuntime()) return void toast.warning("Réponses rapides : Tauri requis.");
+  const accountId = currentAccount()?.id?.trim() || state.selectedAccountId?.trim() || "";
   const ran = await withLlmQueue("Réponses rapides", async (signal) => {
     if (signal.aborted) return;
     state.aiOpen = true;
@@ -38,6 +40,7 @@ export async function llmQuickRepliesThreadUi() {
     const res = await withTimeout(
       invoke<{ suggestions: Array<{ text: string; tone: string; rationale?: string }> }>("llm_quick_reply_thread", {
         threadId,
+        accountId: accountId || null,
       }),
       LLM_INVOKE_TIMEOUT_MS,
     );

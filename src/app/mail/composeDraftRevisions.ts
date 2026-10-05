@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { DraftRevisionListItem } from "../types";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
@@ -9,7 +9,7 @@ import { render } from "../dispatch";
 import { state } from "../state";
 
 export async function refreshDraftRevisions(limit = 50): Promise<void> {
-  const accountId = currentAccount()?.id?.trim() ?? "";
+  const accountId = composeSendAccount()?.id?.trim() ?? "";
   const sessionId = state.draftSessionId?.trim() ?? "";
   if (!isTauriRuntime() || !accountId || !sessionId) return;
   state.draftRevisionsLoading = true;

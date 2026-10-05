@@ -6,7 +6,7 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { openConfirmModal } from "../modals/promptConfirm";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { state } from "../state";
 import {
   computePreview,
@@ -24,7 +24,7 @@ import { syncComposeAttachmentsHiddenField } from "./composeAttachmentPaths";
 export async function restoreDraftRevisionFromWire(revisionId: string): Promise<void> {
   if (!isTauriRuntime()) return;
   const rid = revisionId.trim();
-  const accountId = currentAccount()?.id?.trim() ?? "";
+  const accountId = composeSendAccount()?.id?.trim() ?? "";
   if (!rid || !accountId) return;
   const ok = await openConfirmModal({
     title: "Restaurer cette version ?",

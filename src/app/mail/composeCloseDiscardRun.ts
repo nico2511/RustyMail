@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
@@ -14,7 +14,7 @@ export async function discardCurrentDraftSession(): Promise<void> {
     clearDraftSession();
     return;
   }
-  const accountId = currentAccount()?.id?.trim() ?? "";
+  const accountId = composeSendAccount()?.id?.trim() ?? "";
   const sessionId = state.draftSessionId?.trim() ?? "";
   const savedId = state.savedDraftRecordId?.trim() ?? "";
   requireComposeCloseFlowDeps().clearDraftRevisionDebounce();

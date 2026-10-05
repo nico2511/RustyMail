@@ -10,10 +10,32 @@ use crate::ai_llm_util::{
 use rustymail_domain::QuickRepliesResult;
 use rustymail_llm::{LlmEngine, LlmError};
 
+const QUICK_REPLY_TONES: &[&str] = &["neutral", "formal", "warm", "direct"];
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QuickPack {
     suggestions: Vec<rustymail_domain::QuickReplySuggestion>,
+}
+
+/// Un seul enum anglais ; tolère concaténations du modèle (`NEUTRALFORMAL`) et alias FR.
+pub(crate) fn normalize_quick_reply_tone(raw: &str) -> String {
+    let v = raw.trim().to_ascii_lowercase().replace([' ', '-', '_'], "");
+    if v.is_empty() {
+        return "neutral".into();
+    }
+    for t in QUICK_REPLY_TONES {
+        if v == *t || v.starts_with(t) {
+            return (*t).into();
+        }
+    }
+    match v.as_str() {
+        "neutre" => "neutral".into(),
+        "formel" | "formelle" => "formal".into(),
+        "chaleureux" | "chaleureuse" => "warm".into(),
+        "directe" => "direct".into(),
+        _ => "neutral".into(),
+    }
 }
 
 pub fn quick_replies_with_llm(
@@ -29,7 +51,12 @@ pub fn quick_replies_with_llm(
     let user = if ctx.is_empty() {
         "Aucune conversation donnée ; propose quand même 4 formulations générales de réponses polies type « merci », « bien reçu », « je reviens vers vous », etc.".to_string()
     } else {
-        untrusted_mail_for_engine(engine, "quick-reply-context", &ctx)
+        let body = untrusted_mail_for_engine(engine, "quick-reply-context", &ctx);
+        format!(
+            "Rôle : tu es le propriétaire de la boîte. Propose 4 réponses courtes au dernier message entrant.\n\
+Interdiction : ne reformule pas leur message, ne signe pas à leur place.\n\
+Fil :\n{body}"
+        )
     };
 
     let raw = engine.generate(
@@ -46,9 +73,7 @@ pub fn quick_replies_with_llm(
         .take(6)
         .map(|mut s| {
             s.text = s.text.trim().chars().take(400).collect();
-            if s.tone.trim().is_empty() {
-                s.tone = "neutre".into();
-            }
+            s.tone = normalize_quick_reply_tone(&s.tone);
             s.rationale = s.rationale.trim().chars().take(160).collect();
             s
         })
@@ -85,4 +110,17 @@ pub fn quick_replies_with_llm(
                 .unwrap_or(false),
         ),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_tone_picks_first_enum_from_concat() {
+        assert_eq!(normalize_quick_reply_tone("NEUTRALFORMAL"), "neutral");
+        assert_eq!(normalize_quick_reply_tone("formal-warm"), "formal");
+        assert_eq!(normalize_quick_reply_tone("formel"), "formal");
+        assert_eq!(normalize_quick_reply_tone(""), "neutral");
+    }
 }
