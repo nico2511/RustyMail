@@ -673,13 +673,16 @@ pub async fn llm_grammar_compose(
 fn llm_quick_reply_thread_compute(
     paths: &AppPaths,
     thread_id: String,
+    account_id: String,
 ) -> Result<rustymail_domain::QuickRepliesResult, String> {
     crate::ipc_guard::validate_thread_id(&thread_id)?;
     let prefs = load_app_prefs(&paths.prefs_path);
     llm_gate_feature(&prefs, paths, AiFeature::QuickReplyThread)?;
     let mut engine = build_llm_engine(&prefs, paths)?;
     let view = open_thread_domain(&paths.db_path, thread_id.trim())?;
-    let ctx = transcript_for_llm(&view, &engine);
+    // Transcript annoté (rôle entrant/sortant) pour éviter l’inversion de rôle dans les suggestions.
+    let owner = transcript_owner_for_account(&paths.db_path, account_id.trim());
+    let ctx = transcript_for_llm_with_owner(&view, &engine, &owner);
     let lang = prefs.general.mother_language.as_str();
     ai_quick_reply::quick_replies_with_llm(&mut engine, Some(ctx.as_str()), lang)
         .map_err(|e| e.to_string())
@@ -689,12 +692,16 @@ fn llm_quick_reply_thread_compute(
 pub async fn llm_quick_reply_thread(
     paths: State<'_, AppPaths>,
     thread_id: String,
+    account_id: Option<String>,
 ) -> Result<rustymail_domain::QuickRepliesResult, String> {
     let paths = Clone::clone(&*paths);
     let thread_id = thread_id.trim().to_string();
-    tauri::async_runtime::spawn_blocking(move || llm_quick_reply_thread_compute(&paths, thread_id))
-        .await
-        .map_err(|e| format!("llm_quick_reply_thread join: {e}"))?
+    let account_id = account_id.unwrap_or_default().trim().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        llm_quick_reply_thread_compute(&paths, thread_id, account_id)
+    })
+    .await
+    .map_err(|e| format!("llm_quick_reply_thread join: {e}"))?
 }
 
 fn llm_quick_reply_compose_compute(
