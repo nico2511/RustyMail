@@ -152,6 +152,13 @@ const CATALOG: &[PromptCatalogEntry] = &[
         &[]
     ),
     prompt_entry!(
+        "digest_cut_reformat",
+        "Digest cut — rewrite reading",
+        "../../prompts/digest_cut_reformat.system.txt",
+        &["output_language"],
+        &[]
+    ),
+    prompt_entry!(
         "agent_intent",
         "Agent — intent",
         "../../prompts/agent_intent.system.txt",

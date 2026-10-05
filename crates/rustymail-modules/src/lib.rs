@@ -9,6 +9,7 @@ pub mod ai_assist_skills;
 pub mod ai_assist_thread;
 pub mod ai_contact_profile;
 pub mod ai_digest_cut;
+pub mod ai_digest_cut_reformat;
 pub mod ai_extraction;
 pub mod ai_flux_affiner;
 pub mod ai_grammar;

@@ -51,7 +51,7 @@ function stepsNav(active: 1 | 2 | 3): string {
   const items: Array<{ n: 1 | 2 | 3; label: string; hint: string }> = [
     { n: 1, label: "Choisir", hint: "Un mail réel" },
     { n: 2, label: "Proposer", hint: "3 zones auto" },
-    { n: 3, label: "Ajuster", hint: "Puis aperçu" },
+    { n: 3, label: "Ajuster", hint: "Puis reformater" },
   ];
   return `<ol class="digest-cut__steps" aria-label="Étapes de l’éditeur de découpe">
     ${items
@@ -112,17 +112,21 @@ function zoneRow(name: DigestCutZoneName): string {
 }
 
 function previewPane(): string {
+  if (digestCut.reformatting) return `<p class="dim">Reformatage du texte…</p>`;
   if (digestCut.previewing) return `<p class="dim">Calcul de l’aperçu…</p>`;
   if (digestCut.previewError) {
     return `<p class="digest-bench__warn">${escapeHtml(digestCut.previewError)}</p>`;
   }
-  if (digestCut.previewApplicable === false) {
+  if (digestCut.previewApplicable === false && !digestCut.reformattedHtml.trim()) {
     return `<p class="digest-bench__warn">Cette découpe ne colle pas à ce mail (domaine ou repères). La lecture resterait normale.</p>`;
   }
   if (digestCut.previewApplicable && digestCut.previewHtml) {
-    return sanitizeEmailHtml(digestCut.previewHtml).html;
+    const note = digestCut.reformattedHtml.trim()
+      ? `<p class="digest-cut__reformat-note dim">Lecture reformattée (texte réécrit).</p>`
+      : "";
+    return `${note}${sanitizeEmailHtml(digestCut.previewHtml).html}`;
   }
-  return `<p class="digest-cut__empty-hint">Cliquez <strong>Voir l’aperçu</strong> pour comparer avec le mail d’origine.</p>`;
+  return `<p class="digest-cut__empty-hint">Ajustez les zones, puis <strong>Reformater le texte (IA)</strong> pour une lecture claire.</p>`;
 }
 
 function threadList(): string {
@@ -239,17 +243,17 @@ function pickSection(loaded: boolean): string {
 }
 
 function proposeSection(loaded: boolean): string {
-  const busy = digestCut.proposing ? "disabled" : "";
+  const busy = digestCut.proposing || digestCut.reformatting ? "disabled" : "";
   const ready = Boolean(digestCut.proposal);
   return `<section class="digest-cut__card${loaded ? "" : " digest-cut__card--disabled"}" aria-labelledby="digest-cut-step2">
     <header class="digest-cut__card-head">
       <h4 id="digest-cut-step2" class="digest-cut__card-title"><span class="digest-cut__card-n">2</span> Proposer la découpe</h4>
       ${ready ? `<span class="digest-cut__badge digest-cut__badge--ok">Fait</span>` : `<span class="digest-cut__badge">${loaded ? "À faire" : "Bloqué"}</span>`}
     </header>
-    <p class="digest-bench__fine">L’app découpe le mail en <strong>en-tête</strong>, <strong>corps</strong> et <strong>pied</strong>, et explique le choix en français.</p>
+    <p class="digest-bench__fine">L’IA (ou la structure) choisit <strong>en-tête</strong>, <strong>corps</strong> et <strong>pied</strong>. Ensuite seulement on reformate le texte.</p>
     <div class="digest-cut__actions">
-      <button type="button" class="primary-button" data-action="digest-cut-propose" ${loaded && !digestCut.proposing ? "" : "disabled"} ${busy}>${digestCut.proposing ? "Proposition…" : ready ? "Reproposer" : "Proposer"}</button>
-      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && !digestCut.proposing ? "" : "disabled"} ${busy} title="Le modèle local revérifie chaque zone (balises complètes)">Valider avec l’IA</button>
+      <button type="button" class="primary-button" data-action="digest-cut-propose" ${loaded && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy}>${digestCut.proposing ? "Proposition…" : ready ? "Reproposer" : "Proposer"}</button>
+      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && ready && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy} title="Le modèle local revérifie les zones">Valider les zones (IA)</button>
     </div>
     <p class="digest-bench__fine dim">Rien n’est activé en lecture automatique depuis cet écran.</p>
   </section>`;
@@ -258,10 +262,18 @@ function proposeSection(loaded: boolean): string {
 function adjustSection(): string {
   const hasProposal = Boolean(digestCut.proposal);
   const explanation = digestCut.proposal?.explanationFr?.trim() ?? "";
+  const busy = digestCut.proposing || digestCut.reformatting || digestCut.previewing;
+  const reformatted = Boolean(digestCut.reformattedHtml.trim());
   return `<section class="digest-cut__card${hasProposal ? "" : " digest-cut__card--disabled"}" aria-labelledby="digest-cut-step3">
     <header class="digest-cut__card-head">
-      <h4 id="digest-cut-step3" class="digest-cut__card-title"><span class="digest-cut__card-n">3</span> Ajuster et comparer</h4>
-      ${hasProposal ? `<span class="digest-cut__badge digest-cut__badge--ok">Ouvert</span>` : `<span class="digest-cut__badge">Après l’étape 2</span>`}
+      <h4 id="digest-cut-step3" class="digest-cut__card-title"><span class="digest-cut__card-n">3</span> Ajuster et reformater</h4>
+      ${
+        reformatted
+          ? `<span class="digest-cut__badge digest-cut__badge--ok">Texte reformatté</span>`
+          : hasProposal
+            ? `<span class="digest-cut__badge digest-cut__badge--ok">Zones prêtes</span>`
+            : `<span class="digest-cut__badge">Après l’étape 2</span>`
+      }
     </header>
     ${
       hasProposal
@@ -274,10 +286,14 @@ function adjustSection(): string {
            <div class="digest-cut__zones">${zoneRow("header")}${zoneRow("body")}${zoneRow("footer")}</div>
            ${paintBar()}
            <div class="digest-cut__actions">
-             <button type="button" class="primary-button" data-action="digest-cut-preview">${digestCut.previewing ? "Aperçu…" : "Voir l’aperçu"}</button>
+             <button type="button" class="primary-button" data-action="digest-cut-reformat" ${busy ? "disabled" : ""}>${
+               digestCut.reformatting ? "Reformatage…" : reformatted ? "Reformater à nouveau" : "Reformater le texte (IA)"
+             }</button>
+             <button type="button" class="ghost-button" data-action="digest-cut-preview" ${busy ? "disabled" : ""}>${digestCut.previewing ? "Aperçu…" : "Voir l’aperçu"}</button>
              <button type="button" class="ghost-button" data-action="digest-cut-toggle-code" aria-pressed="${digestCut.showCode ? "true" : "false"}">${digestCut.showCode ? "Masquer le code" : "Détails techniques"}</button>
-           </div>`
-        : `<p class="digest-cut__empty-hint">Quand une proposition existe, vous réglez ici chaque zone puis comparez à droite.</p>`
+           </div>
+           <p class="digest-bench__fine dim">D’abord les zones, puis l’IA réécrit une lecture claire (titre, détails, sans le bruit du pied).</p>`
+        : `<p class="digest-cut__empty-hint">Quand une proposition existe, vous réglez les zones puis reformatez le texte.</p>`
     }
   </section>`;
 }

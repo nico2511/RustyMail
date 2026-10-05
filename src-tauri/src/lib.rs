@@ -2425,7 +2425,8 @@ pub fn run() {
             digest_cut::digest_cut_parse_eml,
             digest_cut::digest_cut_propose_zones,
             digest_cut::digest_cut_proposal_yaml,
-            digest_cut::digest_cut_preview
+            digest_cut::digest_cut_preview,
+            digest_cut::digest_cut_reformat
         ])
         .build(tauri::generate_context!())
         .expect("failed to build RustyMail")

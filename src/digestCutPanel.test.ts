@@ -86,7 +86,8 @@ describe("renderDigestCutPanel", () => {
     expect(html).toContain('data-action="digest-cut-paint-zone"');
     expect(html).toContain("Changer le bloc");
     expect(html).toContain("bloc HTML complet");
-    expect(html).toContain("Valider avec l’IA");
+    expect(html).toContain("Valider les zones (IA)");
+    expect(html).toContain("Reformater le texte (IA)");
     expect(html).toContain('aria-pressed="true">Afficher');
     expect(html).toContain("Voir l’aperçu");
     expect(html).not.toContain('id="digest-cut-yaml"');

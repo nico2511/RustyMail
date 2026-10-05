@@ -1,6 +1,7 @@
 //! Éditeur de découpe digest (aperçu + proposition de zones). N'écrit pas la lecture.
 
 use rustymail_modules::ai_digest_cut::propose_digest_cut_zones;
+use rustymail_modules::ai_digest_cut_reformat::reformat_digest_cut_reading;
 use rustymail_modules::mail_cleaning::digest_fixtures::{
     proposal_to_fixture_yaml, DigestCutProposal,
 };
@@ -61,6 +62,24 @@ pub struct DigestCutYamlPayload {
 #[serde(rename_all = "camelCase")]
 pub struct DigestCutYamlView {
     pub yaml: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DigestCutReformatPayload {
+    pub html: String,
+    pub sender_email: String,
+    pub current: DigestCutProposal,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DigestCutReformatView {
+    pub proposal: DigestCutProposal,
+    pub reading_html: String,
+    pub from_model: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_reason: Option<String>,
 }
 
 /// Conservé pour un test interne. L'écran ne l'appelle pas : le mail vient de la boîte, du message ouvert, ou d'un `.eml`.
@@ -144,6 +163,47 @@ pub fn digest_cut_preview(
     payload: DigestPreviewPayload,
 ) -> Result<crate::digest_bench::DigestPreviewView, String> {
     crate::digest_bench::digest_fixture_preview(payload)
+}
+
+/// Après les zones : réécrit / reformate le texte pour la lecture (IA ou repli local).
+#[tauri::command]
+pub fn digest_cut_reformat(
+    paths: State<'_, AppPaths>,
+    payload: DigestCutReformatPayload,
+) -> Result<DigestCutReformatView, String> {
+    validate_html(&payload.html)?;
+    validate_sender(&payload.sender_email)?;
+    let prefs = rustymail_infrastructure::load_app_prefs(&paths.prefs_path);
+    let lang = prefs.ai.draft_language.trim();
+    let lang = if lang.is_empty() { "fr" } else { lang };
+    let outcome = match build_llm_engine(&prefs, &paths) {
+        Ok(mut engine) => reformat_digest_cut_reading(
+            Some(&mut engine),
+            &payload.html,
+            &payload.sender_email,
+            lang,
+            &payload.current,
+        ),
+        Err(e) => {
+            let mut out = reformat_digest_cut_reading(
+                None,
+                &payload.html,
+                &payload.sender_email,
+                lang,
+                &payload.current,
+            );
+            out.fallback_reason = Some(format!(
+                "Moteur IA indisponible pour le reformatage : {e}. Même chemin que Paramètres → IA."
+            ));
+            out
+        }
+    };
+    Ok(DigestCutReformatView {
+        proposal: outcome.proposal,
+        reading_html: outcome.reading_html,
+        from_model: outcome.from_model,
+        fallback_reason: outcome.fallback_reason,
+    })
 }
 
 #[cfg(test)]

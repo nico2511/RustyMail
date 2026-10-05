@@ -85,9 +85,12 @@ export const digestCut = {
   yaml: "",
   yamlReady: false,
   proposing: false,
+  reformatting: false,
   previewing: false,
   previewApplicable: null as boolean | null,
   previewHtml: "",
+  /** Lecture réécrite par l’IA (prioritaire sur l’aperçu fixture). */
+  reformattedHtml: "",
   previewError: "",
   showCode: false,
   notice: "",

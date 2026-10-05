@@ -52,12 +52,21 @@ type PreviewView = {
   error?: string | null;
 };
 
+type ReformatView = {
+  proposal: DigestCutProposal;
+  readingHtml: string;
+  fromModel: boolean;
+  fallbackReason?: string | null;
+};
+
 function clearCutResult(): void {
   digestCut.proposal = null;
   digestCut.yaml = "";
   digestCut.yamlReady = false;
   digestCut.previewApplicable = null;
   digestCut.previewHtml = "";
+  digestCut.reformattedHtml = "";
+  digestCut.reformatting = false;
   digestCut.previewError = "";
   digestCut.showCode = false;
   digestCut.paintZone = null;
@@ -256,6 +265,7 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
       },
     });
     digestCut.proposal = view.proposal;
+    digestCut.reformattedHtml = "";
     if (!view.proposal.explanationFr?.trim()) {
       view.proposal.explanationFr = explainZonesFr(view.proposal);
     }
@@ -268,7 +278,7 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
     await previewDigestCut();
     if (view.fromModel) {
       digestCut.notice =
-        "Proposition IA : chaque zone colorée est un bloc HTML complet. Ajustez au clic, puis confirmez.";
+        "Zones proposées. Ajustez si besoin, puis Reformater le texte (IA).";
     } else {
       const why = view.fallbackReason?.trim() ?? "";
       if (/contexte trop|n_ctx/i.test(why)) {
@@ -306,6 +316,7 @@ export function setDigestCutZoneAction(zone: DigestCutZoneName, action: DigestCu
   if (!digestCut.proposal) return;
   digestCut.proposal.zones[zone].action = action;
   digestCut.proposal.explanationFr = explainZonesFr(digestCut.proposal);
+  digestCut.reformattedHtml = "";
   // Un seul remount via preview (évite un double reset de scroll settings).
   void syncYamlFromProposal().then(() => previewDigestCut());
 }
@@ -329,6 +340,7 @@ function applyPaintPickAndPreview(): void {
     render();
     return;
   }
+  digestCut.reformattedHtml = "";
   if (digestCut.proposal) {
     digestCut.proposal.explanationFr = explainZonesFr(digestCut.proposal);
   }
@@ -443,8 +455,69 @@ export function toggleDigestCutCode(): void {
   render();
 }
 
+export async function reformatDigestCutReading(): Promise<void> {
+  captureDigestCutDom();
+  if (!digestCut.proposal || !digestCut.html.trim()) {
+    digestCut.notice = "Proposez ou peignez d’abord les zones, puis reformatez le texte.";
+    render();
+    return;
+  }
+  if (!isTauriRuntime()) {
+    digestCut.notice = "Le reformatage passe par l'application.";
+    render();
+    return;
+  }
+  digestCut.reformatting = true;
+  digestCut.notice = "Reformatage du texte (IA)…";
+  render();
+  try {
+    const view = await invoke<ReformatView>("digest_cut_reformat", {
+      payload: {
+        html: digestCut.html,
+        senderEmail: digestCut.senderEmail,
+        current: digestCut.proposal,
+      },
+    });
+    digestCut.proposal = view.proposal;
+    if (!view.proposal.explanationFr?.trim()) {
+      view.proposal.explanationFr = explainZonesFr(view.proposal);
+    }
+    digestCut.reformattedHtml = view.readingHtml?.trim() ?? "";
+    revalidateProposalFromHtml(view.proposal, digestCut.html, view.fromModel ? "llm" : "heuristic");
+    await syncYamlFromProposal();
+    if (digestCut.reformattedHtml) {
+      digestCut.previewApplicable = true;
+      digestCut.previewHtml = digestCut.reformattedHtml;
+      digestCut.previewError = "";
+    } else {
+      await previewDigestCut();
+    }
+    if (view.fromModel) {
+      digestCut.notice =
+        "Texte reformatté par l’IA : titre/détails clarifiés à droite. Les zones restent celles choisies.";
+    } else {
+      const why = view.fallbackReason?.trim() ?? "";
+      digestCut.notice = why
+        ? `Reformatage local (repli). ${why}`
+        : "Reformatage structurel local (sans modèle).";
+    }
+  } catch (error) {
+    digestCut.notice = tauriErrorMessage(error);
+  } finally {
+    digestCut.reformatting = false;
+    render();
+  }
+}
+
 export async function previewDigestCut(): Promise<void> {
   captureDigestCutDom();
+  if (digestCut.reformattedHtml.trim()) {
+    digestCut.previewApplicable = true;
+    digestCut.previewHtml = digestCut.reformattedHtml;
+    digestCut.previewError = "";
+    render();
+    return;
+  }
   if (!digestCut.yaml.trim() || !digestCut.html.trim()) {
     digestCut.previewApplicable = null;
     digestCut.previewHtml = "";
@@ -500,6 +573,9 @@ export async function handleDigestCutAction(action: string, element?: HTMLElemen
       return true;
     case "digest-cut-refine":
       await proposeDigestCutZones(true);
+      return true;
+    case "digest-cut-reformat":
+      await reformatDigestCutReading();
       return true;
     case "digest-cut-preview":
       await previewDigestCut();

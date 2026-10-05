@@ -10636,5 +10636,6 @@ button.thread-tag-chip--search:focus-visible {
 .digest-cut__paint-check.digest-cut__check--ok { color: #166534; }
 .digest-cut__paint-check.digest-cut__check--warn { color: #92400e; }
 .digest-cut__paint-check.digest-cut__check--bad { color: #991b1b; }
+.digest-cut__reformat-note { margin: 0 0 8px; font-size: 12px; }
 .digest-cut__file { display: inline-flex; align-items: center; cursor: pointer; }
 .digest-cut__code { margin-top: 10px; }
