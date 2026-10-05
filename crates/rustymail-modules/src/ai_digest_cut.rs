@@ -603,7 +603,9 @@ mod tests {
     fn prompt_example_has_non_empty_header_and_body_anchors() {
         let prompt = include_str!("../prompts/digest_cut.system.txt");
         let start = prompt.find("{\"fixtureId\"").expect("example json");
-        let end = prompt[start..].find('\n').map_or(prompt.len(), |i| start + i);
+        let end = prompt[start..]
+            .find('\n')
+            .map_or(prompt.len(), |i| start + i);
         let example: serde_json::Value =
             serde_json::from_str(prompt[start..end].trim()).expect("example parses");
         let dto: super::DigestCutDto = serde_json::from_value(example).expect("example dto");

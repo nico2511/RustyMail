@@ -1114,7 +1114,12 @@ mod tests {
             proposal.zones.body.anchors
         );
         assert!(!proposal.zones.footer.anchors.is_empty());
-        assert!(proposal.zones.body.anchors.iter().all(|a| a.selector.as_deref() == Some("tr")));
+        assert!(proposal
+            .zones
+            .body
+            .anchors
+            .iter()
+            .all(|a| a.selector.as_deref() == Some("tr")));
         let yaml = proposal_to_fixture_yaml(&proposal).expect("yaml");
         let preview = preview_candidate_fixture(&yaml, NESTED_TABLE_MARKETING, "news@boutique.fr");
         assert!(preview.applicable, "{:?}", preview.error);
@@ -1149,7 +1154,12 @@ mod tests {
         let classless_nested = "<table><tbody><tr><td><table><tbody>\
 <tr><td>Titre</td></tr><tr><td>Texte du message</td></tr>\
 </tbody></table></td></tr></tbody></table>";
-        for html in [classless_nested, "<p>seul</p>", "<div></div>", NESTED_TABLE_MARKETING] {
+        for html in [
+            classless_nested,
+            "<p>seul</p>",
+            "<div></div>",
+            NESTED_TABLE_MARKETING,
+        ] {
             let proposal = analyze_html_structure_heuristic(html, "a@b.fr");
             assert!(!proposal.zones.body.anchors.is_empty(), "{html}");
             assert!(!proposal.zones.header.anchors.is_empty(), "{html}");

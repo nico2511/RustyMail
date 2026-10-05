@@ -68,11 +68,7 @@ pub fn transcript_role(
     } else {
         bare_email(sender_display)
     };
-    if !candidate.is_empty()
-        && owner_addresses
-            .iter()
-            .any(|a| bare_email(a) == candidate)
-    {
+    if !candidate.is_empty() && owner_addresses.iter().any(|a| bare_email(a) == candidate) {
         TranscriptRole::Outgoing
     } else {
         TranscriptRole::Incoming
@@ -203,8 +199,16 @@ pub fn should_run_slot_skill(
     if !needs {
         return false;
     }
-    // L’expéditeur a déjà proposé le créneau : ne pas proposer de créneaux à sa place.
-    if intent.is_some_and(|i| i.speech_act == SPEECH_ACT_SENDER_PROPOSES_MEETING) {
+    // L’expéditeur a déjà proposé le créneau : ne pas proposer de créneaux à sa place
+    // (speech_act ou faits typés sender/proposer|proposal — même logique que l’inversion de rôle).
+    if intent.is_some_and(|i| i.speech_act == SPEECH_ACT_SENDER_PROPOSES_MEETING)
+        || facts.is_some_and(|f| {
+            f.facts.iter().any(|fact| {
+                fact.actor.as_deref() == Some("sender")
+                    && (fact.actor_role.as_deref() == Some("proposer") || fact.kind == "proposal")
+            })
+        })
+    {
         return false;
     }
     if !facts_support_scheduling(facts) {
@@ -816,7 +820,30 @@ mod tests {
             speech_act: "owner_must_propose".into(),
             ..intent
         };
-        assert!(should_run_slot_skill(&r, Some(&owner_proposes), "", Some(&facts)));
+        assert!(should_run_slot_skill(
+            &r,
+            Some(&owner_proposes),
+            "",
+            Some(&facts)
+        ));
+        // Speech act manquant / faux, mais faits typés sender → toujours skip.
+        let mut sender_fact = AssistFact::new(
+            "proposal",
+            "Rendez-vous proposé le mercredi 18 novembre le matin.",
+        );
+        sender_fact.actor = Some("sender".into());
+        sender_fact.actor_role = Some("proposer".into());
+        let facts_typed = AssistFactsSnapshot {
+            facts: vec![sender_fact],
+            ambiguities: vec![],
+            confidence: 0.9,
+        };
+        assert!(!should_run_slot_skill(
+            &r,
+            Some(&owner_proposes),
+            "",
+            Some(&facts_typed)
+        ));
     }
 
     #[test]
@@ -855,7 +882,10 @@ mod tests {
             TranscriptRole::Incoming
         );
         assert_eq!(transcript_role("", "", &owner), TranscriptRole::Incoming);
-        assert_eq!(transcript_role("a@b.fr", "A", &[]), TranscriptRole::Incoming);
+        assert_eq!(
+            transcript_role("a@b.fr", "A", &[]),
+            TranscriptRole::Incoming
+        );
     }
 
     #[test]
@@ -872,7 +902,9 @@ mod tests {
             "ACTION DEPANNAGE",
             "2026-10-01",
         );
-        assert!(head.starts_with("[message_id=m1] rôle=entrant boîte=nico@example.com de ACTION DEPANNAGE"));
+        assert!(head.starts_with(
+            "[message_id=m1] rôle=entrant boîte=nico@example.com de ACTION DEPANNAGE"
+        ));
         let no_box = transcript_message_header("m2", TranscriptRole::Outgoing, None, "Moi", "d");
         assert!(no_box.contains("rôle=sortant de Moi"));
         assert!(!transcript_owner_preamble(None).contains("Boîte du propriétaire"));

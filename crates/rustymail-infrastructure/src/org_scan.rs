@@ -1332,7 +1332,8 @@ fn scan_empty_mailboxes(conn: &Connection, account_id: &str) -> Result<Vec<OrgPr
             continue;
         }
         // INBOX et dossiers protégés : 0 message en cache n’est pas un signal « vide ».
-        if is_protected_mailbox_for_org_delete(&mb) || is_protected_mailbox_for_org_delete(&resolved)
+        if is_protected_mailbox_for_org_delete(&mb)
+            || is_protected_mailbox_for_org_delete(&resolved)
         {
             continue;
         }
@@ -1406,7 +1407,9 @@ mod tests {
 
     #[test]
     fn detects_empty_mailbox_claims() {
-        assert!(orientation_claims_empty_mailbox("Votre boîte vide ne nécessite rien."));
+        assert!(orientation_claims_empty_mailbox(
+            "Votre boîte vide ne nécessite rien."
+        ));
         assert!(orientation_claims_empty_mailbox("The mailbox is empty."));
         assert!(!orientation_claims_empty_mailbox(
             "Aucun message non lu, mais 40 fils dans Projets."
@@ -1422,7 +1425,12 @@ mod tests {
         let old =
             (Utc::now() - Duration::days(120)).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
         insert_stale_inbox_thread(&conn, "acc-a", "t1", &old);
-        for mb in ["INBOX", "INBOX.Archive2020", "Perso/Vraiment", "Perso.Vraiment2"] {
+        for mb in [
+            "INBOX",
+            "INBOX.Archive2020",
+            "Perso/Vraiment",
+            "Perso.Vraiment2",
+        ] {
             conn.execute(
                 "INSERT INTO imap_state (account_id, mailbox, last_uid) VALUES ('acc-a', ?1, 0)",
                 params![mb],
@@ -1444,7 +1452,11 @@ mod tests {
         .expect("message");
         let out = scan_empty_mailboxes(&conn, "acc-a").expect("scan");
         assert_eq!(out.len(), 1);
-        let names: Vec<&str> = out[0].thread_refs.iter().map(|r| r.mailbox.as_str()).collect();
+        let names: Vec<&str> = out[0]
+            .thread_refs
+            .iter()
+            .map(|r| r.mailbox.as_str())
+            .collect();
         assert_eq!(names, vec!["Perso/Vraiment"]);
         assert!(out[0].title.contains("sans cache local"));
     }

@@ -363,9 +363,8 @@ pub fn consistency_check_with_llm(
             )
         })
         .unwrap_or_default();
-    let user = format!(
-        "FIL :\n{ctx}\n\nFAITS :\n{facts_json}{intent_line}\n\nBROUILLON :\n{draft_clip}"
-    );
+    let user =
+        format!("FIL :\n{ctx}\n\nFAITS :\n{facts_json}{intent_line}\n\nBROUILLON :\n{draft_clip}");
     let raw = engine.generate(
         system.as_str(),
         &user,
@@ -499,15 +498,24 @@ mod tests {
 
     const INVERTED_DRAFT: &str = "Bonjour,\n\nMerci de nous informer de cette maintenance. \
 Pourriez-vous nous indiquer vos disponibilités pour le nettoyage ?\n\nCordialement";
-    const GOOD_DRAFT: &str = "Bonjour,\n\nLe mercredi 18 novembre le matin me convient pour le nettoyage. \
+    const GOOD_DRAFT: &str =
+        "Bonjour,\n\nLe mercredi 18 novembre le matin me convient pour le nettoyage. \
 Pouvez-vous préciser l'heure d'arrivée ?\n\nCordialement";
 
     #[test]
     fn role_inversion_detected_when_sender_proposes() {
         let facts = sender_proposal_facts();
         assert!(sender_proposes_meeting(None, Some(&facts)));
-        assert!(draft_inverts_proposal_roles(None, Some(&facts), INVERTED_DRAFT));
-        assert!(!draft_inverts_proposal_roles(None, Some(&facts), GOOD_DRAFT));
+        assert!(draft_inverts_proposal_roles(
+            None,
+            Some(&facts),
+            INVERTED_DRAFT
+        ));
+        assert!(!draft_inverts_proposal_roles(
+            None,
+            Some(&facts),
+            GOOD_DRAFT
+        ));
     }
 
     #[test]
@@ -515,7 +523,11 @@ Pouvez-vous préciser l'heure d'arrivée ?\n\nCordialement";
         let i = intent(SPEECH_ACT_SENDER_PROPOSES_MEETING);
         assert!(draft_inverts_proposal_roles(Some(&i), None, INVERTED_DRAFT));
         let other = intent("sender_informs");
-        assert!(!draft_inverts_proposal_roles(Some(&other), None, INVERTED_DRAFT));
+        assert!(!draft_inverts_proposal_roles(
+            Some(&other),
+            None,
+            INVERTED_DRAFT
+        ));
         assert!(!draft_inverts_proposal_roles(None, None, INVERTED_DRAFT));
     }
 
@@ -548,7 +560,8 @@ Pouvez-vous préciser l'heure d'arrivée ?\n\nCordialement";
         assert!(!inv && guidance.is_none() && issues.is_empty() && flags.is_empty());
 
         // Le drapeau du LLM seul suffit.
-        let (inv, _) = apply_role_inversion(true, None, &facts, GOOD_DRAFT, &mut issues, &mut flags);
+        let (inv, _) =
+            apply_role_inversion(true, None, &facts, GOOD_DRAFT, &mut issues, &mut flags);
         assert!(inv);
     }
 

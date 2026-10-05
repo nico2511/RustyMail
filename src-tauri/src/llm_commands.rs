@@ -245,7 +245,10 @@ pub(crate) fn transcript_owner_for_account(
         })
         .map(|a| a.email.trim().to_string())
         .filter(|e| !e.is_empty());
-    let addresses = accounts.iter().map(|a| a.email.trim().to_string()).collect();
+    let addresses = accounts
+        .iter()
+        .map(|a| a.email.trim().to_string())
+        .collect();
     TranscriptOwner { mailbox, addresses }
 }
 

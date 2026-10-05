@@ -509,9 +509,7 @@ mod compose_html_send_tests {
         assert!(lower.contains("multipart/alternative"), "{raw}");
         assert!(lower.contains("content-id:"), "{raw}");
         // related doit envelopper le HTML (pas l’alternative) : le Content-ID suit text/html.
-        let related_at = lower
-            .find("multipart/related")
-            .expect("related");
+        let related_at = lower.find("multipart/related").expect("related");
         let html_at = lower.find("text/html").expect("html");
         let cid_at = lower.find("content-id:").expect("cid");
         assert!(

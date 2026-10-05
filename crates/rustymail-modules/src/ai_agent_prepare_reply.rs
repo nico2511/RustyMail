@@ -322,7 +322,10 @@ mod tests {
             normalize_speech_act(" Sender-Proposes Meeting "),
             "sender_proposes_meeting"
         );
-        assert_eq!(normalize_speech_act("owner_must_propose"), "owner_must_propose");
+        assert_eq!(
+            normalize_speech_act("owner_must_propose"),
+            "owner_must_propose"
+        );
         assert_eq!(normalize_speech_act("whatever"), "");
     }
 

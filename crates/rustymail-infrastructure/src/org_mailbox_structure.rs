@@ -76,8 +76,8 @@ pub fn analyze_mailbox_structure(
 
     // Même résolution de noms que la barre latérale (`sqlite_mailbox_sidebar_counts`) :
     // un alias entre `imap_state` et `messages.mailbox` ne doit pas produire un faux « vide ».
-    let mut candidates = crate::mailbox_resolution_candidates(conn, account_id)
-        .map_err(|e| e.to_string())?;
+    let mut candidates =
+        crate::mailbox_resolution_candidates(conn, account_id).map_err(|e| e.to_string())?;
     {
         let known: BTreeSet<String> = candidates.iter().cloned().collect();
         for n in &raw_names {
@@ -88,7 +88,10 @@ pub fn analyze_mailbox_structure(
     }
     let mut names: BTreeSet<String> = BTreeSet::new();
     for n in &raw_names {
-        names.insert(crate::resolve_scoped_mailbox_with_candidates(n, &candidates));
+        names.insert(crate::resolve_scoped_mailbox_with_candidates(
+            n,
+            &candidates,
+        ));
     }
     let mut counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     for (mb, tc, mc) in raw_counts {
@@ -205,7 +208,11 @@ pub fn format_org_mailbox_overview(
     structure: &OrgMailboxStructure,
     thread_count: usize,
 ) -> String {
-    let names: Vec<String> = structure.entries.iter().map(|e| e.mailbox.clone()).collect();
+    let names: Vec<String> = structure
+        .entries
+        .iter()
+        .map(|e| e.mailbox.clone())
+        .collect();
     let sidebar = crate::sidebar_counts_on_connection(conn, account_id, &names).unwrap_or_default();
     // (nom, fils, non lus) ; repli sur les compteurs de structure si la requête échoue.
     let mut folders: Vec<(String, usize, usize)> = if sidebar.is_empty() {
