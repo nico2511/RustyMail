@@ -74,7 +74,8 @@ function publish(next: DesktopUpdatePhase, opts?: { toast?: string }): void {
     else if (next.kind === "uptodate" || next.kind === "ready") toast.success(opts.toast);
     else toast.info(opts.toast);
   }
-  if (state.view === "settings" && state.settingsTab === "general") render();
+  const chromeKinds = next.kind === "available" || next.kind === "ready";
+  if (chromeKinds || (state.view === "settings" && state.settingsTab === "general")) render();
 }
 
 async function replacePending(next: PendingUpdate | null): Promise<void> {
@@ -121,7 +122,6 @@ export async function checkForDesktopUpdate(opts?: { quiet?: boolean }): Promise
           },
         },
       });
-      if (state.view === "settings" && state.settingsTab === "general") render();
     }
   } catch (error) {
     await replacePending(null);

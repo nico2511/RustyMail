@@ -24,7 +24,6 @@ import { initials } from "../../lib/tags";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
 import type { ThreadListItem } from "../../types";
-import { inboxScopeTitleEligible, renderInboxScopeTitleHtml } from "./accountScopeRender";
 import {
   renderAccountsRecoveryBanner,
   renderDefaultAccountPromptBanner,
@@ -345,15 +344,7 @@ export function renderList(mode: "full" | "threads-only" | "filters-only" = "ful
                   ? `<button type="button" class="ghost-button inbox-back-imap-btn" data-action="clear-search-exit" title="Quitter la recherche et revenir au dossier">← ${escapeHtml(threadMailboxListLabel(mailboxTitleRaw).label)}</button>`
                 : ""
               }
-              ${
-                inboxScopeTitleEligible(listMailbox, {
-                  draft: draftBoxVirtual,
-                  search: searchContext,
-                  panel: Boolean(panelMb),
-                })
-                  ? renderInboxScopeTitleHtml()
-                  : `<h1 class="inbox-mailbox-title${searchContext ? " inbox-mailbox-title--search" : ""}">${mailboxLabel}</h1>`
-              }
+              <h1 class="inbox-mailbox-title${searchContext ? " inbox-mailbox-title--search" : ""}">${mailboxLabel}</h1>
               ${
                 savedView && (savedView.newCount ?? 0) > 0
                   ? `<span class="inbox-view-new-pill" aria-label="${savedView.newCount} nouveau${savedView.newCount === 1 ? "" : "x"}">+${savedView.newCount}</span>`

@@ -6,8 +6,8 @@ export function enterComposeView(opts?: { skipHistory?: boolean }): void {
   enterComposeViewImpl(opts);
 }
 
-export function startNewDraftSession(): void {
-  startNewDraftSessionImpl();
+export function startNewDraftSession(opts?: { sendAccountId?: string | null }): void {
+  startNewDraftSessionImpl(opts);
 }
 
 export function syncPreviewOpenFromComposeLayout(): void {

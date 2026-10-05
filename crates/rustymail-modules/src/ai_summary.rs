@@ -7,11 +7,11 @@ use serde::Deserialize;
 
 use crate::ai_llm_contracts::{validate_summary_llm_shape, SUMMARY_THREAD_JSON_GBNF};
 use crate::ai_llm_util::{
-    budget_report, cancelled_llm_err, gen_params_json_for_prompt, parse_model_json,
-    stream_chunk_or_cancel, truncate_chars, untrusted_mail_for_engine,
+    budget_report, cancelled_llm_err, gen_params_json_for_prompt, output_room_after_prompt,
+    parse_model_json, stream_chunk_or_cancel, truncate_chars, untrusted_mail_for_engine,
 };
 use rustymail_domain::{DiscussionThreadView, Message, TokenBudgetReport};
-use rustymail_llm::{LlmEngine, LlmError};
+use rustymail_llm::{LlmEngine, LlmError, LlmGenParams};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct SummaryResult {
@@ -72,18 +72,86 @@ struct SummaryLlmDto {
     source_message_ids: Vec<String>,
 }
 
-fn transcript_for_summary(view: &DiscussionThreadView) -> String {
-    let mut parts = Vec::with_capacity(view.messages.len().min(42) + 1);
+/// Place minimale réservée à la sortie JSON (sinon `max_tokens` tombe à 1 et la synthèse est vide).
+const MIN_SUMMARY_OUTPUT_ROOM: u32 = 384;
+const MIN_SUMMARY_OUTPUT_TOKENS: u32 = 384;
+const MAX_SUMMARY_OUTPUT_TOKENS: u32 = 4096;
+const SUMMARY_CTX_ERR: &str = "Synthèse impossible : la fenêtre de contexte ne laisse pas assez de place pour un JSON complet. Augmentez n_ctx dans Paramètres → IA, ou ouvrez un fil plus court.";
+
+fn transcript_for_summary(
+    view: &DiscussionThreadView,
+    max_messages: usize,
+    per_message_chars: usize,
+) -> String {
+    let mut parts = Vec::with_capacity(max_messages.min(view.messages.len()) + 2);
     parts.push(format!("Sujet du fil : {}\n", view.subject));
-    for message in view.messages.iter().take(40) {
+    let total = view.messages.len();
+    let take = max_messages.min(total).max(usize::from(total > 0));
+    let start = total.saturating_sub(take);
+    if start > 0 {
+        parts.push(format!(
+            "…({start} message(s) antérieur(s) omis pour laisser de la place au résumé)\n"
+        ));
+    }
+    for message in view.messages.iter().skip(start).take(take) {
         parts.push(format!(
             "[message_id={}] {}\n{}\n",
             message.message_id,
             message.sender,
-            truncate_chars(message.cleaned_text.as_str(), 4000),
+            truncate_chars(message.cleaned_text.as_str(), per_message_chars),
         ));
     }
     parts.join("\n")
+}
+
+/// Réduit le transcript tant que le prompt mange toute la fenêtre (fils longs / multi-conversations).
+fn fit_summary_user(
+    engine: &LlmEngine,
+    system: &str,
+    view: &DiscussionThreadView,
+) -> Result<(String, bool), LlmError> {
+    let mut max_messages = view.messages.len().min(40).max(1);
+    let mut per_message_chars = 4000usize;
+    let original_chars =
+        transcript_for_summary(view, max_messages, per_message_chars).chars().count();
+    for _ in 0..16 {
+        let transcript = transcript_for_summary(view, max_messages, per_message_chars);
+        let user = untrusted_mail_for_engine(engine, "thread-summary", &transcript);
+        let room = output_room_after_prompt(engine, system, &user, 64);
+        let clipped = transcript.chars().count() < original_chars;
+        if room >= MIN_SUMMARY_OUTPUT_ROOM {
+            return Ok((user, clipped));
+        }
+        if per_message_chars > 700 {
+            per_message_chars = (per_message_chars * 2 / 3).max(700);
+        } else if max_messages > 2 {
+            max_messages = (max_messages * 2 / 3).max(2);
+        } else if per_message_chars > 220 {
+            per_message_chars = (per_message_chars * 2 / 3).max(220);
+        } else if max_messages > 1 {
+            max_messages = 1;
+        } else {
+            return Err(LlmError::Msg(SUMMARY_CTX_ERR.into()));
+        }
+    }
+    Err(LlmError::Msg(SUMMARY_CTX_ERR.into()))
+}
+
+fn prepare_summary_prompt(
+    view: &DiscussionThreadView,
+    engine: &LlmEngine,
+    output_language: &str,
+) -> Result<(String, String, LlmGenParams), LlmError> {
+    let system = summary_system(output_language);
+    let (user, _) = fit_summary_user(engine, system.as_str(), view)?;
+    let params = gen_params_json_for_prompt(
+        engine,
+        system.as_str(),
+        &user,
+        MIN_SUMMARY_OUTPUT_TOKENS,
+        MAX_SUMMARY_OUTPUT_TOKENS,
+    );
+    Ok((system, user, params))
 }
 
 fn filter_evidence(ids: &[String], view: &DiscussionThreadView) -> Vec<String> {
@@ -668,10 +736,22 @@ fn unreadable_summary(
     user: &str,
 ) -> Result<SummaryResult, LlmError> {
     let trimmed = raw.trim();
+    // Réponse quasi vide : souvent un effondrement de budget de sortie — heuristique plutôt qu’échec dur.
     if trimmed.is_empty() || trimmed.len() < 24 {
-        return Err(LlmError::InvalidJson(
-            "Réponse du modèle sans synthèse JSON exploitable.".into(),
-        ));
+        let mut fallback = summarize_thread(view);
+        if fallback.bullets.is_empty() {
+            fallback.bullets = vec![SUMMARY_UNREADABLE_FR.to_string()];
+        }
+        fallback.budget = budget_report(
+            engine.n_ctx(),
+            engine,
+            system,
+            user,
+            Some(raw),
+            user.contains("[tronqué]"),
+        );
+        fallback.budget.strategy = "local_llm_summary:empty_fallback".into();
+        return Ok(fallback);
     }
     let mut fallback = SummaryResult {
         title: view.subject.clone(),
@@ -762,9 +842,7 @@ pub fn summarize_thread_with_llm(
     engine: &mut LlmEngine,
     output_language: &str,
 ) -> Result<SummaryResult, LlmError> {
-    let system = summary_system(output_language);
-    let user = untrusted_mail_for_engine(engine, "thread-summary", &transcript_for_summary(view));
-    let params = gen_params_json_for_prompt(engine, system.as_str(), &user, 512, 4096);
+    let (system, user, params) = prepare_summary_prompt(view, engine, output_language)?;
     let raw =
         engine.generate_with_schema(system.as_str(), &user, &params, SUMMARY_THREAD_JSON_GBNF)?;
     summary_from_raw(&raw, view, engine, system.as_str(), &user)
@@ -778,9 +856,7 @@ pub fn summarize_thread_with_llm_streaming(
     cancelled: &AtomicBool,
     mut on_chunk: impl FnMut(&str),
 ) -> Result<SummaryResult, LlmError> {
-    let system = summary_system(output_language);
-    let user = untrusted_mail_for_engine(engine, "thread-summary", &transcript_for_summary(view));
-    let params = gen_params_json_for_prompt(engine, system.as_str(), &user, 512, 4096);
+    let (system, user, params) = prepare_summary_prompt(view, engine, output_language)?;
     let raw = engine.generate_streaming_with_schema(
         system.as_str(),
         &user,
@@ -1016,5 +1092,42 @@ mod tests {
         assert!(summary.bullets[0].contains("souhaite un rendez-vous"));
         assert!(summary.bullets[1].contains("bien reçue"));
         assert!(summary.bullets.iter().all(|b| !b.contains("=== [")));
+    }
+
+    #[test]
+    fn empty_model_output_falls_back_to_heuristic() {
+        let summary = parse("");
+        assert_eq!(summary.title, "RE: Demande de rendez-vous");
+        assert!(summary.bullets.iter().any(|b| b.contains("souhaite un rendez-vous")));
+        assert_eq!(summary.budget.strategy, "local_llm_summary:empty_fallback");
+    }
+
+    #[test]
+    fn fit_summary_user_leaves_output_room_on_small_ctx() {
+        let mut view = courty_view();
+        for i in 0..30 {
+            view.messages.push(message(
+                &format!("m-extra-{i}"),
+                "Expéditeur long",
+                &format!(
+                    "=== [{i}] ===\n{}",
+                    "Paragraphe assez long pour saturer un petit n_ctx et provoquer une sortie JSON vide. "
+                        .repeat(40)
+                ),
+            ));
+        }
+        let mut engine = engine();
+        engine.set_n_ctx_probe(2048);
+        let system = summary_system("fr");
+        let (user, clipped) =
+            fit_summary_user(&engine, system.as_str(), &view).expect("fit summary");
+        assert!(clipped, "le transcript multi-conversations doit être réduit");
+        let room = output_room_after_prompt(&engine, system.as_str(), &user, 64);
+        assert!(
+            room >= MIN_SUMMARY_OUTPUT_ROOM,
+            "room={room} user_chars={}",
+            user.chars().count()
+        );
+        assert!(user.contains("omis pour laisser de la place") || user.contains("Paragraphe"));
     }
 }

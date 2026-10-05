@@ -9,6 +9,7 @@ export function clearDraftSession(): void {
   const d = requireComposeCloseFlowDeps();
   state.draftSessionId = null;
   state.savedDraftRecordId = null;
+  state.composeSendAccountId = undefined;
   state.draftRevisionsLoading = false;
   state.draftRevisions = [];
   state.draftDiffRevisionId = null;

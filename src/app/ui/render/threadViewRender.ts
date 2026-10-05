@@ -391,7 +391,7 @@ export function renderThread() {
         <div class="thread-quick-reveal-bar">
           <button
             type="button"
-            class="thread-quick-reveal surface-sm${state.threadQuickReplyOpen ? " is-open" : ""}"
+            class="thread-quick-reveal${state.threadQuickReplyOpen ? " is-open" : ""}"
             data-action="toggle-thread-quick-reply"
             aria-expanded="${state.threadQuickReplyOpen ? "true" : "false"}"
             aria-controls="thread-quick-panel"
@@ -405,7 +405,7 @@ export function renderThread() {
         <div id="thread-quick-panel" class="thread-quick-panel${state.threadQuickReplyOpen ? " is-open" : ""}">
           <div class="thread-quick-panel-inner">
             <footer class="quick-reply thread-quick-footer">
-              <div class="thread-quick-sheet surface-sm">
+              <div class="thread-quick-sheet">
                 <p class="thread-quick-kicker"><span>Répondre à</span> <strong>${replyTarget}</strong></p>
                 <input
                   type="text"

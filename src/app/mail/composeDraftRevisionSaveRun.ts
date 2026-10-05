@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { withTimeout, tauriErrorMessage } from "../lib/tauriCommand";
@@ -23,7 +23,7 @@ import { syncComposeAttachmentsHiddenField } from "./composeAttachmentPaths";
 
 export async function upsertSavedDraftSilent(): Promise<boolean> {
   if (!isTauriRuntime()) return false;
-  const accountId = currentAccount()?.id?.trim();
+  const accountId = composeSendAccount()?.id?.trim();
   if (!accountId || !state.draftSessionId?.trim() || !state.draft) return false;
   const titleRaw = state.draft.subject?.trim() ?? "";
   const title = titleRaw.length ? titleRaw : "Sans objet";
@@ -47,7 +47,7 @@ export async function upsertSavedDraftSilent(): Promise<boolean> {
 }
 
 export async function saveDraftRevisionNow(opts?: { force?: boolean }): Promise<boolean> {
-  const accountId = currentAccount()?.id?.trim() ?? "";
+  const accountId = composeSendAccount()?.id?.trim() ?? "";
   const sessionId = state.draftSessionId?.trim() ?? "";
   if (!isTauriRuntime() || !accountId || !sessionId) return false;
   if (!state.draft) return false;

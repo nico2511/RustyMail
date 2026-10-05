@@ -31,7 +31,7 @@ export async function resumeOrphanDraftSession(sessionId: string): Promise<void>
       MAIL_ACTION_TIMEOUT_MS,
     );
     state.resumeDraftModal = null;
-    startNewDraftSession();
+    startNewDraftSession({ sendAccountId: accountId });
     state.draftSessionId = sid;
     state.draft = draft;
     loadComposeMarkdownIntoEditor(draft.markdownBody ?? "");

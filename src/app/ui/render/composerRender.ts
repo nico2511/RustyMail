@@ -1,5 +1,10 @@
 import { isAiFeatureEnabled } from "../../../aiFeatures";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
+import {
+  composeSendAccount,
+  sendableAccounts,
+  shouldShowComposeFromAccountSelect,
+} from "../../core/composeSendAccount";
 import { iconSvg } from "../../lib/iconSvg";
 import { renderComposeToolbar } from "./composeToolbarRender";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
@@ -175,6 +180,25 @@ export function renderComposer() {
      <div class="field-row"><label class="compose-field-label">Cci</label><div id="compose-bcc-host" class="compose-recipients-host compose-to-cell"></div></div>`
     : "";
 
+  const fromAccounts = sendableAccounts();
+  const fromSelectedId = composeSendAccount()?.id ?? state.composeSendAccountId ?? fromAccounts[0]?.id ?? "";
+  const fromRow =
+    shouldShowComposeFromAccountSelect() ?
+      `<div class="field-row compose-from-row">
+            <label for="compose-from-account" class="compose-field-label">De</label>
+            <select id="compose-from-account" class="compose-from-select" aria-label="Compte expéditeur" title="Compte qui enverra ce message">
+              ${fromAccounts
+                .map((a) => {
+                  const label = a.displayName?.trim()
+                    ? `${a.displayName.trim()} · ${a.email}`
+                    : a.email;
+                  return `<option value="${escapeAttr(a.id)}" ${a.id === fromSelectedId ? "selected" : ""}>${escapeHtml(label)}</option>`;
+                })
+                .join("")}
+            </select>
+          </div>`
+    : "";
+
   const correctionPlain = composeSourcePlainText(state.composeCanonicalBody || state.composeBody || "");
   const correctionSuggestions = retainGrammarSuggestionsInText(state.composeGrammarSuggestions, correctionPlain);
   if ((state.composeGrammarSuggestions?.length ?? 0) !== correctionSuggestions.length) {
@@ -247,6 +271,7 @@ export function renderComposer() {
       </header>
       <div class="compose-workspace">
         <div class="compose-meta-card surface-sm">
+          ${fromRow}
           <div class="field-row compose-to-row">
             <label for="compose-to" class="compose-field-label">À</label>
             <div class="compose-to-cell">

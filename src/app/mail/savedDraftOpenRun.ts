@@ -41,7 +41,7 @@ export async function openSavedDraftById(savedDraftId: string): Promise<void> {
       MAIL_ACTION_TIMEOUT_MS,
     );
     enterComposeView();
-    startNewDraftSession();
+    startNewDraftSession({ sendAccountId: account.id });
     state.draftSessionId = res.sessionId;
     state.savedDraftRecordId = res.savedDraftId;
     state.draft = res.draft;

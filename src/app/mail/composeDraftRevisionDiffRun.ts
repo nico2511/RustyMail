@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Draft, DraftPreview } from "../types";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { safeInvoke, tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
@@ -14,7 +14,7 @@ import { requireComposeDraftRevisionDiffDeps } from "./composeDraftRevisionDiffC
 export async function computeDraftDiffAgainstRevision(revisionId: string): Promise<void> {
   const d = requireComposeDraftRevisionDiffDeps();
   const rid = revisionId.trim();
-  const accountId = currentAccount()?.id?.trim() ?? "";
+  const accountId = composeSendAccount()?.id?.trim() ?? "";
   if (!isTauriRuntime() || !rid || !accountId) return;
   if (!state.draft) return;
   // Lecture pour le diff : ne marque pas le brouillon comme modifié.

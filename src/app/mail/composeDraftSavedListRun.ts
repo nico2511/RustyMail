@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
@@ -13,7 +13,7 @@ import { saveDraftRevisionNow } from "./composeDraftRevisionSaveRun";
 
 export async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }): Promise<boolean> {
   if (!isTauriRuntime()) return false;
-  const accountId = currentAccount()?.id?.trim();
+  const accountId = composeSendAccount()?.id?.trim();
   if (!accountId || !state.draftSessionId?.trim() || !state.draft) {
     toast.error("Impossible d’enregistrer : session ou compte indisponible.");
     return false;

@@ -30,8 +30,9 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
     : "";
   return `
       <style>
-        :host{display:block;box-sizing:border-box;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif;padding:0 2px}
-        .mail{padding:0;line-height:1.55;font-size:13px;background:transparent}
+        :host{display:block;box-sizing:border-box;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif;padding:20px 24px 24px}
+        .mail{padding:0;line-height:1.62;font-size:15px;background:transparent}
+        .mail.mail--clean{font-size:15.5px;line-height:1.68}
         .mail :is(p, ul, ol, blockquote, pre, table){margin:0 0 10px}
         .mail :is(h1,h2,h3){margin:8px 0 10px;font-family:ui-serif,Georgia,Cambria,"Times New Roman",serif;font-weight:400;letter-spacing:-0.02em}
         .mail a{color:var(--accent)}
@@ -113,7 +114,6 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail table.rm-mail-data th,.mail table.rm-mail-data td{padding:6px 8px;border:1px solid rgba(120,119,117,.35);vertical-align:top;text-align:left;line-height:1.4}
         .mail table.rm-mail-data th{font-weight:650;background:rgba(255,255,255,.04)}
         .mail blockquote{padding:8px 12px;border-left:2px solid rgba(232,228,223,.12);background:rgba(255,255,255,.02);border-radius:10px}
-        .mail.mail--clean{line-height:1.65}
         .mail details.rm-mail-folded-quote{margin:1.45rem 0 0}
         .mail details.rm-mail-folded-quote > summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;line-height:1.4;text-transform:uppercase;color:var(--dim,rgba(238,240,238,.62))}
         .mail details.rm-mail-folded-quote[open] > summary{margin-bottom:0.7rem}

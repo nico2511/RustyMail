@@ -94,7 +94,6 @@ function renderHeadingGroup(): string {
 export function renderComposeToolbar(props: ComposeToolbarProps): string {
   const busy = composeAiBusyKind(props.llmJobLabel);
   const blocked = busy !== null;
-  const showAi = props.grammarEnabled || props.rewriteEnabled;
 
   const mdChunks = [
     COMPOSE_MD_GROUPS[0]!.map(renderMdButton).join(""),
@@ -164,26 +163,25 @@ export function renderComposeToolbar(props: ComposeToolbarProps): string {
       </div>`
     : "";
 
-  const aiRow =
-    showAi ?
-      `<div class="compose-toolbar__row compose-toolbar__row--ai">
-        ${correct}
-        ${transform}
-      </div>`
-    : "";
-
   const recording = props.micState === "recording";
+  const aiRow = `<div class="compose-toolbar__row compose-toolbar__row--ai">
+      ${correct}
+      ${transform}
+      <div class="compose-toolbar__trailing">
+        ${replies}
+        <button type="button" class="mic-button compose-toolbar__dictate ${escapeAttr(props.micState)}" data-action="mic" data-compose-cmd="dictate" title="${escapeAttr(props.micTitle)}" aria-label="${escapeAttr(props.micAria)}" aria-pressed="${recording ? "true" : "false"}">
+          <span class="mic-button__ico" aria-hidden="true">${iconSvg("mic")}</span>
+          <span class="compose-toolbar__dictate-label">Dicter</span>
+        </button>
+      </div>
+    </div>`;
+
   return `<div class="compose-toolbar" role="region" aria-label="Outils du compositeur">
     <div class="compose-toolbar__row">
       <span class="compose-toolbar__label" id="compose-write-label">Écrire</span>
       <div class="md-toolbar compose-toolbar__tools" role="toolbar" aria-labelledby="compose-write-label">
         ${mdHtml}
       </div>
-      ${replies}
-      <button type="button" class="mic-button compose-toolbar__dictate ${escapeAttr(props.micState)}" data-action="mic" data-compose-cmd="dictate" title="${escapeAttr(props.micTitle)}" aria-label="${escapeAttr(props.micAria)}" aria-pressed="${recording ? "true" : "false"}">
-        <span class="mic-button__ico" aria-hidden="true">${iconSvg("mic")}</span>
-        <span class="compose-toolbar__dictate-label">Dicter</span>
-      </button>
     </div>
     ${aiRow}
   </div>`;

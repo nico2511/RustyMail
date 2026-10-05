@@ -110,6 +110,7 @@ export const state: State = {
   personalFoldersOpen: false,
   composeAdvancedOpen: false,
   composeCcBccOpen: false,
+  composeSendAccountId: undefined,
   listFilter: "all",
   mailboxBriefBannerHtml: "",
   mailboxDigestKey: "",

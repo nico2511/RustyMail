@@ -6,10 +6,9 @@ import { toast } from "../lib/toast";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { openConfirmModal } from "../modals/promptConfirm";
+import { DEMO_PLAYGROUND_ACCOUNT_ID } from "../core/demoAccount";
 import { loadAccountsFromBackend } from "./accountsLoadAction";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
-
-const DEMO_PLAYGROUND_ACCOUNT_ID = "playground@demo.rustymail.app";
 
 export async function tryHandleThreadLlmDemoWire(action: string): Promise<boolean> {
   switch (action) {

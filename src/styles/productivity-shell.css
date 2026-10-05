@@ -98,6 +98,18 @@ select {
   font-size: 12px;
 }
 
+.status-bar .status-bar-update {
+  color: var(--copper, #e88c4a);
+  border-color: rgba(232, 140, 74, 0.4);
+  background: rgba(232, 140, 74, 0.14);
+}
+
+.status-bar .status-bar-update--ready {
+  color: var(--success, #6cc88a);
+  border-color: rgba(108, 200, 138, 0.45);
+  background: rgba(108, 200, 138, 0.14);
+}
+
 .status-bar .dim,
 .status-bar .muted,
 .status-bar .status-bar-compact,

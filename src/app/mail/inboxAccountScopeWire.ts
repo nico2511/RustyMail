@@ -13,15 +13,6 @@ export async function tryHandleInboxAccountScopeWire(
   element?: HTMLElement,
 ): Promise<boolean> {
   switch (action) {
-    case "toggle-inbox-account-menu":
-      state.accountModalOpen = false;
-      state.inboxAccountMenuOpen = !state.inboxAccountMenuOpen;
-      render();
-      return true;
-    case "close-inbox-account-menu":
-      state.inboxAccountMenuOpen = false;
-      render();
-      return true;
     case "toggle-account-modal":
       state.inboxAccountMenuOpen = false;
       state.accountModalOpen = !state.accountModalOpen;

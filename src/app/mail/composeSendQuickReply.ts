@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Draft, SendDraftOutcome } from "../types";
-import { currentAccount } from "../core/accountContext";
+import { composeSendAccount } from "../core/composeSendAccount";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
@@ -39,7 +39,7 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
   try {
     const sendOutcome = await withTimeout(
       invoke<SendDraftOutcome>("send_draft", {
-        accountId: currentAccount()?.id ?? null,
+        accountId: composeSendAccount()?.id ?? null,
         draft,
         sendAck: "send-draft",
       }),

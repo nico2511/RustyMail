@@ -5,7 +5,6 @@ import { state } from "../../state";
 import { railAccountRowExpanded, railImapFoldersVisible } from "../../mail/inboxAccountScope";
 import {
   renderAccountModalHtml,
-  renderInboxScopeTitleHtml,
   renderRailAccountScopeHtml,
 } from "./accountScopeRender";
 
@@ -49,18 +48,12 @@ describe("marquage multi-compte", () => {
     expect(html).not.toContain("folder-button--scope");
   });
 
-  it("aligne le titre, le menu et la modale sur le même filtre", () => {
-    state.inboxAccountMenuOpen = true;
+  it("aligne la modale et le rail sur le même filtre", () => {
     state.accountModalOpen = true;
     state.selectedMailbox = "INBOX";
     state.selectedAccountId = "factu";
     state.mailboxUnread = { INBOX: 2 };
-    const title = renderInboxScopeTitleHtml();
     const modal = renderAccountModalHtml();
-    expect(title).toContain("Facturation");
-    expect(title).toContain("data-account-hue=\"plum\"");
-    expect(title).toContain("2 non lus");
-    expect(title).toContain("Tous les comptes");
     expect(modal).toContain("aria-selected=\"true\"");
     expect(modal).toContain("Facturation");
     expect(modal).toContain("Ajouter un compte");

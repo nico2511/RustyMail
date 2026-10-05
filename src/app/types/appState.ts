@@ -224,6 +224,11 @@ export type State = {
   composeAdvancedOpen: boolean;
   /** Afficher les champs Cc / Cci lorsque présents ou ouverts explicitement. */
   composeCcBccOpen: boolean;
+  /**
+   * Compte expéditeur du brouillon ouvert (sélecteur De si multi-compte hors démo).
+   * Indépendant de `selectedAccountId` pour ne pas recharger la boîte en changeant l’expéditeur.
+   */
+  composeSendAccountId?: string;
   /** Filtre d’affichage sur l’index (style client mail). */
   listFilter: "all" | "unread" | "starred" | "focused" | "auto";
   /** Bannière panneau brief (HTML interne, cartes type RustyMail — pas de Markdown). */

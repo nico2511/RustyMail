@@ -1,4 +1,3 @@
-import { isInboxLikeMailbox, isUnifiedInboxMailbox } from "../../../mailboxKinds";
 import type { Account } from "../../../accountSetup";
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import {
@@ -106,35 +105,6 @@ function railAccountButton(account: Account, scoped: boolean): string {
       <span class="folder-name">${escapeHtml(label)}</span>
       ${count}
     </button>
-  </div>`;
-}
-
-export function inboxScopeTitleEligible(listMailbox: string, opts: { draft: boolean; search: boolean; panel: boolean }): boolean {
-  if (state.accounts.length < 2 || opts.draft || opts.search || opts.panel) return false;
-  return isUnifiedInboxMailbox(listMailbox) || isInboxLikeMailbox(listMailbox);
-}
-
-export function renderInboxScopeTitleHtml(): string {
-  const scope = currentInboxScope();
-  const unified = scope === "all";
-  const account = unified ? undefined : state.accounts.find((a) => a.id === scope);
-  const label = unified ? "Tous les comptes" : account ? accountShortLabel(account) : "Réception";
-  const hue = account ? hueFor(account.id) : "";
-  const unread = unified ? allAccountsInboxUnread() : account ? accountInboxUnreadCount(account.id) : 0;
-  const hueAttr = hue ? ` data-account-hue="${hue}"` : "";
-  const open = state.inboxAccountMenuOpen;
-  return `<div class="inbox-scope"${hueAttr}>
-    <button type="button" class="inbox-scope-btn" data-action="toggle-inbox-account-menu" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox" title="Filtrer par compte">
-      <span class="inbox-scope-name">${escapeHtml(label)}</span>
-      <span class="inbox-scope-chevron" aria-hidden="true"></span>
-    </button>
-    ${unread > 0 ? `<span class="inbox-scope-unread">${escapeHtml(unreadCountLabelFr(unread))}</span>` : ""}
-    ${
-      open
-        ? `<button type="button" class="inbox-account-scrim" data-action="close-inbox-account-menu" aria-label="Fermer le filtre des comptes"></button>
-           <div class="inbox-account-menu" role="listbox" aria-label="Comptes">${renderAccountScopeChoicesHtml()}</div>`
-        : ""
-    }
   </div>`;
 }
 

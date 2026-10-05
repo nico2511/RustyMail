@@ -4,6 +4,7 @@ import {
   type StatusBarProgressJob,
 } from "../../../statusBarProgress";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
+import { desktopUpdatePhase } from "../../mail/desktopUpdate";
 import { state } from "../../state";
 import { gatherStatusBarProgressJobs } from "../../mail/statusBarProgressJobs";
 import { renderDeps } from "./renderDeps";
@@ -122,6 +123,17 @@ export function renderBackgroundActivityChips(opts: { digestSlot: boolean }): st
   return chips.join("");
 }
 
+function renderStatusBarUpdateIndicator(): string {
+  const phase = desktopUpdatePhase();
+  if (phase.kind === "available") {
+    return `<button type="button" class="status-bar-update" data-action="desktop-update-open" title="Version ${escapeAttr(phase.version)} disponible — Paramètres → Général">Màj ${escapeHtml(phase.version)}</button>`;
+  }
+  if (phase.kind === "ready") {
+    return `<button type="button" class="status-bar-update status-bar-update--ready" data-action="desktop-update-relaunch" title="Version ${escapeAttr(phase.version)} installée — redémarrer">Redémarrer</button>`;
+  }
+  return "";
+}
+
 export function renderGlobalStatusFooter(): string {
   const st = state.status;
   const coreReady = isTauriRuntime() && Boolean(state.capabilities?.mailCore);
@@ -140,12 +152,14 @@ export function renderGlobalStatusFooter(): string {
       `<div class="status-bar-compose-ai">${renderStatusBarAiQuickTrigger()}</div>`
     : "";
   const progressInline = renderStatusBarProgressInline();
+  const updateIndicator = renderStatusBarUpdateIndicator();
   return `
     <footer class="status-bar-wrap">
       ${composeAiQuick}
       <footer class="status-bar">
         <span class="${dotClass}" title="${escapeAttr(dotTitle)}"></span>
         <span class="status-bar-app">${escapeHtml(st?.appName ?? "RustyMail")} ${escapeHtml(st?.version ?? "0.1.1")}</span>
+        ${updateIndicator}
         ${progressInline}
         ${chipBlock}
         ${
