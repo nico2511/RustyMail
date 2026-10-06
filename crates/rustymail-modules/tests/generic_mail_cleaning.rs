@@ -124,6 +124,29 @@ fn outlook_forward_chain_builds_conversation_report() {
 }
 
 #[test]
+fn outlook_reply_wrote_chain_builds_multi_turn_report() {
+    let html = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/generic/outlook_reply_wrote_chain.html"
+    ));
+    let msg = generic_message(html.to_string());
+    let ctx = CleaningInput::from_message(&msg);
+    let reg = ProviderRegistry::builtin();
+    let out = clean_html_for_markdown(&reg, &ctx, html);
+
+    assert!(out.html.contains("rm-conversation-report"));
+    assert!(out.html.contains("Pouvez-vous me rappeler"));
+    assert!(!out.html.contains("divRplyFwdMsg"));
+    assert!(!out.html.contains("x_divRplyFwdMsg"));
+    assert!(out.html.contains("Alice Exemple") || out.html.contains("alice@example.com"));
+    let turns = out.html.matches("rm-conversation-turn").count();
+    assert!(
+        turns >= 2,
+        "attendu ≥2 tours, obtenu {turns} — historique découpé"
+    );
+}
+
+#[test]
 fn keeps_useful_small_logo_not_tracker_pixel() {
     let html = r#"<div><p>Hi</p><img src="https://cdn.example/logo.png" width="36" height="36" alt="Logo"/><img src="https://t.example/pixel" width="1" height="1" role="presentation"/></div>"#;
     let msg = generic_message(html.into());

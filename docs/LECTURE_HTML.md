@@ -20,7 +20,8 @@ Les mentions légales du plain (`dimmedBlocks`) ne sont plus seulement coupées 
 
 ## Ce qui tient
 
-- Générique : scripts, styles, MSO/VML, pixels de tracking, signatures repliées, rapports de transfert Outlook (tours visibles, pas un digest).
+- Générique : scripts, styles, MSO/VML, pixels de tracking, signatures repliées, rapports de transfert / réponse Outlook (tours visibles, pas un digest). Les attributions « Le … a écrit : » (Gmail/Apple) deviennent des frontières de tours quand le rapport s’active.
+- Affichage : bordures de cellules **uniquement** sur `table.rm-mail-data` (tableaux du compositeur). Les tables de layout (marketing, enveloppes `rm-conversation-envelope`) restent sans grille.
 - Amazon, Deblock, GitHub : digests inchangés sur leurs fixtures.
 - Affichage : filet CSS sur `.gmail_quote` restant, sauf à l’intérieur d’une citation repliée. `.rm-mail-signature` reste masquée.
 

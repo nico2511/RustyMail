@@ -9,6 +9,7 @@ import { searchScopeBadgeShort, searchScopeLabel } from "../../lib/searchScopeLa
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { iconSvg } from "../../lib/iconSvg";
 import { state } from "../../state";
+import { renderActionMenuHtml } from "../../mail/actionMenu";
 import { renderDeps } from "./renderDeps";
 import { renderSearchBadgeChip } from "./searchBadgeChip";
 
@@ -151,16 +152,6 @@ export function renderSearchBadgesHtml(): string {
     );
   }
 
-  if (
-    state.searchSenders.length > 0 &&
-    isTauriRuntime() &&
-    isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")
-  ) {
-    parts.push(
-      `<button type="button" class="search-badge search-badge--summarize" role="listitem" data-action="summarize-sender-threads" title="Résumer le fil ouvert ou le contexte filtré"><span class="search-badge__label">Résumer</span></button>`,
-    );
-  }
-
   if (parts.length === 0) return "";
 
   return `<div class="inbox-search-badges" role="list" aria-label="Critères de recherche actifs">${parts.join("")}</div>`;
@@ -228,32 +219,86 @@ export function renderSearchViewActionsHtml(visibleCount: number): string {
       dateAsc ? "Date ↑" : "Date ↓"
     }</button>`,
   );
+
+  const resultItems: { action: string; label: string; title?: string }[] = [];
   if (n > 0) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-mark-read" title="Marquer comme lus (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Lus</button>`,
-    );
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-archive" title="Archiver (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Archiver</button>`,
-    );
-  }
-  if (d.searchViewCanOpenOrganizer()) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-open-organizer" title="Ouvrir Organiser V2 (structure boîte, sans rescan global)">Organiser</button>`,
-    );
-  }
-  if (d.searchViewCanAffinerFlux()) {
-    btns.push(
-      `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--affiner" data-action="search-view-affiner" title="LLM : proposer un dossier IMAP pour ce flux (Propositions Organiser activées)">Affiner</button>`,
-    );
+    resultItems.push({
+      action: "search-view-mark-read",
+      label: "Marquer lus",
+      title: `Marquer comme lus (jusqu’à ${SAVED_VIEW_BATCH_MAX})`,
+    });
+    resultItems.push({
+      action: "search-view-archive",
+      label: "Archiver",
+      title: `Archiver (jusqu’à ${SAVED_VIEW_BATCH_MAX})`,
+    });
   }
   if (state.activeSavedSearchId && saved && (saved.newCount ?? 0) > 0) {
     const marking = state.savedSearchMarkingSeenId === state.activeSavedSearchId;
+    if (!marking) {
+      resultItems.push({
+        action: "saved-search-mark-seen",
+        label: `+${saved.newCount} · vu`,
+        title: "Marquer la vue comme à jour (badge nouveaux)",
+      });
+    }
+  }
+  if (resultItems.length > 0) {
     btns.push(
-      marking
-        ? `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" disabled aria-busy="true">Marquage…</button>`
-        : `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" data-action="saved-search-mark-seen" title="Marquer la vue comme à jour (badge nouveaux)">+${saved.newCount} · vu</button>`,
+      renderActionMenuHtml({
+        label: "Sur les résultats",
+        title: "Actions sur les fils visibles",
+        triggerClass: "ghost-button search-ctx-btn action-menu__trigger",
+        items: resultItems,
+      }),
     );
   }
+
+  const orgItems: { action: string; label: string; title?: string }[] = [];
+  if (d.searchViewCanOpenOrganizer()) {
+    orgItems.push({
+      action: "search-view-open-organizer",
+      label: "Organiser",
+      title: "Ouvrir Organiser V2 (structure boîte, sans rescan global)",
+    });
+  }
+  if (d.searchViewCanAffinerFlux()) {
+    orgItems.push({
+      action: "search-view-affiner",
+      label: "Affiner",
+      title: "LLM : proposer un dossier IMAP pour ce flux",
+    });
+  }
+  if (
+    state.searchSenders.length > 0 &&
+    isAiFeatureEnabled(state.appPrefs.ai, "featureThreadSummaryEnabled")
+  ) {
+    orgItems.push({
+      action: "summarize-sender-threads",
+      label: "Résumer",
+      title: "Résumer le fil ouvert ou le contexte filtré",
+    });
+  }
+  if (orgItems.length > 0) {
+    btns.push(
+      renderActionMenuHtml({
+        label: "Organiser",
+        title: "Organiser, affiner, résumer",
+        triggerClass: "ghost-button search-ctx-btn action-menu__trigger",
+        items: orgItems,
+      }),
+    );
+  }
+
+  if (state.activeSavedSearchId && saved && (saved.newCount ?? 0) > 0) {
+    const marking = state.savedSearchMarkingSeenId === state.activeSavedSearchId;
+    if (marking) {
+      btns.push(
+        `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--watch" disabled aria-busy="true">Marquage…</button>`,
+      );
+    }
+  }
+
   return btns.join("");
 }
 

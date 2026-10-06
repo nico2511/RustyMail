@@ -60,6 +60,17 @@ static RE_OUTLOOK_INLINE_QUOTE: LazyLock<Regex> = LazyLock::new(|| {
     .expect("outlook inline quote header regex")
 });
 
+/// Attribution type Apple Mail / Gmail : « Le 14 septembre 2026 …, Alice <a@x> a écrit : »
+static RE_WROTE_ATTRIBUTION: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?is)^\s*le\s+([^,\n]{3,80}),\s*(.+?)\s+a\s+[ée]crit\s*:?\s*$")
+        .expect("wrote attribution regex")
+});
+
+static RE_WROTE_ATTRIBUTION_LOOSE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?is)\ble\s+[^,\n]{3,80},\s*.+?\s+a\s+[ée]crit\s*:")
+        .expect("wrote attribution loose regex")
+});
+
 static RE_ENV_FROM: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?is)(?:de|from)\s*:\s*(.*?)(?:envoy[ée]|envoye|sent)\s*:")
         .expect("env from regex")
@@ -359,14 +370,56 @@ impl Envelope {
 
 fn parse_envelope(raw: &str) -> Envelope {
     let text = normalize_probe(raw).replace('\n', " ");
-    Envelope {
+    let mut env = Envelope {
         from: parse_participants(&capture_env(&RE_ENV_FROM, &text)),
         sent: capture_env(&RE_ENV_SENT, &text),
         to: parse_participants(&capture_env(&RE_ENV_TO, &text)),
         cc: parse_participants(&capture_env(&RE_ENV_CC, &text)),
         bcc: parse_participants(&capture_env(&RE_ENV_BCC, &text)),
         subject: capture_subject(&text),
+    };
+    if !env.has_any() {
+        if let Some(wrote) = parse_wrote_attribution(raw) {
+            env = wrote;
+        }
+    } else if env.from.is_empty() || env.sent.is_empty() {
+        if let Some(wrote) = parse_wrote_attribution(raw) {
+            if env.from.is_empty() {
+                env.from = wrote.from;
+            }
+            if env.sent.is_empty() {
+                env.sent = wrote.sent;
+            }
+        }
     }
+    env
+}
+
+fn parse_wrote_attribution(raw: &str) -> Option<Envelope> {
+    let text = normalize_probe(raw);
+    let line = text.lines().map(str::trim).find(|l| !l.is_empty())?;
+    let caps = RE_WROTE_ATTRIBUTION.captures(line)?;
+    let sent = normalize_whitespace(caps.get(1)?.as_str());
+    let who = normalize_whitespace(caps.get(2)?.as_str());
+    let from = parse_participants(&who);
+    if from.is_empty() && who.is_empty() {
+        return None;
+    }
+    Some(Envelope {
+        from: if from.is_empty() {
+            vec![Participant {
+                name: who,
+                email: String::new(),
+            }]
+        } else {
+            from
+        },
+        sent,
+        to: Vec::new(),
+        cc: Vec::new(),
+        bcc: Vec::new(),
+        subject: String::new(),
+    })
 }
 
 fn capture_subject(text: &str) -> String {
@@ -496,7 +549,10 @@ fn collect_boundaries(doc: &Html) -> Vec<NodeId> {
     let mut inline: Vec<(usize, NodeId)> = doc
         .select(&SEL_INLINE_QUOTE_BLOCKS)
         .filter(|el| !ids.contains(&el.id()))
-        .filter(|el| block_looks_like_outlook_inline_quote_header(*el))
+        .filter(|el| {
+            block_looks_like_outlook_inline_quote_header(*el)
+                || block_looks_like_wrote_attribution(*el)
+        })
         .map(|el| {
             let mass = visible_char_count(&el.text().collect::<String>());
             (mass, el.id())
@@ -519,6 +575,16 @@ fn collect_boundaries(doc: &Html) -> Vec<NodeId> {
     ids.sort_by_key(|id| order.iter().position(|&x| x == *id).unwrap_or(usize::MAX));
     ids.dedup();
     ids
+}
+
+fn block_looks_like_wrote_attribution(el: ElementRef<'_>) -> bool {
+    let text = normalize_probe(&el.text().collect::<String>());
+    let mass = visible_char_count(&text);
+    // Attribution courte seule (pas tout un blockquote imbriqué).
+    if mass == 0 || mass > 220 {
+        return false;
+    }
+    RE_WROTE_ATTRIBUTION.is_match(text.trim())
 }
 
 fn block_looks_like_outlook_inline_quote_header(el: ElementRef<'_>) -> bool {
@@ -573,6 +639,9 @@ fn body_is_header_junk(text: &str) -> bool {
     if t.is_empty() {
         return true;
     }
+    if RE_WROTE_ATTRIBUTION.is_match(t) {
+        return true;
+    }
     if RE_OUTLOOK_INLINE_QUOTE.is_match(t) && visible_char_count(t) < 120 {
         return true;
     }
@@ -622,6 +691,9 @@ fn clean_conversation_body_text(text: &str) -> String {
             continue;
         }
         if RE_OUTLOOK_INLINE_QUOTE.is_match(&l) && visible_char_count(&l) < 200 {
+            continue;
+        }
+        if RE_WROTE_ATTRIBUTION.is_match(&l) || RE_WROTE_ATTRIBUTION_LOOSE.is_match(&l) {
             continue;
         }
         if looks_like_email_list_line(&l) {

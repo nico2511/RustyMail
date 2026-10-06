@@ -54,8 +54,8 @@ Outputs (Cargo **workspace** → repo-root `target/release/`; fallback `src-taur
 
 ## Versioning
 
-- Package version in `package.json`, `src-tauri/tauri.conf.json`, and workspace `Cargo.toml` (currently `0.4.1`) — **all three must match**; the release workflow publishes `v{tauri.conf.version}`
-- Tag format: `v0.4.1` (must match release workflow pattern)
+- Package version in `package.json`, `src-tauri/tauri.conf.json`, and workspace `Cargo.toml` (currently `0.4.2`) — **all three must match**; the release workflow publishes `v{tauri.conf.version}`
+- Tag format: `v0.4.2` (must match release workflow pattern)
 
 ## Mises à jour automatiques (Windows)
 

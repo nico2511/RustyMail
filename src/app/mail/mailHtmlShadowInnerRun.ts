@@ -95,7 +95,7 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-amazon-digest tbody tr:not(:first-child) th,.mail article.rm-amazon-digest tbody tr:not(:first-child) td,
         .mail article.rm-github-digest tbody tr:not(:first-child) th,.mail article.rm-github-digest tbody tr:not(:first-child) td{border-top:1px solid rgba(120,119,117,.16)}
         .mail article.rm-conversation-report{display:flex;flex-direction:column;gap:14px;margin:0}
-        .mail article.rm-conversation-report .rm-conversation-turn{padding:12px 14px;border:1px solid rgba(120,119,117,.18);border-radius:10px;background:rgba(255,255,255,.025)}
+        .mail article.rm-conversation-report .rm-conversation-turn{padding:14px 16px;border:1px solid rgba(120,119,117,.14);border-radius:10px;background:rgba(255,255,255,.025)}
         .mail article.rm-conversation-report .rm-conversation-turn--cited{border-left:2px solid rgba(232,228,223,.14)}
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="1"]{margin-left:12px}
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="2"]{margin-left:24px}
@@ -103,7 +103,7 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="4"]{margin-left:48px}
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="5"]{margin-left:60px}
         .mail article.rm-conversation-report .rm-conversation-envelope{width:100%;border-collapse:collapse;font-size:12px;margin:0 0 10px}
-        .mail article.rm-conversation-report .rm-conversation-envelope th,.mail article.rm-conversation-report .rm-conversation-envelope td{padding:4px 12px 4px 0;vertical-align:top;text-align:left;line-height:1.4}
+        .mail article.rm-conversation-report .rm-conversation-envelope th,.mail article.rm-conversation-report .rm-conversation-envelope td{padding:4px 12px 4px 0;border:0;vertical-align:top;text-align:left;line-height:1.45;background:transparent}
         .mail article.rm-conversation-report .rm-conversation-envelope th{font-weight:600;white-space:nowrap;width:1%;color:var(--dim,rgba(238,240,238,.58))}
         .mail article.rm-conversation-report .rm-conversation-envelope tr:not(:first-child) th,.mail article.rm-conversation-report .rm-conversation-envelope tr:not(:first-child) td{border-top:1px solid rgba(120,119,117,.12)}
         .mail article.rm-conversation-report .rm-conversation-participants{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -111,10 +111,8 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-conversation-report .rm-conversation-body{margin:0;line-height:1.55}
         .mail article.rm-conversation-report .rm-conversation-body :is(p, div){margin:0 0 10px}
         .mail article.rm-conversation-report .rm-conversation-body br{display:block;content:"";margin-bottom:0.45em}
-        .mail table{max-width:100%;width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 12px}
-        .mail table th,.mail table td{padding:6px 8px;border:1px solid rgba(120,119,117,.35);vertical-align:top;text-align:left;line-height:1.4}
-        .mail table th{font-weight:650;background:rgba(255,255,255,.04)}
-        .mail table.rm-mail-data{font-size:12.5px;margin:8px 0 12px}
+        .mail table{max-width:100%;border-collapse:collapse}
+        .mail table.rm-mail-data{width:100%;font-size:12.5px;margin:8px 0 12px}
         .mail table.rm-mail-data th,.mail table.rm-mail-data td{padding:6px 8px;border:1px solid rgba(120,119,117,.35);vertical-align:top;text-align:left;line-height:1.4}
         .mail table.rm-mail-data th{font-weight:650;background:rgba(255,255,255,.04)}
         .mail blockquote{padding:8px 12px;border-left:2px solid rgba(232,228,223,.12);background:rgba(255,255,255,.02);border-radius:10px}

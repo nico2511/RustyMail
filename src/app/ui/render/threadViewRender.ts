@@ -7,7 +7,6 @@ import { formatAttachmentSizeKb } from "../../lib/attachmentSize";
 import { mailHtmlMountAttrs } from "../../lib/htmlMessage";
 import { iconSvg } from "../../lib/iconSvg";
 import { initials } from "../../lib/tags";
-import { threadTagsForModal } from "../../lib/threadTagsModal";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { state } from "../../state";
 import { messageAccordionOpen, threadMessageFoldPreview } from "../../mail/threadAccordion";
@@ -25,21 +24,11 @@ import type {
 import { renderDimmedBlocksFold } from "../../mail/dimmedBlocksFold";
 import { renderHistoryFold } from "../../mail/historyFold";
 import { unsubscribeHrefScore } from "../../mail/mailUnsubscribeLinks";
+import { renderActionMenuHtml } from "../../mail/actionMenu";
 import { renderViewNavTrail } from "./listChrome";
 import { renderDeps } from "./renderDeps";
 
 const ENABLE_CLEAN_MESSAGE_VIEW = true;
-
-function iconThreadMessageViewToggle(userMode: MessageViewMode): string {
-  /* En vue lisible : proposer le passage au brut ; en brut : revenir lisible quand pertinent. */
-  const cleanActive = userMode === "clean";
-  const rawTitle =
-    "Afficher tout brut — HTML MIME ou texte source tel quel (sans nettoyage d’affichage).";
-  const cleanTitle = "Vue lisible — nettoyage et mise en forme automatiques quand le message le permet.";
-  return `<button type="button" class="icon-pill thread-view-mode-toggle ${cleanActive ? "" : "thread-view-mode-toggle--raw"}" data-action="toggle-message-view" title="${
-    cleanActive ? escapeAttr(rawTitle) : escapeAttr(cleanTitle)
-  }" aria-label="${escapeAttr(cleanActive ? "Afficher tout brut" : "Vue lisible automatique")}">${iconSvg(cleanActive ? "mailViewRaw" : "mailViewClean")}</button>`;
-}
 
 function renderMailUnsubscribeBar(links: MailUnsubscribeLink[]): string {
   if (!links.length) return "";
@@ -97,28 +86,54 @@ function renderThreadMsgHeadActions(
 ): string {
   const motherRaw = state.appPrefs.general.motherLanguage?.trim() || "fr";
   const offerTr = renderDeps().shouldOfferPerMessageTranslate(message, motherRaw, threadTags);
-  const globeBtn =
-    offerTr ?
-      `<button type="button" class="icon-pill icon-pill-sm thread-msg-translate" data-action="llm-translate-message" data-msg-id="${escapeAttr(message.messageId)}" title="Traduire ce message vers la langue mère (LLM)" aria-label="Traduire ce message">${iconSvg("globe")}</button>`
-    : "";
   const security = renderMailSecurityPop(message, { compact: true });
-  const retagBtn = state.selectedThreadId?.trim()
-    ? `<button type="button" class="icon-pill icon-pill-sm thread-msg-retag" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId)}" title="Recalculer les tags du fil" aria-label="Recalculer les tags du fil">${iconSvg("sync")}</button>`
-    : "";
-  const quoteBtn =
-    message.collapsedQuotes.length ?
-      `<button type="button" class="icon-pill icon-pill-sm thread-quote-open" data-action="open-quote-fold" data-msg-id="${escapeAttr(message.messageId)}" title="Citations repliées" aria-label="Citations repliées">${iconSvg("open")}</button>`
-    : "";
   const replyBtn = `<button type="button" class="icon-pill icon-pill-sm thread-reply-one" data-action="reply-one" data-msg-id="${escapeAttr(message.messageId)}" title="Répondre à ce mail" aria-label="Répondre à ce mail">${iconSvg("reply")}</button>`;
   const forwardOneBtn = `<button type="button" class="icon-pill icon-pill-sm thread-forward-one" data-action="forward-one" data-msg-id="${escapeAttr(message.messageId)}" title="Transférer ce message" aria-label="Transférer ce message">${iconSvg("forward")}</button>`;
 
-  const aiBar = globeBtn ? `<div class="action-bar action-bar--ai action-bar--compact">${globeBtn}</div>` : "";
+  const moreItems = [
+    ...(offerTr
+      ? [
+          {
+            action: "llm-translate-message",
+            label: "Traduire",
+            extraAttrs: `data-msg-id="${escapeAttr(message.messageId)}"`,
+          },
+        ]
+      : []),
+    ...(state.selectedThreadId?.trim()
+      ? [
+          {
+            action: "retag-thread",
+            label: "Recalculer les tags",
+            extraAttrs: `data-thread-id="${escapeAttr(state.selectedThreadId)}"`,
+          },
+        ]
+      : []),
+    ...(message.collapsedQuotes.length
+      ? [
+          {
+            action: "open-quote-fold",
+            label: "Citations repliées",
+            extraAttrs: `data-msg-id="${escapeAttr(message.messageId)}"`,
+          },
+        ]
+      : []),
+  ];
+  // nlRuleHtml is a full button — keep as compact sibling if present
   const secBar = security ? `<div class="action-bar action-bar--sec action-bar--compact">${security}</div>` : "";
-  const utilParts = [retagBtn, quoteBtn, nlRuleHtml].filter(Boolean).join("");
-  const utilBar = utilParts ? `<div class="action-bar action-bar--util action-bar--compact">${utilParts}</div>` : "";
   const opsBar = `<div class="action-bar action-bar--ops action-bar--compact">${replyBtn}${forwardOneBtn}</div>`;
+  const moreMenu =
+    moreItems.length > 0
+      ? renderActionMenuHtml({
+          label: "Plus",
+          ariaLabel: "Plus d’actions sur ce message",
+          triggerClass: "ghost-button action-menu__trigger action-menu__trigger--sm",
+          items: moreItems,
+        })
+      : "";
+  const nlBar = nlRuleHtml ? `<div class="action-bar action-bar--util action-bar--compact">${nlRuleHtml}</div>` : "";
 
-  return `<div class="thread-msg-head-actions" role="group" aria-label="Actions sur ce message">${aiBar}${secBar}${utilBar}${opsBar}</div>`;
+  return `<div class="thread-msg-head-actions" role="group" aria-label="Actions sur ce message">${secBar}${opsBar}${moreMenu}${nlBar}</div>`;
 }
 
 function renderMessageInlineTranslation(message: CleanedMessageView, targetLang: string, offerTranslationUi: boolean): string {
@@ -185,11 +200,6 @@ export function renderThread() {
   const participantLinks = renderDeps().threadParticipantsWithEmails(thread.messages);
   const avCap = 5;
   const avExtra = participantLinks.length > avCap ? participantLinks.length - avCap : 0;
-  const threadTagsCount = threadTagsForModal(thread.tags ?? []).length;
-  const threadTagsBtnTitle =
-    threadTagsCount > 0 ?
-      `Tags du fil (${threadTagsCount}) — kind, source, domaine…`
-    : "Tags du fil — kind, source, domaine…";
   const replyTarget = escapeHtml(renderDeps().threadQuickReplyTargetName(msgs));
   const translationTargetLang = state.appPrefs.general.motherLanguage?.trim() || "fr";
   const recipientEventsById = renderDeps().threadRecipientPresenceEventsByMessageId(thread.messages);
@@ -201,24 +211,13 @@ export function renderThread() {
     : undefined;
   const toolbarFollowed = listRow ? renderDeps().threadListFollowed(listRow) : false;
   const threadUnreadNav = Boolean(listRow?.unread ?? thread?.unread);
-  const curSeenToggleTitle = threadUnreadNav ? "Marquer comme lu" : "Marquer comme non lu";
-  const curSeenToggleIcon = threadUnreadNav ? "read" : "unread";
   const readingSimple = true;
   const threadReadingLayoutClass = " thread-reading--reading-layout";
 
   return `
     <section class="thread-view thread-reading${threadReadingLayoutClass}" aria-label="Fil de discussion">
       <header class="thread-reading-head">
-        ${renderViewNavTrail(`<div class="action-bar action-bar--ai" role="toolbar" aria-label="Actions IA">
-              <button type="button" class="icon-pill thread-nav-icon" data-action="summarize" title="Résumer" aria-label="Résumer">${iconSvg("spark")}</button>
-              ${
-                msgs.some((m) => renderDeps().shouldOfferPerMessageTranslate(m, translationTargetLang, thread.tags))
-                  ? `<button type="button" class="icon-pill thread-nav-icon" data-action="llm-translate-thread" title="Traduire tout le fil en un bloc (LLM)" aria-label="Traduire tout le fil">${iconSvg("globe")}</button>`
-                  : ""
-              }
-              <button type="button" class="icon-pill thread-nav-icon${state.aiOpen ? " icon-pill--active" : ""}" data-action="toggle-ai" aria-expanded="${state.aiOpen}" title="${state.aiOpen ? "Masquer le panneau Détails" : "Panneau Détails"}" aria-label="${state.aiOpen ? "Masquer le panneau Détails" : "Panneau Détails"}">${iconSvg("panel")}</button>
-            </div>
-            <div class="action-bar action-bar--util" role="toolbar" aria-label="Actions utilitaires">
+        ${renderViewNavTrail(`<div class="action-bar action-bar--util" role="toolbar" aria-label="Synchronisation">
               <button type="button" class="icon-pill thread-nav-sync${state.syncInProgress ? " is-loading" : ""}" data-action="sync-inbox" title="Synchroniser (Ctrl+F5)" aria-label="Synchroniser" ${state.syncInProgress ? "disabled" : ""}>${state.syncInProgress ? `<span class="mini-sync"><span class="spinner" aria-hidden="true"></span></span>` : iconSvg("sync")}</button>
             </div>`)}
 
@@ -249,33 +248,65 @@ export function renderThread() {
 
           <div class="thread-action-bar">
             <div class="thread-more-actions">
-              <div class="action-bar action-bar--util" role="toolbar" aria-label="Actions utilitaires">
-                <button type="button" class="icon-pill${state.threadTagsModalOpen ? " icon-pill--active" : ""}" data-action="open-thread-tags" title="${escapeAttr(threadTagsBtnTitle)}" aria-label="${escapeAttr(threadTagsBtnTitle)}" aria-expanded="${state.threadTagsModalOpen}">${iconSvg("tags")}</button>
-                <button type="button" class="icon-pill" data-action="retag-thread" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}" title="Recalculer les tags" aria-label="Recalculer les tags">${iconSvg("sync")}</button>
+              <div class="action-bar action-bar--primary" role="toolbar" aria-label="Répondre">
                 <button type="button" class="icon-pill inbox-thread-follow-toggle ${toolbarFollowed ? "inbox-thread-follow-toggle--on" : ""}" data-action="toggle-thread-follow" data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}" title="${escapeAttr(toolbarFollowed ? "Retirer du suivi" : "Suivre ce fil")}" aria-label="${escapeAttr(toolbarFollowed ? "Retirer du suivi" : "Suivre ce fil")}" aria-pressed="${toolbarFollowed}">${iconSvg(toolbarFollowed ? "starFilled" : "starOutline")}</button>
                 ${
-                  ENABLE_CLEAN_MESSAGE_VIEW ?
-                    `${iconThreadMessageViewToggle(userMode)}`
-                  : ""
-                }
-              </div>
-              <div class="action-bar action-bar--ops" role="toolbar" aria-label="Actions opérationnelles">
-                <button type="button" class="icon-pill" data-action="thread-archive-cur" title="Archiver" aria-label="Archiver">${iconSvg("archive")}</button>
-                <button type="button" class="icon-pill" data-action="thread-unarchive-cur" title="Désarchiver vers Inbox" aria-label="Désarchiver">${iconSvg("move")}</button>
-                ${
                   blockReply
                     ? ""
-                    : `<button type="button" class="icon-pill" data-action="reply" title="Répondre" aria-label="Répondre">${iconSvg("reply")}</button>`
-                }
-                <button type="button" class="icon-pill inbox-seen-toggle ${threadUnreadNav ? "inbox-seen-toggle--is-unread" : ""}" data-action="toggle-thread-seen-cur" title="${escapeAttr(curSeenToggleTitle)}" aria-label="${escapeAttr(curSeenToggleTitle)}">${iconSvg(curSeenToggleIcon)}</button>
-                <button type="button" class="icon-pill danger" data-action="thread-trash-cur" title="Corbeille" aria-label="Corbeille">${iconSvg("trash")}</button>
-                <button type="button" class="icon-pill" data-action="thread-move-cur" title="Déplacer" aria-label="Déplacer">${iconSvg("move")}</button>
-                ${
-                  blockReply
-                    ? ""
-                    : `<button type="button" class="icon-pill" data-action="reply-all" title="Répondre à tous" aria-label="Répondre à tous">${iconSvg("replyAll")}</button>`
+                    : `<button type="button" class="primary-button thread-reply-primary" data-action="reply" title="Répondre" aria-label="Répondre">${iconSvg("reply")}<span>Répondre</span></button>
+                       <button type="button" class="icon-pill" data-action="reply-all" title="Répondre à tous" aria-label="Répondre à tous">${iconSvg("replyAll")}</button>`
                 }
                 <button type="button" class="icon-pill" data-action="forward" title="Transférer" aria-label="Transférer">${iconSvg("forward")}</button>
+              </div>
+              <div class="action-bar action-bar--menus" role="toolbar" aria-label="Plus d’actions">
+                ${renderActionMenuHtml({
+                  label: "Organiser",
+                  title: "Archiver, déplacer, corbeille…",
+                  triggerClass: "ghost-button action-menu__trigger",
+                  items: [
+                    { action: "thread-archive-cur", label: "Archiver" },
+                    { action: "thread-unarchive-cur", label: "Désarchiver" },
+                    { action: "thread-move-cur", label: "Déplacer" },
+                    {
+                      action: "toggle-thread-seen-cur",
+                      label: threadUnreadNav ? "Marquer comme lu" : "Marquer comme non lu",
+                    },
+                    { action: "thread-trash-cur", label: "Corbeille", danger: true },
+                  ],
+                })}
+                ${renderActionMenuHtml({
+                  label: "IA",
+                  title: "Résumer, traduire, panneau détails",
+                  triggerClass: "ghost-button action-menu__trigger",
+                  items: [
+                    { action: "summarize", label: "Résumer" },
+                    ...(msgs.some((m) =>
+                      renderDeps().shouldOfferPerMessageTranslate(m, translationTargetLang, thread.tags),
+                    )
+                      ? [{ action: "llm-translate-thread", label: "Traduire le fil" }]
+                      : []),
+                    {
+                      action: "toggle-ai",
+                      label: state.aiOpen ? "Masquer le panneau" : "Panneau Détails",
+                    },
+                  ],
+                })}
+                ${renderActionMenuHtml({
+                  label: "Plus",
+                  title: "Tags, vue, options",
+                  triggerClass: "ghost-button action-menu__trigger",
+                  items: [
+                    { action: "open-thread-tags", label: "Tags du fil" },
+                    {
+                      action: "retag-thread",
+                      label: "Recalculer les tags",
+                      extraAttrs: `data-thread-id="${escapeAttr(state.selectedThreadId ?? "")}"`,
+                    },
+                    ...(ENABLE_CLEAN_MESSAGE_VIEW
+                      ? [{ action: "toggle-message-view", label: userMode === "clean" ? "Afficher brut" : "Vue lisible" }]
+                      : []),
+                  ],
+                })}
               </div>
             </div>
           </div>

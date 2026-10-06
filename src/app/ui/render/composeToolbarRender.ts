@@ -38,12 +38,6 @@ export const COMPOSE_MD_GROUPS: readonly (readonly ComposeMdCommand[])[] = [
     { id: "ol", label: "Numéros", title: "Liste numérotée", className: "" },
     { id: "link", label: "Lien", title: "Lien (Ctrl+K)", className: "" },
     { id: "image", label: "Image", title: "Image", className: "" },
-    { id: "table", label: "Tableau", title: "Insérer un tableau (choisir lignes × colonnes)", className: "" },
-    { id: "table-add-row", label: "+L", title: "Ajouter une ligne (curseur dans le tableau)", className: "compose-tool--table-edit" },
-    { id: "table-add-col", label: "+C", title: "Ajouter une colonne (curseur dans le tableau)", className: "compose-tool--table-edit" },
-    { id: "table-del-row", label: "−L", title: "Supprimer la ligne courante", className: "compose-tool--table-edit" },
-    { id: "table-del-col", label: "−C", title: "Supprimer la colonne courante", className: "compose-tool--table-edit" },
-    { id: "table-del", label: "✕T", title: "Supprimer le tableau", className: "compose-tool--table-edit" },
   ],
   [
     { id: "code", label: "Code", title: "Code", className: "compose-tool--code" },
@@ -53,6 +47,14 @@ export const COMPOSE_MD_GROUPS: readonly (readonly ComposeMdCommand[])[] = [
     { id: "undo", label: "Annuler", title: "Annuler", className: "" },
     { id: "redo", label: "Refaire", title: "Refaire", className: "" },
   ],
+];
+
+const COMPOSE_TABLE_EDIT_CMDS: readonly ComposeMdCommand[] = [
+  { id: "table-add-row", label: "+L", title: "Ajouter une ligne (curseur dans le tableau)", className: "compose-tool--table-edit" },
+  { id: "table-add-col", label: "+C", title: "Ajouter une colonne (curseur dans le tableau)", className: "compose-tool--table-edit" },
+  { id: "table-del-row", label: "−L", title: "Supprimer la ligne courante", className: "compose-tool--table-edit" },
+  { id: "table-del-col", label: "−C", title: "Supprimer la colonne courante", className: "compose-tool--table-edit" },
+  { id: "table-del", label: "✕T", title: "Supprimer le tableau", className: "compose-tool--table-edit compose-tool--table-del" },
 ];
 
 export type ComposeToolbarProps = {
@@ -103,6 +105,15 @@ function renderHeadingGroup(): string {
   return `<div class="compose-heading-group" role="group" aria-label="Titre"><span class="compose-heading-group__name">Titre</span>${levels}</div>`;
 }
 
+function renderTableGroup(): string {
+  const insert = `<button type="button" class="ghost-button md-button compose-tool compose-table-group__insert" data-md="table" data-compose-cmd="md:table" title="Insérer un tableau (choisir lignes × colonnes)">Tableau</button>`;
+  const edits = COMPOSE_TABLE_EDIT_CMDS.map(
+    (cmd) =>
+      `<button type="button" class="ghost-button md-button compose-tool compose-table-group__edit ${cmd.className}" data-md="${escapeAttr(cmd.id)}" data-compose-cmd="md:${escapeAttr(cmd.id)}" title="${escapeAttr(cmd.title)}" aria-label="${escapeAttr(cmd.title)}">${escapeHtml(cmd.label)}</button>`,
+  ).join("");
+  return `<div class="compose-table-group" role="group" aria-label="Tableau">${insert}<span class="compose-table-group__sep" aria-hidden="true"></span>${edits}</div>`;
+}
+
 export function renderComposeToolbar(props: ComposeToolbarProps): string {
   const busy = composeAiBusyKind(props.llmJobLabel);
   const blocked = busy !== null;
@@ -110,7 +121,8 @@ export function renderComposeToolbar(props: ComposeToolbarProps): string {
   const mdChunks = [
     COMPOSE_MD_GROUPS[0]!.map(renderMdButton).join(""),
     renderHeadingGroup(),
-    ...COMPOSE_MD_GROUPS.slice(1).map((group) => group.map(renderMdButton).join("")),
+    COMPOSE_MD_GROUPS[1]!.map(renderMdButton).join("") + renderTableGroup(),
+    ...COMPOSE_MD_GROUPS.slice(2).map((group) => group.map(renderMdButton).join("")),
   ];
   const mdHtml = mdChunks
     .map((chunk, index) => `${index > 0 ? `<span class="md-toolbar-sep" aria-hidden="true"></span>` : ""}${chunk}`)

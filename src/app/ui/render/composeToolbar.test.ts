@@ -34,6 +34,11 @@ describe("barre du compositeur", () => {
     expect(html).toContain('class="compose-heading-group"');
     expect(html).toContain('aria-label="Titre"');
     expect(html).toContain(">Titre<");
+    expect(html).toContain('class="compose-table-group"');
+    expect(html).toContain('aria-label="Tableau"');
+    expect(html).toContain('data-md="table"');
+    expect(html).toContain('data-md="table-add-row"');
+    expect(html).toContain('data-md="table-del"');
     expect(html).toContain('data-md="h1"');
     expect(html).toContain('data-md="h2"');
     expect(html).toContain('data-md="h3"');

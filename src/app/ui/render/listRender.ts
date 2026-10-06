@@ -35,22 +35,17 @@ import {
   renderInboxSearchContextBlock,
   renderSearchBarStackHtml,
 } from "./searchRender";
-import { renderBackgroundActivityChips } from "./statusFooterRender";
 
 function inboxListFooterInnerHtml(draftBoxVirtual: boolean, total: number): string {
   const loadMore =
     state.hasMoreThreads ?
       '<button type="button" class="ghost-button inbox-load-more" data-action="load-more">Charger plus</button>'
     : "";
-  const chips = renderBackgroundActivityChips({ digestSlot: false });
+  // Activité IA / sync : uniquement dans la barre d’état globale (éviter le doublon Cache IA, etc.).
   let center = "";
-  if (chips) {
-    center = `<div class="inbox-footer-activity" role="status" aria-live="polite">${chips}</div>`;
-  } else if (!draftBoxVirtual && isTauriRuntime()) {
-    center = `<span class="inbox-end-hint dim">Arrière-plan : en veille</span>`;
-  } else if (draftBoxVirtual) {
+  if (draftBoxVirtual) {
     center = `<span class="inbox-end-hint dim">Stockage local SQLite · pas de sync IMAP</span>`;
-  } else {
+  } else if (!isTauriRuntime()) {
     center = `<span class="inbox-end-hint dim">Mode navigateur — lancez Tauri pour la sync</span>`;
   }
   const endList =

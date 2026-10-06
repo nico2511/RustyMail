@@ -70,7 +70,7 @@ fn unwrap_redundant_wrappers(doc: &mut Html) {
                     return None;
                 }
                 if el.value().attrs.iter().any(|(name, _)| {
-                    super::attrs::keep_attr(element_local_name(el), name.local.as_ref())
+                    super::attrs::keep_attr(element_local_name(el), name.local.as_ref(), false)
                 }) {
                     return None;
                 }
