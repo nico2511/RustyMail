@@ -122,6 +122,13 @@ pub use prefs_urls::{
 };
 pub use provider_errors::{oauth_http_error, oauth_redirect_error, redact_sensitive_snippet};
 pub use tls_policy::{effective_allow_invalid_tls, persist_allow_invalid_tls_from_ui_checkbox};
+pub use unsubscribe_detect::{
+    blob_has_unsubscribe_signal, extract_unsubscribe_links_from_html, href_has_unsubscribe_signal,
+    html_has_unsubscribe_link, index_message_unsubscribe_urls, list_unsubscribe_header_present,
+    message_has_unsubscribe_signal, parse_and_sort_unsubscribe_urls_json,
+    parse_list_unsubscribe_header, parse_unsubscribe_urls_json, sort_unsubscribe_urls,
+    unsubscribe_url_score,
+};
 pub use vcard::{export_address_contacts_vcard, import_address_contacts_vcard, ImportVcardResult};
 
 pub use account_imap_lock::{acquire_account_imap_lock, with_account_imap_lock};

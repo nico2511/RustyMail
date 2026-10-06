@@ -4,6 +4,29 @@ use std::collections::HashSet;
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json;
+use unicode_normalization::UnicodeNormalization;
+
+/// Normalise pour matcher FR/EN malgré accents / entités HTML courantes.
+fn fold_unsub_key(raw: &str) -> String {
+    let mut s = raw.to_string();
+    for (from, to) in [
+        ("&eacute;", "e"),
+        ("&Eacute;", "e"),
+        ("&egrave;", "e"),
+        ("&agrave;", "a"),
+        ("&nbsp;", " "),
+        ("&#160;", " "),
+        ("&#39;", "'"),
+        ("&rsquo;", "'"),
+        ("&lsquo;", "'"),
+    ] {
+        s = s.replace(from, to);
+    }
+    s.nfd()
+        .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
+        .flat_map(|c| c.to_lowercase())
+        .collect::<String>()
+}
 
 pub fn list_unsubscribe_header_present(headers: &[(String, String)]) -> bool {
     headers.iter().any(|(name, value)| {
@@ -13,40 +36,54 @@ pub fn list_unsubscribe_header_present(headers: &[(String, String)]) -> bool {
 }
 
 pub fn blob_has_unsubscribe_signal(blob: &str) -> bool {
-    let blob = blob.to_ascii_lowercase();
+    let blob = fold_unsub_key(blob);
     blob.contains("unsubscribe")
         || blob.contains("opt-out")
         || blob.contains("optout")
         || blob.contains("desinscri")
-        || blob.contains("desabonner")
+        || blob.contains("desabon")
         || blob.contains("desinscription")
         || blob.contains("list-unsubscribe")
         || blob.contains("list-manage")
         || blob.contains("subscription center")
         || blob.contains("email preferences")
         || blob.contains("communication preferences")
+        || blob.contains("advertising preferences")
+        || blob.contains("ne plus recevoir")
+        || blob.contains("stop receiving")
+        || blob.contains("stop receiv")
+        || blob.contains("remove me from")
+        || blob.contains("manage preferences")
 }
 
-/// Segments de chemin courants pour désinscription (ex. Yuka `/mk/un/v2/…`).
+/// Segments de chemin courants pour désinscription (ex. Yuka `/mk/un/v2/…`, Iterable `/s/u/`).
 fn url_path_has_unsubscribe_signal(path_and_query: &str) -> bool {
-    let p = path_and_query.to_ascii_lowercase();
+    let p = fold_unsub_key(path_and_query);
     if p.contains("unsubscribe")
         || p.contains("optout")
         || p.contains("opt_out")
         || p.contains("opt-out")
-        || p.contains("subscription")
-        || p.contains("preferences")
         || p.contains("list-manage")
         || p.contains("list_unsubscribe")
+        || p.contains("email-preference")
+        || p.contains("preferences/email")
+        || p.contains("advertising-preferences")
+        || p.contains("manage-subscription")
+        || p.contains("subscription-center")
+        || p.contains("subscription_center")
     {
         return true;
     }
-    // ESP marketing : segment court `/un/` (Yuka, etc.), pas seulement le mot « unsubscribe ».
+    // ESP marketing : segments courts (Yuka `/un/`, Iterable one-click `/s/uh/` + `/s/u/`).
     p.contains("/un/")
         || p.contains("/unsub")
         || p.contains("/optout")
         || p.contains("/opt-out")
         || p.contains("/manage-subscription")
+        || p.contains("/s/uh/")
+        || p.contains("/s/u/")
+        || p.contains("/as/unsubscribe")
+        || p.contains("/unsubscribe.")
 }
 
 fn href_path_and_query(href: &str) -> Option<String> {
@@ -71,22 +108,30 @@ fn href_path_and_query(href: &str) -> Option<String> {
 }
 
 pub fn href_has_unsubscribe_signal(href: &str) -> bool {
-    let href_lc = href.trim().to_ascii_lowercase();
+    let href_lc = fold_unsub_key(href.trim());
     if href_lc.is_empty() {
         return false;
     }
     if href_lc.contains("unsubscribe")
         || href_lc.contains("opt-out")
         || href_lc.contains("optout")
-        || href_lc.contains("subscription")
         || href_lc.contains("preferences/email")
         || href_lc.contains("email-preference")
         || href_lc.contains("list-manage")
+        || href_lc.contains("unsubscribe.iterable")
+        || href_lc.contains("list-unsubscribe")
     {
         return true;
     }
-    if href_lc.starts_with("mailto:") && blob_has_unsubscribe_signal(href) {
-        return true;
+    // Hosts / mailto ESP dédiés désinscription.
+    if href_lc.starts_with("mailto:") {
+        if blob_has_unsubscribe_signal(href)
+            || href_lc.contains("unsubscribe+")
+            || href_lc.contains("unsubscribe@")
+            || href_lc.contains("unsub@")
+        {
+            return true;
+        }
     }
     if let Some(path) = href_path_and_query(href) {
         if url_path_has_unsubscribe_signal(&path) {
@@ -140,16 +185,7 @@ pub fn message_has_unsubscribe_signal(
         subject,
         plain.chars().take(2000).collect::<String>()
     );
-    let blob_lc = blob.to_ascii_lowercase();
-    if blob_lc.contains("unsubscribe")
-        || blob_lc.contains("opt-out")
-        || blob_lc.contains("optout")
-        || blob_lc.contains("désabonner")
-        || blob_lc.contains("desabonner")
-        || blob_lc.contains("se desinscrire")
-        || blob_lc.contains("se désinscrire")
-        || blob_lc.contains("list-unsubscribe")
-    {
+    if blob_has_unsubscribe_signal(&blob) {
         return true;
     }
     if let Some(h) = html {
@@ -160,14 +196,14 @@ pub fn message_has_unsubscribe_signal(
     false
 }
 
-/// Score aligné sur le tri UI (`sortUnsubscribeLinks` dans `main.ts`) : préfère HTTPS actionnable
+/// Score aligné sur le tri UI (`sortUnsubscribeLinks`) : préfère HTTPS actionnable
 /// aux `mailto:` et aux redirecteurs `/click` quand les deux sont présents.
 pub fn unsubscribe_url_score(href: &str) -> i32 {
     let href = href.trim();
     if href.is_empty() {
         return i32::MIN / 4;
     }
-    let low = href.to_ascii_lowercase();
+    let low = fold_unsub_key(href);
     let mut score = 0;
     if low.starts_with("https://") || low.starts_with("http://") {
         score += 30;
@@ -182,16 +218,20 @@ pub fn unsubscribe_url_score(href: &str) -> i32 {
         || low.contains("optout")
         || low.contains("opt_out")
         || low.contains("desinscri")
-        || low.contains("desabonner")
+        || low.contains("desabon")
     {
         score += 80;
     }
     if low.contains("list-unsubscribe")
         || low.contains("list-manage")
-        || low.contains("subscription")
-        || low.contains("preferences")
+        || low.contains("subscription-center")
+        || low.contains("email-preference")
+        || low.contains("preferences/email")
     {
         score += 25;
+    }
+    if low.contains("/s/uh/") || low.contains("/s/u/") {
+        score += 55;
     }
     if low.contains("unsub.aspx") {
         score += 35;
@@ -256,21 +296,28 @@ fn push_unsub_url(
 }
 
 fn anchor_text_looks_like_unsubscribe(text: &str) -> bool {
-    let t = text.to_ascii_lowercase();
+    let t = fold_unsub_key(text);
     t.contains("unsubscribe")
         || t.contains("opt-out")
         || t.contains("optout")
         || t.contains("desinscri")
-        || t.contains("desabonner")
+        || t.contains("desabon")
         || t.contains("se desinscrire")
-        || t.contains("se désinscrire")
+        || t.contains("ne plus recevoir")
+        || t.contains("stop receiving")
         || t.contains("email preferences")
         || t.contains("communication preferences")
+        || t.contains("advertising preferences")
 }
 
 fn anchor_text_weak_unsubscribe_label(text: &str) -> bool {
-    let t = text.trim().to_ascii_lowercase();
-    t == "ici" || t == "here" || t == "click here" || t == "cliquez ici" || t == "cliquez"
+    let t = fold_unsub_key(text).trim().to_string();
+    t == "ici"
+        || t == "here"
+        || t == "click here"
+        || t == "cliquez ici"
+        || t == "cliquez"
+        || t == "link"
 }
 
 fn html_context_before_index(html_lc: &str, index: usize) -> &str {
@@ -317,8 +364,9 @@ pub fn extract_unsubscribe_links_from_html(html: &str, limit: usize) -> Vec<Stri
             if !label_ok && anchor_text_weak_unsubscribe_label(after_href) {
                 let ctx = html_context_before_index(&html_lc, href_key);
                 weak_label_with_context = blob_has_unsubscribe_signal(ctx)
-                    || ctx.contains("desinscri")
-                    || ctx.contains("desabonner");
+                    || fold_unsub_key(ctx).contains("desinscri")
+                    || fold_unsub_key(ctx).contains("desabon")
+                    || fold_unsub_key(ctx).contains("ne plus recevoir");
             }
         }
         if href_ok || label_ok || weak_label_with_context {
@@ -648,5 +696,50 @@ mod tests {
     fn detects_html_unsub() {
         let html = r#"<a href="https://x.com/unsubscribe">Se désinscrire</a>"#;
         assert!(html_has_unsubscribe_link(html));
+    }
+
+    #[test]
+    fn fold_matches_accented_french_label() {
+        assert!(blob_has_unsubscribe_signal("Se désinscrire"));
+        assert!(blob_has_unsubscribe_signal("se d&eacute;sinscrire"));
+        assert!(anchor_text_looks_like_unsubscribe("Se désabonner"));
+    }
+
+    #[test]
+    fn detects_iterable_style_paths() {
+        assert!(href_has_unsubscribe_signal(
+            "https://links.iterable.com/s/uh/Iw35cOOggG1OP4Ad/25"
+        ));
+        assert!(href_has_unsubscribe_signal(
+            "http://links.swissborg.com/s/u/BSbrFspXkijdqVtJ1EDyO/25"
+        ));
+        assert!(href_has_unsubscribe_signal(
+            "mailto:unsubscribe+20208333+26673752@unsubscribe.iterable.com"
+        ));
+    }
+
+    #[test]
+    fn extract_accented_desinscrire_with_iterable_path() {
+        let html = r#"Si vous ne souhaitez plus recevoir d'e-mails, cliquez sur se <a href="http://links.swissborg.com/s/u/BSbrFspX/25">désinscrire</a>."#;
+        let urls = extract_unsubscribe_links_from_html(html, 4);
+        assert_eq!(urls.len(), 1, "{urls:?}");
+        assert!(urls[0].contains("/s/u/"));
+    }
+
+    #[test]
+    fn extract_cliquez_ici_after_ne_plus_recevoir() {
+        let html = r#"Pour ne plus recevoir nos emails promotionnels, <a href="https://trk.aliexpress.com/unsub?x=1">Cliquez ici</a>."#;
+        let urls = extract_unsubscribe_links_from_html(html, 4);
+        assert_eq!(urls.len(), 1, "{urls:?}");
+    }
+
+    #[test]
+    fn bare_account_preferences_path_is_not_unsub() {
+        assert!(!href_has_unsubscribe_signal(
+            "https://shop.example.com/account/preferences"
+        ));
+        assert!(!href_has_unsubscribe_signal(
+            "https://shop.example.com/product/subscription-box"
+        ));
     }
 }

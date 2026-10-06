@@ -674,7 +674,7 @@ export function renderSettings() {
               "digestCut",
               t("settings.tabs.digestCut"),
               tabDigestCut,
-              "Outil 1/2 — découpe d’un vrai mail (boîte / .eml) + proposition LLM",
+              "Outil 1/2 — rendre un vrai mail lisible (boîte / .eml)",
             ),
             settingsNavButton(
               "digestBench",
