@@ -2,11 +2,11 @@
 
 RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI (summaries, rewrite, translation, grammar, dictation, semantic search) runs on-device or over HTTP to OpenRouter / llama-server — never required for core mail.
 
-**0.3.9** follows 0.3.8: multi-account compose « De » (send + draft save on the same account), toolbar dictate/IA row, summary LLM context fit + empty fallback, status footer / UI polish, demo account helpers.
+**0.4.0** follows 0.3.9: éditeur de découpe digest (zones visuelles, validation, reformatage IA du texte), recherche multi-compte, détection désinscription renforcée.
 
 ## Screenshots
 
-UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.3.9 build (compose in the app uses TipTap, not the mockup’s markdown field).
+UI previews rendered from the productivity mockups in [`docs/mockups/productivity/`](docs/mockups/productivity/README.md). The mail is fictional demo content. These frames show the intended shell; they are not a pixel-perfect capture of the 0.4.0 build (compose in the app uses TipTap, not the mockup’s markdown field).
 
 **Inbox** — unified list, charcoal rail, account labels.
 
