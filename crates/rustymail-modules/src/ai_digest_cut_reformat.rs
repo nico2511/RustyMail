@@ -18,7 +18,7 @@ use rustymail_llm::{LlmEngine, LlmError};
 const MIN_OUTPUT_TOKENS: u32 = 384;
 const MAX_OUTPUT_TOKENS: u32 = 1_024;
 const MIN_OUTPUT_ROOM: u32 = 280;
-const EXCERPT_CHARS: usize = 900;
+const EXCERPT_CHARS: usize = 1_200;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -64,13 +64,21 @@ pub fn reformat_digest_cut_reading(
     engine: Option<&mut LlmEngine>,
     html: &str,
     sender_email: &str,
+    subject: &str,
     output_language: &str,
     current: &DigestCutProposal,
 ) -> DigestCutReformatOutcome {
-    let excerpts = zone_excerpts(html, sender_email, current);
+    let excerpts = zone_excerpts(html, sender_email, subject, current);
     let mut fallback_reason = None;
     if let Some(engine) = engine {
-        match reformat_with_llm(engine, sender_email, output_language, current, &excerpts) {
+        match reformat_with_llm(
+            engine,
+            sender_email,
+            subject,
+            output_language,
+            current,
+            &excerpts,
+        ) {
             Ok(dto) => {
                 let (proposal, reading_html) = apply_reformat_dto(current, dto);
                 return DigestCutReformatOutcome {
@@ -95,7 +103,7 @@ pub fn reformat_digest_cut_reading(
                 .into(),
         );
     }
-    let (proposal, reading_html) = heuristic_reformat(current, &excerpts);
+    let (proposal, reading_html) = heuristic_reformat(current, subject, &excerpts);
     DigestCutReformatOutcome {
         proposal,
         reading_html,
@@ -110,7 +118,12 @@ struct ZoneExcerpts {
     footer: String,
 }
 
-fn zone_excerpts(html: &str, sender_email: &str, proposal: &DigestCutProposal) -> ZoneExcerpts {
+fn zone_excerpts(
+    html: &str,
+    sender_email: &str,
+    subject: &str,
+    proposal: &DigestCutProposal,
+) -> ZoneExcerpts {
     let mut as_is = proposal.clone();
     as_is.zones.header.presentation = Some(ZonePresentation::AsIs);
     as_is.zones.body.presentation = Some(ZonePresentation::AsIs);
@@ -118,9 +131,18 @@ fn zone_excerpts(html: &str, sender_email: &str, proposal: &DigestCutProposal) -
     let preview = preview_candidate_fixture(&yaml, html, sender_email);
     let reading = preview.html.unwrap_or_default();
     let plain = strip_tags_to_plain(&reading);
+    let subject = subject.split_whitespace().collect::<Vec<_>>().join(" ");
+    let header = if subject.is_empty() {
+        truncate_chars(&plain, EXCERPT_CHARS / 3)
+    } else {
+        truncate_chars(
+            &format!("{subject} — {plain}"),
+            EXCERPT_CHARS / 3,
+        )
+    };
     // Découpe grossière : tout le rendu as_is est le corps utile ; footer = zone footer du mail source.
     ZoneExcerpts {
-        header: truncate_chars(&plain, EXCERPT_CHARS / 3),
+        header,
         body: truncate_chars(&plain, EXCERPT_CHARS),
         footer: truncate_chars(
             &proposal
@@ -151,6 +173,7 @@ fn strip_tags_to_plain(html: &str) -> String {
 fn reformat_with_llm(
     engine: &mut LlmEngine,
     sender_email: &str,
+    subject: &str,
     output_language: &str,
     current: &DigestCutProposal,
     excerpts: &ZoneExcerpts,
@@ -162,9 +185,11 @@ fn reformat_with_llm(
         "bodyAction": current.zones.body.action,
         "footerAction": current.zones.footer.action,
     });
+    let subject_line = subject.split_whitespace().collect::<Vec<_>>().join(" ");
     let user = format!(
-        "Sender (context only): {}\nZones: {}\n\n{}\n\n{}\n\n{}",
+        "Sender (context only): {}\nSubject (context only): {}\nZones: {}\n\n{}\n\n{}\n\n{}",
         sender_email.trim(),
+        truncate_chars(&subject_line, 160),
         slim,
         untrusted_mail_for_engine(engine, "digest-cut-header-text", &excerpts.header),
         untrusted_mail_for_engine(engine, "digest-cut-body-text", &excerpts.body),
@@ -296,6 +321,7 @@ fn tag_header_roles(zone: &mut DigestCutZone) {
 
 fn heuristic_reformat(
     current: &DigestCutProposal,
+    subject: &str,
     excerpts: &ZoneExcerpts,
 ) -> (DigestCutProposal, String) {
     let text = format!("{} {}", excerpts.header, excerpts.body);
@@ -305,27 +331,89 @@ fn heuristic_reformat(
         .filter(|s| s.len() >= 3)
         .take(12)
         .collect();
-    let title = lines.first().unwrap_or(&"Message").to_string();
-    let amount = lines
+    let subject = subject.split_whitespace().collect::<Vec<_>>().join(" ");
+    let title = if !subject.is_empty() {
+        clip_field(&subject, 120)
+    } else {
+        lines.first().unwrap_or(&"Message").to_string()
+    };
+    let currency_hits: Vec<&str> = lines
         .iter()
-        .find(|l| {
+        .copied()
+        .filter(|l| {
             let u = l.to_ascii_uppercase();
             u.contains("EUR") || u.contains("USD") || l.contains('€') || l.contains('$')
         })
-        .map(|s| (*s).to_string());
+        .collect();
+    // Catalogue promo : beaucoup de prix isolés → pas de tableau inventé.
+    let promo_catalog = currency_hits.len() >= 5
+        && !text.to_ascii_lowercase().contains("commande")
+        && !text.to_ascii_lowercase().contains("order")
+        && !text.to_ascii_lowercase().contains("alerte")
+        && !text.to_ascii_lowercase().contains("livré")
+        && !text.to_ascii_lowercase().contains("delivered");
+    let amount = if promo_catalog {
+        None
+    } else {
+        currency_hits.first().map(|s| (*s).to_string())
+    };
     let mut rows = Vec::new();
-    for line in lines.iter().skip(1).take(6) {
-        if let Some((label, value)) = line.split_once(':') {
-            let label = label.trim();
-            let value = value.trim();
-            if !label.is_empty() && !value.is_empty() && label.len() <= 40 {
-                rows.push(ReformatRowDto {
-                    label: label.to_string(),
-                    value: value.to_string(),
-                });
+    if !promo_catalog {
+        for line in lines.iter().skip(1).take(6) {
+            if let Some((label, value)) = line.split_once(':') {
+                let label = label.trim();
+                let value = value.trim();
+                if !label.is_empty() && !value.is_empty() && label.len() <= 40 {
+                    rows.push(ReformatRowDto {
+                        label: label.to_string(),
+                        value: value.to_string(),
+                    });
+                }
             }
         }
     }
+    let used_in_rows: std::collections::HashSet<String> = rows
+        .iter()
+        .flat_map(|r| [r.label.clone(), r.value.clone()])
+        .collect();
+    let commentary: Vec<String> = lines
+        .iter()
+        .skip(1)
+        .filter(|line| {
+            let lower = line.to_ascii_lowercase();
+            if used_in_rows.contains(**line) {
+                return false;
+            }
+            // Garder une courte explication utile ; jeter CTA / légal / désinscription.
+            if lower.contains("investir")
+                || lower.contains("unsubscribe")
+                || lower.contains("désinscri")
+                || lower.contains("desinscri")
+                || lower.contains("mentions légales")
+                || lower.contains("click here")
+                || lower.contains("cliquez ici")
+            {
+                return false;
+            }
+            line.len() >= 40
+        })
+        .take(2)
+        .map(|s| clip_field(s, 120))
+        .collect();
+    let paragraphs = if promo_catalog {
+        vec!["Catalogue promotionnel — aucun détail de commande personnelle.".into()]
+    } else if !commentary.is_empty() {
+        commentary
+    } else if rows.len() < 2 {
+        lines
+            .iter()
+            .skip(1)
+            .take(3)
+            .map(|s| clip_field(s, 120))
+            .collect()
+    } else {
+        vec![]
+    };
     let dto = ReformatDto {
         explanation_fr: "Reformatage structurel local (sans modèle) : lecture clarifiée.".into(),
         header_presentation: Some(if amount.is_some() {
@@ -342,16 +430,7 @@ fn heuristic_reformat(
         amount: amount.map(|a| clip_field(&a, 120)).unwrap_or_default(),
         details_heading: "Détails".into(),
         rows,
-        paragraphs: if amount.is_none() {
-            lines
-                .iter()
-                .skip(1)
-                .take(3)
-                .map(|s| clip_field(s, 120))
-                .collect()
-        } else {
-            vec![]
-        },
+        paragraphs,
         hide_footer: true,
     };
     let (mut proposal, html) = apply_reformat_dto(current, dto);
@@ -457,5 +536,21 @@ mod tests {
         assert!(html.contains("+ 50 EUR"));
         assert!(html.contains("<th scope=\"row\">Date</th>"));
         assert!(html.contains("rm-digest"));
+    }
+
+    #[test]
+    fn prompt_example_allows_key_value_plus_commentary() {
+        let prompt = include_str!("../prompts/digest_cut_reformat.system.txt");
+        let start = prompt.find("{\"explanationFr\"").expect("example json");
+        let end = prompt[start..]
+            .find('\n')
+            .map_or(prompt.len(), |i| start + i);
+        let example: serde_json::Value =
+            serde_json::from_str(prompt[start..end].trim()).expect("example parses");
+        let dto: ReformatDto = serde_json::from_value(example).expect("example dto");
+        assert!(dto.rows.len() >= 2);
+        assert!(!dto.paragraphs.is_empty());
+        assert!(dto.hide_footer);
+        assert!(validate_reformat_dto(&dto).is_ok());
     }
 }

@@ -50,10 +50,10 @@ function currentStep(): 1 | 2 | 3 {
 function stepsNav(active: 1 | 2 | 3): string {
   const items: Array<{ n: 1 | 2 | 3; label: string; hint: string }> = [
     { n: 1, label: "Choisir", hint: "Un mail réel" },
-    { n: 2, label: "Proposer", hint: "3 zones auto" },
-    { n: 3, label: "Ajuster", hint: "Puis reformater" },
+    { n: 2, label: "Repérer", hint: "Signal vs bruit" },
+    { n: 3, label: "Lire", hint: "Version claire" },
   ];
-  return `<ol class="digest-cut__steps" aria-label="Étapes de l’éditeur de découpe">
+  return `<ol class="digest-cut__steps" aria-label="Étapes pour rendre un mail lisible">
     ${items
       .map((item) => {
         const state =
@@ -126,7 +126,7 @@ function previewPane(): string {
       : "";
     return `${note}${sanitizeEmailHtml(digestCut.previewHtml).html}`;
   }
-  return `<p class="digest-cut__empty-hint">Ajustez les zones, puis <strong>Reformater le texte (IA)</strong> pour une lecture claire.</p>`;
+  return `<p class="digest-cut__empty-hint">Ajustez si besoin, puis <strong>Rendre lisible (IA)</strong>.</p>`;
 }
 
 function threadList(): string {
@@ -158,7 +158,7 @@ function messageList(): string {
       </li>`;
     })
     .join("");
-  return `<p class="digest-cut__subhead">Messages du fil — choisissez celui à découper</p>
+  return `<p class="digest-cut__subhead">Messages du fil — choisissez celui à rendre lisible</p>
     <h4 class="digest-bench__thread-title">${escapeHtml(digestCut.threadSubject || "(sans objet)")}</h4>
     <ul class="digest-bench__list">${messages}</ul>`;
 }
@@ -247,13 +247,13 @@ function proposeSection(loaded: boolean): string {
   const ready = Boolean(digestCut.proposal);
   return `<section class="digest-cut__card${loaded ? "" : " digest-cut__card--disabled"}" aria-labelledby="digest-cut-step2">
     <header class="digest-cut__card-head">
-      <h4 id="digest-cut-step2" class="digest-cut__card-title"><span class="digest-cut__card-n">2</span> Proposer la découpe</h4>
+      <h4 id="digest-cut-step2" class="digest-cut__card-title"><span class="digest-cut__card-n">2</span> Repérer l’essentiel</h4>
       ${ready ? `<span class="digest-cut__badge digest-cut__badge--ok">Fait</span>` : `<span class="digest-cut__badge">${loaded ? "À faire" : "Bloqué"}</span>`}
     </header>
-    <p class="digest-bench__fine">L’IA (ou la structure) choisit <strong>en-tête</strong>, <strong>corps</strong> et <strong>pied</strong>. Ensuite seulement on reformate le texte.</p>
+    <p class="digest-bench__fine">On sépare le <strong>signal</strong> (titre, faits, analyse utile) du <strong>bruit</strong> (pied promo / légal).</p>
     <div class="digest-cut__actions">
-      <button type="button" class="primary-button" data-action="digest-cut-propose" ${loaded && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy}>${digestCut.proposing ? "Proposition…" : ready ? "Reproposer" : "Proposer"}</button>
-      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && ready && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy} title="Le modèle local revérifie les zones">Valider les zones (IA)</button>
+      <button type="button" class="primary-button" data-action="digest-cut-propose" ${loaded && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy}>${digestCut.proposing ? "Analyse…" : ready ? "Repérer à nouveau" : "Repérer l’essentiel"}</button>
+      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && ready && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy} title="Le modèle local revérifie les zones">Revérifier (IA)</button>
     </div>
     <p class="digest-bench__fine dim">Rien n’est activé en lecture automatique depuis cet écran.</p>
   </section>`;
@@ -266,10 +266,10 @@ function adjustSection(): string {
   const reformatted = Boolean(digestCut.reformattedHtml.trim());
   return `<section class="digest-cut__card${hasProposal ? "" : " digest-cut__card--disabled"}" aria-labelledby="digest-cut-step3">
     <header class="digest-cut__card-head">
-      <h4 id="digest-cut-step3" class="digest-cut__card-title"><span class="digest-cut__card-n">3</span> Ajuster et reformater</h4>
+      <h4 id="digest-cut-step3" class="digest-cut__card-title"><span class="digest-cut__card-n">3</span> Lecture claire</h4>
       ${
         reformatted
-          ? `<span class="digest-cut__badge digest-cut__badge--ok">Texte reformatté</span>`
+          ? `<span class="digest-cut__badge digest-cut__badge--ok">Lisible</span>`
           : hasProposal
             ? `<span class="digest-cut__badge digest-cut__badge--ok">Zones prêtes</span>`
             : `<span class="digest-cut__badge">Après l’étape 2</span>`
@@ -287,13 +287,13 @@ function adjustSection(): string {
            ${paintBar()}
            <div class="digest-cut__actions">
              <button type="button" class="primary-button" data-action="digest-cut-reformat" ${busy ? "disabled" : ""}>${
-               digestCut.reformatting ? "Reformatage…" : reformatted ? "Reformater à nouveau" : "Reformater le texte (IA)"
+               digestCut.reformatting ? "Mise en lisibilité…" : reformatted ? "Rendre lisible à nouveau" : "Rendre lisible (IA)"
              }</button>
              <button type="button" class="ghost-button" data-action="digest-cut-preview" ${busy ? "disabled" : ""}>${digestCut.previewing ? "Aperçu…" : "Voir l’aperçu"}</button>
              <button type="button" class="ghost-button" data-action="digest-cut-toggle-code" aria-pressed="${digestCut.showCode ? "true" : "false"}">${digestCut.showCode ? "Masquer le code" : "Détails techniques"}</button>
            </div>
-           <p class="digest-bench__fine dim">D’abord les zones, puis l’IA réécrit une lecture claire (titre, détails, sans le bruit du pied).</p>`
-        : `<p class="digest-cut__empty-hint">Quand une proposition existe, vous réglez les zones puis reformatez le texte.</p>`
+           <p class="digest-bench__fine dim">L’IA garde le signal (titre, faits, analyse utile) et jette le bruit (promo, pied légal).</p>`
+        : `<p class="digest-cut__empty-hint">Après l’étape 2, vous pouvez ajuster puis rendre le mail lisible.</p>`
     }
   </section>`;
 }
@@ -310,8 +310,8 @@ export function renderDigestCutPanel(): string {
 
   return `<div class="settings-page digest-cut">
     <article class="settings-card surface-sm digest-cut__shell">
-      <h3 class="thread-kicker">Éditeur de découpe</h3>
-      <p class="digest-cut__lead">Découpez un mail HTML en <strong>en-tête</strong>, <strong>corps</strong> et <strong>pied</strong> pour une lecture plus claire. Outil d’essai : ça ne change pas la lecture réelle tant que vous n’activez rien ailleurs.</p>
+      <h3 class="thread-kicker">Rendre un mail lisible</h3>
+      <p class="digest-cut__lead">Gardez ce qui compte, retirez le bruit. Outil d’essai : ça ne change pas la lecture réelle tant que vous n’activez rien ailleurs.</p>
       ${stepsNav(step)}
       ${digestCut.notice ? `<p class="digest-cut__notice" aria-live="polite">${escapeHtml(digestCut.notice)}</p>` : ""}
       <div class="digest-cut__flow">
@@ -325,7 +325,7 @@ export function renderDigestCutPanel(): string {
           <div class="digest-bench__pane-body mail digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}</div>
         </section>
         <section class="digest-bench__pane">
-          <h4 class="digest-bench__pane-title">Lecture découpée</h4>
+          <h4 class="digest-bench__pane-title">Lecture claire</h4>
           <div class="digest-bench__pane-body mail">${previewPane()}</div>
         </section>
       </div>

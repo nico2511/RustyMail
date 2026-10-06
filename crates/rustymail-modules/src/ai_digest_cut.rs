@@ -72,6 +72,7 @@ pub fn propose_digest_cut_zones(
     engine: Option<&mut LlmEngine>,
     html: &str,
     sender_email: &str,
+    subject: &str,
     output_language: &str,
     current: Option<&DigestCutProposal>,
 ) -> DigestCutModelOutcome {
@@ -80,7 +81,7 @@ pub fn propose_digest_cut_zones(
         .unwrap_or_else(|| analyze_html_structure_heuristic(html, sender_email));
     let mut fallback_reason: Option<String> = None;
     if let Some(engine) = engine {
-        match propose_with_llm(engine, html, sender_email, output_language, current) {
+        match propose_with_llm(engine, html, sender_email, subject, output_language, current) {
             Ok(llm) => {
                 if proposal_to_fixture_yaml(&llm).is_ok() {
                     return DigestCutModelOutcome {
@@ -134,6 +135,7 @@ fn propose_with_llm(
     engine: &mut LlmEngine,
     html: &str,
     sender_email: &str,
+    subject: &str,
     output_language: &str,
     current: Option<&DigestCutProposal>,
 ) -> Result<DigestCutProposal, LlmError> {
@@ -164,6 +166,7 @@ fn propose_with_llm(
         let user = build_digest_cut_user(
             engine,
             sender_email,
+            subject,
             &outline,
             &current_block,
             html,
@@ -255,6 +258,7 @@ fn propose_with_llm(
 fn build_digest_cut_user(
     engine: &LlmEngine,
     sender_email: &str,
+    subject: &str,
     outline: &str,
     current_block: &str,
     html: &str,
@@ -269,9 +273,11 @@ fn build_digest_cut_user(
             untrusted_mail_for_engine(engine, "digest-cut-mail-html", &clipped)
         )
     };
+    let subject_line = subject.split_whitespace().collect::<Vec<_>>().join(" ");
     format!(
-        "Sender email (for domain matching and fixtureId slug only): {}\n\nDOM outline (tags/classes/order — primary signal):\n{}{}{}",
+        "Sender email (for domain matching and fixtureId slug only): {}\nSubject (identity hint only): {}\n\nDOM outline (tags/classes/order — primary signal):\n{}{}{}",
         sender_email.trim(),
+        truncate_chars(&subject_line, 160),
         outline,
         current_block,
         html_block

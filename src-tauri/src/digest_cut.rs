@@ -31,6 +31,8 @@ pub struct DigestCutProposePayload {
     pub html: String,
     pub sender_email: String,
     #[serde(default)]
+    pub subject: String,
+    #[serde(default)]
     pub use_llm: bool,
     /// Proposition déjà ajustée. Conservée si le modèle ne répond pas.
     #[serde(default)]
@@ -69,6 +71,8 @@ pub struct DigestCutYamlView {
 pub struct DigestCutReformatPayload {
     pub html: String,
     pub sender_email: String,
+    #[serde(default)]
+    pub subject: String,
     pub current: DigestCutProposal,
 }
 
@@ -109,6 +113,7 @@ pub fn digest_cut_propose_zones(
                 Some(&mut engine),
                 &payload.html,
                 &payload.sender_email,
+                &payload.subject,
                 lang,
                 current,
             ),
@@ -117,6 +122,7 @@ pub fn digest_cut_propose_zones(
                     None,
                     &payload.html,
                     &payload.sender_email,
+                    &payload.subject,
                     lang,
                     current,
                 );
@@ -127,7 +133,7 @@ pub fn digest_cut_propose_zones(
             }
         }
     } else {
-        propose_digest_cut_zones(None, &payload.html, &payload.sender_email, lang, None)
+        propose_digest_cut_zones(None, &payload.html, &payload.sender_email, &payload.subject, lang, None)
     };
     Ok(DigestCutProposeView {
         proposal: outcome.proposal,
@@ -181,6 +187,7 @@ pub fn digest_cut_reformat(
             Some(&mut engine),
             &payload.html,
             &payload.sender_email,
+            &payload.subject,
             lang,
             &payload.current,
         ),
@@ -189,6 +196,7 @@ pub fn digest_cut_reformat(
                 None,
                 &payload.html,
                 &payload.sender_email,
+                &payload.subject,
                 lang,
                 &payload.current,
             );

@@ -38,11 +38,11 @@ beforeEach(() => {
 describe("renderDigestCutPanel", () => {
   it("shows a clear 3-step flow and keeps HTML code secondary", () => {
     const html = renderDigestCutPanel();
-    expect(html).toContain("Éditeur de découpe");
+    expect(html).toContain("Rendre un mail lisible");
     expect(html).toContain("digest-cut__steps");
     expect(html).toContain("Choisir");
-    expect(html).toContain("Proposer");
-    expect(html).toContain("Ajuster");
+    expect(html).toContain("Repérer");
+    expect(html).toContain("Lire");
     expect(html).toContain('data-action="digest-cut-search"');
     expect(html).toContain('data-action="digest-cut-open-current"');
     expect(html).toContain('id="digest-cut-eml"');
@@ -86,8 +86,8 @@ describe("renderDigestCutPanel", () => {
     expect(html).toContain('data-action="digest-cut-paint-zone"');
     expect(html).toContain("Changer le bloc");
     expect(html).toContain("bloc HTML complet");
-    expect(html).toContain("Valider les zones (IA)");
-    expect(html).toContain("Reformater le texte (IA)");
+    expect(html).toContain("Revérifier (IA)");
+    expect(html).toContain("Rendre lisible (IA)");
     expect(html).toContain('aria-pressed="true">Afficher');
     expect(html).toContain("Voir l’aperçu");
     expect(html).not.toContain('id="digest-cut-yaml"');

@@ -180,7 +180,7 @@ export async function loadDigestCutMessage(messageId: string): Promise<void> {
     senderEmail: message.senderEmail,
     subject: digestCut.threadSubject || message.sender,
     messageId,
-    notice: "Message chargé depuis la boîte. Proposez la découpe : explication en français, puis ajustez les zones.",
+    notice: "Message chargé. Repérez l’essentiel, puis rendez-le lisible.",
   });
   render();
 }
@@ -203,7 +203,7 @@ export function loadDigestCutFromOpenMessage(): void {
     senderEmail: withHtml.senderEmail,
     subject: thread.subject,
     messageId: withHtml.messageId,
-    notice: "Mail déjà ouvert dans la lecture. Proposez la découpe pour une explication en français.",
+    notice: "Mail déjà ouvert. Repérez l’essentiel, puis rendez-le lisible.",
   });
   render();
 }
@@ -227,7 +227,7 @@ export async function importDigestCutEmlBase64(emlBase64: string): Promise<void>
       html: mail.html,
       senderEmail: mail.senderEmail,
       subject: mail.subject,
-      notice: "Fichier .eml chargé. Proposez la découpe pour une explication en français.",
+      notice: "Fichier .eml chargé. Repérez l’essentiel, puis rendez-le lisible.",
     });
   } catch (error) {
     digestCut.notice = tauriErrorMessage(error);
@@ -243,7 +243,7 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
     return;
   }
   if (refine && !digestCut.proposal) {
-    digestCut.notice = "Proposez d'abord une découpe, ajustez les zones, puis affinez.";
+    digestCut.notice = "Repérez d’abord l’essentiel, ajustez si besoin, puis affinez.";
     render();
     return;
   }
@@ -260,6 +260,7 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
       payload: {
         html: digestCut.html,
         senderEmail: digestCut.senderEmail,
+        subject: digestCut.subject,
         useLlm: true,
         current: refine ? digestCut.proposal : null,
       },
@@ -278,7 +279,7 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
     await previewDigestCut();
     if (view.fromModel) {
       digestCut.notice =
-        "Zones proposées. Ajustez si besoin, puis Reformater le texte (IA).";
+        "Essentiel repéré. Ajustez si besoin, puis Rendre lisible (IA).";
     } else {
       const why = view.fallbackReason?.trim() ?? "";
       if (/contexte trop|n_ctx/i.test(why)) {
@@ -458,23 +459,24 @@ export function toggleDigestCutCode(): void {
 export async function reformatDigestCutReading(): Promise<void> {
   captureDigestCutDom();
   if (!digestCut.proposal || !digestCut.html.trim()) {
-    digestCut.notice = "Proposez ou peignez d’abord les zones, puis reformatez le texte.";
+    digestCut.notice = "Repérez ou peignez d’abord les zones, puis rendez le mail lisible.";
     render();
     return;
   }
   if (!isTauriRuntime()) {
-    digestCut.notice = "Le reformatage passe par l'application.";
+    digestCut.notice = "La mise en lisibilité passe par l'application.";
     render();
     return;
   }
   digestCut.reformatting = true;
-  digestCut.notice = "Reformatage du texte (IA)…";
+  digestCut.notice = "Mise en lisibilité (IA)…";
   render();
   try {
     const view = await invoke<ReformatView>("digest_cut_reformat", {
       payload: {
         html: digestCut.html,
         senderEmail: digestCut.senderEmail,
+        subject: digestCut.subject,
         current: digestCut.proposal,
       },
     });
@@ -494,12 +496,12 @@ export async function reformatDigestCutReading(): Promise<void> {
     }
     if (view.fromModel) {
       digestCut.notice =
-        "Texte reformatté par l’IA : titre/détails clarifiés à droite. Les zones restent celles choisies.";
+        "Lecture claire à droite : signal gardé, bruit retiré.";
     } else {
       const why = view.fallbackReason?.trim() ?? "";
       digestCut.notice = why
-        ? `Reformatage local (repli). ${why}`
-        : "Reformatage structurel local (sans modèle).";
+        ? `Lecture clarifiée en local (repli). ${why}`
+        : "Lecture clarifiée en local (sans modèle).";
     }
   } catch (error) {
     digestCut.notice = tauriErrorMessage(error);
