@@ -81,7 +81,14 @@ pub fn propose_digest_cut_zones(
         .unwrap_or_else(|| analyze_html_structure_heuristic(html, sender_email));
     let mut fallback_reason: Option<String> = None;
     if let Some(engine) = engine {
-        match propose_with_llm(engine, html, sender_email, subject, output_language, current) {
+        match propose_with_llm(
+            engine,
+            html,
+            sender_email,
+            subject,
+            output_language,
+            current,
+        ) {
             Ok(llm) => {
                 if proposal_to_fixture_yaml(&llm).is_ok() {
                     return DigestCutModelOutcome {

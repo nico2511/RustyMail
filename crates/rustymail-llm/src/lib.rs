@@ -9,7 +9,9 @@ mod privacy;
 pub use engine::LlmEngine;
 
 #[cfg(feature = "http")]
-pub use engine::{list_ollama_tags, ollama_native_base_url, parse_ollama_tags_json, probe_openai_models};
+pub use engine::{
+    list_ollama_tags, ollama_native_base_url, parse_ollama_tags_json, probe_openai_models,
+};
 
 /// Sonde `GET /v1/models`. Sans le client HTTP compilé, la sonde est indisponible.
 #[cfg(not(feature = "http"))]

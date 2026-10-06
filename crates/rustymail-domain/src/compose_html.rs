@@ -275,16 +275,13 @@ fn attr_allowed(tag: &str, name: &str) -> bool {
     matches!(
         (tag, name),
         ("a", "href" | "title")
-            | ("img", "src" | "alt" | "title" | "width" | "height" | "style")
+            | (
+                "img",
+                "src" | "alt" | "title" | "width" | "height" | "style"
+            )
             | (
                 "table",
-                "border"
-                    | "cellpadding"
-                    | "cellspacing"
-                    | "width"
-                    | "class"
-                    | "style"
-                    | "align"
+                "border" | "cellpadding" | "cellspacing" | "width" | "class" | "style" | "align"
             )
             | (
                 "td" | "th",
@@ -588,13 +585,13 @@ mod tests {
 
     #[test]
     fn keeps_image_width_and_table_borders() {
-        let html = r#"<p><img src="cid:img1-abcd" width="200" style="width: 200px; height: auto;" alt="a" /></p><table class="rm-mail-data" border="1" cellpadding="6" cellspacing="0"><tr><th bgcolor="#f2f0ec" style="border:1px solid #787775;padding:6px 8px;">A</th><td style="border:1px solid #787775;">B</td></tr></table>"#;
+        let html = r##"<p><img src="cid:img1-abcd" width="200" style="width: 200px; height: auto;" alt="a" /></p><table class="rm-mail-data" border="1" cellpadding="6" cellspacing="0"><tr><th bgcolor="#f2f0ec" style="border:1px solid #787775;padding:6px 8px;">A</th><td style="border:1px solid #787775;">B</td></tr></table>"##;
         let safe = sanitize_compose_html(html);
         assert!(safe.contains(r#"width="200""#));
         assert!(safe.contains("width: 200px"));
         assert!(safe.contains(r#"class="rm-mail-data""#));
         assert!(safe.contains(r#"border="1""#));
-        assert!(safe.contains(r#"bgcolor="#f2f0ec""#));
+        assert!(safe.contains(r##"bgcolor="#f2f0ec""##));
         assert!(safe.contains("border:1px solid #787775"));
         assert!(!safe.to_ascii_lowercase().contains("javascript"));
     }

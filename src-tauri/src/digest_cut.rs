@@ -133,7 +133,14 @@ pub fn digest_cut_propose_zones(
             }
         }
     } else {
-        propose_digest_cut_zones(None, &payload.html, &payload.sender_email, &payload.subject, lang, None)
+        propose_digest_cut_zones(
+            None,
+            &payload.html,
+            &payload.sender_email,
+            &payload.subject,
+            lang,
+            None,
+        )
     };
     Ok(DigestCutProposeView {
         proposal: outcome.proposal,

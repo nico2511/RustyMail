@@ -3,7 +3,9 @@
 #[cfg(feature = "http")]
 mod http_chat;
 #[cfg(feature = "http")]
-pub use http_chat::{list_ollama_tags, ollama_native_base_url, parse_ollama_tags_json, probe_openai_models};
+pub use http_chat::{
+    list_ollama_tags, ollama_native_base_url, parse_ollama_tags_json, probe_openai_models,
+};
 #[cfg(not(feature = "http"))]
 mod stub;
 

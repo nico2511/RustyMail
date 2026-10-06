@@ -1421,9 +1421,7 @@ fn list_ollama_models(paths: State<'_, AppPaths>) -> Result<Vec<String>, String>
     let prefs = load_app_prefs(&paths.prefs_path);
     let base = prefs.ai.ollama_base_url.trim();
     if base.is_empty() {
-        return Err(
-            "Ollama : renseignez l’URL (souvent http://127.0.0.1:11434/v1).".into(),
-        );
+        return Err("Ollama : renseignez l’URL (souvent http://127.0.0.1:11434/v1).".into());
     }
     rustymail_llm::list_ollama_tags(base)
 }

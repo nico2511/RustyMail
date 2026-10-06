@@ -618,7 +618,10 @@ mod tests {
     fn keeps_compose_inline_images_visible() {
         let html = r#"<div><p>Voici les trois photos du chantier aujourd’hui.</p><p><img src="cid:img1-abcd" width="200" alt="a"/></p><p><img src="cid:img2-efgh" width="400" alt="b"/></p><p><img src="cid:img3-ijkl" width="640" alt="c"/></p></div>"#;
         let out = fold_signature_tail(html);
-        assert!(!out.contains("rm-mail-signature"), "images compose ne doivent pas être pliées: {out}");
+        assert!(
+            !out.contains("rm-mail-signature"),
+            "images compose ne doivent pas être pliées: {out}"
+        );
         assert!(out.contains("cid:img1-abcd"));
         assert!(out.contains("cid:img3-ijkl"));
     }
@@ -627,7 +630,10 @@ mod tests {
     fn keeps_rm_mail_data_table_with_image() {
         let html = r#"<div><p>Récapitulatif des pièces.</p><table class="rm-mail-data" border="1"><tr><th>Photo</th><th>Note</th></tr><tr><td><img src="cid:img1-abcd" alt="p"/></td><td>OK</td></tr></table></div>"#;
         let out = fold_signature_tail(html);
-        assert!(!out.contains("rm-mail-signature"), "tableau de données: {out}");
+        assert!(
+            !out.contains("rm-mail-signature"),
+            "tableau de données: {out}"
+        );
         assert!(out.contains("rm-mail-data"));
         assert!(out.contains("cid:img1-abcd"));
     }

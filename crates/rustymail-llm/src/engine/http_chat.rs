@@ -915,7 +915,10 @@ pub fn probe_openai_models(base_url: &str) -> Result<(), String> {
 
 /// Racine native Ollama (`http://127.0.0.1:11434`) à partir d’une base OpenAI-compatible (`…/v1`).
 pub fn ollama_native_base_url(openai_compatible_base: &str) -> String {
-    let mut base = openai_compatible_base.trim().trim_end_matches('/').to_string();
+    let mut base = openai_compatible_base
+        .trim()
+        .trim_end_matches('/')
+        .to_string();
     if base.is_empty() {
         return base;
     }
@@ -1113,8 +1116,12 @@ mod grammar_tests {
 
     #[test]
     fn parse_ollama_tags_extracts_sorted_names() {
-        let body = r#"{"models":[{"name":"qwen2.5:7b"},{"name":"llama3.2"},{"name":"qwen2.5:7b"}]}"#;
+        let body =
+            r#"{"models":[{"name":"qwen2.5:7b"},{"name":"llama3.2"},{"name":"qwen2.5:7b"}]}"#;
         let names = parse_ollama_tags_json(body).expect("parse");
-        assert_eq!(names, vec!["llama3.2".to_string(), "qwen2.5:7b".to_string()]);
+        assert_eq!(
+            names,
+            vec!["llama3.2".to_string(), "qwen2.5:7b".to_string()]
+        );
     }
 }

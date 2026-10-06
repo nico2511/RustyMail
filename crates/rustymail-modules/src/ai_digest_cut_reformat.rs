@@ -128,10 +128,8 @@ pub fn reformat_digest_cut_reading(
             }
         }
     } else {
-        fallback_reason = Some(
-            "Aucun moteur IA joignable pour le reformatage (Paramètres → IA)."
-                .into(),
-        );
+        fallback_reason =
+            Some("Aucun moteur IA joignable pour le reformatage (Paramètres → IA).".into());
     }
     let (proposal, reading_html) =
         heuristic_reformat(current, subject, html, &excerpts, &candidates);
@@ -172,12 +170,7 @@ fn zone_excerpts(
         header,
         body: truncate_chars(&plain, EXCERPT_CHARS),
         footer: truncate_chars(
-            &proposal
-                .zones
-                .footer
-                .rationale
-                .clone()
-                .unwrap_or_default(),
+            &proposal.zones.footer.rationale.clone().unwrap_or_default(),
             200,
         ),
     }
@@ -315,7 +308,12 @@ fn is_allowed_action_url(url: &str) -> bool {
 }
 
 fn parse_presentation(raw: Option<&str>, fallback: ZonePresentation) -> ZonePresentation {
-    match raw.map(str::trim).unwrap_or("").to_ascii_lowercase().as_str() {
+    match raw
+        .map(str::trim)
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
         "prominent" => ZonePresentation::Prominent,
         "key_value" => ZonePresentation::KeyValue,
         "as_is" => ZonePresentation::AsIs,
@@ -586,11 +584,7 @@ fn heuristic_reformat(
     (proposal, out_html)
 }
 
-fn guess_highlight(
-    subject: &str,
-    excerpts: &ZoneExcerpts,
-    html: &str,
-) -> Option<(String, String)> {
+fn guess_highlight(subject: &str, excerpts: &ZoneExcerpts, html: &str) -> Option<(String, String)> {
     let blob = format!("{} {} {}", subject, excerpts.header, excerpts.body);
     if let Ok(re) = regex::Regex::new(
         r"(?i)(?:n[°o]\s*(?:de\s*)?commande|order\s*#?|commande)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{5,})",
@@ -665,7 +659,11 @@ fn extract_useful_link_candidates(html: &str, limit: usize) -> Vec<LinkCandidate
             });
         }
     }
-    out.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.url.len().cmp(&b.url.len())));
+    out.sort_by(|a, b| {
+        b.score
+            .cmp(&a.score)
+            .then_with(|| a.url.len().cmp(&b.url.len()))
+    });
     out.truncate(limit);
     out
 }
@@ -775,10 +773,7 @@ fn build_reading_html(fixture_id: &str, dto: &ReformatDto) -> String {
         if !hi_label.is_empty() {
             out.push_str(&format!("<span>{}</span>", esc_pcdata(&hi_label)));
         }
-        out.push_str(&format!(
-            "<strong>{}</strong></p>\n",
-            esc_pcdata(&hi_value)
-        ));
+        out.push_str(&format!("<strong>{}</strong></p>\n", esc_pcdata(&hi_value)));
     }
     if !amount.is_empty() {
         out.push_str(&format!(

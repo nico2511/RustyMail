@@ -62,7 +62,10 @@ pub(crate) fn keep_attr(tag: &str, attr: &str) -> bool {
         "href" | "src" | "alt" | "title" | "colspan" | "rowspan" | "role" | "aria-label" | "id"
         | "data-digest-id" => true,
         "width" | "height" => {
-            matches!(tag, "img" | "video" | "picture" | "source" | "svg" | "table" | "td" | "th")
+            matches!(
+                tag,
+                "img" | "video" | "picture" | "source" | "svg" | "table" | "td" | "th"
+            )
         }
         // Présentation utile (compose TipTap + clients) — pas de `style` libre (risque CSS).
         "border" | "cellpadding" | "cellspacing" => matches!(tag, "table"),
@@ -98,13 +101,13 @@ mod tests {
 
     #[test]
     fn keeps_table_border_attrs_and_rm_mail_data_class() {
-        let html = r#"<table class="rm-mail-data MsoNormal" border="1" cellpadding="6" cellspacing="0"><tr><th bgcolor="#f2f0ec" align="left">A</th><td>B</td></tr></table>"#;
+        let html = r##"<table class="rm-mail-data MsoNormal" border="1" cellpadding="6" cellspacing="0"><tr><th bgcolor="#f2f0ec" align="left">A</th><td>B</td></tr></table>"##;
         let out = strip_presentation_attrs(html);
         assert!(out.contains("rm-mail-data"));
         assert!(!out.contains("MsoNormal"));
         assert!(out.contains(r#"border="1""#));
         assert!(out.contains(r#"cellpadding="6""#));
-        assert!(out.contains(r#"bgcolor="#f2f0ec""#));
+        assert!(out.contains(r##"bgcolor="#f2f0ec""##));
     }
 
     #[test]
