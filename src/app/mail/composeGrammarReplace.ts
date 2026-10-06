@@ -144,14 +144,15 @@ function isWordCharAt(source: string, index: number): boolean {
   return /\p{L}|\p{N}|['’]/u.test(ch);
 }
 
-/** Extrait court / homophone : ne matcher que comme mot entier (évite a→à dans « plastique »). */
+/**
+ * Mot unique : ne matcher que comme mot entier.
+ * Évite « troi »→« trois » puis re-match de « troi » dans « trois » (→ troiss…).
+ * Les phrases (espaces) restent en correspondance de sous-chaîne.
+ */
 export function grammarNeedleNeedsWordBoundary(needle: string): boolean {
   const t = needle.trim();
   if (!t) return false;
-  const chars = [...t];
-  if (chars.length <= 2) return true;
-  if (/\s/.test(t)) return false;
-  return /^(a|à|ou|où|la|là|du|dû|sur|sûr|des|dès)$/i.test(t);
+  return !/\s/.test(t);
 }
 
 export function spanHasWordBoundary(source: string, start: number, end: number): boolean {
@@ -179,9 +180,14 @@ export function grammarSuggestionTooAmbiguous(original: string, replacement: str
   return /^(a|à|ou|où|la|là)$/i.test(o);
 }
 
-/** N× « tout remplacer » seulement si l’extrait n’est pas un homophone court. */
+/** N× « tout remplacer » : OK sauf homophones / extraits 1–2 lettres trop risqués. */
 export function grammarAllowReplaceAll(original: string): boolean {
-  return !grammarNeedleNeedsWordBoundary(original);
+  const t = original.trim();
+  if (!t) return false;
+  if (/\s/.test(t)) return true;
+  const chars = [...t];
+  if (chars.length <= 2) return false;
+  return !/^(a|à|ou|où|la|là|du|dû|sur|sûr|des|dès)$/i.test(t);
 }
 
 export function findGrammarSpans(source: string, suggestion: GrammarReplaceInput): Span[] {

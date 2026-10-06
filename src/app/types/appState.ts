@@ -231,6 +231,8 @@ export type State = {
   composeSendAccountId?: string;
   /** Filtre d’affichage sur l’index (style client mail). */
   listFilter: "all" | "unread" | "starred" | "focused" | "auto";
+  /** Tri date des fils en contexte recherche / vue filtrée (`asc` = plus anciens d’abord). */
+  listDateSort: "asc" | "desc";
   /** Bannière panneau brief (HTML interne, cartes type RustyMail — pas de Markdown). */
   mailboxBriefBannerHtml: string;
   /** Dernier brief d’action structuré (`llm_inbox_digest`). */

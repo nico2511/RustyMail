@@ -218,6 +218,16 @@ export function renderSearchViewActionsHtml(visibleCount: number): string {
   const n = Math.min(visibleCount, SAVED_VIEW_BATCH_MAX);
   const saved = d.activeSavedSearchItem();
   const btns: string[] = [];
+  const dateAsc = state.listDateSort === "asc";
+  btns.push(
+    `<button type="button" class="ghost-button search-ctx-btn search-ctx-btn--sort${dateAsc ? " is-asc" : ""}" data-action="search-view-toggle-date-sort" title="${
+      dateAsc
+        ? "Tri actuel : plus anciens d’abord — cliquer pour plus récents d’abord"
+        : "Tri actuel : plus récents d’abord — cliquer pour plus anciens d’abord"
+    }" aria-label="${dateAsc ? "Tri date croissant" : "Tri date décroissant"}">${
+      dateAsc ? "Date ↑" : "Date ↓"
+    }</button>`,
+  );
   if (n > 0) {
     btns.push(
       `<button type="button" class="ghost-button search-ctx-btn" data-action="search-view-mark-read" title="Marquer comme lus (jusqu’à ${SAVED_VIEW_BATCH_MAX})">Lus</button>`,

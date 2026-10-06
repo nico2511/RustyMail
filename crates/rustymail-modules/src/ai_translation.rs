@@ -267,8 +267,15 @@ fn translation_user(
     target_lang: &str,
 ) -> String {
     format!(
-        "Target language ISO 639-1: {target_lang}\nSource language hint (auto if unknown): {source_lang}\nTranslate the human message inside the delimiters into the target language.\n{}",
+        "Target language ISO 639-1: {target_lang}\nSource language hint (auto if unknown): {source_lang}\nTranslate the human message inside the delimiters into the target language. Always translate; do not refuse and do not copy the notice or delimiters into translatedText.\n{}",
         untrusted_mail_for_engine(engine, "mail-translation", body),
+    )
+}
+
+/// Repli sans notice « untrusted » : les petits modèles Ollama la paraphrasent parfois en refus.
+fn translation_user_plain(body: &str, source_lang: &str, target_lang: &str) -> String {
+    format!(
+        "Target language ISO 639-1: {target_lang}\nSource language hint (auto if unknown): {source_lang}\nTranslate the text between the markers into the target language. Output one JSON object only; translatedText = translation only.\n--- mail ---\n{body}\n--- end ---"
     )
 }
 
@@ -282,6 +289,52 @@ fn map_translation_retry_err(err: LlmError) -> LlmError {
         )),
         LlmError::InvalidJson(_) => LlmError::Msg(TRANSLATION_PARSE_ERR.into()),
         other => other,
+    }
+}
+
+fn translation_retry_after_invalid_json(
+    engine: &mut LlmEngine,
+    system: &str,
+    user: &str,
+    body: &str,
+    source_message_id: &str,
+    source_lang: &str,
+    target_lang: &str,
+) -> Result<TranslationResult, LlmError> {
+    // 1) Même cadre, consigne renforcée. 2) Si méta/refus, cadre allégé (moins d’échos « untrusted »).
+    let user_retry = format!(
+        "{user}\n\nRetry: the same single JSON object. translatedText must be the translated human message only — never a refusal or the untrusted notice."
+    );
+    let params = translation_gen_params(engine, system, &user_retry, body);
+    let raw = engine.generate(system, &user_retry, &params)?;
+    match translation_from_raw(
+        &raw,
+        engine,
+        system,
+        &user_retry,
+        source_message_id,
+        source_lang,
+        target_lang,
+        body,
+    ) {
+        Ok(res) => Ok(res),
+        Err(LlmError::InvalidJson(msg)) if msg.contains("meta") => {
+            let user_plain = translation_user_plain(body, source_lang, target_lang);
+            let params = translation_gen_params(engine, system, &user_plain, body);
+            let raw = engine.generate(system, &user_plain, &params)?;
+            translation_from_raw(
+                &raw,
+                engine,
+                system,
+                &user_plain,
+                source_message_id,
+                source_lang,
+                target_lang,
+                body,
+            )
+            .map_err(map_translation_retry_err)
+        }
+        Err(e) => Err(map_translation_retry_err(e)),
     }
 }
 
@@ -312,24 +365,15 @@ fn translate_nonstream_body(
         body,
     ) {
         Ok(res) => Ok(res),
-        Err(LlmError::InvalidJson(_)) => {
-            let user_retry = format!(
-                "{user}\n\nRetry: the same single JSON object. translatedText must be the translated human message only."
-            );
-            let params = translation_gen_params(engine, system.as_str(), &user_retry, body);
-            let raw = engine.generate(system.as_str(), &user_retry, &params)?;
-            translation_from_raw(
-                &raw,
-                engine,
-                system.as_str(),
-                &user_retry,
-                source_message_id,
-                source_lang,
-                target_lang,
-                body,
-            )
-            .map_err(map_translation_retry_err)
-        }
+        Err(LlmError::InvalidJson(_)) => translation_retry_after_invalid_json(
+            engine,
+            system.as_str(),
+            &user,
+            body,
+            source_message_id,
+            source_lang,
+            target_lang,
+        ),
         Err(e) => Err(e),
     }
 }
@@ -437,22 +481,15 @@ pub fn translate_plain_with_llm_streaming(
             if let Some(e) = cancelled_llm_err(cancelled) {
                 return Err(e);
             }
-            let user_retry = format!(
-                "{user}\n\nRetry: the same single JSON object. translatedText must be the translated human message only."
-            );
-            let params = translation_gen_params(engine, system.as_str(), &user_retry, &body);
-            let raw = engine.generate(system.as_str(), &user_retry, &params)?;
-            translation_from_raw(
-                &raw,
+            translation_retry_after_invalid_json(
                 engine,
                 system.as_str(),
-                &user_retry,
+                &user,
+                &body,
                 source_message_id,
                 source_lang,
                 target_lang,
-                &body,
-            )
-            .map_err(map_translation_retry_err)?
+            )?
         }
         Err(e) => return Err(e),
     };

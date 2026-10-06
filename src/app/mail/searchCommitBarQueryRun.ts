@@ -85,6 +85,7 @@ export async function clearSearchAndReloadInbox(): Promise<void> {
   state.searchMinSecurityScore = null;
   state.searchMailboxPrefix = null;
   state.activeSavedSearchId = null;
+  state.listDateSort = "desc";
   resetManualSearchNlFilters();
   await d.loadMailView(false);
   render();

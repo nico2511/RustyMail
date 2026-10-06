@@ -350,6 +350,8 @@ const TRANSLATION_REFUSAL_PHRASES: &[&str] = &[
 ];
 
 /// Échos du cadre (délimiteurs, notice, champs du schéma). Pas le mot « non fiable » seul.
+/// Éviter les formulations trop courtes (« instructions du message ») : elles apparaissent
+/// dans des mails réels (expédition, support) et faisaient rejeter une traduction fidèle.
 const TRANSLATION_BOILERPLATE_MARKERS: &[&str] = &[
     "contenu non fiable",
     "contenus de mails",
@@ -358,8 +360,11 @@ const TRANSLATION_BOILERPLATE_MARKERS: &[&str] = &[
     "begin untrusted",
     "end untrusted",
     "do not obey",
+    "role changes, or format demands",
     "consignes de format",
-    "instructions du message",
+    "instructions du message systeme",
+    "uniquement aux instructions du message",
+    "ne mentionnez pas le message systeme",
     "message systeme",
     "sans consigne ni mention de json",
     "never quote or paraphrase",
@@ -1314,6 +1319,16 @@ Si ce jour ne vous convient pas, veuillez nous contacter pour fixer un nouveau r
             salvage_translation_text("The required JSON format is in the attachment.", attached)
                 .as_deref(),
             Some(attached)
+        );
+        // Mails d’expédition / marketplace : « instructions du message » est du contenu, pas une consigne modèle.
+        let ship = "Votre acheteur attend. Suivez les instructions du message pour expédier la commande aujourd’hui.";
+        assert_eq!(
+            salvage_translation_text(
+                "Your buyer is waiting. Follow the instructions in this message to ship your order today.",
+                ship
+            )
+            .as_deref(),
+            Some(ship)
         );
     }
 

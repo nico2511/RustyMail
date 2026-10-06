@@ -112,6 +112,7 @@ export const state: State = {
   composeCcBccOpen: false,
   composeSendAccountId: undefined,
   listFilter: "all",
+  listDateSort: "desc",
   mailboxBriefBannerHtml: "",
   mailboxDigestKey: "",
   mailboxDigestLive: false,

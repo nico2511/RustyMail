@@ -26,6 +26,8 @@ beforeEach(() => {
   digestCut.previewApplicable = null;
   digestCut.previewHtml = "";
   digestCut.previewError = "";
+  digestCut.reformattedHtml = "";
+  digestCut.reformatting = false;
   digestCut.showCode = false;
   digestCut.notice = "";
   digestCut.paintZone = null;
@@ -89,8 +91,13 @@ describe("renderDigestCutPanel", () => {
     expect(html).toContain("Revérifier (IA)");
     expect(html).toContain("Rendre lisible (IA)");
     expect(html).toContain('aria-pressed="true">Afficher');
-    expect(html).toContain("Voir l’aperçu");
+    expect(html).toContain("Voir la découpe");
+    expect(html).toContain("Découpe");
     expect(html).not.toContain('id="digest-cut-yaml"');
+    digestCut.reformattedHtml = '<article class="rm-digest"><h2>Livré</h2></article>';
+    const after = renderDigestCutPanel();
+    expect(after).toContain("Lecture claire");
+    expect(after).not.toContain("Voir la découpe");
     digestCut.showCode = true;
     expect(renderDigestCutPanel()).toContain('id="digest-cut-yaml"');
   });

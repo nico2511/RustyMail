@@ -221,6 +221,41 @@ describe("applyComposeGrammarSuggestionAtIndex", () => {
     expect(state.composeGrammarSuggestions).toBeNull();
   });
 
+  it("n’empile pas de s sur troi → trois au second clic", async () => {
+    state.composeBody = "mangé troi chaussettes";
+    state.composeCanonicalBody = state.composeBody;
+    state.draft = emptyDraft(state.composeBody);
+    state.composeGrammarSuggestions = [{ reason: "orthographe", original: "troi", replacement: "trois" }];
+    paintShell();
+
+    applyComposeGrammarSuggestionAtIndex(0);
+    expect(bodyValue()).toBe("mangé trois chaussettes");
+    expect(state.composeGrammarSuggestions).toBeNull();
+
+    state.composeGrammarSuggestions = [{ reason: "orthographe", original: "troi", replacement: "trois" }];
+    applyComposeGrammarSuggestionAtIndex(0);
+    expect(bodyValue()).toBe("mangé trois chaussettes");
+    expect(toastText()).toContain("n’a pas été modifié");
+  });
+
+  it("applique toutes les suggestions via Tout corriger", async () => {
+    const { applyComposeGrammarSuggestionsEverything } = await import("./composeWireGrammarRun");
+    state.composeBody = "troi plastik";
+    state.composeCanonicalBody = state.composeBody;
+    state.draft = emptyDraft(state.composeBody);
+    state.composeGrammarSuggestions = [
+      { reason: "x", original: "troi", replacement: "trois" },
+      { reason: "y", original: "plastik", replacement: "plastique" },
+    ];
+    paintShell();
+
+    applyComposeGrammarSuggestionsEverything();
+
+    expect(bodyValue()).toBe("trois plastique");
+    expect(toastText()).toContain("Toutes les corrections appliquées");
+    expect(state.composeGrammarSuggestions).toBeNull();
+  });
+
   it("retrouve l’extrait malgré une apostrophe typographique", async () => {
     state.composeBody = "salu moi c'est nicolas";
     state.composeCanonicalBody = state.composeBody;

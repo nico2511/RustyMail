@@ -112,7 +112,7 @@ function zoneRow(name: DigestCutZoneName): string {
 }
 
 function previewPane(): string {
-  if (digestCut.reformatting) return `<p class="dim">Reformatage du texte…</p>`;
+  if (digestCut.reformatting) return `<p class="dim">Mise en lisibilité…</p>`;
   if (digestCut.previewing) return `<p class="dim">Calcul de l’aperçu…</p>`;
   if (digestCut.previewError) {
     return `<p class="digest-bench__warn">${escapeHtml(digestCut.previewError)}</p>`;
@@ -122,11 +122,17 @@ function previewPane(): string {
   }
   if (digestCut.previewApplicable && digestCut.previewHtml) {
     const note = digestCut.reformattedHtml.trim()
-      ? `<p class="digest-cut__reformat-note dim">Lecture reformattée (texte réécrit).</p>`
-      : "";
+      ? `<p class="digest-cut__reformat-note dim">Article de lecture — signal en avant.</p>`
+      : `<p class="digest-cut__reformat-note dim">Aperçu de la découpe (zones). Puis Rendre lisible.</p>`;
     return `${note}${sanitizeEmailHtml(digestCut.previewHtml).html}`;
   }
   return `<p class="digest-cut__empty-hint">Ajustez si besoin, puis <strong>Rendre lisible (IA)</strong>.</p>`;
+}
+
+function previewPaneTitle(): string {
+  if (digestCut.reformattedHtml.trim()) return "Lecture claire";
+  if (digestCut.proposal) return "Découpe";
+  return "Lecture claire";
 }
 
 function threadList(): string {
@@ -289,10 +295,14 @@ function adjustSection(): string {
              <button type="button" class="primary-button" data-action="digest-cut-reformat" ${busy ? "disabled" : ""}>${
                digestCut.reformatting ? "Mise en lisibilité…" : reformatted ? "Rendre lisible à nouveau" : "Rendre lisible (IA)"
              }</button>
-             <button type="button" class="ghost-button" data-action="digest-cut-preview" ${busy ? "disabled" : ""}>${digestCut.previewing ? "Aperçu…" : "Voir l’aperçu"}</button>
+             ${
+               reformatted
+                 ? ""
+                 : `<button type="button" class="ghost-button" data-action="digest-cut-preview" ${busy ? "disabled" : ""}>${digestCut.previewing ? "Aperçu…" : "Voir la découpe"}</button>`
+             }
              <button type="button" class="ghost-button" data-action="digest-cut-toggle-code" aria-pressed="${digestCut.showCode ? "true" : "false"}">${digestCut.showCode ? "Masquer le code" : "Détails techniques"}</button>
            </div>
-           <p class="digest-bench__fine dim">L’IA garde le signal (titre, faits, analyse utile) et jette le bruit (promo, pied légal).</p>`
+           <p class="digest-bench__fine dim">L’IA construit un article : IDs voyants, faits, liens utiles — sans le blabla.</p>`
         : `<p class="digest-cut__empty-hint">Après l’étape 2, vous pouvez ajuster puis rendre le mail lisible.</p>`
     }
   </section>`;
@@ -325,8 +335,8 @@ export function renderDigestCutPanel(): string {
           <div class="digest-bench__pane-body mail digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}</div>
         </section>
         <section class="digest-bench__pane">
-          <h4 class="digest-bench__pane-title">Lecture claire</h4>
-          <div class="digest-bench__pane-body mail">${previewPane()}</div>
+          <h4 class="digest-bench__pane-title">${escapeHtml(previewPaneTitle())}</h4>
+          <div class="digest-bench__pane-body mail digest-cut__reading">${previewPane()}</div>
         </section>
       </div>
       ${codeBlock()}

@@ -117,4 +117,15 @@ describe("applyGrammarReplacement", () => {
     expect(grammarSuggestionTooAmbiguous("plastik", "plastique")).toBe(false);
     expect(grammarSuggestionTooAmbiguous("a mange", "a mangé")).toBe(false);
   });
+
+  it("n’empile pas de lettres après troi → trois (préfixe dans le mot corrigé)", () => {
+    const once = applyGrammarReplacement("mangé troi chaussettes", suggestion("troi", "trois"));
+    expect(once.text).toBe("mangé trois chaussettes");
+    expect(once.replaced).toBe(1);
+    // Sans frontière de mot, « troi » matcherait encore dans « trois » → « troiss ».
+    expect(countGrammarOccurrences(once.text, suggestion("troi", "trois"))).toBe(0);
+    const again = applyGrammarReplacement(once.text, suggestion("troi", "trois"));
+    expect(again.replaced).toBe(0);
+    expect(again.text).toBe("mangé trois chaussettes");
+  });
 });

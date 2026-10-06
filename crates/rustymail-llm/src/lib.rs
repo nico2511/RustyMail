@@ -9,12 +9,18 @@ mod privacy;
 pub use engine::LlmEngine;
 
 #[cfg(feature = "http")]
-pub use engine::probe_openai_models;
+pub use engine::{list_ollama_tags, ollama_native_base_url, parse_ollama_tags_json, probe_openai_models};
 
 /// Sonde `GET /v1/models`. Sans le client HTTP compilé, la sonde est indisponible.
 #[cfg(not(feature = "http"))]
 pub fn probe_openai_models(_base_url: &str) -> Result<(), String> {
     Err("Sonde Ollama indisponible : client HTTP non compilé.".into())
+}
+
+/// Liste `GET /api/tags`. Sans le client HTTP compilé, indisponible.
+#[cfg(not(feature = "http"))]
+pub fn list_ollama_tags(_base_url: &str) -> Result<Vec<String>, String> {
+    Err("Liste Ollama indisponible : client HTTP non compilé.".into())
 }
 pub use error::LlmError;
 pub use hardware::{

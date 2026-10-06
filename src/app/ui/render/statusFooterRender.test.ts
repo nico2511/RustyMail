@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { defaultAppPrefs } from "../../../prefs_defaults";
 import { paintStatusBarProgressDom } from "../../mail/statusBarProgressPaintRun";
 import { state } from "../../state";
 import { registerRenderDeps, type RenderDeps } from "./renderDeps";
@@ -33,6 +34,7 @@ beforeEach(() => {
   state.syncInProgress = false;
   state.statusBarJobs = [];
   state.searchViewBatchJob = null;
+  state.appPrefs = defaultAppPrefs();
 });
 
 describe("renderGlobalStatusFooter", () => {
@@ -40,6 +42,8 @@ describe("renderGlobalStatusFooter", () => {
     const html = renderGlobalStatusFooter();
     expect(html).toContain("RustyMail 0.3.3");
     expect(html).toContain("ada@example.com");
+    expect(html).toContain('data-action="status-bar-model-open"');
+    expect(html).toContain("status-bar-model");
     expect(html).not.toContain("cœur prêt");
     expect(html).not.toContain("lisibilité");
     expect(html).not.toContain("hors Tauri");
@@ -55,6 +59,16 @@ describe("renderGlobalStatusFooter", () => {
     expect(html).toContain('class="status-bar-update"');
     expect(html).toContain("Màj 0.4.0");
     expect(html).toContain('data-action="desktop-update-open"');
+    expect(html).toContain('data-action="status-bar-model-open"');
+  });
+
+  it("affiche le modèle Ollama actif dans la barre", () => {
+    state.appPrefs.ai.chatBackend = "ollama";
+    state.appPrefs.ai.ollamaEnabled = true;
+    state.appPrefs.ai.ollamaModel = "qwen2.5:7b";
+    const html = renderGlobalStatusFooter();
+    expect(html).toContain("qwen2.5:7b");
+    expect(html).toContain('class="status-bar-model"');
   });
 });
 

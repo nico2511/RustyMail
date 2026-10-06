@@ -17,6 +17,7 @@ export function paintStatusBarProgressDom(): void {
     return;
   }
   const anchor =
+    bar.querySelector(".status-bar-model") ??
     bar.querySelector(".status-bar-update") ??
     bar.querySelector(".status-bar-app") ??
     bar.querySelector(".status-bar-sep");

@@ -46,6 +46,7 @@ export async function saveCurrentSearchView(): Promise<void> {
     searchDraft: state.searchDraft,
     searchNewsletterRule: state.searchNewsletterRule,
     searchModifiersTouched: state.searchModifiersTouched,
+    listDateSort: state.listDateSort,
   });
   try {
     const saved = await upsertSavedSearchCmd(

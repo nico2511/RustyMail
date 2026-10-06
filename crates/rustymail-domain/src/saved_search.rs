@@ -16,6 +16,9 @@ pub struct SavedSearchUiState {
     pub newsletter_local_part: Option<String>,
     #[serde(default)]
     pub search_modifiers_touched: bool,
+    /// Tri liste par date d’activité : `asc` | `desc` (défaut côté UI : plus récents d’abord).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list_date_sort: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

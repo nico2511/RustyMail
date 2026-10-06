@@ -2,10 +2,6 @@ import { Editor, Extension } from "@tiptap/core";
 import { ComposeImage, selectComposeImageSrc } from "./composeImage";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
-import Table from "@tiptap/extension-table";
-import TableCell from "@tiptap/extension-table-cell";
-import TableHeader from "@tiptap/extension-table-header";
-import TableRow from "@tiptap/extension-table-row";
 import Underline from "@tiptap/extension-underline";
 import StarterKit from "@tiptap/starter-kit";
 import type { Node as PMNode } from "@tiptap/pm/model";
@@ -26,6 +22,13 @@ import { ComposeGrammarHighlights } from "./composeGrammarHighlights";
 import { schedulePreviewUpdate } from "./composeDraftPreview";
 import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 import { prepareInlineImageFromFile } from "./composeInlineImageLimits";
+import {
+  ComposeTable,
+  ComposeTableCell,
+  ComposeTableHeader,
+  ComposeTableRow,
+  promptComposeTableSize,
+} from "./composeTable";
 import { toast } from "../lib/toast";
 
 const BLOCK_SEPARATOR = "\n\n";
@@ -364,10 +367,10 @@ export function mountComposeBodyEditor(host: HTMLElement): void {
         }),
         ComposeImage.configure({ inline: true, allowBase64: true }),
         Placeholder.configure({ placeholder: "Écrire le message…" }),
-        Table.configure({ resizable: false }),
-        TableRow,
-        TableHeader,
-        TableCell,
+        ComposeTable.configure({ resizable: false }),
+        ComposeTableRow,
+        ComposeTableHeader,
+        ComposeTableCell,
         ComposeLinkKeys,
         ComposeGrammarHighlights,
       ],
@@ -489,8 +492,26 @@ export async function applyComposeToolbarCommand(action: string): Promise<void> 
       else chain.toggleCode().run();
       break;
     }
-    case "table":
-      chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    case "table": {
+      const size = promptComposeTableSize();
+      if (!size) break;
+      chain.insertTable({ rows: size.rows, cols: size.cols, withHeaderRow: true }).run();
+      break;
+    }
+    case "table-add-row":
+      chain.addRowAfter().run();
+      break;
+    case "table-add-col":
+      chain.addColumnAfter().run();
+      break;
+    case "table-del-row":
+      chain.deleteRow().run();
+      break;
+    case "table-del-col":
+      chain.deleteColumn().run();
+      break;
+    case "table-del":
+      chain.deleteTable().run();
       break;
     default:
       break;
@@ -544,12 +565,42 @@ export function hasComposeTextSelection(): boolean {
   return readComposeSelectionPlainText().trim().length > 0;
 }
 
-/** Remplace uniquement la sélection courante par du texte (conserve le reste du brouillon). */
-export function replaceComposeSelectionWithText(text: string): boolean {
+/** Instantané de sélection (survît au clic menu / perte de focus / attente LLM). */
+export type ComposeSelectionSnapshot = {
+  from: number;
+  to: number;
+  text: string;
+};
+
+export function captureComposeSelectionSnapshot(): ComposeSelectionSnapshot | null {
+  const ed = getComposeBodyEditor();
+  if (!ed) return null;
+  const { from, to } = ed.state.selection;
+  if (to <= from) return null;
+  const text = ed.state.doc.textBetween(from, to, BLOCK_SEPARATOR, "\n");
+  if (!text.trim()) return null;
+  return { from, to, text };
+}
+
+/** Remplace la sélection (courante ou instantané capturé) par du texte. */
+export function replaceComposeSelectionWithText(
+  text: string,
+  snap?: ComposeSelectionSnapshot | null,
+): boolean {
   const ed = getComposeBodyEditor();
   if (!ed) return false;
-  const { from, to } = ed.state.selection;
-  if (to <= from) return false;
+  let from: number;
+  let to: number;
+  if (snap) {
+    from = snap.from;
+    to = snap.to;
+    if (from < 0 || to <= from || to > ed.state.doc.content.size) return false;
+    const current = ed.state.doc.textBetween(from, to, BLOCK_SEPARATOR, "\n");
+    if (current !== snap.text) return false;
+  } else {
+    ({ from, to } = ed.state.selection);
+    if (to <= from) return false;
+  }
   const insert = text.replace(/\u00a0/g, " ");
   ignore += 1;
   try {

@@ -19,6 +19,7 @@ import {
   findGrammarSpans,
   grammarTextsMatch,
   grammarOriginalTooLong,
+  retainGrammarSuggestionsInText,
   replacementDropsCriticalPunct,
   replacementDropsWords,
   type GrammarReplaceInput,
@@ -30,6 +31,8 @@ const BLOCK_SEPARATOR = "\n\n";
 const TOAST_APPLIED = "Remplacement appliqué.";
 const TOAST_APPLIED_FIRST = "Remplacement appliqué (première occurrence).";
 const TOAST_APPLIED_ALL = "Remplacements appliqués.";
+const TOAST_APPLIED_EVERYTHING = "Toutes les corrections appliquées.";
+const TOAST_APPLIED_PARTIAL = "Corrections appliquées — certaines n’ont pas pu l’être.";
 const TOAST_MISSING = "Occurrence introuvable — le texte n’a pas été modifié.";
 const TOAST_BAD_INDEX = "Suggestion introuvable — rouvrez Correction.";
 
@@ -91,7 +94,7 @@ function finishApplied(
   void computePreview();
 }
 
-function suggestionGuards(suggestion: GrammarReplaceInput): boolean {
+function suggestionGuards(suggestion: GrammarReplaceInput, opts?: { quiet?: boolean }): boolean {
   const original = suggestion.original;
   const replacement = suggestion.replacement ?? "";
   if (
@@ -99,7 +102,9 @@ function suggestionGuards(suggestion: GrammarReplaceInput): boolean {
     replacementDropsWords(original, replacement) ||
     replacementDropsCriticalPunct(original, replacement)
   ) {
-    toast.warning("Cette suggestion retirerait du texte — elle n’a pas été appliquée.");
+    if (!opts?.quiet) {
+      toast.warning("Cette suggestion retirerait du texte — elle n’a pas été appliquée.");
+    }
     return false;
   }
   return true;
@@ -208,4 +213,55 @@ export function applyComposeGrammarSuggestionAllAtIndex(index: number): void {
   }
 
   finishApplied(index, suggestion, totalBefore, { appliedAll: true });
+}
+
+/**
+ * Applique toutes les suggestions du panneau (chaque occurrence), au choix de l’utilisateur.
+ */
+export function applyComposeGrammarSuggestionsEverything(): void {
+  const snapshot = [...(state.composeGrammarSuggestions ?? [])];
+  if (!snapshot.length) {
+    toast.warning(TOAST_BAD_INDEX);
+    return;
+  }
+
+  let applied = 0;
+  for (const suggestion of snapshot) {
+    if (!suggestionGuards(suggestion, { quiet: true })) continue;
+    let guard = 0;
+    while (remainingOccurrences(suggestion) > 0 && guard < 64) {
+      guard += 1;
+      if (applyOneViaTipTap(suggestion) > 0) {
+        applied += 1;
+        continue;
+      }
+      if (applyOneViaPlainFallback(suggestion) > 0) {
+        applied += 1;
+        continue;
+      }
+      break;
+    }
+  }
+
+  const plain = readComposePlainText();
+  const live = retainGrammarSuggestionsInText(state.composeGrammarSuggestions, plain);
+  state.composeGrammarSuggestions = live.length ? live : null;
+
+  if (applied <= 0) {
+    toast(TOAST_MISSING);
+    return;
+  }
+
+  flushComposeEditorToState();
+  markComposeDraftEdited();
+  try {
+    scheduleDraftRevisionSave();
+  } catch (err) {
+    if (!(err instanceof Error) || !err.message.includes("registerComposeDraftRevisionAutosaveDeps")) {
+      throw err;
+    }
+  }
+  toast.success(state.composeGrammarSuggestions?.length ? TOAST_APPLIED_PARTIAL : TOAST_APPLIED_EVERYTHING);
+  paintComposeEditor();
+  void computePreview();
 }

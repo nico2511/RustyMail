@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isAiFeatureEnabled } from "../../aiFeatures";
-import { COMPOSE_GRAMMAR_JOB, composeRewriteJobLabel } from "../core/composeAiJobs";
+import { COMPOSE_GRAMMAR_JOB, composeRewriteJobLabel, composeTranslateJobLabel } from "../core/composeAiJobs";
 import { rewriteStyleLabelFr } from "../core/composeTone";
 import { LLM_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
@@ -8,10 +8,12 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
+import type { LlmTranslationResult } from "../types";
 import {
+  captureComposeSelectionSnapshot,
   hasComposeTextSelection,
   readComposePlainText,
-  readComposeSelectionPlainText,
+  type ComposeSelectionSnapshot,
   replaceComposeSelectionWithText,
   replaceComposeWithModelText,
 } from "./composeBodyEditor";
@@ -29,11 +31,24 @@ import {
   introducesLlmMeta,
   LLM_META_GRAMMAR_TOAST,
   LLM_META_REWRITE_TOAST,
+  LLM_META_TRANSLATION_TOAST,
+  translationVisibleText,
 } from "./llmMetaGuard";
 import { withLlmQueue } from "./llmJobQueue";
 import { setPendingDraftRevisionEventKind } from "./composeDraftRevisionEventKind";
 import { scheduleDraftRevisionSave } from "./composeDraftRevisionAutosave";
 import { refreshComposeGrammarHighlights } from "./composeGrammarHighlights";
+import {
+  composeTranslateLangLabel,
+  normalizeComposeTranslateLang,
+} from "./composeTranslateLangs";
+
+function composeTranslateFeatureOn(): boolean {
+  return (
+    isAiFeatureEnabled(state.appPrefs.ai, "featureMessageTranslateEnabled") ||
+    isAiFeatureEnabled(state.appPrefs.ai, "featureThreadTranslateEnabled")
+  );
+}
 
 export type ComposeAiScope = "document" | "selection";
 
@@ -49,21 +64,24 @@ function composeAiStillOnSameDraft(sessionId: string | null, sourcePlain: string
   return state.view === "compose" && state.draftSessionId === sessionId && readComposePlainText() === sourcePlain;
 }
 
-function resolveComposeScope(scope?: ComposeAiScope): { scope: ComposeAiScope; text: string } | null {
-  if (scope === "selection" || (scope !== "document" && hasComposeTextSelection())) {
-    const selected = readComposeSelectionPlainText();
-    if (!selected.trim()) {
+function resolveComposeScope(
+  scope?: ComposeAiScope,
+  selectionSnap?: ComposeSelectionSnapshot | null,
+): { scope: ComposeAiScope; text: string; selection: ComposeSelectionSnapshot | null } | null {
+  if (scope === "selection" || (scope !== "document" && (selectionSnap || hasComposeTextSelection()))) {
+    const snap = selectionSnap?.text.trim() ? selectionSnap : captureComposeSelectionSnapshot();
+    if (!snap?.text.trim()) {
       toast.warning("Sélectionnez d’abord du texte.");
       return null;
     }
-    return { scope: "selection", text: selected };
+    return { scope: "selection", text: snap.text, selection: snap };
   }
   const full = readComposePlainText();
   if (!full.trim()) {
     toast.warning("Le message est vide.");
     return null;
   }
-  return { scope: "document", text: full };
+  return { scope: "document", text: full, selection: null };
 }
 
 function filterUsableSuggestions(incoming: GrammarSuggestion[], haystack: string): GrammarSuggestion[] {
@@ -85,7 +103,11 @@ function filterUsableSuggestions(incoming: GrammarSuggestion[], haystack: string
   });
 }
 
-export async function composeAiRewrite(styleRaw: string, scope: ComposeAiScope = "document"): Promise<void> {
+export async function composeAiRewrite(
+  styleRaw: string,
+  scope: ComposeAiScope = "document",
+  selectionSnap?: ComposeSelectionSnapshot | null,
+): Promise<void> {
   if (state.view !== "compose") {
     toast.warning("Ouvre le compositeur pour réécrire.");
     return;
@@ -94,7 +116,7 @@ export async function composeAiRewrite(styleRaw: string, scope: ComposeAiScope =
     toast.warning("Réécriture IA désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
-  const resolved = resolveComposeScope(scope);
+  const resolved = resolveComposeScope(scope, selectionSnap);
   if (!resolved) return;
   const style = styleRaw.trim() || "Neutral";
   const styleLabel = rewriteStyleLabelFr(style);
@@ -123,7 +145,7 @@ export async function composeAiRewrite(styleRaw: string, scope: ComposeAiScope =
             : "rewrite";
       setPendingDraftRevisionEventKind(kind);
       if (resolved.scope === "selection") {
-        if (!replaceComposeSelectionWithText(rewritten)) {
+        if (!replaceComposeSelectionWithText(rewritten, resolved.selection)) {
           toast.warning("La sélection n’est plus disponible.");
           return;
         }
@@ -144,7 +166,10 @@ export async function composeAiRewrite(styleRaw: string, scope: ComposeAiScope =
   if (ran === null) return;
 }
 
-export async function composeAiGrammar(scope: ComposeAiScope = "document"): Promise<void> {
+export async function composeAiGrammar(
+  scope: ComposeAiScope = "document",
+  selectionSnap?: ComposeSelectionSnapshot | null,
+): Promise<void> {
   if (state.view !== "compose") {
     toast.warning("Ouvre le compositeur.");
     return;
@@ -153,7 +178,7 @@ export async function composeAiGrammar(scope: ComposeAiScope = "document"): Prom
     toast.warning("Correction grammaticale désactivée — activez-la dans Paramètres IA ou le panneau « IA ».");
     return;
   }
-  const resolved = resolveComposeScope(scope);
+  const resolved = resolveComposeScope(scope, selectionSnap);
   if (!resolved) return;
   if (!isTauriRuntime()) return void toast.warning("Correction (LLM) : Tauri requis.");
   const sessionId = state.draftSessionId;
@@ -192,7 +217,7 @@ export async function composeAiGrammar(scope: ComposeAiScope = "document"): Prom
         if (applied === 0 || corrected === resolved.text) {
           state.composeGrammarSuggestions = null;
           toast("Aucune correction sur la sélection.");
-        } else if (!replaceComposeSelectionWithText(corrected)) {
+        } else if (!replaceComposeSelectionWithText(corrected, resolved.selection)) {
           toast.warning("La sélection n’est plus disponible.");
         } else {
           state.composeGrammarSuggestions = null;
@@ -221,6 +246,70 @@ export async function composeAiGrammar(scope: ComposeAiScope = "document"): Prom
     }
     if (signal.aborted || state.view !== "compose" || state.draftSessionId !== sessionId) return;
     render();
+  });
+  if (ran === null) return;
+}
+
+/** Traduit le document ou la sélection vers `targetLang` (défaut : langue mère). */
+export async function composeAiTranslate(
+  targetLangRaw?: string,
+  scope: ComposeAiScope = "document",
+  selectionSnap?: ComposeSelectionSnapshot | null,
+): Promise<void> {
+  if (state.view !== "compose") {
+    toast.warning("Ouvre le compositeur pour traduire.");
+    return;
+  }
+  if (!composeTranslateFeatureOn()) {
+    toast.warning("Traduction IA désactivée — activez-la dans Paramètres IA.");
+    return;
+  }
+  const targetLang = normalizeComposeTranslateLang(
+    targetLangRaw?.trim() || state.appPrefs.general.motherLanguage || "fr",
+  );
+  const langLabel = composeTranslateLangLabel(targetLang);
+  const resolved = resolveComposeScope(scope, selectionSnap);
+  if (!resolved) return;
+  if (!isTauriRuntime()) return void toast.warning("Traduction IA : Tauri requis.");
+  const sessionId = state.draftSessionId;
+  const fullBefore = readComposePlainText();
+  const ran = await withLlmQueue(composeTranslateJobLabel(targetLang), async (signal) => {
+    if (signal.aborted || state.view !== "compose" || state.draftSessionId !== sessionId) return;
+    if (resolved.scope === "document" && readComposePlainText() !== fullBefore) return;
+    try {
+      const res = await withTimeout(
+        invoke<LlmTranslationResult>("llm_translate_compose", {
+          text: resolved.text,
+          targetLang,
+        }),
+        LLM_INVOKE_TIMEOUT_MS,
+      );
+      if (signal.aborted || state.view !== "compose" || state.draftSessionId !== sessionId) return;
+      const raw = (res.translatedText ?? "").trim();
+      const visible = raw ? translationVisibleText(resolved.text, raw) : null;
+      if (!visible) {
+        toast.error(LLM_META_TRANSLATION_TOAST);
+        return;
+      }
+      setPendingDraftRevisionEventKind("rewrite");
+      if (resolved.scope === "selection") {
+        if (!replaceComposeSelectionWithText(visible, resolved.selection)) {
+          toast.warning("La sélection n’est plus disponible.");
+          return;
+        }
+        toast.success(`Sélection traduite (${langLabel}).`);
+      } else {
+        if (readComposePlainText() !== fullBefore) return;
+        replaceComposeWithModelText(visible);
+        toast.success(`Message traduit (${langLabel}).`);
+      }
+      render();
+      void computePreview();
+      scheduleDraftRevisionSave(200);
+    } catch (e) {
+      if (signal.aborted) return;
+      toast.error(tauriErrorMessage(e));
+    }
   });
   if (ran === null) return;
 }

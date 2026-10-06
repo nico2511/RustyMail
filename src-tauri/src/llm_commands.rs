@@ -374,7 +374,7 @@ pub(crate) fn open_thread_domain(
 }
 
 /// Révision des prompts / formats JSON — **bump** quand le comportement des features cachées change.
-pub const AI_CACHE_PROMPT_REVISION: u32 = 9;
+pub const AI_CACHE_PROMPT_REVISION: u32 = 10;
 
 fn sanitize_cache_seg(s: &str) -> String {
     s.chars()
@@ -613,6 +613,48 @@ pub async fn llm_translate_thread(
     })
     .await
     .map_err(|e| format!("llm_translate_thread join: {e}"))?
+}
+
+fn llm_translate_compose_compute(
+    paths: &AppPaths,
+    text: String,
+    target_lang: String,
+) -> Result<TranslationResult, String> {
+    crate::ipc_guard::validate_target_lang(&target_lang)?;
+    let body = text.trim();
+    if body.is_empty() {
+        return Err("Texte à traduire vide.".into());
+    }
+    if body.chars().count() > 48_000 {
+        return Err("Texte trop long pour la traduction (max 48 000 caractères).".into());
+    }
+    let prefs = load_app_prefs(&paths.prefs_path);
+    // Compose : même famille que la traduction message (texte libre).
+    llm_gate_feature(&prefs, paths, AiFeature::MessageTranslate)?;
+    let mut engine = build_llm_engine(&prefs, paths)?;
+    ai_translation::translate_plain_with_llm(
+        &mut engine,
+        "compose",
+        body,
+        "auto",
+        target_lang.trim(),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn llm_translate_compose(
+    paths: State<'_, AppPaths>,
+    text: String,
+    target_lang: String,
+) -> Result<TranslationResult, String> {
+    let paths = Clone::clone(&*paths);
+    let target_lang = target_lang.trim().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        llm_translate_compose_compute(&paths, text, target_lang)
+    })
+    .await
+    .map_err(|e| format!("llm_translate_compose join: {e}"))?
 }
 
 fn llm_rewrite_compose_compute(

@@ -11,6 +11,8 @@ export type SavedSearchUiState = {
   newsletterDomain?: string | null;
   newsletterLocalPart?: string | null;
   searchModifiersTouched?: boolean;
+  /** Tri par date d’activité du fil : `asc` | `desc`. */
+  listDateSort?: string | null;
 };
 
 export type SavedSearch = {

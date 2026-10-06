@@ -708,19 +708,19 @@ mod tests {
     #[test]
     fn detects_iterable_style_paths() {
         assert!(href_has_unsubscribe_signal(
-            "https://links.iterable.com/s/uh/Iw35cOOggG1OP4Ad/25"
+            "https://links.example-esp.com/s/uh/tokenDemoUh/25"
         ));
         assert!(href_has_unsubscribe_signal(
-            "http://links.swissborg.com/s/u/BSbrFspXkijdqVtJ1EDyO/25"
+            "http://links.example-esp.com/s/u/tokenDemoU/25"
         ));
         assert!(href_has_unsubscribe_signal(
-            "mailto:unsubscribe+20208333+26673752@unsubscribe.iterable.com"
+            "mailto:unsubscribe+111+222@unsubscribe.example-esp.com"
         ));
     }
 
     #[test]
     fn extract_accented_desinscrire_with_iterable_path() {
-        let html = r#"Si vous ne souhaitez plus recevoir d'e-mails, cliquez sur se <a href="http://links.swissborg.com/s/u/BSbrFspX/25">désinscrire</a>."#;
+        let html = r#"Si vous ne souhaitez plus recevoir d'e-mails, cliquez sur se <a href="http://links.example-esp.com/s/u/tokenDemo/25">désinscrire</a>."#;
         let urls = extract_unsubscribe_links_from_html(html, 4);
         assert_eq!(urls.len(), 1, "{urls:?}");
         assert!(urls[0].contains("/s/u/"));

@@ -1,7 +1,8 @@
-//! Après sélection des zones : réécriture / reformatage du texte pour la lecture.
+//! Après sélection des zones : article de lecture (signal en avant, blabla dehors).
 
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashSet;
 
 use crate::ai_llm_util::{
     gen_params_json_for_prompt, output_room_after_prompt, parse_model_json, truncate_chars,
@@ -19,6 +20,8 @@ const MIN_OUTPUT_TOKENS: u32 = 384;
 const MAX_OUTPUT_TOKENS: u32 = 1_024;
 const MIN_OUTPUT_ROOM: u32 = 280;
 const EXCERPT_CHARS: usize = 1_200;
+const MAX_ACTIONS: usize = 2;
+const MAX_CONTACTS: usize = 2;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,22 +37,46 @@ struct ReformatDto {
     #[serde(default)]
     amount: String,
     #[serde(default)]
+    highlight_label: String,
+    #[serde(default)]
+    highlight_value: String,
+    #[serde(default)]
     details_heading: String,
     #[serde(default)]
     rows: Vec<ReformatRowDto>,
     #[serde(default)]
     paragraphs: Vec<String>,
     #[serde(default)]
+    actions: Vec<ReformatActionDto>,
+    #[serde(default)]
+    contacts: Vec<ReformatRowDto>,
+    #[serde(default)]
     hide_footer: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ReformatRowDto {
     #[serde(default)]
     label: String,
     #[serde(default)]
     value: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReformatActionDto {
+    #[serde(default)]
+    label: String,
+    #[serde(default)]
+    url: String,
+}
+
+#[derive(Debug, Clone)]
+struct LinkCandidate {
+    label: String,
+    url: String,
+    score: i32,
 }
 
 pub struct DigestCutReformatOutcome {
@@ -69,6 +96,7 @@ pub fn reformat_digest_cut_reading(
     current: &DigestCutProposal,
 ) -> DigestCutReformatOutcome {
     let excerpts = zone_excerpts(html, sender_email, subject, current);
+    let candidates = extract_useful_link_candidates(html, 8);
     let mut fallback_reason = None;
     if let Some(engine) = engine {
         match reformat_with_llm(
@@ -78,8 +106,10 @@ pub fn reformat_digest_cut_reading(
             output_language,
             current,
             &excerpts,
+            &candidates,
         ) {
-            Ok(dto) => {
+            Ok(mut dto) => {
+                enrich_dto_with_local_signal(&mut dto, subject, html, &excerpts, &candidates);
                 let (proposal, reading_html) = apply_reformat_dto(current, dto);
                 return DigestCutReformatOutcome {
                     proposal,
@@ -103,7 +133,8 @@ pub fn reformat_digest_cut_reading(
                 .into(),
         );
     }
-    let (proposal, reading_html) = heuristic_reformat(current, subject, &excerpts);
+    let (proposal, reading_html) =
+        heuristic_reformat(current, subject, html, &excerpts, &candidates);
     DigestCutReformatOutcome {
         proposal,
         reading_html,
@@ -135,12 +166,8 @@ fn zone_excerpts(
     let header = if subject.is_empty() {
         truncate_chars(&plain, EXCERPT_CHARS / 3)
     } else {
-        truncate_chars(
-            &format!("{subject} — {plain}"),
-            EXCERPT_CHARS / 3,
-        )
+        truncate_chars(&format!("{subject} — {plain}"), EXCERPT_CHARS / 3)
     };
-    // Découpe grossière : tout le rendu as_is est le corps utile ; footer = zone footer du mail source.
     ZoneExcerpts {
         header,
         body: truncate_chars(&plain, EXCERPT_CHARS),
@@ -177,6 +204,7 @@ fn reformat_with_llm(
     output_language: &str,
     current: &DigestCutProposal,
     excerpts: &ZoneExcerpts,
+    candidates: &[LinkCandidate],
 ) -> Result<ReformatDto, LlmError> {
     let system = crate::prompts::system_prompt_for_language("digest_cut_reformat", output_language);
     let slim = json!({
@@ -186,11 +214,20 @@ fn reformat_with_llm(
         "footerAction": current.zones.footer.action,
     });
     let subject_line = subject.split_whitespace().collect::<Vec<_>>().join(" ");
+    let links_json = serde_json::to_string(
+        &candidates
+            .iter()
+            .take(6)
+            .map(|c| json!({"label": c.label, "url": c.url}))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap_or_else(|_| "[]".into());
     let user = format!(
-        "Sender (context only): {}\nSubject (context only): {}\nZones: {}\n\n{}\n\n{}\n\n{}",
+        "Sender (context only): {}\nSubject (context only): {}\nZones: {}\nCandidate action links (prefer these urls, do not invent): {}\n\n{}\n\n{}\n\n{}",
         sender_email.trim(),
         truncate_chars(&subject_line, 160),
         slim,
+        links_json,
         untrusted_mail_for_engine(engine, "digest-cut-header-text", &excerpts.header),
         untrusted_mail_for_engine(engine, "digest-cut-body-text", &excerpts.body),
         untrusted_mail_for_engine(engine, "digest-cut-footer-note", &excerpts.footer),
@@ -223,14 +260,23 @@ fn reformat_with_llm(
 
 fn validate_reformat_dto(dto: &ReformatDto) -> Result<(), LlmError> {
     let bad = |s: &str| s.to_ascii_lowercase().contains("ignore all") || s.contains('<');
-    if bad(&dto.explanation_fr) || bad(&dto.title) || bad(&dto.amount) || bad(&dto.details_heading)
+    if bad(&dto.explanation_fr)
+        || bad(&dto.title)
+        || bad(&dto.amount)
+        || bad(&dto.details_heading)
+        || bad(&dto.highlight_label)
+        || bad(&dto.highlight_value)
     {
         return Err(LlmError::InvalidJson("reformat fields".into()));
     }
-    if dto.rows.len() > 8 || dto.paragraphs.len() > 4 {
+    if dto.rows.len() > 8
+        || dto.paragraphs.len() > 4
+        || dto.actions.len() > MAX_ACTIONS
+        || dto.contacts.len() > MAX_CONTACTS
+    {
         return Err(LlmError::InvalidJson("reformat size".into()));
     }
-    for row in &dto.rows {
+    for row in dto.rows.iter().chain(dto.contacts.iter()) {
         if bad(&row.label) || bad(&row.value) {
             return Err(LlmError::InvalidJson("reformat row".into()));
         }
@@ -240,14 +286,32 @@ fn validate_reformat_dto(dto: &ReformatDto) -> Result<(), LlmError> {
             return Err(LlmError::InvalidJson("reformat paragraph".into()));
         }
     }
+    for action in &dto.actions {
+        if bad(&action.label) {
+            return Err(LlmError::InvalidJson("reformat action".into()));
+        }
+        if !is_allowed_action_url(&action.url) || href_looks_like_unsubscribe(&action.url) {
+            return Err(LlmError::InvalidJson("reformat action url".into()));
+        }
+    }
     if dto.title.trim().is_empty()
         && dto.amount.trim().is_empty()
+        && dto.highlight_value.trim().is_empty()
         && dto.rows.is_empty()
         && dto.paragraphs.is_empty()
+        && dto.actions.is_empty()
     {
         return Err(LlmError::InvalidJson("reformat empty".into()));
     }
     Ok(())
+}
+
+fn is_allowed_action_url(url: &str) -> bool {
+    let u = url.trim();
+    (u.starts_with("https://") || u.starts_with("http://"))
+        && !u.contains('<')
+        && !u.contains(' ')
+        && u.len() <= 500
 }
 
 fn parse_presentation(raw: Option<&str>, fallback: ZonePresentation) -> ZonePresentation {
@@ -274,10 +338,8 @@ fn apply_reformat_dto(
 ) -> (DigestCutProposal, String) {
     let mut proposal = current.clone();
     proposal.source = ProposalSource::Llm;
-    let header_pres = parse_presentation(
-        dto.header_presentation.as_deref(),
-        ZonePresentation::AsIs,
-    );
+    let header_pres =
+        parse_presentation(dto.header_presentation.as_deref(), ZonePresentation::AsIs);
     let body_pres = parse_presentation(dto.body_presentation.as_deref(), ZonePresentation::AsIs);
     proposal.zones.header.presentation = Some(header_pres);
     proposal.zones.body.presentation = Some(body_pres);
@@ -319,10 +381,71 @@ fn tag_header_roles(zone: &mut DigestCutZone) {
     }
 }
 
+fn enrich_dto_with_local_signal(
+    dto: &mut ReformatDto,
+    subject: &str,
+    html: &str,
+    excerpts: &ZoneExcerpts,
+    candidates: &[LinkCandidate],
+) {
+    dto.actions = sanitize_actions(std::mem::take(&mut dto.actions), candidates);
+    if dto.actions.is_empty() {
+        dto.actions = actions_from_candidates(candidates);
+    }
+    if dto.highlight_value.trim().is_empty() {
+        if let Some((label, value)) = guess_highlight(subject, excerpts, html) {
+            dto.highlight_label = label;
+            dto.highlight_value = value;
+        }
+    }
+    dto.actions.truncate(MAX_ACTIONS);
+    dto.contacts.truncate(MAX_CONTACTS);
+}
+
+fn sanitize_actions(
+    actions: Vec<ReformatActionDto>,
+    candidates: &[LinkCandidate],
+) -> Vec<ReformatActionDto> {
+    let allowed: HashSet<&str> = candidates.iter().map(|c| c.url.as_str()).collect();
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    for action in actions {
+        let url = action.url.trim().to_string();
+        let label = clip_field(action.label.trim(), 80);
+        if label.is_empty() || !is_allowed_action_url(&url) || href_looks_like_unsubscribe(&url) {
+            continue;
+        }
+        if !candidates.is_empty() && !allowed.contains(url.as_str()) {
+            continue;
+        }
+        if seen.insert(url.clone()) {
+            out.push(ReformatActionDto { label, url });
+        }
+        if out.len() >= MAX_ACTIONS {
+            break;
+        }
+    }
+    out
+}
+
+fn actions_from_candidates(candidates: &[LinkCandidate]) -> Vec<ReformatActionDto> {
+    candidates
+        .iter()
+        .take(MAX_ACTIONS)
+        .map(|c| ReformatActionDto {
+            label: clip_field(&c.label, 80),
+            url: c.url.clone(),
+        })
+        .filter(|a| !a.label.is_empty() && is_allowed_action_url(&a.url))
+        .collect()
+}
+
 fn heuristic_reformat(
     current: &DigestCutProposal,
     subject: &str,
+    html: &str,
     excerpts: &ZoneExcerpts,
+    candidates: &[LinkCandidate],
 ) -> (DigestCutProposal, String) {
     let text = format!("{} {}", excerpts.header, excerpts.body);
     let lines: Vec<&str> = text
@@ -337,6 +460,7 @@ fn heuristic_reformat(
     } else {
         lines.first().unwrap_or(&"Message").to_string()
     };
+    let text_lc = text.to_ascii_lowercase();
     let currency_hits: Vec<&str> = lines
         .iter()
         .copied()
@@ -345,18 +469,26 @@ fn heuristic_reformat(
             u.contains("EUR") || u.contains("USD") || l.contains('€') || l.contains('$')
         })
         .collect();
-    // Catalogue promo : beaucoup de prix isolés → pas de tableau inventé.
     let promo_catalog = currency_hits.len() >= 5
-        && !text.to_ascii_lowercase().contains("commande")
-        && !text.to_ascii_lowercase().contains("order")
-        && !text.to_ascii_lowercase().contains("alerte")
-        && !text.to_ascii_lowercase().contains("livré")
-        && !text.to_ascii_lowercase().contains("delivered");
+        && !text_lc.contains("commande")
+        && !text_lc.contains("order")
+        && !text_lc.contains("alerte")
+        && !text_lc.contains("livré")
+        && !text_lc.contains("delivered");
+
     let amount = if promo_catalog {
-        None
+        String::new()
+    } else if text_lc.contains("livré") || text_lc.contains("delivered") {
+        "Livré".into()
+    } else if text_lc.contains("failed") || text_lc.contains("échec") {
+        "Échec".into()
     } else {
-        currency_hits.first().map(|s| (*s).to_string())
+        currency_hits
+            .first()
+            .map(|s| clip_field(s, 120))
+            .unwrap_or_default()
     };
+
     let mut rows = Vec::new();
     if !promo_catalog {
         for line in lines.iter().skip(1).take(6) {
@@ -372,7 +504,14 @@ fn heuristic_reformat(
             }
         }
     }
-    let used_in_rows: std::collections::HashSet<String> = rows
+
+    let (highlight_label, highlight_value) = if promo_catalog {
+        (String::new(), String::new())
+    } else {
+        guess_highlight(&subject, excerpts, html).unwrap_or_default()
+    };
+
+    let used_in_rows: HashSet<String> = rows
         .iter()
         .flat_map(|r| [r.label.clone(), r.value.clone()])
         .collect();
@@ -384,7 +523,6 @@ fn heuristic_reformat(
             if used_in_rows.contains(**line) {
                 return false;
             }
-            // Garder une courte explication utile ; jeter CTA / légal / désinscription.
             if lower.contains("investir")
                 || lower.contains("unsubscribe")
                 || lower.contains("désinscri")
@@ -414,9 +552,10 @@ fn heuristic_reformat(
     } else {
         vec![]
     };
-    let dto = ReformatDto {
-        explanation_fr: "Reformatage structurel local (sans modèle) : lecture clarifiée.".into(),
-        header_presentation: Some(if amount.is_some() {
+
+    let mut dto = ReformatDto {
+        explanation_fr: "Article de lecture local (sans modèle) : signal mis en avant.".into(),
+        header_presentation: Some(if !amount.is_empty() {
             "prominent".into()
         } else {
             "as_is".into()
@@ -427,15 +566,185 @@ fn heuristic_reformat(
             "as_is".into()
         }),
         title: clip_field(&title, 120),
-        amount: amount.map(|a| clip_field(&a, 120)).unwrap_or_default(),
+        amount,
+        highlight_label,
+        highlight_value,
         details_heading: "Détails".into(),
         rows,
         paragraphs,
+        actions: if promo_catalog {
+            vec![]
+        } else {
+            actions_from_candidates(candidates)
+        },
+        contacts: vec![],
         hide_footer: true,
     };
-    let (mut proposal, html) = apply_reformat_dto(current, dto);
+    enrich_dto_with_local_signal(&mut dto, &subject, html, excerpts, candidates);
+    let (mut proposal, out_html) = apply_reformat_dto(current, dto);
     proposal.source = ProposalSource::Heuristic;
-    (proposal, html)
+    (proposal, out_html)
+}
+
+fn guess_highlight(
+    subject: &str,
+    excerpts: &ZoneExcerpts,
+    html: &str,
+) -> Option<(String, String)> {
+    let blob = format!("{} {} {}", subject, excerpts.header, excerpts.body);
+    if let Ok(re) = regex::Regex::new(
+        r"(?i)(?:n[°o]\s*(?:de\s*)?commande|order\s*#?|commande)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{5,})",
+    ) {
+        if let Some(cap) = re.captures(&blob) {
+            if let Some(m) = cap.get(1) {
+                let value = m.as_str().trim();
+                if value.len() >= 6 {
+                    return Some(("N° commande".into(), clip_field(value, 80)));
+                }
+            }
+        }
+    }
+    let lc = blob.to_ascii_lowercase();
+    if lc.contains("suivi") || lc.contains("tracking") || lc.contains("colis") {
+        if let Some(tok) = blob
+            .split_whitespace()
+            .find(|t| t.len() >= 10 && t.chars().all(|c| c.is_ascii_alphanumeric()))
+        {
+            return Some(("N° suivi".into(), clip_field(tok, 80)));
+        }
+    }
+    let _ = html;
+    None
+}
+
+fn extract_useful_link_candidates(html: &str, limit: usize) -> Vec<LinkCandidate> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    let html_lc = html.to_ascii_lowercase();
+    let mut search_from = 0usize;
+    while out.len() < limit * 3 {
+        let Some(rel) = html_lc[search_from..].find("href=") else {
+            break;
+        };
+        let href_key = search_from + rel;
+        search_from = href_key + 5;
+        let part = &html[href_key + 5..];
+        if part.len() < 2 {
+            continue;
+        }
+        let quote = part.as_bytes()[0];
+        if quote != b'"' && quote != b'\'' {
+            continue;
+        }
+        let rest = &part[1..];
+        let end = rest.find(quote as char).unwrap_or(rest.len().min(1200));
+        let url = rest[..end.min(rest.len())].trim();
+        if !is_allowed_action_url(url) || href_looks_like_unsubscribe(url) {
+            continue;
+        }
+        let label = if let Some(close) = part.to_ascii_lowercase().find("</a>") {
+            strip_tags_to_plain(&part[end.min(part.len())..close.min(part.len())])
+        } else {
+            String::new()
+        };
+        let label = clip_field(&label, 80);
+        let score = useful_link_score(url, &label);
+        if score < 20 {
+            continue;
+        }
+        let label = if label.is_empty() {
+            default_action_label(url)
+        } else {
+            label
+        };
+        if seen.insert(url.to_string()) {
+            out.push(LinkCandidate {
+                label,
+                url: url.to_string(),
+                score,
+            });
+        }
+    }
+    out.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.url.len().cmp(&b.url.len())));
+    out.truncate(limit);
+    out
+}
+
+fn default_action_label(url: &str) -> String {
+    let u = url.to_ascii_lowercase();
+    if u.contains("progress-tracker") || u.contains("track") || u.contains("suivi") {
+        "Suivre le colis".into()
+    } else if u.contains("order") || u.contains("commande") {
+        "Voir la commande".into()
+    } else if u.contains("actions/runs") || u.contains("github.com") {
+        "Voir les résultats".into()
+    } else if u.contains("deal") {
+        "Voir le deal".into()
+    } else {
+        "Ouvrir".into()
+    }
+}
+
+fn useful_link_score(url: &str, label: &str) -> i32 {
+    let blob = format!("{} {}", url, label).to_ascii_lowercase();
+    if href_looks_like_unsubscribe(&blob) {
+        return -100;
+    }
+    let mut score = 0;
+    for (kw, pts) in [
+        ("progress-tracker", 90),
+        ("track", 70),
+        ("suivi", 70),
+        ("package", 50),
+        ("order", 60),
+        ("commande", 60),
+        ("actions/runs", 85),
+        ("view results", 80),
+        ("voir les résultats", 80),
+        ("dealabs", 55),
+        ("deal", 40),
+        ("investir", 35),
+        ("vault", 35),
+        ("github.com", 30),
+    ] {
+        if blob.contains(kw) {
+            score += pts;
+        }
+    }
+    for (kw, pts) in [
+        ("facebook", -40),
+        ("instagram", -40),
+        ("linkedin", -40),
+        ("twitter", -40),
+        ("discord", -40),
+        ("social", -30),
+        ("play.google", -40),
+        ("apps.apple", -40),
+        ("rate us", -40),
+    ] {
+        if blob.contains(kw) {
+            score += pts;
+        }
+    }
+    score
+}
+
+fn href_looks_like_unsubscribe(href: &str) -> bool {
+    let h = href.to_ascii_lowercase();
+    h.contains("unsubscribe")
+        || h.contains("opt-out")
+        || h.contains("optout")
+        || h.contains("desinscri")
+        || h.contains("désinscri")
+        || h.contains("desabon")
+        || h.contains("list-manage")
+        || h.contains("list-unsubscribe")
+        || h.contains("unsubscribe.iterable")
+        || h.contains("/s/uh/")
+        || h.contains("/s/u/")
+        || h.contains("/un/")
+        || h.contains("/unsub")
+        || h.contains("ne plus recevoir")
 }
 
 fn esc_pcdata(text: &str) -> String {
@@ -445,6 +754,10 @@ fn esc_pcdata(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
+fn esc_attr(text: &str) -> String {
+    esc_pcdata(text)
+}
+
 fn build_reading_html(fixture_id: &str, dto: &ReformatDto) -> String {
     let mut out = format!(
         "<!-- rustymail:digest id=\"{}\" -->\n<article class=\"rm-digest\">\n",
@@ -452,12 +765,24 @@ fn build_reading_html(fixture_id: &str, dto: &ReformatDto) -> String {
     );
     let title = clip_field(dto.title.trim(), 120);
     let amount = clip_field(dto.amount.trim(), 120);
+    let hi_label = clip_field(dto.highlight_label.trim(), 80);
+    let hi_value = clip_field(dto.highlight_value.trim(), 120);
     if !title.is_empty() {
         out.push_str(&format!("  <h2>{}</h2>\n", esc_pcdata(&title)));
     }
+    if !hi_value.is_empty() {
+        out.push_str("  <p class=\"rm-digest__highlight\">");
+        if !hi_label.is_empty() {
+            out.push_str(&format!("<span>{}</span>", esc_pcdata(&hi_label)));
+        }
+        out.push_str(&format!(
+            "<strong>{}</strong></p>\n",
+            esc_pcdata(&hi_value)
+        ));
+    }
     if !amount.is_empty() {
         out.push_str(&format!(
-            "  <p><strong>{}</strong></p>\n",
+            "  <p class=\"rm-digest__status\"><strong>{}</strong></p>\n",
             esc_pcdata(&amount)
         ));
     }
@@ -482,6 +807,23 @@ fn build_reading_html(fixture_id: &str, dto: &ReformatDto) -> String {
         }
         out.push_str("    </tbody>\n  </table>\n");
     }
+    let contacts: Vec<_> = dto
+        .contacts
+        .iter()
+        .filter(|r| !r.label.trim().is_empty() && !r.value.trim().is_empty())
+        .take(MAX_CONTACTS)
+        .collect();
+    if !contacts.is_empty() {
+        out.push_str("  <h3>Contact</h3>\n  <table>\n    <tbody>\n");
+        for row in contacts {
+            out.push_str("      <tr><th scope=\"row\">");
+            out.push_str(&esc_pcdata(&clip_field(row.label.trim(), 120)));
+            out.push_str("</th><td>");
+            out.push_str(&esc_pcdata(&clip_field(row.value.trim(), 120)));
+            out.push_str("</td></tr>\n");
+        }
+        out.push_str("    </tbody>\n  </table>\n");
+    }
     for p in dto.paragraphs.iter().take(4) {
         let line = clip_field(p.trim(), 120);
         if line.is_empty() {
@@ -491,55 +833,115 @@ fn build_reading_html(fixture_id: &str, dto: &ReformatDto) -> String {
         out.push_str(&esc_pcdata(&line));
         out.push_str("</p>\n");
     }
+    let actions: Vec<_> = dto
+        .actions
+        .iter()
+        .filter(|a| is_allowed_action_url(&a.url) && !href_looks_like_unsubscribe(&a.url))
+        .take(MAX_ACTIONS)
+        .collect();
+    if !actions.is_empty() {
+        out.push_str("  <p class=\"rm-digest__actions\">");
+        for (i, action) in actions.iter().enumerate() {
+            if i > 0 {
+                out.push(' ');
+            }
+            let label = clip_field(action.label.trim(), 80);
+            let label = if label.is_empty() {
+                default_action_label(&action.url)
+            } else {
+                label
+            };
+            out.push_str(&format!(
+                "<a href=\"{}\" rel=\"noopener noreferrer\" target=\"_blank\">{}</a>",
+                esc_attr(action.url.trim()),
+                esc_pcdata(&label)
+            ));
+        }
+        out.push_str("</p>\n");
+    }
     out.push_str("</article>\n");
     out
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{build_reading_html, validate_reformat_dto, ReformatDto, ReformatRowDto};
+    use super::*;
 
-    #[test]
-    fn rejects_html_injection_in_fields() {
-        let dto = ReformatDto {
+    fn empty_dto() -> ReformatDto {
+        ReformatDto {
             explanation_fr: "ok".into(),
             header_presentation: Some("prominent".into()),
             body_presentation: Some("key_value".into()),
-            title: "<script>x</script>".into(),
+            title: String::new(),
             amount: String::new(),
+            highlight_label: String::new(),
+            highlight_value: String::new(),
             details_heading: String::new(),
             rows: vec![],
             paragraphs: vec![],
+            actions: vec![],
+            contacts: vec![],
             hide_footer: true,
-        };
+        }
+    }
+
+    #[test]
+    fn rejects_html_injection_in_fields() {
+        let mut dto = empty_dto();
+        dto.title = "<script>x</script>".into();
         assert!(validate_reformat_dto(&dto).is_err());
     }
 
     #[test]
-    fn builds_table_reading_html() {
-        let dto = ReformatDto {
-            explanation_fr: "ok".into(),
-            header_presentation: Some("prominent".into()),
-            body_presentation: Some("key_value".into()),
-            title: "Paiement reçu".into(),
-            amount: "+ 50 EUR".into(),
-            details_heading: "Détails".into(),
-            rows: vec![ReformatRowDto {
-                label: "Date".into(),
-                value: "1 mai".into(),
-            }],
-            paragraphs: vec![],
-            hide_footer: true,
-        };
-        let html = build_reading_html("exemple-fr", &dto);
-        assert!(html.contains("<h2>Paiement reçu</h2>"));
-        assert!(html.contains("+ 50 EUR"));
-        assert!(html.contains("<th scope=\"row\">Date</th>"));
-        assert!(html.contains("rm-digest"));
+    fn rejects_unsubscribe_action_url() {
+        let mut dto = empty_dto();
+        dto.title = "Promo".into();
+        dto.actions = vec![ReformatActionDto {
+            label: "Se désinscrire".into(),
+            url: "https://links.example.com/s/u/abc".into(),
+        }];
+        assert!(validate_reformat_dto(&dto).is_err());
     }
 
     #[test]
-    fn prompt_example_allows_key_value_plus_commentary() {
+    fn builds_article_with_highlight_and_actions() {
+        let mut dto = empty_dto();
+        dto.title = "Livré — Nettoyant contacts".into();
+        dto.amount = "Livré aujourd’hui".into();
+        dto.highlight_label = "N° commande".into();
+        dto.highlight_value = "123-4567890-1234567".into();
+        dto.details_heading = "Détails".into();
+        dto.rows = vec![ReformatRowDto {
+            label: "Lieu".into(),
+            value: "Ville-Exemple".into(),
+        }];
+        dto.actions = vec![ReformatActionDto {
+            label: "Suivre le colis".into(),
+            url: "https://shop.example.com/progress-tracker/package/demo".into(),
+        }];
+        assert!(validate_reformat_dto(&dto).is_ok());
+        let html = build_reading_html("shop-example", &dto);
+        assert!(html.contains("rm-digest__highlight"));
+        assert!(html.contains("123-4567890-1234567"));
+        assert!(html.contains("rm-digest__actions"));
+        assert!(html.contains("progress-tracker"));
+        assert!(html.contains("Suivre le colis"));
+    }
+
+    #[test]
+    fn extracts_useful_links_and_skips_unsub() {
+        let html = r#"
+          <a href="https://shop.example.com/progress-tracker/package/demo">Suivre votre colis</a>
+          <a href="http://links.example-esp.com/s/u/tokenDemo">désinscrire</a>
+          <a href="https://social.example.com/x">Réseau social</a>
+        "#;
+        let links = extract_useful_link_candidates(html, 4);
+        assert_eq!(links.len(), 1);
+        assert!(links[0].url.contains("progress-tracker"));
+    }
+
+    #[test]
+    fn prompt_example_parses_with_actions() {
         let prompt = include_str!("../prompts/digest_cut_reformat.system.txt");
         let start = prompt.find("{\"explanationFr\"").expect("example json");
         let end = prompt[start..]
@@ -548,8 +950,8 @@ mod tests {
         let example: serde_json::Value =
             serde_json::from_str(prompt[start..end].trim()).expect("example parses");
         let dto: ReformatDto = serde_json::from_value(example).expect("example dto");
-        assert!(dto.rows.len() >= 2);
-        assert!(!dto.paragraphs.is_empty());
+        assert!(!dto.highlight_value.is_empty());
+        assert!(!dto.actions.is_empty());
         assert!(dto.hide_footer);
         assert!(validate_reformat_dto(&dto).is_ok());
     }

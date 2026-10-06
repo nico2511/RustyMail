@@ -3,6 +3,7 @@ import type { NewsletterRuleRow, ThreadListItem } from "../types";
 import { state } from "../state";
 import { isSearchActive } from "./searchQueryContext";
 import { firstMatchingNewsletterRule } from "./newsletterRulesMatch";
+import { sortThreadsByLastActivity } from "./mailListThreadSort";
 
 export function threadMatchesNewsletterRule(thread: ThreadListItem, rule: NewsletterRuleRow): boolean {
   for (const p of thread.participants) {
@@ -29,7 +30,9 @@ export function threadsVisibleInList(): ThreadListItem[] {
     const rule = state.searchNewsletterRule;
     base = base.filter((t) => threadMatchesNewsletterRule(t, rule));
   }
-  if (isSearchActive()) return base;
+  if (isSearchActive()) {
+    return sortThreadsByLastActivity(base, state.listDateSort === "asc" ? "asc" : "desc");
+  }
   if (state.listFilter === "unread") return base.filter((t) => t.unread);
   if (state.listFilter === "starred") return base.filter((t) => threadListFollowed(t));
   if (state.listFilter === "focused") return base.filter((t) => !t.isNewsletterThread);

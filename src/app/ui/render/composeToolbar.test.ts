@@ -12,6 +12,8 @@ const base: ComposeToolbarProps = {
   rewriteEnabled: true,
   grammarEnabled: true,
   quickRepliesEnabled: false,
+  translateEnabled: true,
+  translateLang: "fr",
 };
 
 function openTag(html: string, attr: string): string {
@@ -45,6 +47,9 @@ describe("barre du compositeur", () => {
     expect(html).toContain('data-action="compose-ai-rewrite-selected-tone"');
     expect(html).toContain('data-rewrite-style="Concise"');
     expect(html).toContain('data-compose-cmd="ai:shorten"');
+    expect(html).toContain('data-compose-cmd="ai:translate"');
+    expect(html).toContain('id="compose-translate-lang"');
+    expect(html).toContain(">Traduire<");
     expect(html).not.toContain("Style sélectionné");
     expect(html).not.toContain(">Formel<");
     expect(html).not.toContain('data-rewrite-style="Formal"');
@@ -58,6 +63,7 @@ describe("barre du compositeur", () => {
       rewriteEnabled: false,
       grammarEnabled: false,
       quickRepliesEnabled: false,
+      translateEnabled: false,
     });
     expect(html).toContain(">Écrire<");
     expect(html).toContain('data-action="mic"');
@@ -65,6 +71,8 @@ describe("barre du compositeur", () => {
     expect(html).not.toContain(">Transformer<");
     expect(html).not.toContain("compose-ai-grammar");
     expect(html).not.toContain("compose-ai-rewrite");
+    expect(html).not.toContain("compose-ai-translate");
+    expect(html).not.toContain("compose-translate-lang");
   });
 
   it("place réponses et dictée sur la barre IA, à droite", () => {
@@ -118,6 +126,7 @@ describe("états IA du compositeur", () => {
     expect(composeAiBusyKind(composeRewriteJobLabel("Assertive"))).toBe("rewrite");
     expect(composeAiBusyKind("Orthographe")).toBe("grammar");
     expect(composeAiBusyKind("Réponses rapides")).toBe("replies");
+    expect(composeAiBusyKind("Traduction · Français")).toBe("translate");
     expect(composeAiBusyKind("Synthèse")).toBe("other");
     expect(composeAiBusyKind(null)).toBeNull();
   });

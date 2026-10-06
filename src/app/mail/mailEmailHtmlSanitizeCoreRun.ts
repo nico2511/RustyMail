@@ -10,6 +10,7 @@ import { stripOutlookDisplayNoiseFromDoc } from "./mailEmailHtmlOutlookStripRun"
 import {
   dropActiveContentFromHtml,
   normalizeEmailLinksInDoc,
+  restoreImgSizeAttrsFromStyle,
   sanitizeEmailImagesInDoc,
   stripUnsafeInlineStylesInEmailDoc,
 } from "./mailEmailHtmlSanitizeDomRun";
@@ -49,6 +50,7 @@ export function sanitizeEmailHtml(
       FORBID_TAGS: FORBIDDEN_ACTIVE_TAGS,
       // DOMPurify bloque déjà tous les attributs on*. La liste reste explicite pour les relecteurs.
       FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur"],
+      ADD_ATTR: ["width", "height", "bgcolor", "border", "cellpadding", "cellspacing", "valign"],
       ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|cid|tel):|data:image\/(?:png|jpe?g|gif|webp|bmp);base64,)/i,
     });
     const doc = new DOMParser().parseFromString(String(clean), "text/html");
@@ -56,6 +58,7 @@ export function sanitizeEmailHtml(
     stripUnsafeInlineStylesInEmailDoc(doc);
     normalizeEmailLinksInDoc(doc);
     sanitizeEmailImagesInDoc(doc, allowRemoteImages);
+    restoreImgSizeAttrsFromStyle(doc);
     const unsubscribeLinks = collectUnsubscribeLinksFromDoc(doc);
     if (relocateUnsubscribe && unsubscribeLinks.length) hideRelocatedUnsubscribeInDoc(doc);
     const hasConversationReport = Boolean(doc.querySelector("article.rm-conversation-report"));

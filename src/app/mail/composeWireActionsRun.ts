@@ -6,4 +6,5 @@ export { restoreDraftRevisionFromWire } from "./composeWireRevisionRestoreRun";
 export {
   applyComposeGrammarSuggestionAtIndex,
   applyComposeGrammarSuggestionAllAtIndex,
+  applyComposeGrammarSuggestionsEverything,
 } from "./composeWireGrammarRun";

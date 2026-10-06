@@ -275,8 +275,29 @@ fn attr_allowed(tag: &str, name: &str) -> bool {
     matches!(
         (tag, name),
         ("a", "href" | "title")
-            | ("img", "src" | "alt" | "title" | "width" | "height")
-            | ("td" | "th", "colspan" | "rowspan")
+            | ("img", "src" | "alt" | "title" | "width" | "height" | "style")
+            | (
+                "table",
+                "border"
+                    | "cellpadding"
+                    | "cellspacing"
+                    | "width"
+                    | "class"
+                    | "style"
+                    | "align"
+            )
+            | (
+                "td" | "th",
+                "colspan"
+                    | "rowspan"
+                    | "width"
+                    | "height"
+                    | "bgcolor"
+                    | "align"
+                    | "valign"
+                    | "style"
+                    | "border"
+            )
             | ("ol", "start")
     )
 }
@@ -357,6 +378,28 @@ fn rewrite_tags(input: &str) -> String {
     out
 }
 
+/// Styles présentationnels sûrs (tableaux / images). Refuse url(), expression, position, etc.
+fn safe_presentation_style(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    if lower.contains("url(")
+        || lower.contains("expression")
+        || lower.contains("behavior")
+        || lower.contains("javascript:")
+        || lower.contains("@import")
+        || lower.contains("position:")
+        || lower.contains("z-index")
+    {
+        return false;
+    }
+    true
+}
+
+fn class_allowed_for_compose(value: &str) -> bool {
+    value
+        .split_whitespace()
+        .all(|c| c.starts_with("rm-mail-") || c == "rm-mail-data")
+}
+
 fn push_start(out: &mut String, name: &str, attrs: &[(String, String)], self_closing: bool) {
     out.push('<');
     out.push_str(name);
@@ -365,6 +408,12 @@ fn push_start(out: &mut String, name: &str, attrs: &[(String, String)], self_clo
             continue;
         }
         if (key == "href" || key == "src") && !safe_url(value, name == "img" && key == "src") {
+            continue;
+        }
+        if key == "style" && !safe_presentation_style(value) {
+            continue;
+        }
+        if key == "class" && !class_allowed_for_compose(value) {
             continue;
         }
         out.push(' ');
@@ -535,6 +584,19 @@ mod tests {
         ));
         assert!(plain.contains("[image]"));
         assert!(!plain.contains("cid:"));
+    }
+
+    #[test]
+    fn keeps_image_width_and_table_borders() {
+        let html = r#"<p><img src="cid:img1-abcd" width="200" style="width: 200px; height: auto;" alt="a" /></p><table class="rm-mail-data" border="1" cellpadding="6" cellspacing="0"><tr><th bgcolor="#f2f0ec" style="border:1px solid #787775;padding:6px 8px;">A</th><td style="border:1px solid #787775;">B</td></tr></table>"#;
+        let safe = sanitize_compose_html(html);
+        assert!(safe.contains(r#"width="200""#));
+        assert!(safe.contains("width: 200px"));
+        assert!(safe.contains(r#"class="rm-mail-data""#));
+        assert!(safe.contains(r#"border="1""#));
+        assert!(safe.contains(r#"bgcolor="#f2f0ec""#));
+        assert!(safe.contains("border:1px solid #787775"));
+        assert!(!safe.to_ascii_lowercase().contains("javascript"));
     }
 
     #[test]

@@ -50,6 +50,14 @@ describe("llmMetaGuard", () => {
       false,
     );
     expect(translationIsInstructionEcho("I cannot.", "Je ne peux pas.")).toBe(false);
+    const ship =
+      "Votre acheteur attend. Suivez les instructions du message pour expédier la commande aujourd’hui.";
+    expect(
+      translationVisibleText(
+        "Your buyer is waiting. Follow the instructions in this message to ship your order today.",
+        ship,
+      ),
+    ).toBe(ship);
   });
 
   it("refuse une consigne de traduction et retire le cadre autour du message", () => {

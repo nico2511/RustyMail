@@ -209,7 +209,10 @@ export function renderComposer() {
       `<aside class="compose-correction-panel surface-sm" role="complementary" aria-label="Correction de texte">
         <div class="compose-correction-panel__head">
           <strong>Correction de texte</strong>
-          <button type="button" class="ghost-button compose-correction-dismiss" data-action="compose-grammar-dismiss">Fermer</button>
+          <div class="compose-correction-panel__actions">
+            <button type="button" class="ghost-button compose-correction-apply-all" data-action="compose-grammar-apply-everything" title="Appliquer toutes les suggestions dans le texte">Tout corriger</button>
+            <button type="button" class="ghost-button compose-correction-dismiss" data-action="compose-grammar-dismiss">Fermer</button>
+          </div>
         </div>
         <ul class="compose-correction-list" role="list">
           ${correctionSuggestions
@@ -320,6 +323,10 @@ export function renderComposer() {
           rewriteEnabled: isAiFeatureEnabled(state.appPrefs.ai, "featureComposeRewriteEnabled"),
           grammarEnabled: isAiFeatureEnabled(state.appPrefs.ai, "featureComposeGrammarEnabled"),
           quickRepliesEnabled: isAiFeatureEnabled(state.appPrefs.ai, "featureQuickReplyComposeEnabled"),
+          translateEnabled:
+            isAiFeatureEnabled(state.appPrefs.ai, "featureMessageTranslateEnabled") ||
+            isAiFeatureEnabled(state.appPrefs.ai, "featureThreadTranslateEnabled"),
+          translateLang: state.appPrefs.general.motherLanguage?.trim() || "fr",
         })}
         ${correctionPanelHtml}
         <div class="composer-body composer-body--${isHistorique ? "historique" : layout}">

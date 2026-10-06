@@ -10,6 +10,12 @@ export type NewsletterRuleLike = {
   localPart?: string | null;
 };
 
+export type ListDateSort = "asc" | "desc";
+
+export function parseListDateSort(raw: string | null | undefined): ListDateSort {
+  return (raw ?? "").trim().toLowerCase() === "asc" ? "asc" : "desc";
+}
+
 export function buildSavedSearchUiState(s: {
   listFilter: ListFilter;
   searchScope: "account" | "mailbox";
@@ -17,6 +23,7 @@ export function buildSavedSearchUiState(s: {
   searchDraft: string;
   searchNewsletterRule: NewsletterRuleLike | null;
   searchModifiersTouched: boolean;
+  listDateSort?: ListDateSort;
 }): SavedSearchUiState {
   const rule = s.searchNewsletterRule;
   return {
@@ -27,6 +34,7 @@ export function buildSavedSearchUiState(s: {
     newsletterDomain: rule?.domain ?? null,
     newsletterLocalPart: rule?.localPart ?? null,
     searchModifiersTouched: s.searchModifiersTouched,
+    listDateSort: parseListDateSort(s.listDateSort),
   };
 }
 
@@ -56,6 +64,7 @@ export function applySavedSearchToState(
     searchDraft: string;
     searchModifiersTouched: boolean;
     searchNewsletterRule: NewsletterRuleLike | null;
+    listDateSort: ListDateSort;
   },
   opts: {
     findNewsletterRule: (domain: string, localPart: string | null) => NewsletterRuleLike | null;
@@ -65,6 +74,7 @@ export function applySavedSearchToState(
   resetSearchStructuralState(state);
   const q = saved.query;
   const ui = saved.uiState ?? {};
+  state.listDateSort = parseListDateSort(ui.listDateSort);
 
   state.search = (q.text ?? "").trim();
   state.searchDraft = (ui.searchDraft ?? state.search).trim();

@@ -12,12 +12,14 @@ import { state } from "../state";
 import type { Draft } from "../types";
 import { renderComposeToolbar, type ComposeToolbarProps } from "../ui/render/composeToolbarRender";
 import {
+  captureComposeSelectionSnapshot,
   destroyComposeBodyEditor,
   getComposeBodyEditor,
   mapComposePlainSpanToDoc,
   mountComposeBodyEditor,
   readComposeEditorHtml,
   readComposePlainText,
+  replaceComposeSelectionWithText,
 } from "./composeBodyEditor";
 import { isComposeHtmlSource } from "./composeHtmlBody";
 import { registerComposeDraftPreviewDeps } from "./composeDraftPreview";
@@ -34,6 +36,8 @@ const toolbarProps: ComposeToolbarProps = {
   rewriteEnabled: true,
   grammarEnabled: true,
   quickRepliesEnabled: true,
+  translateEnabled: true,
+  translateLang: "fr",
 };
 
 function emptyDraft(markdownBody: string): Draft {
@@ -130,6 +134,8 @@ describe("éditeur TipTap du compositeur", () => {
     expect(document.querySelector('[data-compose-cmd="ai:grammar"]')).toBeTruthy();
     expect(document.querySelector('[data-compose-cmd="ai:rewrite"]')).toBeTruthy();
     expect(document.querySelector('[data-compose-cmd="ai:shorten"]')).toBeTruthy();
+    expect(document.querySelector('[data-compose-cmd="ai:translate"]')).toBeTruthy();
+    expect(document.querySelector("#compose-translate-lang")).toBeTruthy();
     expect(document.querySelector('[data-compose-cmd="dictate"]')).toBeTruthy();
   });
 
@@ -180,5 +186,19 @@ describe("éditeur TipTap du compositeur", () => {
       end: Number(second.dataset.plainEnd),
     });
     expect(readComposePlainText()).toBe("aa puis bb");
+  });
+
+  it("remplace une sélection capturée même après collapse du curseur", () => {
+    mount("");
+    const editor = getComposeBodyEditor();
+    editor?.commands.setContent("<p>Bonjour le monde</p>", false);
+    const end = editor!.state.doc.content.size;
+    editor?.commands.setTextSelection({ from: 1, to: Math.max(1, end - 1) });
+    const snap = captureComposeSelectionSnapshot();
+    expect(snap?.text).toContain("Bonjour");
+    // Simule le clic menu : la sélection TipTap disparaît.
+    editor?.commands.setTextSelection(1);
+    expect(replaceComposeSelectionWithText("Salut tout le monde", snap)).toBe(true);
+    expect(readComposePlainText()).toContain("Salut tout le monde");
   });
 });

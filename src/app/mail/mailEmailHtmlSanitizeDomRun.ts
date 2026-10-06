@@ -64,15 +64,42 @@ export function normalizeEmailLinksInDoc(doc: Document): void {
   });
 }
 
+function parseCssPxSize(ruleValue: string): string | null {
+  const m = ruleValue.trim().match(/^(\d+(?:\.\d+)?)\s*px$/i);
+  if (!m) return null;
+  const n = Math.round(Number(m[1]));
+  return n >= 1 && n <= 8000 ? String(n) : null;
+}
+
+/** Si DOMPurify a retiré width/height, les reconstituer depuis le style inline. */
+export function restoreImgSizeAttrsFromStyle(doc: Document): void {
+  doc.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
+    const rawStyle = (img.getAttribute("style") || "").trim();
+    if (!rawStyle) return;
+    for (const piece of rawStyle.split(";")) {
+      const [propRaw, ...rest] = piece.split(":");
+      const prop = (propRaw || "").trim().toLowerCase();
+      const val = rest.join(":").trim();
+      if (prop === "width" && !img.getAttribute("width")) {
+        const px = parseCssPxSize(val);
+        if (px) img.setAttribute("width", px);
+      }
+      if (prop === "height" && !img.getAttribute("height") && val.toLowerCase() !== "auto") {
+        const px = parseCssPxSize(val);
+        if (px) img.setAttribute("height", px);
+      }
+    }
+  });
+}
+
 export function sanitizeEmailImagesInDoc(doc: Document, allowRemoteImages: boolean): void {
   doc.querySelectorAll<HTMLSourceElement>("source").forEach((source) => {
     source.removeAttribute("src");
     source.removeAttribute("srcset");
   });
   doc.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
-    img.removeAttribute("width");
-    img.removeAttribute("height");
     img.removeAttribute("srcset");
+    // Conserver width/height (compose TipTap / clients) — ne pas forcer la taille naturelle.
     const src = (img.getAttribute("src") || "").trim();
     if (src && mailUrlLooksRemote(src) && !allowRemoteImages) {
       img.setAttribute("data-remote-src", src);
@@ -86,13 +113,14 @@ export function sanitizeEmailImagesInDoc(doc: Document, allowRemoteImages: boole
     }
     const rawStyle = (img.getAttribute("style") || "").trim();
     if (!rawStyle) return;
+    // Garder width/height/max-width inline si présents ; retirer min-* qui écrasent le layout.
     const pieces = rawStyle
       .split(";")
       .map((s) => s.trim())
       .filter(Boolean)
       .filter((rule) => {
         const prop = rule.split(":")[0]?.trim().toLowerCase() ?? "";
-        return !/^(width|height|max-width|max-height|min-width|min-height)$/.test(prop);
+        return !/^(min-width|min-height)$/.test(prop);
       });
     if (!pieces.length) img.removeAttribute("style");
     else img.setAttribute("style", pieces.join("; "));

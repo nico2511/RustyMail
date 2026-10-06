@@ -5,6 +5,7 @@ import {
 } from "../../../statusBarProgress";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 import { desktopUpdatePhase } from "../../mail/desktopUpdate";
+import { statusBarActiveModelChip } from "../../mail/statusBarModelLabel";
 import { state } from "../../state";
 import { gatherStatusBarProgressJobs } from "../../mail/statusBarProgressJobs";
 import { renderDeps } from "./renderDeps";
@@ -134,6 +135,11 @@ function renderStatusBarUpdateIndicator(): string {
   return "";
 }
 
+function renderStatusBarModelChip(): string {
+  const chip = statusBarActiveModelChip(state.appPrefs.ai);
+  return `<button type="button" class="status-bar-model" data-action="status-bar-model-open" title="${escapeAttr(chip.title)}" aria-haspopup="dialog">${escapeHtml(chip.label)}</button>`;
+}
+
 export function renderGlobalStatusFooter(): string {
   const st = state.status;
   const coreReady = isTauriRuntime() && Boolean(state.capabilities?.mailCore);
@@ -153,6 +159,7 @@ export function renderGlobalStatusFooter(): string {
     : "";
   const progressInline = renderStatusBarProgressInline();
   const updateIndicator = renderStatusBarUpdateIndicator();
+  const modelChip = renderStatusBarModelChip();
   return `
     <footer class="status-bar-wrap">
       ${composeAiQuick}
@@ -160,6 +167,7 @@ export function renderGlobalStatusFooter(): string {
         <span class="${dotClass}" title="${escapeAttr(dotTitle)}"></span>
         <span class="status-bar-app">${escapeHtml(st?.appName ?? "RustyMail")} ${escapeHtml(st?.version ?? "0.1.1")}</span>
         ${updateIndicator}
+        ${modelChip}
         ${progressInline}
         ${chipBlock}
         ${

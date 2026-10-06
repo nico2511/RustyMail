@@ -320,15 +320,68 @@ fn table_looks_like_signature_block(table: ElementRef<'_>) -> bool {
     has_signature_contact_signals(table) || mass < 900
 }
 
+fn table_has_rm_mail_data_class(table: ElementRef<'_>) -> bool {
+    table
+        .value()
+        .attr("class")
+        .map(|c| c.split_whitespace().any(|t| t == "rm-mail-data"))
+        .unwrap_or(false)
+}
+
+/// Image utile (cid / data / http), pas un spacer Outlook.
+fn element_has_content_image(el: ElementRef<'_>) -> bool {
+    let Ok(sel) = Selector::parse("img") else {
+        return false;
+    };
+    for img in el.select(&sel) {
+        let src = img.attr("src").unwrap_or("").trim().to_ascii_lowercase();
+        if src.is_empty() {
+            continue;
+        }
+        if img.attr("data-outlook-trace").is_some() {
+            continue;
+        }
+        let id = img.attr("id").unwrap_or("").to_ascii_lowercase();
+        if id.contains("x0000") {
+            continue;
+        }
+        if src.starts_with("cid:")
+            || src.starts_with("data:image/")
+            || src.starts_with("http://")
+            || src.starts_with("https://")
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn table_looks_like_logo_only_signature(table: ElementRef<'_>) -> bool {
+    let Ok(sel_img) = Selector::parse("img") else {
+        return false;
+    };
+    let Ok(sel_cell) = Selector::parse("td, th") else {
+        return false;
+    };
+    let imgs = table.select(&sel_img).count();
+    let cells = table.select(&sel_cell).count();
+    let text_mass = visible_char_count(&table.text().collect::<String>());
+    imgs > 0 && text_mass < 40 && cells <= 3
+}
+
 fn table_looks_like_signature_tail_block(table: ElementRef<'_>) -> bool {
+    // Tableaux de données TipTap / compose : ne jamais les plier en signature.
+    if table_has_rm_mail_data_class(table) {
+        return false;
+    }
     if !table_looks_like_signature_block(table) {
         return false;
     }
-    has_signature_contact_signals(table)
-        || table
-            .select(&Selector::parse("img").unwrap())
-            .next()
-            .is_some()
+    if has_signature_contact_signals(table) {
+        return true;
+    }
+    // Ancien critère « toute table avec image » pliait aussi un tableau de contenu.
+    table_looks_like_logo_only_signature(table)
 }
 
 fn has_signature_contact_signals(el: ElementRef<'_>) -> bool {
@@ -378,7 +431,8 @@ fn node_looks_like_signature_tail(el: ElementRef<'_>) -> bool {
         "p" | "div" | "span" | "font" | "center" => {
             let mass = element_visible_mass(el);
             if mass == 0 {
-                return true;
+                // Paragraphe image-only (compose TipTap) : contenu, pas signature.
+                return !element_has_content_image(el);
             }
             if element_looks_like_signature_start(el) {
                 return true;
@@ -558,5 +612,23 @@ mod tests {
             r#"<div><p>Cordialement, voici la réponse.</p><p>Suite du fil.</p><p>Fin.</p></div>"#;
         let out = fold_signature_tail(html);
         assert!(!out.contains("rm-mail-signature"));
+    }
+
+    #[test]
+    fn keeps_compose_inline_images_visible() {
+        let html = r#"<div><p>Voici les trois photos du chantier aujourd’hui.</p><p><img src="cid:img1-abcd" width="200" alt="a"/></p><p><img src="cid:img2-efgh" width="400" alt="b"/></p><p><img src="cid:img3-ijkl" width="640" alt="c"/></p></div>"#;
+        let out = fold_signature_tail(html);
+        assert!(!out.contains("rm-mail-signature"), "images compose ne doivent pas être pliées: {out}");
+        assert!(out.contains("cid:img1-abcd"));
+        assert!(out.contains("cid:img3-ijkl"));
+    }
+
+    #[test]
+    fn keeps_rm_mail_data_table_with_image() {
+        let html = r#"<div><p>Récapitulatif des pièces.</p><table class="rm-mail-data" border="1"><tr><th>Photo</th><th>Note</th></tr><tr><td><img src="cid:img1-abcd" alt="p"/></td><td>OK</td></tr></table></div>"#;
+        let out = fold_signature_tail(html);
+        assert!(!out.contains("rm-mail-signature"), "tableau de données: {out}");
+        assert!(out.contains("rm-mail-data"));
+        assert!(out.contains("cid:img1-abcd"));
     }
 }

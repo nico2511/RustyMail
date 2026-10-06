@@ -67,6 +67,8 @@ describe("renderComposer", () => {
     expect(html).toContain("Correction");
     expect(html).toContain('data-compose-cmd="ai:grammar"');
     expect(html).toContain('data-compose-cmd="ai:rewrite"');
+    expect(html).toContain('data-compose-cmd="ai:translate"');
+    expect(html).toContain('id="compose-translate-lang"');
   });
 
   it("n’affiche pas une correction dont le corps ne contient plus l’extrait", () => {

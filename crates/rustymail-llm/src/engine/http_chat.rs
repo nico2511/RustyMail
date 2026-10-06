@@ -913,9 +913,86 @@ pub fn probe_openai_models(base_url: &str) -> Result<(), String> {
     }
 }
 
+/// Racine native Ollama (`http://127.0.0.1:11434`) à partir d’une base OpenAI-compatible (`…/v1`).
+pub fn ollama_native_base_url(openai_compatible_base: &str) -> String {
+    let mut base = openai_compatible_base.trim().trim_end_matches('/').to_string();
+    if base.is_empty() {
+        return base;
+    }
+    if base.to_ascii_lowercase().ends_with("/v1") {
+        base.truncate(base.len().saturating_sub(3));
+        while base.ends_with('/') {
+            base.pop();
+        }
+    }
+    base
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaTagsResponse {
+    #[serde(default)]
+    models: Vec<OllamaTagModel>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaTagModel {
+    #[serde(default)]
+    name: String,
+}
+
+/// Extrait les noms de modèles depuis le JSON `GET /api/tags` d’Ollama.
+pub fn parse_ollama_tags_json(body: &str) -> Result<Vec<String>, String> {
+    let parsed: OllamaTagsResponse = serde_json::from_str(body)
+        .map_err(|e| format!("Ollama : réponse /api/tags illisible ({e})."))?;
+    let mut names: Vec<String> = parsed
+        .models
+        .into_iter()
+        .map(|m| m.name.trim().to_string())
+        .filter(|n| !n.is_empty())
+        .collect();
+    names.sort();
+    names.dedup();
+    Ok(names)
+}
+
+/// Liste les modèles locaux via l’API native Ollama `GET /api/tags`.
+pub fn list_ollama_tags(base_url: &str) -> Result<Vec<String>, String> {
+    let root = ollama_native_base_url(base_url);
+    if root.is_empty() {
+        return Err("Ollama : URL vide.".into());
+    }
+    let url = format!("{root}/api/tags");
+    let loopback = base_url_looks_loopback(&root);
+    let mut builder = reqwest::blocking::Client::builder().timeout(Duration::from_secs(3));
+    if loopback {
+        builder = builder.no_proxy();
+    }
+    let client = builder
+        .build()
+        .map_err(|e| format!("Ollama : client HTTP ({e})."))?;
+    match client.get(&url).send() {
+        Ok(resp) if resp.status().is_success() => {
+            let body = resp
+                .text()
+                .map_err(|e| format!("Ollama : lecture /api/tags ({e})."))?;
+            parse_ollama_tags_json(&body)
+        }
+        Ok(resp) => Err(format!(
+            "Ollama injoignable à {root} (HTTP {}). Vérifiez `ollama serve` et l’URL.",
+            resp.status()
+        )),
+        Err(e) => Err(format!(
+            "Ollama injoignable à {root}. Lancez `ollama serve` ou corrigez l’URL. Détail : {e}"
+        )),
+    }
+}
+
 #[cfg(test)]
 mod grammar_tests {
-    use super::{effective_grammar, grammar_for_kind, probe_openai_models, HttpChatBackendKind};
+    use super::{
+        effective_grammar, grammar_for_kind, ollama_native_base_url, parse_ollama_tags_json,
+        probe_openai_models, HttpChatBackendKind,
+    };
     use crate::LlmGenParams;
 
     #[test]
@@ -1016,5 +1093,28 @@ mod grammar_tests {
         let err = probe_openai_models("http://127.0.0.1:1/v1").expect_err("refused");
         assert!(err.contains("Ollama injoignable"));
         assert!(err.contains("11434") || err.contains("127.0.0.1:1"));
+    }
+
+    #[test]
+    fn ollama_native_base_strips_v1_suffix() {
+        assert_eq!(
+            ollama_native_base_url("http://127.0.0.1:11434/v1"),
+            "http://127.0.0.1:11434"
+        );
+        assert_eq!(
+            ollama_native_base_url("http://127.0.0.1:11434/v1/"),
+            "http://127.0.0.1:11434"
+        );
+        assert_eq!(
+            ollama_native_base_url("http://127.0.0.1:11434"),
+            "http://127.0.0.1:11434"
+        );
+    }
+
+    #[test]
+    fn parse_ollama_tags_extracts_sorted_names() {
+        let body = r#"{"models":[{"name":"qwen2.5:7b"},{"name":"llama3.2"},{"name":"qwen2.5:7b"}]}"#;
+        let names = parse_ollama_tags_json(body).expect("parse");
+        assert_eq!(names, vec!["llama3.2".to_string(), "qwen2.5:7b".to_string()]);
     }
 }

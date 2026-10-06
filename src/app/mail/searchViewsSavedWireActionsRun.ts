@@ -15,11 +15,17 @@ import {
 } from "./searchViewBatch";
 import { openOrganizationV2View } from "./orgFolderWireActions";
 import { clearSearchAndReloadInbox } from "./searchCommitQuery";
+import { persistActiveSavedSearchUiState } from "./savedSearchPersistUiRun";
 
 export async function tryHandleSearchViewsSavedWire(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
     case "save-saved-search":
       void saveCurrentSearchView();
+      return true;
+    case "search-view-toggle-date-sort":
+      state.listDateSort = state.listDateSort === "asc" ? "desc" : "asc";
+      render();
+      void persistActiveSavedSearchUiState();
       return true;
     case "clear-search-exit":
       void clearSearchAndReloadInbox();

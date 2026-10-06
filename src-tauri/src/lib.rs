@@ -1415,6 +1415,19 @@ fn list_cached_gguf_models(paths: State<'_, AppPaths>) -> Result<Vec<String>, St
     list_cached_gguf_filenames(&paths.llm_models_dir)
 }
 
+/// Modèles locaux Ollama (`GET /api/tags`) pour le sélecteur rapide de la barre de statut.
+#[tauri::command]
+fn list_ollama_models(paths: State<'_, AppPaths>) -> Result<Vec<String>, String> {
+    let prefs = load_app_prefs(&paths.prefs_path);
+    let base = prefs.ai.ollama_base_url.trim();
+    if base.is_empty() {
+        return Err(
+            "Ollama : renseignez l’URL (souvent http://127.0.0.1:11434/v1).".into(),
+        );
+    }
+    rustymail_llm::list_ollama_tags(base)
+}
+
 #[tauri::command]
 fn cancel_prefetch_llm_model(app: tauri::AppHandle) -> Result<(), String> {
     llm_gguf_download_cancel_request();
@@ -2310,6 +2323,7 @@ pub fn run() {
             llm_status,
             llm_status_refresh_hardware,
             list_cached_gguf_models,
+            list_ollama_models,
             prefetch_llm_model,
             cancel_prefetch_llm_model,
             oauth_google_configured,
@@ -2319,6 +2333,7 @@ pub fn run() {
             llm_commands::llm_translate_message,
             llm_commands::llm_translate_thread,
             llm_commands::llm_rewrite_compose,
+            llm_commands::llm_translate_compose,
             llm_commands::llm_grammar_compose,
             llm_commands::llm_quick_reply_thread,
             llm_commands::llm_quick_reply_compose,

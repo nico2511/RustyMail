@@ -43,6 +43,7 @@ export async function acceptSuggestedSavedView(senderEmail: string): Promise<voi
     searchDraft: `@${item.senderEmail}`,
     searchNewsletterRule: null,
     searchModifiersTouched: true,
+    listDateSort: "desc",
   });
   try {
     const saved = await upsertSavedSearchCmd(

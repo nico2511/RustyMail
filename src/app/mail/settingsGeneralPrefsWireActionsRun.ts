@@ -10,8 +10,9 @@ import {
   installDesktopUpdate,
   relaunchDesktopApp,
 } from "./desktopUpdate";
+import { openStatusBarModelSwitch } from "./statusBarModelSwitch";
 
-export async function tryHandleSettingsGeneralPrefsWire(action: string, _element?: HTMLElement): Promise<boolean> {
+export async function tryHandleSettingsGeneralPrefsWire(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
     case "save-default-account-prompt": {
       void (async () => {
@@ -57,6 +58,9 @@ export async function tryHandleSettingsGeneralPrefsWire(action: string, _element
       return true;
     case "desktop-update-relaunch":
       void relaunchDesktopApp().catch((error) => toast.error(tauriErrorMessage(error)));
+      return true;
+    case "status-bar-model-open":
+      void openStatusBarModelSwitch(element);
       return true;
     default:
       return false;

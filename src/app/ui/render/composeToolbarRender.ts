@@ -3,11 +3,15 @@ import { composeAiBusyKind } from "../../core/composeAiJobs";
 import { toneLabelsFr, tones } from "../../core/composeTone";
 import { iconSvg } from "../../lib/iconSvg";
 import type { Tone } from "../../types";
+import {
+  COMPOSE_TRANSLATE_LANGS,
+  normalizeComposeTranslateLang,
+} from "../../mail/composeTranslateLangs";
 
 /**
  * Commandes stables du compositeur.
  * TipTap les exécute sans redessiner cette barre :
- * `md:*`, `ai:grammar`, `ai:rewrite`, `ai:shorten`, `ai:replies`, `dictate`.
+ * `md:*`, `ai:grammar`, `ai:rewrite`, `ai:shorten`, `ai:translate`, `ai:replies`, `dictate`.
  */
 export type ComposeMdCommand = {
   id: string;
@@ -34,7 +38,12 @@ export const COMPOSE_MD_GROUPS: readonly (readonly ComposeMdCommand[])[] = [
     { id: "ol", label: "Numéros", title: "Liste numérotée", className: "" },
     { id: "link", label: "Lien", title: "Lien (Ctrl+K)", className: "" },
     { id: "image", label: "Image", title: "Image", className: "" },
-    { id: "table", label: "Tableau", title: "Tableau", className: "" },
+    { id: "table", label: "Tableau", title: "Insérer un tableau (choisir lignes × colonnes)", className: "" },
+    { id: "table-add-row", label: "+L", title: "Ajouter une ligne (curseur dans le tableau)", className: "compose-tool--table-edit" },
+    { id: "table-add-col", label: "+C", title: "Ajouter une colonne (curseur dans le tableau)", className: "compose-tool--table-edit" },
+    { id: "table-del-row", label: "−L", title: "Supprimer la ligne courante", className: "compose-tool--table-edit" },
+    { id: "table-del-col", label: "−C", title: "Supprimer la colonne courante", className: "compose-tool--table-edit" },
+    { id: "table-del", label: "✕T", title: "Supprimer le tableau", className: "compose-tool--table-edit" },
   ],
   [
     { id: "code", label: "Code", title: "Code", className: "compose-tool--code" },
@@ -55,6 +64,9 @@ export type ComposeToolbarProps = {
   rewriteEnabled: boolean;
   grammarEnabled: boolean;
   quickRepliesEnabled: boolean;
+  translateEnabled: boolean;
+  /** Langue préselectionnée (langue mère des prefs). */
+  translateLang: string;
 };
 
 function aiButton(opts: {
@@ -163,10 +175,33 @@ export function renderComposeToolbar(props: ComposeToolbarProps): string {
       </div>`
     : "";
 
+  const mother = normalizeComposeTranslateLang(props.translateLang);
+  const langOptions = COMPOSE_TRANSLATE_LANGS.map(
+    (l) =>
+      `<option value="${escapeAttr(l.code)}"${l.code === mother ? " selected" : ""}>${escapeHtml(l.label)}</option>`,
+  ).join("");
+  const translate = props.translateEnabled
+    ? `<div class="compose-toolbar__cluster compose-toolbar__cluster--translate">
+        <span class="compose-toolbar__label" id="compose-translate-label">Traduire</span>
+        <select id="compose-translate-lang" class="compose-toolbar__lang" aria-labelledby="compose-translate-label" title="Langue cible (défaut : langue mère)">
+          ${langOptions}
+        </select>
+        ${aiButton({
+          action: "compose-ai-translate",
+          label: "Traduire",
+          title: "Traduit tout le message vers la langue choisie. Pour une zone : sélection + clic droit.",
+          extra: ` data-compose-cmd="ai:translate"`,
+          spinning: busy === "translate",
+          blocked,
+        })}
+      </div>`
+    : "";
+
   const recording = props.micState === "recording";
   const aiRow = `<div class="compose-toolbar__row compose-toolbar__row--ai">
       ${correct}
       ${transform}
+      ${translate}
       <div class="compose-toolbar__trailing">
         ${replies}
         <button type="button" class="mic-button compose-toolbar__dictate ${escapeAttr(props.micState)}" data-action="mic" data-compose-cmd="dictate" title="${escapeAttr(props.micTitle)}" aria-label="${escapeAttr(props.micAria)}" aria-pressed="${recording ? "true" : "false"}">

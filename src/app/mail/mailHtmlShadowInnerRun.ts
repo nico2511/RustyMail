@@ -64,15 +64,17 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail .mail-unsubscribe-section--relocated{display:none !important}
         .mail img{
           box-sizing:border-box;
-          max-width:100% !important;
-          width:auto !important;
-          height:auto !important;
-          max-height:min(50vh,520px) !important;
+          max-width:100%;
+          height:auto;
+          max-height:min(50vh,520px);
           object-fit:contain;
           display:block;
           border-radius:12px;
           border:1px solid rgba(232,228,223,.10);
           cursor:zoom-in
+        }
+        .mail img:not([width]){
+          width:auto;
         }
         .mail img.mail-remote-image-blocked,.mail img.mail-image-blocked,.mail img.mail-cid-missing{
           min-height:42px;
@@ -109,7 +111,9 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-conversation-report .rm-conversation-body{margin:0;line-height:1.55}
         .mail article.rm-conversation-report .rm-conversation-body :is(p, div){margin:0 0 10px}
         .mail article.rm-conversation-report .rm-conversation-body br{display:block;content:"";margin-bottom:0.45em}
-        .mail table{max-width:100%;width:100%;border-collapse:collapse}
+        .mail table{max-width:100%;width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 12px}
+        .mail table th,.mail table td{padding:6px 8px;border:1px solid rgba(120,119,117,.35);vertical-align:top;text-align:left;line-height:1.4}
+        .mail table th{font-weight:650;background:rgba(255,255,255,.04)}
         .mail table.rm-mail-data{font-size:12.5px;margin:8px 0 12px}
         .mail table.rm-mail-data th,.mail table.rm-mail-data td{padding:6px 8px;border:1px solid rgba(120,119,117,.35);vertical-align:top;text-align:left;line-height:1.4}
         .mail table.rm-mail-data th{font-weight:650;background:rgba(255,255,255,.04)}

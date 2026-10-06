@@ -63,4 +63,13 @@ describe("sanitizeEmailHtml", () => {
     const { html } = sanitizeEmailHtml(`<img src="data:image/png;base64,iVBORw0KGgo=" alt="ok"/>`);
     expect(html).toContain("data:image/png;base64,iVBORw0KGgo=");
   });
+
+  it("conserve la largeur d’image (attr ou style) pour le rendu", () => {
+    const { html } = sanitizeEmailHtml(
+      `<img src="cid:img1-abcd" width="200" style="width: 200px; height: auto; max-width: 100%;" alt="a"/>`,
+    );
+    expect(html).toContain('width="200"');
+    expect(html).toContain("width: 200px");
+    expect(html).toContain("cid:img1-abcd");
+  });
 });
