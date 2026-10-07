@@ -1,4 +1,6 @@
 import { handleDigestCutAction, handleDigestCutMailClick, importDigestCutEmlBase64 } from "./digestCutActions";
+import { digestCut } from "./digestCutState";
+import { render } from "../dispatch";
 import { snapToCuttableBlock } from "./digestCutValidate";
 
 function fileToBase64(file: File): Promise<string> {
@@ -38,6 +40,16 @@ export function wireEventsDomDigestCut(signal: AbortSignal): void {
         .catch(() => {
           void importDigestCutEmlBase64("");
         });
+    },
+    { signal },
+  );
+
+  document.addEventListener(
+    "keydown",
+    (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !digestCut.zoneStudioOpen) return;
+      digestCut.zoneStudioOpen = false;
+      render();
     },
     { signal },
   );

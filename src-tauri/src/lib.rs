@@ -1321,19 +1321,23 @@ async fn prefetch_semantic_minilm_model(paths: State<'_, AppPaths>) -> Result<St
     ))
 }
 
-/// Télécharge (ou valide le cache) le fichier GGML pour la langue + taille + profil courants.
+/// Télécharge (ou valide le cache) le fichier GGML pour la langue + taille + profil courants,
+/// puis précharge le moteur en RAM pour accélérer la prochaine dictée.
 #[tauri::command]
 async fn prefetch_whisper_dictation_model(paths: State<'_, AppPaths>) -> Result<String, String> {
     let prefs = load_app_prefs(&paths.prefs_path);
     let ai = prefs.ai.clone();
     let path = tauri::async_runtime::spawn_blocking(move || {
-        whisper_dictation::ensure_ggml_weights(
+        let path = whisper_dictation::ensure_ggml_weights(
             &ai.whisper_hf_repo_id,
             &ai.whisper_hf_revision,
             &ai.whisper_model_size,
             &ai.whisper_transcription_profile,
             &ai.whisper_cpp_language,
-        )
+        )?;
+        // Best-effort : les poids seuls restent utiles si le warm échoue.
+        let _ = whisper_dictation::warm_whisper_engine(&ai);
+        Ok::<_, String>(path)
     })
     .await
     .map_err(|e| format!("tâche préchargement Whisper: {e}"))??;

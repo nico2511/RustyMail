@@ -44,7 +44,7 @@ fn outlook_fixture_keeps_body_strips_mso_and_quote_noise() {
     let out = clean_html_for_markdown(&reg, &ctx, html);
 
     assert_eq!(out.resolved_provider, ProviderId::Generic);
-    assert_eq!(out.generic_rule_set_version, "12");
+    assert_eq!(out.generic_rule_set_version, "13");
     let low = out.html.to_ascii_lowercase();
     assert!(low.contains("message principal outlook"));
     assert!(!low.contains("[if mso]"));
@@ -103,24 +103,32 @@ fn outlook_forward_chain_builds_conversation_report() {
     let reg = ProviderRegistry::builtin();
     let out = clean_html_for_markdown(&reg, &ctx, html);
 
-    assert_eq!(out.generic_rule_set_version, "12");
+    assert_eq!(out.generic_rule_set_version, "13");
     assert!(out.html.contains("rm-conversation-report"));
     assert!(out.html.contains("rm-conversation-turn--cited"));
     assert!(
-        !out.html.contains("rm-mail-folded-quote"),
-        "le rapport intervenants reste lisible, hors du pli de citation"
+        out.html.contains("rm-mail-folded-quote"),
+        "l’historique cité est replié ; la dernière réponse reste devant"
     );
+    assert!(out.html.contains("rm-conversation-history"));
     assert!(out.html.contains("Message transféré"));
     assert!(out.html.contains("brief logistique"));
     let reply_at = out.html.find("Message transféré").unwrap();
+    let fold_at = out.html.find("rm-mail-folded-quote").unwrap();
     let cited_at = out.html.find("brief logistique").unwrap();
-    assert!(reply_at < cited_at);
+    assert!(reply_at < fold_at);
+    assert!(fold_at < cited_at);
     assert!(out.html.contains("Alice"));
     assert!(!out.html.contains("Signature"));
     assert!(!out.html.contains("divRplyFwdMsg"));
     let conv = out.conversation_text.expect("conversation text");
     assert!(conv.contains("=== [1]"));
-    assert!(conv.contains("--- cité ---"));
+    assert!(conv.contains("Message transféré"));
+    assert!(
+        !conv.contains("--- cité ---"),
+        "historique replié exclu du texte de lecture"
+    );
+    assert!(!conv.contains("brief logistique"));
 }
 
 #[test]
@@ -136,6 +144,7 @@ fn outlook_reply_wrote_chain_builds_multi_turn_report() {
 
     assert!(out.html.contains("rm-conversation-report"));
     assert!(out.html.contains("Pouvez-vous me rappeler"));
+    assert!(out.html.contains("rm-mail-folded-quote"));
     assert!(!out.html.contains("divRplyFwdMsg"));
     assert!(!out.html.contains("x_divRplyFwdMsg"));
     assert!(out.html.contains("Alice Exemple") || out.html.contains("alice@example.com"));
@@ -143,6 +152,38 @@ fn outlook_reply_wrote_chain_builds_multi_turn_report() {
     assert!(
         turns >= 2,
         "attendu ≥2 tours, obtenu {turns} — historique découpé"
+    );
+    let reply_at = out.html.find("Pouvez-vous me rappeler").unwrap();
+    let fold_at = out.html.find("rm-mail-folded-quote").unwrap();
+    assert!(reply_at < fold_at);
+}
+
+#[test]
+fn outlook_real_rdv_chain_folds_history_behind_latest_reply() {
+    let html = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/generic/outlook_real_rdv_chain.html"
+    ));
+    let msg = generic_message(html.to_string());
+    let ctx = CleaningInput::from_message(&msg);
+    let reg = ProviderRegistry::builtin();
+    let out = clean_html_for_markdown(&reg, &ctx, html);
+
+    assert!(out.html.contains("rm-conversation-report"));
+    assert!(out.html.contains("Pouvez-vous me rappeler"));
+    assert!(out.html.contains("rm-mail-folded-quote"));
+    assert!(out.html.contains("rm-conversation-history"));
+    assert!(out.html.contains("data-depth=\"1\""));
+    assert!(!out.html.contains("x_gmail_quote"));
+    assert!(!out.html.contains("divRplyFwdMsg"));
+    let reply_at = out.html.find("Pouvez-vous me rappeler").unwrap();
+    let fold_at = out.html.find("rm-mail-folded-quote").unwrap();
+    assert!(reply_at < fold_at);
+    // Historique encore présent une fois le pli ouvert.
+    assert!(
+        out.html.contains("bilan")
+            || out.html.contains("courrier d'adressage")
+            || out.html.contains("bonne adresse")
     );
 }
 
@@ -219,24 +260,24 @@ fn cleaned_text_follows_visible_reply_not_plain_noise_or_folded_quote() {
 #[test]
 fn plain_outlook_history_stays_behind_a_fold_not_a_digest() {
     let html = r#"<div>
-<p>Bonjour Mr LECHOPIER,</p>
+<p>Bonjour Mr EXEMPLE,</p>
 <p>Pouvez-vous me rappeler svp</p>
 <p>Merci</p>
 <p>Cordialement</p>
-<p>De : Nicolas Lechopier</p>
+<p>De : Alice Exemple</p>
 <p>Envoyé : mercredi 16 septembre 2026 11:44</p>
-<p>À : secretariat@drcourty.fr</p>
+<p>À : secretariat@example.fr</p>
 <p>Objet : RE: Demande de rendez-vous</p>
 <p>Bonjour,</p>
 <p>Merci pour votre retour.</p>
-<p>Le 14 septembre 2026 13:21:22 GMT+02:00, Nicolas Lechopier a écrit :</p>
+<p>Le 14 septembre 2026 13:21:22 GMT+02:00, Alice Exemple a écrit :</p>
 <p>Voici le document demandé.</p>
 </div>"#;
     let mut msg = generic_message(html.to_string());
     msg.plain_body = "\
-Bonjour Mr LECHOPIER,\n\nPouvez-vous me rappeler svp\n\nMerci\nCordialement\n\n\
-De : Nicolas Lechopier\nEnvoyé : mercredi 16 septembre 2026 11:44\n\
-À : secretariat@drcourty.fr\nObjet : RE: Demande de rendez-vous\n\n\
+Bonjour Mr EXEMPLE,\n\nPouvez-vous me rappeler svp\n\nMerci\nCordialement\n\n\
+De : Alice Exemple\nEnvoyé : mercredi 16 septembre 2026 11:44\n\
+À : secretariat@example.fr\nObjet : RE: Demande de rendez-vous\n\n\
 Voici le document demandé.\n"
         .into();
     let view = clean_message(&msg);
@@ -261,7 +302,7 @@ Voici le document demandé.\n"
 }
 
 #[test]
-fn cleaned_text_keeps_outlook_conversation_report() {
+fn cleaned_text_keeps_outlook_visible_reply_not_folded_history() {
     let html = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/fixtures/generic/outlook_forward_chain.html"
@@ -269,10 +310,14 @@ fn cleaned_text_keeps_outlook_conversation_report() {
     let mut msg = generic_message(html.to_string());
     msg.plain_body = "BRUIT_PLAIN hors du rapport".into();
     let view = clean_message(&msg);
-    assert!(view.cleaned_text.contains("=== [1]"));
+    assert!(view.cleaned_text.contains("Message transféré"));
     assert!(
-        view.cleaned_text.contains("brief logistique")
-            || view.cleaned_text.contains("Message transféré")
+        !view.cleaned_text.contains("brief logistique"),
+        "historique Outlook replié hors de cleanedText (fil / IA / aperçu)"
     );
     assert!(!view.cleaned_text.contains("BRUIT_PLAIN"));
+    assert!(!view.cleaned_text.contains("--- cité ---"));
+    let html_out = view.cleaned_html_body.expect("html");
+    assert!(html_out.contains("rm-mail-folded-quote"));
+    assert!(html_out.contains("brief logistique"));
 }

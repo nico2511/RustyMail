@@ -20,6 +20,8 @@ import {
   readComposeEditorHtml,
   readComposePlainText,
   replaceComposeSelectionWithText,
+  replaceLastComposePlainSegment,
+  appendComposePlainText,
 } from "./composeBodyEditor";
 import { isComposeHtmlSource } from "./composeHtmlBody";
 import { registerComposeDraftPreviewDeps } from "./composeDraftPreview";
@@ -200,5 +202,13 @@ describe("éditeur TipTap du compositeur", () => {
     editor?.commands.setTextSelection(1);
     expect(replaceComposeSelectionWithText("Salut tout le monde", snap)).toBe(true);
     expect(readComposePlainText()).toContain("Salut tout le monde");
+  });
+
+  it("remplace le dernier segment texte appendu (dictée → réécriture)", () => {
+    mount("");
+    appendComposePlainText("phrase brute");
+    expect(replaceLastComposePlainSegment("phrase brute", "Phrase soignée.")).toBe(true);
+    expect(readComposePlainText()).toContain("Phrase soignée.");
+    expect(readComposePlainText()).not.toContain("phrase brute");
   });
 });

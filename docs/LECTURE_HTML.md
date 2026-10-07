@@ -10,20 +10,20 @@ Les images distantes restent bloquées tant que la personne ne demande pas à le
 
 | Chemin | Rôle |
 | --- | --- |
-| **Générique** (règles v11) | Lecture personne-à-personne. Le corps reste le message. Les citations Gmail et les `blockquote type="cite"` deviennent un `<details class="rm-mail-folded-quote">` fermé : la réponse est devant, l’historique se rouvre. Une citation qui est tout le message reste visible. La signature Gmail rejoint `rm-mail-signature` (masquée, comme les autres queues de signature). |
+| **Générique** (règles v13) | Lecture personne-à-personne. Le corps reste le message. Les citations Gmail (`gmail_quote`, y compris `x_gmail_quote` Outlook) et les `blockquote type="cite"` deviennent un `<details class="rm-mail-folded-quote">` fermé : la réponse est devant, l’historique se rouvre. Une citation qui est tout le message reste visible. La signature Gmail rejoint `rm-mail-signature` (masquée, comme les autres queues de signature). |
 | **Fixture Deblock** | Digest transactionnel. Domaine `deblock.com` et ancres `div.f-fallback` (header / body affichés, footer masqué). Sinon repli générique. Pas d’appel de modèle à l’ouverture. |
 | **Plugins Amazon, GitHub** | Digests ad hoc. Ils ne sont pas étendus au courrier générique, ni réécrits en fixture dans cette phase. |
 
-`cleanedText` (synthèses, traduction, questions sur le fil) suit le corps affiché : le rapport de conversation Outlook quand il existe, sinon le texte du HTML nettoyé **sans** la citation repliée ni la signature masquée. Sans HTML, on garde le texte plain après signature et citations `>`.
+`cleanedText` (aperçu fil, synthèses, traduction, questions) suit le corps **visible** : dernière réponse seulement. Les citations Gmail et l’historique Outlook repliés (`.rm-mail-folded-quote`) restent hors du texte, comme les signatures masquées. Sans HTML, on garde le texte plain après signature et citations `>`.
 
 Les mentions légales du plain (`dimmedBlocks`) ne sont plus seulement coupées : dans la vue texte, elles sont dans un bloc « Mentions masquées ».
 
 ## Ce qui tient
 
-- Générique : scripts, styles, MSO/VML, pixels de tracking, signatures repliées, rapports de transfert / réponse Outlook (tours visibles, pas un digest). Les attributions « Le … a écrit : » (Gmail/Apple) deviennent des frontières de tours quand le rapport s’active.
+- Générique : scripts, styles, MSO/VML, pixels de tracking, signatures repliées, rapports de transfert / réponse Outlook (dernière réponse devant, historique en `<details>` indenté — pas un digest). Les attributions « Le … a écrit : » (Gmail/Apple) deviennent des frontières de tours quand le rapport s’active.
 - Affichage : bordures de cellules **uniquement** sur `table.rm-mail-data` (tableaux du compositeur). Les tables de layout (marketing, enveloppes `rm-conversation-envelope`) restent sans grille.
 - Amazon, Deblock, GitHub : digests inchangés sur leurs fixtures.
-- Affichage : filet CSS sur `.gmail_quote` restant, sauf à l’intérieur d’une citation repliée. `.rm-mail-signature` reste masquée.
+- Affichage : filet CSS sur `.gmail_quote` / `.x_gmail_quote` restants, sauf à l’intérieur d’une citation repliée. `.rm-mail-signature` reste masquée.
 
 ## Frontière volontaire
 

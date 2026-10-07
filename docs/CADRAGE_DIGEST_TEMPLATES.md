@@ -349,7 +349,7 @@ Côté écran (`src/app/mail/`) :
 
 ### Ce qui n’est pas un digest
 
-`mail_cleaning/generic/` : MSO/VML, citations Gmail, prune, images, lisibilité. Fixtures `tests/fixtures/generic/` (`gmail_thread`, `outlook_mso`, `outlook_forward_chain`, `otp_short`). Rapport de conversation Outlook (`rm-conversation-report`) : autre forme structurée, hors plugins expéditeur.
+`mail_cleaning/generic/` : MSO/VML, citations Gmail (`gmail_quote` / `x_gmail_quote`), prune, images, lisibilité. Fixtures `tests/fixtures/generic/` (`gmail_thread`, `outlook_mso`, `outlook_forward_chain`, `outlook_real_rdv_chain`, `otp_short`). Rapport de conversation Outlook (`rm-conversation-report`) : dernière réponse visible, historique en `<details>` indenté, hors plugins expéditeur.
 
 `ai_assist_skills` / `ai_inbox_digest` : skills d’assistance sur un fil déjà nettoyé. Aucun lien avec la fabrication de fixtures.
 

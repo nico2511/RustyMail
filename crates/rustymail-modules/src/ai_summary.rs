@@ -907,17 +907,17 @@ mod tests {
     use rustymail_domain::{CleanedMessageView, MailSecuritySignals, ThreadId};
     use rustymail_llm::LlmEngine;
 
-    const COURTY_TITLE: &str = "Rendez-vous avec le Dr. Courty!";
-    const COURTY_BULLETS: [&str; 4] = [
-        "Le rendez-vous est possible sans courrier d'adressage si vous n'avez jamais rencontré Dr COURTY.",
+    const MARTIN_TITLE: &str = "Rendez-vous avec le Dr. Martin!";
+    const MARTIN_BULLETS: [&str; 4] = [
+        "Le rendez-vous est possible sans courrier d'adressage si vous n'avez jamais rencontré Dr MARTIN.",
         "Il est recommandé de fournir un courrier d'adressage si vous n'avez déjà rencontré le Dr.",
         "Le rendez-vous est fixé à une date et une heure à déterminer.",
         "Il est possible de renvoyer le mail avec la bonne adresse pour éviter les problèmes de livraison.",
     ];
 
-    fn courty_json() -> String {
-        let title = serde_json::to_string(COURTY_TITLE).expect("title");
-        let bullets = serde_json::to_string(&COURTY_BULLETS).expect("bullets");
+    fn martin_json() -> String {
+        let title = serde_json::to_string(MARTIN_TITLE).expect("title");
+        let bullets = serde_json::to_string(&MARTIN_BULLETS).expect("bullets");
         format!("{{\"title\":{title},\"bullets\":{bullets},\"sourceMessageIds\":[\"m1\",\"m2\"]}}")
     }
 
@@ -944,19 +944,19 @@ mod tests {
         }
     }
 
-    fn courty_view() -> DiscussionThreadView {
+    fn martin_view() -> DiscussionThreadView {
         DiscussionThreadView {
-            id: ThreadId("t-courty".into()),
+            id: ThreadId("t-martin".into()),
             subject: "RE: Demande de rendez-vous".into(),
             messages: vec![
                 message(
                     "m1",
-                    "Nicolas Lechopier",
-                    "=== [1] .. ===\nBonjour, je souhaite un rendez-vous avec le Dr Courty.",
+                    "Alice Exemple",
+                    "=== [1] .. ===\nBonjour, je souhaite un rendez-vous avec le Dr Martin.",
                 ),
                 message(
                     "m2",
-                    "secretariat@drcourty.fr",
+                    "secretariat@example.fr",
                     "=== [1] .. ===\nVotre demande est bien reçue.",
                 ),
             ],
@@ -977,15 +977,15 @@ mod tests {
     }
 
     fn parse(raw: &str) -> SummaryResult {
-        let view = courty_view();
+        let view = martin_view();
         let mut engine = engine();
         summary_from_raw(raw, &view, &mut engine, "system", "user").expect("summary")
     }
 
-    fn assert_courty(summary: &SummaryResult) {
-        assert_eq!(summary.title, COURTY_TITLE);
+    fn assert_martin(summary: &SummaryResult) {
+        assert_eq!(summary.title, MARTIN_TITLE);
         assert!(summary.bullets.len() >= 3, "puces : {:?}", summary.bullets);
-        assert!(summary.bullets.iter().any(|b| b.contains("Dr COURTY")));
+        assert!(summary.bullets.iter().any(|b| b.contains("Dr MARTIN")));
         assert!(summary
             .bullets
             .iter()
@@ -999,39 +999,39 @@ mod tests {
 
     #[test]
     fn summary_parses_plain_json() {
-        assert_courty(&parse(&courty_json()));
+        assert_martin(&parse(&martin_json()));
     }
 
     #[test]
     fn summary_parses_prefixed_json_with_earlier_brace() {
         let raw = format!(
             "Je résume {{rapidement}} le fil avant le JSON.\n{}",
-            courty_json()
+            martin_json()
         );
-        assert_courty(&parse(&raw));
+        assert_martin(&parse(&raw));
     }
 
     #[test]
     fn summary_parses_json_missing_opening_brace() {
-        let raw = courty_json();
+        let raw = martin_json();
         let raw = raw.trim_start_matches('{');
-        assert_courty(&parse(raw));
+        assert_martin(&parse(raw));
     }
 
     #[test]
     fn summary_parses_fenced_json() {
-        let raw = format!("```json\n{}\n```\n", courty_json());
-        assert_courty(&parse(&raw));
+        let raw = format!("```json\n{}\n```\n", martin_json());
+        assert_martin(&parse(&raw));
     }
 
     #[test]
     fn summary_parses_truncated_json() {
-        let full = courty_json();
+        let full = martin_json();
         let cut = full.find("livraison").expect("cut point");
         let raw = &full[..cut];
         let summary = parse(raw);
-        assert_eq!(summary.title, COURTY_TITLE);
-        assert!(summary.bullets.iter().any(|b| b.contains("Dr COURTY")));
+        assert_eq!(summary.title, MARTIN_TITLE);
+        assert!(summary.bullets.iter().any(|b| b.contains("Dr MARTIN")));
         assert!(summary
             .bullets
             .iter()
@@ -1045,19 +1045,19 @@ mod tests {
     #[test]
     fn summary_parses_encapsulated_json_string() {
         let wrapped = serde_json::json!({
-            "output": courty_json(),
+            "output": martin_json(),
         })
         .to_string();
-        assert_courty(&parse(&wrapped));
+        assert_martin(&parse(&wrapped));
     }
 
     #[test]
     fn summary_parses_json_with_raw_newline_inside_string() {
         let raw = format!(
-            "{{\"title\":\"{COURTY_TITLE}\",\"bullets\":[\"Le rendez-vous est possible\nsans courrier.\",\"Il est recommandé de fournir un courrier d'adressage.\"]}}"
+            "{{\"title\":\"{MARTIN_TITLE}\",\"bullets\":[\"Le rendez-vous est possible\nsans courrier.\",\"Il est recommandé de fournir un courrier d'adressage.\"]}}"
         );
         let summary = parse(&raw);
-        assert_eq!(summary.title, COURTY_TITLE);
+        assert_eq!(summary.title, MARTIN_TITLE);
         assert!(summary.bullets.iter().any(|b| b.contains("sans courrier")));
         assert!(summary
             .bullets
@@ -1069,9 +1069,9 @@ mod tests {
     fn summary_prefers_real_object_over_short_prefix_object() {
         let raw = format!(
             "{{\"title\":\"brouillon\",\"bullets\":[\"trop court\"]}}\n{}",
-            courty_json()
+            martin_json()
         );
-        assert_courty(&parse(&raw));
+        assert_martin(&parse(&raw));
     }
 
     #[test]
@@ -1083,12 +1083,12 @@ mod tests {
         let blob = summary.bullets.join("\n");
         assert!(!blob.contains("extrait modèle"));
         assert!(!blob.contains("=== ["));
-        assert!(!blob.contains("Nicolas Lechopier"));
+        assert!(!blob.contains("Alice Exemple"));
     }
 
     #[test]
     fn heuristic_summary_skips_conversation_index_markers() {
-        let summary = summarize_thread(&courty_view());
+        let summary = summarize_thread(&martin_view());
         assert_eq!(summary.bullets.len(), 2, "{:?}", summary.bullets);
         assert!(summary.bullets[0].contains("souhaite un rendez-vous"));
         assert!(summary.bullets[1].contains("bien reçue"));
@@ -1108,7 +1108,7 @@ mod tests {
 
     #[test]
     fn fit_summary_user_leaves_output_room_on_small_ctx() {
-        let mut view = courty_view();
+        let mut view = martin_view();
         for i in 0..30 {
             view.messages.push(message(
                 &format!("m-extra-{i}"),

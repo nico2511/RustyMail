@@ -114,11 +114,18 @@ body.clarity-dark .ai-quick-panel-backdrop {
 /*
  * HTML expéditeur : papier de lecture (pas le blanc cru) pour rester
  * lisible sans plaque trop dure sur le chrome sombre.
+ * Les tokens --text/--dim du chrome sombre ne passent pas ici : le shadow
+ * (bandeau images distantes, digests…) hérite de ces variables.
  */
 body.clarity-dark .message-html {
   background: #ebe6dc;
   color: #1a1d22;
-  border: 1px solid color-mix(in srgb, #ebe6dc 72%, var(--border-weak));
+  --text: #1a1d22;
+  --dim: #4a5560;
+  --muted: #3d4652;
+  --border: rgba(28, 30, 34, 0.14);
+  --border-weak: rgba(28, 30, 34, 0.08);
+  border: 1px solid color-mix(in srgb, #ebe6dc 72%, rgba(28, 30, 34, 0.12));
   /* Padding réel aussi dans le shadow (:host) — ici pour le cadre papier. */
   padding: 20px 24px 24px;
   border-radius: 12px;

@@ -385,7 +385,6 @@ export function renderThread() {
                       <span class="thread-msg-fold-chevron" aria-hidden="true"></span>
                     </button>
                     <div class="thread-msg-head-main">${headMainHtml}</div>
-                    ${headActionsHtml}
                   </header>
                   ${
                     msgOpen
@@ -393,6 +392,7 @@ export function renderThread() {
                       : `<button type="button" class="thread-msg-fold-preview" data-action="thread-accordion-toggle" data-msg-id="${escapeAttr(message.messageId)}">${escapeHtml(foldPreview)}</button>`
                   }
                   <div class="thread-msg-card mail-security-tier ${renderDeps().mailSecurityTierClass(renderDeps().normalizedMailSecurity(message))}">
+                    ${headActionsHtml}
                     ${renderMessageBody(message, eff, unsubLinks)}
                     ${inlineTr}
                     ${

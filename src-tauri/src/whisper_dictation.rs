@@ -13,8 +13,26 @@ use transcribe_rs::accel::{set_whisper_accelerator, WhisperAccelerator, GPU_DEVI
 use transcribe_rs::whisper_cpp::{WhisperEngine, WhisperInferenceParams, WhisperLoadParams};
 use transcribe_rs::TranscribeError;
 
-/// Sérialise le chargement + l’inférence whisper.cpp (pas thread-safe / RAM lourde).
-static WHISPER_TRANSCRIBE_LOCK: Mutex<()> = Mutex::new(());
+/// Cache le moteur chargé (recharger le GGML à chaque dictée coûte plusieurs secondes sur CPU).
+struct CachedWhisperEngine {
+    path: PathBuf,
+    use_gpu: bool,
+    flash_attn: bool,
+    engine: WhisperEngine,
+}
+
+/// Sérialise chargement + inférence ; conserve le moteur entre dictées.
+static WHISPER_ENGINE_CACHE: Mutex<Option<CachedWhisperEngine>> = Mutex::new(None);
+
+fn lock_whisper_cache() -> std::sync::MutexGuard<'static, Option<CachedWhisperEngine>> {
+    WHISPER_ENGINE_CACHE
+        .lock()
+        .unwrap_or_else(|poisoned| {
+            let mut guard = poisoned.into_inner();
+            *guard = None;
+            guard
+        })
+}
 
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -288,8 +306,9 @@ fn dictation_n_threads(profile: &str) -> i32 {
         .unwrap_or(4)
         .max(1);
     match profile {
-        "fast" => cores.clamp(1, 8),
-        _ => cores.min(4).max(1),
+        // `accurate` reste prudent ; fast/balanced utilisent davantage de cœurs CPU.
+        "accurate" => cores.min(4).max(1),
+        _ => cores.clamp(1, 8),
     }
 }
 
@@ -331,20 +350,84 @@ pub fn transcribe_whisper_wav_bytes_typed(
     wav: &[u8],
     prefs: &rustymail_infrastructure::AiPrefs,
 ) -> Result<String, WhisperError> {
-    let _guard = WHISPER_TRANSCRIBE_LOCK
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-
     // `catch_unwind` n'intercepte pas `abort()` / `std::terminate` de whisper.cpp
     // (WHISPER_ASSERT, `wstring_convert` sur certains chemins Windows).
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         transcribe_whisper_wav_bytes_inner(wav, prefs)
     })) {
         Ok(result) => result,
-        Err(_) => Err(WhisperError::Other {
-            message: "Transcription Whisper interrompue (erreur interne). Réessayez ; si besoin, retéléchargez le modèle.".into(),
-        }),
+        Err(_) => {
+            let mut cache = lock_whisper_cache();
+            *cache = None;
+            Err(WhisperError::Other {
+                message: "Transcription Whisper interrompue (erreur interne). Réessayez ; si besoin, retéléchargez le modèle.".into(),
+            })
+        }
     }
+}
+
+/// Charge (ou réchauffe) le moteur en cache pour les prefs courantes — après prefetch GGML.
+pub fn warm_whisper_engine(prefs: &rustymail_infrastructure::AiPrefs) -> Result<(), String> {
+    let path = ensure_ggml_weights(
+        &prefs.whisper_hf_repo_id,
+        &prefs.whisper_hf_revision,
+        &prefs.whisper_model_size,
+        &prefs.whisper_transcription_profile,
+        &prefs.whisper_cpp_language,
+    )?;
+    let unit = parse_processing_unit(&prefs.whisper_processing_unit);
+    set_whisper_accelerator(unit);
+    let use_gpu = effective_use_gpu(unit);
+    let profile = prefs
+        .whisper_transcription_profile
+        .trim()
+        .to_ascii_lowercase();
+    let flash_attn = profile != "accurate" && use_gpu;
+    let load = WhisperLoadParams {
+        use_gpu,
+        flash_attn,
+        gpu_device: GPU_DEVICE_AUTO,
+    };
+    ensure_cached_engine(&path, use_gpu, flash_attn, load).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn ensure_cached_engine(
+    path: &Path,
+    use_gpu: bool,
+    flash_attn: bool,
+    load: WhisperLoadParams,
+) -> Result<(), WhisperError> {
+    let mut cache = lock_whisper_cache();
+    reload_cached_engine_if_needed(&mut cache, path, use_gpu, flash_attn, load)
+}
+
+fn reload_cached_engine_if_needed(
+    cache: &mut Option<CachedWhisperEngine>,
+    path: &Path,
+    use_gpu: bool,
+    flash_attn: bool,
+    load: WhisperLoadParams,
+) -> Result<(), WhisperError> {
+    let reuse = cache.as_ref().is_some_and(|c| {
+        c.path == path && c.use_gpu == use_gpu && c.flash_attn == flash_attn
+    });
+    if reuse {
+        return Ok(());
+    }
+    *cache = None;
+    let engine = WhisperEngine::load_with_params(path, load).map_err(|e: TranscribeError| {
+        WhisperError::Other {
+            message: e.to_string(),
+        }
+    })?;
+    *cache = Some(CachedWhisperEngine {
+        path: path.to_path_buf(),
+        use_gpu,
+        flash_attn,
+        engine,
+    });
+    Ok(())
 }
 
 fn transcribe_whisper_wav_bytes_inner(
@@ -379,13 +462,6 @@ fn transcribe_whisper_wav_bytes_inner(
 
     let n_threads = dictation_n_threads(&profile);
 
-    let mut engine =
-        WhisperEngine::load_with_params(&path, load).map_err(|e: TranscribeError| {
-            WhisperError::Other {
-                message: e.to_string(),
-            }
-        })?;
-
     let samples = wav_bytes_to_f32_samples(wav).map_err(|e| WhisperError::Other { message: e })?;
     validate_samples_for_dictation(&samples, 16000)?;
 
@@ -400,6 +476,15 @@ fn transcribe_whisper_wav_bytes_inner(
     } else if profile == "accurate" {
         inf.no_speech_thold = 0.15;
     }
+
+    let mut cache = lock_whisper_cache();
+    reload_cached_engine_if_needed(&mut cache, &path, use_gpu, flash_attn, load)?;
+    let engine = cache
+        .as_mut()
+        .map(|c| &mut c.engine)
+        .ok_or_else(|| WhisperError::Other {
+            message: "Moteur Whisper indisponible après chargement.".into(),
+        })?;
 
     let result = engine
         .transcribe_with(&samples, &inf)
@@ -430,10 +515,10 @@ mod tests {
         for profile in ["", "fast", "balanced", "accurate", "unknown"] {
             let n = dictation_n_threads(profile);
             assert!(n >= 1, "{profile} => {n}");
-            if profile == "fast" {
-                assert!(n <= 8, "{profile} => {n}");
-            } else {
+            if profile == "accurate" {
                 assert!(n <= 4, "{profile} => {n}");
+            } else {
+                assert!(n <= 8, "{profile} => {n}");
             }
         }
     }

@@ -3464,6 +3464,15 @@ button.thread-tag-chip--search:focus-visible {
   gap: 6px;
 }
 
+/* Ruban dans la carte message (au-dessus du corps), pas flottant hors bulle. */
+.thread-reading .thread-msg-card > .thread-msg-head-actions {
+  width: 100%;
+  justify-content: flex-end;
+  margin: 0 0 10px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--border-weak);
+}
+
 .action-bar--compact {
   padding: 2px 4px;
   gap: 2px;
@@ -10797,6 +10806,16 @@ button.thread-tag-chip--search:focus-visible {
 .digest-cut__reading .rm-digest td {
   padding: 4px 0;
   vertical-align: top;
+  font-weight: 700;
+}
+.digest-cut__reading p strong,
+.digest-cut__reading li strong {
+  font-weight: 700;
+}
+.digest-cut__reading p a {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .digest-cut__reading .rm-digest__actions {
   margin: 4px 0 0;
@@ -10941,6 +10960,33 @@ button.thread-tag-chip--search:focus-visible {
 .digest-cut__paint-check.digest-cut__check--ok { color: #166534; }
 .digest-cut__paint-check.digest-cut__check--warn { color: #92400e; }
 .digest-cut__paint-check.digest-cut__check--bad { color: #991b1b; }
+.digest-cut-studio__panel {
+  width: min(1180px, 96vw);
+  height: min(880px, 92vh);
+  display: flex;
+  flex-direction: column;
+}
+.digest-cut-studio__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.7fr);
+  gap: 14px;
+  min-height: 0;
+  flex: 1;
+  padding: 12px 14px 16px;
+}
+.digest-cut-studio__mail {
+  overflow: auto;
+  min-height: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-weak, rgba(120, 119, 117, 0.35));
+}
+.digest-cut-studio__side {
+  overflow: auto;
+  min-height: 0;
+}
+@media (max-width: 800px) {
+  .digest-cut-studio__body { grid-template-columns: 1fr; }
+}
 .digest-cut__reformat-note { margin: 0 0 8px; font-size: 12px; }
 .digest-cut__file { display: inline-flex; align-items: center; cursor: pointer; }
 .digest-cut__code { margin-top: 10px; }

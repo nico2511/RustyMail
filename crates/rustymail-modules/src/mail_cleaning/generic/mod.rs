@@ -1,7 +1,7 @@
 //! Nettoyage HTML générique (Outlook, Gmail, trackers, prune, lisibilité).
 
 mod attrs;
-mod gmail;
+pub(crate) mod gmail;
 mod images;
 mod outlook;
 mod prune;
@@ -17,7 +17,7 @@ pub use attrs::strip_presentation_attrs;
 pub use images::is_outlook_noise_img;
 pub use prune::prune_empty_boilerplate;
 
-pub const GENERIC_RULE_SET_VERSION: &str = "12";
+pub const GENERIC_RULE_SET_VERSION: &str = "13";
 
 const REMOVABLE_TAGS: &[&str] = &[
     "script", "noscript", "iframe", "object", "embed", "style", "form", "input", "button",

@@ -24,6 +24,13 @@ static RE_TRIMMED: LazyLock<Regex> =
 
 const QUOTE_CLASS_TOKENS: &[&str] = &["gmail_quote", "gmail_quote_container"];
 
+/// Gmail natif (`gmail_quote`) ou préfixe Outlook (`x_gmail_quote`, `x_x_gmail_quote`, …).
+fn is_quote_class_token(token: &str) -> bool {
+    QUOTE_CLASS_TOKENS
+        .iter()
+        .any(|name| token == *name || token.ends_with(&format!("_{name}")))
+}
+
 pub fn clean_gmail_noise(doc: &mut Html) {
     let mut html = serialize_fragment(doc);
     for _ in 0..24 {
@@ -56,8 +63,10 @@ fn next_replacement(doc: &Html) -> Option<(String, String)> {
 }
 
 fn quote_replacement(doc: &Html) -> Option<(String, String)> {
-    let sel =
-        Selector::parse(".gmail_quote, .gmail_quote_container, .gmail_extra, blockquote").ok()?;
+    let sel = Selector::parse(
+        ".gmail_quote, .gmail_quote_container, .x_gmail_quote, .gmail_extra, blockquote, [class*='gmail_quote']",
+    )
+    .ok()?;
     for el in doc.select(&sel) {
         if !is_quote_container(el) || has_quote_ancestor(el) || inside_preserved_region(el) {
             continue;
@@ -121,7 +130,12 @@ fn signature_replacement(doc: &Html) -> Option<(String, String)> {
 }
 
 fn is_quote_container(el: ElementRef<'_>) -> bool {
-    if has_class(el, "gmail_quote") || has_class(el, "gmail_quote_container") {
+    if el
+        .attr("class")
+        .unwrap_or("")
+        .split_whitespace()
+        .any(is_quote_class_token)
+    {
         return true;
     }
     if has_class(el, "gmail_extra") && quote_signal(el) {
@@ -135,7 +149,7 @@ fn is_quote_container(el: ElementRef<'_>) -> bool {
 
 fn quote_signal(el: ElementRef<'_>) -> bool {
     if el
-        .select(&Selector::parse(".gmail_quote, blockquote").unwrap())
+        .select(&Selector::parse(".gmail_quote, .x_gmail_quote, [class*='gmail_quote'], blockquote").unwrap())
         .next()
         .is_some()
     {
@@ -255,7 +269,7 @@ fn strip_quote_class_attrs(html: &str) -> String {
                 .map(|m| m.as_str())
                 .unwrap_or("")
                 .split_whitespace()
-                .filter(|token| !QUOTE_CLASS_TOKENS.contains(token))
+                .filter(|token| !is_quote_class_token(token))
                 .collect();
             if kept.is_empty() {
                 String::new()
@@ -325,5 +339,17 @@ mod tests {
         assert!(out.contains("Seul contenu du transfert"));
         assert!(!out.contains("rm-mail-folded-quote"));
         assert!(!out.contains("gmail_quote"));
+    }
+
+    #[test]
+    fn folds_outlook_prefixed_x_gmail_quote() {
+        let html = r#"<div><p>Pouvez-vous me rappeler svp</p><div class="x_gmail_quote"><div>Le 14 septembre 2026, Alice a écrit :</div><blockquote class="x_gmail_quote"><p>Ancien message Outlook.</p></blockquote></div></div>"#;
+        let mut doc = Html::parse_fragment(html);
+        clean_gmail_noise(&mut doc);
+        let out = serialize_fragment(&doc);
+        assert!(out.contains("rappeler"));
+        assert!(out.contains("rm-mail-folded-quote"));
+        assert!(out.contains("Ancien message Outlook"));
+        assert!(!out.contains("x_gmail_quote"));
     }
 }

@@ -112,7 +112,9 @@ pub fn preview_candidate_fixture(yaml: &str, raw_html: &str, sender_email: &str)
     match parse_fixture(yaml) {
         Ok(fixture) => {
             let id = fixture.id.clone();
-            match apply::apply_fixtures(std::slice::from_ref(&fixture), &cleaned, sender_email) {
+            let rendered = apply::apply_fixtures(std::slice::from_ref(&fixture), &cleaned, sender_email)
+                .or_else(|| apply::apply_ignoring_sender(&fixture, &cleaned));
+            match rendered {
                 Some(html) => FixturePreview {
                     applicable: true,
                     html: Some(html),
@@ -473,5 +475,54 @@ zones:
         set_installed_reading_fixture(None);
         let after = clean_html_for_markdown(&reg, &input, html);
         assert!(!html_has_digest_marker(&after.html));
+    }
+
+    #[test]
+    fn preview_reuses_a_template_from_another_sender() {
+        let yaml = r#"
+id: facture-gabarit
+rule_set_version: "1"
+match:
+  sender:
+    domains:
+      - exact: autre-enseigne.example
+  structure:
+    root: div.letter
+    min_children: 2
+zones:
+  header:
+    action: show
+    presentation: as_is
+    anchors:
+      - selector: h1
+        index: 0
+  body:
+    action: show
+    presentation: as_is
+    anchors:
+      - selector: p
+        index: 0
+  footer:
+    action: hide
+"#;
+        let html = r#"<div class="letter"><h1>Duplicata</h1><p>Total 10</p><div class="foot">Mentions</div></div>"#;
+        let preview = preview_candidate_fixture(yaml, html, "client@magasin-exemple.fr");
+        assert!(preview.applicable, "{:?}", preview.error);
+        let rendered = preview.html.expect("html");
+        assert!(rendered.contains("Duplicata"));
+        assert!(rendered.contains("Total 10"));
+        assert!(!rendered.contains("Mentions"));
+
+        let reg = ProviderRegistry::builtin();
+        let input = CleaningInput {
+            sender_email: "client@magasin-exemple.fr",
+            subject: "facture",
+            html_preview: Some(html),
+            plain_body: None,
+        };
+        set_installed_reading_fixture(Some(parse_fixture(yaml).expect("yaml")));
+        let live = clean_html_for_markdown(&reg, &input, html);
+        assert!(!html_has_digest_marker(&live.html));
+        set_installed_reading_fixture(None);
     }
 }

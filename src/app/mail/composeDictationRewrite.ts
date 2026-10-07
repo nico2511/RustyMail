@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isAiFeatureEnabled } from "../../aiFeatures";
 import { composeRewriteStyleFromTone } from "../core/composeTone";
-import { LLM_INVOKE_TIMEOUT_MS } from "../core/timeouts";
+import { DICTATION_REWRITE_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
@@ -16,7 +16,7 @@ export async function rewriteDictatedSegmentWithTone(raw: string): Promise<strin
     const style = composeRewriteStyleFromTone();
     const res = await withTimeout(
       invoke<{ text: string }>("llm_rewrite_compose", { text: t, style }),
-      LLM_INVOKE_TIMEOUT_MS,
+      DICTATION_REWRITE_TIMEOUT_MS,
     );
     const out = (res.text ?? "").trim();
     return out.length ? out : raw;

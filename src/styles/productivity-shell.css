@@ -740,6 +740,18 @@ select {
   vertical-align: top;
 }
 
+/* En-tête tableau e-mail : fond clair → forcer texte sombre (évite clair-sur-blanc). */
+.composer-mail-shell .compose-tiptap th,
+.composer-mail-shell .composer-body > .preview th {
+  background: #f2f0ec;
+  color: #1c1b19;
+}
+
+.composer-mail-shell .compose-tiptap th *,
+.composer-mail-shell .composer-body > .preview th * {
+  color: inherit;
+}
+
 .composer-mail-shell .compose-tiptap .ProseMirror > :first-child,
 .composer-mail-shell .composer-body > .preview > :first-child {
   margin-top: 0;

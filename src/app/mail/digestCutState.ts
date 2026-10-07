@@ -100,6 +100,8 @@ export const digestCut = {
   paintPick: null as DigestCutPaintPick | null,
   /** Contrôle du bloc sous le curseur / sélection. */
   paintCheck: null as DigestCutZoneCheck | null,
+  /** Éditeur de zones en plein écran. */
+  zoneStudioOpen: false,
   /** Contrôle par zone après proposition ou assignation. */
   zoneChecks: {
     header: null as DigestCutZoneCheck | null,

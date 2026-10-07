@@ -3,7 +3,9 @@
 use serde::Deserialize;
 
 use crate::ai_agent_prepare_reply::AgentIntentResult;
-use crate::ai_llm_util::{gen_params_json_for_prompt, parse_model_json, truncate_chars};
+use crate::ai_llm_util::{
+    fit_fil_context_user, generate_fil_json, parse_model_json, truncate_chars,
+};
 use rustymail_domain::{AssistFact, AssistFactsSnapshot, AssistUserPrefs};
 use rustymail_llm::{LlmEngine, LlmError};
 
@@ -113,7 +115,6 @@ pub fn extract_facts_with_llm(
 ) -> Result<ExtractFactsOutput, LlmError> {
     let lang = user_prefs.lang.trim();
     let lang = if lang.is_empty() { "fr" } else { lang };
-    let ctx = truncate_chars(thread_context, 24_000);
     let intent_hint = prior_intent
         .map(|i| {
             let act = if i.speech_act.trim().is_empty() {
@@ -125,13 +126,17 @@ pub fn extract_facts_with_llm(
         })
         .unwrap_or_default();
     let system = crate::prompts::system_prompt_for_language("assist_facts", lang);
-    let user = format!("Fil :\n{ctx}{intent_hint}");
-    let raw = engine.generate(
+    let dto: FactsDto = generate_fil_json(
+        engine,
         system.as_str(),
-        &user,
-        &gen_params_json_for_prompt(engine, system.as_str(), &user, 768, 4096),
+        thread_context,
+        "Fil :\n",
+        &intent_hint,
+        24_000,
+        768,
+        4096,
     )?;
-    let dto: FactsDto = parse_model_json(&raw)?;
+    let ctx = truncate_chars(thread_context, 24_000);
     let facts = sanitize_facts(dto.facts, &ctx);
     let ambiguities = clip_questions(dto.ambiguities);
     let mut clarification_questions = clip_questions(dto.clarification_questions);
@@ -346,7 +351,6 @@ pub fn consistency_check_with_llm(
 ) -> Result<ConsistencyOutput, LlmError> {
     let lang = user_prefs.lang.trim();
     let lang = if lang.is_empty() { "fr" } else { lang };
-    let ctx = truncate_chars(thread_context, 12_000);
     let draft_clip = truncate_chars(draft, 8000);
     let facts_json = serde_json::to_string(facts).unwrap_or_else(|_| "{}".into());
     let system = crate::prompts::system_prompt_for_language("assist_consistency", lang);
@@ -363,13 +367,18 @@ pub fn consistency_check_with_llm(
             )
         })
         .unwrap_or_default();
-    let user =
-        format!("FIL :\n{ctx}\n\nFAITS :\n{facts_json}{intent_line}\n\nBROUILLON :\n{draft_clip}");
-    let raw = engine.generate(
+    let suffix = format!("\n\nFAITS :\n{facts_json}{intent_line}\n\nBROUILLON :\n{draft_clip}");
+    let (user, params) = fit_fil_context_user(
+        engine,
         system.as_str(),
-        &user,
-        &gen_params_json_for_prompt(engine, system.as_str(), &user, 256, 1536),
+        thread_context,
+        "FIL :\n",
+        &suffix,
+        12_000,
+        256,
+        1536,
     )?;
+    let raw = engine.generate(system.as_str(), &user, &params)?;
     let dto: ConsistencyDto = parse_model_json(&raw)?;
     let llm_role_inversion = dto.role_inversion;
     let mut issues: Vec<String> = dto

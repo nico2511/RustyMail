@@ -193,6 +193,44 @@ export function ensurePaintProposalSkeleton(): DigestCutProposal {
   return digestCut.proposal;
 }
 
+const ZONE_RANK: Record<DigestCutZoneName, number> = { header: 0, body: 1, footer: 2 };
+
+function zoneLabel(zone: DigestCutZoneName): string {
+  if (zone === "header") return "En-tête";
+  if (zone === "body") return "Corps";
+  return "Pied";
+}
+
+function visibleText(el: Element): string {
+  return (el.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
+/** Deux cadres sur le même titre : on n’en garde qu’un, le plus précis. */
+export function exclusiveZoneHits(
+  hits: Array<{ zone: DigestCutZoneName; el: Element }>,
+): Array<{ zone: DigestCutZoneName; el: Element }> {
+  const sorted = [...hits].sort((a, b) => {
+    const len = visibleText(a.el).length - visibleText(b.el).length;
+    if (len !== 0) return len;
+    return ZONE_RANK[a.zone] - ZONE_RANK[b.zone];
+  });
+  const kept: Array<{ zone: DigestCutZoneName; el: Element }> = [];
+  for (const hit of sorted) {
+    const text = visibleText(hit.el);
+    const overlaps = kept.some((other) => {
+      if (other.el === hit.el) return true;
+      const outer = other.el.contains(hit.el) ? other.el : hit.el.contains(other.el) ? hit.el : null;
+      const inner = outer === other.el ? hit.el : outer === hit.el ? other.el : null;
+      if (!outer || !inner) return false;
+      const outerText = visibleText(outer);
+      const innerText = visibleText(inner);
+      return innerText.length > 0 && outerText.length <= innerText.length + 24;
+    });
+    if (!overlaps && text.length > 0) kept.push(hit);
+  }
+  return kept;
+}
+
 /** Surligne les ancres connues + la sélection courante dans un clone DOM. */
 export function decorateMailHtmlForCut(rawHtml: string): string {
   if (!rawHtml.trim()) return rawHtml;
@@ -201,10 +239,15 @@ export function decorateMailHtmlForCut(rawHtml: string): string {
   const proposal = digestCut.proposal;
   if (proposal) {
     const zones: DigestCutZoneName[] = ["header", "body", "footer"];
+    const hits: Array<{ zone: DigestCutZoneName; el: Element }> = [];
     for (const zone of zones) {
       for (const anchor of proposal.zones[zone].anchors) {
-        markAnchorMatches(wrap, anchor, zone, proposal.match.structureRoot);
+        const el = findAnchorElement(wrap, anchor, proposal.match.structureRoot);
+        if (el) hits.push({ zone, el });
       }
+    }
+    for (const hit of exclusiveZoneHits(hits)) {
+      paintZoneFrame(hit.el, hit.zone);
     }
   }
   if (digestCut.paintPick) {
@@ -213,14 +256,13 @@ export function decorateMailHtmlForCut(rawHtml: string): string {
   return wrap.innerHTML;
 }
 
-function markAnchorMatches(
+function findAnchorElement(
   root: HTMLElement,
   anchor: DigestCutAnchor,
-  zone: DigestCutZoneName,
   structureRoot: string,
-): void {
+): Element | null {
   const tag = (anchor.selector ?? "").trim().toLowerCase();
-  if (!tag) return;
+  if (!tag) return null;
   const scope = resolveStructureRootEl(root, structureRoot) ?? root;
   const classNeedle = (anchor.classContains ?? "").trim().toLowerCase();
   const candidates = structureChildren(scope).filter((el) => {
@@ -228,17 +270,16 @@ function markAnchorMatches(
     if (!classNeedle) return true;
     return (el.getAttribute("class") ?? "").toLowerCase().split(/\s+/).some((t) => t.includes(classNeedle));
   });
-  const el =
-    anchor.index != null && anchor.index >= 0 && anchor.index < candidates.length
-      ? candidates[anchor.index]
-      : candidates[0];
-  if (!el) return;
+  if (anchor.index != null && anchor.index >= 0 && anchor.index < candidates.length) {
+    return candidates[anchor.index];
+  }
+  return candidates[0] ?? null;
+}
+
+function paintZoneFrame(el: Element, zone: DigestCutZoneName): void {
   el.classList.add("digest-cut__zone-hl", `digest-cut__zone-hl--${zone}`);
   el.setAttribute("data-digest-cut-zone", zone);
-  el.setAttribute(
-    "data-digest-cut-label",
-    zone === "header" ? "En-tête" : zone === "body" ? "Corps" : "Pied",
-  );
+  el.setAttribute("data-digest-cut-label", zoneLabel(zone));
   const check = digestCut.zoneChecks[zone];
   if (check) {
     el.setAttribute("data-digest-cut-check", check.status);

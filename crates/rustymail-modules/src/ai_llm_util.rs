@@ -166,6 +166,119 @@ pub(crate) fn gen_params_json(max_tokens: u32) -> LlmGenParams {
     gen_params_json_with_grammar(max_tokens, None)
 }
 
+/// Place minimale pour une petite réponse JSON (intention, slots, faits, actions).
+pub(crate) const MIN_ASSIST_JSON_OUTPUT_ROOM: u32 = 256;
+
+const ASSIST_CTX_OVERFLOW_ERR: &str = "Assistant IA : la fenêtre de contexte ne laisse pas assez de place pour une réponse JSON complète. Augmentez n_ctx dans Paramètres → IA, ou ouvrez un fil plus court.";
+
+/// Calage d’un prompt `prefix + fil tronqué + suffix` jusqu’à laisser de la place pour le JSON.
+pub(crate) fn fit_fil_context_user(
+    engine: &LlmEngine,
+    system: &str,
+    thread_context: &str,
+    prefix: &str,
+    suffix: &str,
+    initial_max_chars: usize,
+    min_output: u32,
+    max_output: u32,
+) -> Result<(String, LlmGenParams), LlmError> {
+    let mut max_chars = thread_context
+        .chars()
+        .count()
+        .min(initial_max_chars.max(400))
+        .max(400);
+    for _ in 0..28 {
+        let ctx = truncate_chars(thread_context, max_chars);
+        let user = format!("{prefix}{ctx}{suffix}");
+        let room = output_room_after_prompt(engine, system, &user, 64);
+        let max_tokens =
+            resolve_max_output_tokens(engine, system, &user, min_output, max_output, 64);
+        // Exiger la place demandée par l’appelant (pas seulement le plancher 256).
+        let need = min_output.max(MIN_ASSIST_JSON_OUTPUT_ROOM);
+        if room >= need && max_tokens >= need {
+            return Ok((user, gen_params_json(max_tokens)));
+        }
+        if max_chars <= 500 {
+            return Err(LlmError::Msg(ASSIST_CTX_OVERFLOW_ERR.into()));
+        }
+        max_chars = (max_chars * 2 / 3).max(500);
+    }
+    Err(LlmError::Msg(ASSIST_CTX_OVERFLOW_ERR.into()))
+}
+
+/// JSON tronqué / vide : mérite un second essai avec un fil plus court.
+pub(crate) fn json_truncation_retryable(err: &LlmError) -> bool {
+    match err {
+        LlmError::InvalidJson(msg) => {
+            let m = msg.to_ascii_lowercase();
+            m.contains("eof")
+                || m.contains("vide")
+                || m.contains("sans json")
+                || m.contains("missing field")
+                || m.contains("réparation")
+                || m.contains("expected")
+                ||             m.contains("tronqu")
+                || m.contains("incomplet")
+                || m.contains("intention vide")
+                || m.contains("diagnosis")
+        }
+        LlmError::Msg(msg) => {
+            let m = msg.to_ascii_lowercase();
+            m.contains("vide") || m.contains("empty") || m.contains("diagnostic manquant")
+        }
+        _ => false,
+    }
+}
+
+/// Génère + parse JSON avec calage du fil, puis un essai compact si la sortie est tronquée.
+pub(crate) fn generate_fil_json<T: DeserializeOwned>(
+    engine: &mut LlmEngine,
+    system: &str,
+    thread_context: &str,
+    prefix: &str,
+    suffix: &str,
+    initial_max_chars: usize,
+    min_output: u32,
+    max_output: u32,
+) -> Result<T, LlmError> {
+    let (user, params) = fit_fil_context_user(
+        engine,
+        system,
+        thread_context,
+        prefix,
+        suffix,
+        initial_max_chars,
+        min_output,
+        max_output,
+    )?;
+    let raw = engine.generate(system, &user, &params)?;
+    match parse_model_json::<T>(&raw) {
+        Ok(v) => Ok(v),
+        Err(first) if json_truncation_retryable(&first) => {
+            // Second essai : budget fil nettement plus petit que le premier calage.
+            let first_chars = thread_context.chars().count().min(initial_max_chars.max(400));
+            let compact_chars = ((first_chars * 2) / 5).clamp(800, 2_400);
+            let (user2, params2) = fit_fil_context_user(
+                engine,
+                system,
+                thread_context,
+                prefix,
+                suffix,
+                compact_chars,
+                min_output,
+                max_output,
+            )?;
+            let raw2 = engine.generate(system, &user2, &params2)?;
+            parse_model_json(&raw2).map_err(|e2| {
+                LlmError::InvalidJson(format!(
+                    "Réponse JSON incomplète ou tronquée ({first}). Nouvel essai: {e2}"
+                ))
+            })
+        }
+        Err(e) => Err(e),
+    }
+}
+
 pub(crate) fn gen_params_json_with_grammar(
     max_tokens: u32,
     grammar_gbnf: Option<&str>,
@@ -725,5 +838,36 @@ mod tests {
         engine.set_n_ctx_probe(4096);
         let out = resolve_max_output_tokens(&engine, "system", "user prompt", 512, 8192, 64);
         assert!((512..=4096).contains(&out));
+    }
+
+    #[test]
+    fn fit_fil_context_leaves_json_output_room() {
+        use rustymail_llm::LlmEngine;
+        let mut engine = LlmEngine::open_ai_compatible(
+            "http://127.0.0.1:8080/v1".into(),
+            "test".into(),
+            String::new(),
+        )
+        .expect("engine");
+        engine.set_n_ctx_probe(4096);
+        let system = "Tu analyses un fil et réponds en JSON.";
+        let huge = "x".repeat(80_000);
+        let (user, params) = fit_fil_context_user(
+            &engine,
+            system,
+            &huge,
+            "Fil :\n",
+            "",
+            24_000,
+            256,
+            768,
+        )
+        .expect("fit");
+        let room = output_room_after_prompt(&engine, system, &user, 64);
+        assert!(
+            room >= MIN_ASSIST_JSON_OUTPUT_ROOM,
+            "room collapsed ({room})"
+        );
+        assert!(params.max_tokens >= 128, "max_tokens={}", params.max_tokens);
     }
 }

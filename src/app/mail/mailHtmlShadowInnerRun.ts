@@ -36,9 +36,10 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail :is(p, ul, ol, blockquote, pre, table){margin:0 0 10px}
         .mail :is(h1,h2,h3){margin:8px 0 10px;font-family:ui-serif,Georgia,Cambria,"Times New Roman",serif;font-weight:400;letter-spacing:-0.02em}
         .mail a{color:var(--accent)}
-        .remote-images{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin:0 0 10px;padding:10px 16px;box-sizing:border-box;max-width:100%;border:1px solid rgba(232,228,223,.14);border-radius:10px;background:rgba(255,255,255,.035);color:var(--dim,rgba(238,240,238,.72));font-size:12px;line-height:1.45}
-        .remote-images span{flex:1 1 10rem;min-width:0}
-        .remote-images button{flex:0 0 auto;margin-left:auto;border:1px solid rgba(232,228,223,.18);border-radius:999px;background:rgba(255,255,255,.06);color:var(--text);padding:6px 12px;cursor:pointer}
+        .remote-images{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin:0 0 12px;padding:10px 14px;box-sizing:border-box;max-width:100%;border:1px solid color-mix(in srgb, var(--dim,#4a5560) 28%, transparent);border-radius:10px;background:color-mix(in srgb, var(--dim,#4a5560) 9%, transparent);color:var(--dim,#4a5560);font-size:12.5px;line-height:1.45;font-weight:500}
+        .remote-images span{flex:1 1 10rem;min-width:0;color:inherit}
+        .remote-images button{flex:0 0 auto;margin-left:auto;border:1px solid color-mix(in srgb, var(--text,#1a1d22) 22%, transparent);border-radius:999px;background:color-mix(in srgb, var(--text,#1a1d22) 6%, transparent);color:var(--text,#1a1d22);padding:6px 12px;cursor:pointer;font:inherit;font-weight:650}
+        .remote-images button:hover{background:color-mix(in srgb, var(--text,#1a1d22) 11%, transparent)}
         .mail a.mail-link-disabled{color:var(--dim,rgba(238,240,238,.56));text-decoration:line-through;cursor:not-allowed}
         .mail a.mail-unsubscribe-link{
           display:inline-flex;
@@ -97,11 +98,17 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-conversation-report{display:flex;flex-direction:column;gap:14px;margin:0}
         .mail article.rm-conversation-report .rm-conversation-turn{padding:14px 16px;border:1px solid rgba(120,119,117,.14);border-radius:10px;background:rgba(255,255,255,.025)}
         .mail article.rm-conversation-report .rm-conversation-turn--cited{border-left:2px solid rgba(232,228,223,.14)}
+        .mail article.rm-conversation-report .rm-conversation-history{margin-top:0}
+        .mail article.rm-conversation-report .rm-conversation-history-tree{display:flex;flex-direction:column;gap:10px;padding:10px 12px 8px}
+        .mail article.rm-conversation-report .rm-conversation-history-tree .rm-conversation-turn{background:rgba(255,255,255,.015)}
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="1"]{margin-left:12px}
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="2"]{margin-left:24px}
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="3"]{margin-left:36px}
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="4"]{margin-left:48px}
         .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="5"]{margin-left:60px}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="6"]{margin-left:72px}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="7"]{margin-left:84px}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="8"]{margin-left:96px}
         .mail article.rm-conversation-report .rm-conversation-envelope{width:100%;border-collapse:collapse;font-size:12px;margin:0 0 10px}
         .mail article.rm-conversation-report .rm-conversation-envelope th,.mail article.rm-conversation-report .rm-conversation-envelope td{padding:4px 12px 4px 0;border:0;vertical-align:top;text-align:left;line-height:1.45;background:transparent}
         .mail article.rm-conversation-report .rm-conversation-envelope th{font-weight:600;white-space:nowrap;width:1%;color:var(--dim,rgba(238,240,238,.58))}
@@ -117,17 +124,19 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail table.rm-mail-data th{font-weight:650;background:rgba(255,255,255,.04)}
         .mail blockquote{padding:8px 12px;border-left:2px solid rgba(232,228,223,.12);background:rgba(255,255,255,.02);border-radius:10px}
         .mail details.rm-mail-folded-quote{margin:1.45rem 0 0}
-        .mail details.rm-mail-folded-quote > summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;line-height:1.4;text-transform:uppercase;color:var(--dim,rgba(238,240,238,.62))}
+        .mail details.rm-mail-folded-quote > summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.04em;line-height:1.4;color:var(--dim,rgba(238,240,238,.62))}
+        .mail details.rm-mail-folded-quote.rm-conversation-history > summary{letter-spacing:.08em;text-transform:uppercase}
         .mail details.rm-mail-folded-quote[open] > summary{margin-bottom:0.7rem}
         .mail details.rm-mail-folded-quote > .rm-mail-quote-body{margin:0;padding:12px 14px 4px;border-radius:12px;border:1px solid rgba(120,119,117,.2);background:rgba(120,119,117,.07);color:var(--text);font-size:inherit;line-height:1.62}
         .mail details.rm-mail-folded-quote > .rm-mail-quote-body :is(p, div, blockquote){margin:0 0 0.7em}
         .mail details.rm-mail-folded-quote > .rm-mail-quote-body .rm-mail-quote-kicker{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:12.5px;font-weight:500;line-height:1.4;color:var(--dim,rgba(238,240,238,.72));margin:0 0 2px}
         .mail details.rm-mail-folded-quote > .rm-mail-quote-body .rm-mail-quote-kicker + :not(.rm-mail-quote-kicker){margin-top:0.55em}
-        .mail :is(.gmail_quote, .gmail_quote_container, blockquote.gmail_quote){display:none !important}
-        .mail details.rm-mail-folded-quote :is(.gmail_quote, .gmail_quote_container, blockquote.gmail_quote){display:block !important}
+        .mail details.rm-mail-folded-quote.rm-conversation-history > .rm-mail-quote-body{padding:0;border:0;background:transparent}
+        .mail :is(.gmail_quote, .gmail_quote_container, .x_gmail_quote, [class*="gmail_quote"], blockquote.gmail_quote){display:none !important}
+        .mail details.rm-mail-folded-quote :is(.gmail_quote, .gmail_quote_container, .x_gmail_quote, [class*="gmail_quote"], blockquote.gmail_quote){display:block !important}
         .mail .rm-mail-signature{display:none !important}
         .mail :is(.rm-mail-forward-header, .rm-mail-outlook-quote-header){display:none !important}
-        .mail.mail--clean :is(#Signature, #x_Signature, #signature, #divRplyFwdMsg, #x_divRplyFwdMsg){display:none !important}
+        .mail.mail--clean :is(#Signature, #x_Signature, #signature, #divRplyFwdMsg, #x_divRplyFwdMsg, [id*="divRplyFwdMsg"]){display:none !important}
         .mail *{max-width:100%}
       </style>
       ${remoteImageBanner}

@@ -490,16 +490,16 @@ mod tests {
     #[test]
     fn folds_split_outlook_lines_and_keeps_the_reply() {
         let html = r#"<div>
-<p>Bonjour Mr LECHOPIER,</p>
+<p>Bonjour Mr EXEMPLE,</p>
 <p>Pouvez-vous me rappeler svp</p>
 <p>Merci</p>
 <hr>
-<p>De : Nicolas Lechopier</p>
+<p>De : Alice Exemple</p>
 <p>Envoyé : mercredi 16 septembre 2026 11:44</p>
-<p>À : secretariat@drcourty.fr</p>
+<p>À : secretariat@example.fr</p>
 <p>Objet : RE: Demande de rendez-vous</p>
 <p>Bonjour,</p>
-<p>Le 14 septembre 2026 13:21:22 GMT+02:00, Nicolas Lechopier a écrit :</p>
+<p>Le 14 septembre 2026 13:21:22 GMT+02:00, Alice Exemple a écrit :</p>
 <p>Voici le document demandé.</p>
 </div>"#;
         let out = fold_quoted_history(html);
@@ -514,7 +514,7 @@ mod tests {
         assert!(out.contains("rm-mail-quote-kicker"));
         assert!(
             out.contains("rm-mail-quote-kicker\">De :")
-                || out.contains("rm-mail-quote-kicker\">De : Nicolas")
+                || out.contains("rm-mail-quote-kicker\">De : Alice")
         );
         assert!(!out.contains("rm-mail-quote-kicker\">Voici"));
         assert!(!out.contains("rustymail:"));
@@ -522,7 +522,7 @@ mod tests {
 
     #[test]
     fn folds_br_separated_history_inside_one_block() {
-        let html = "<div>Bonjour Mr LECHOPIER,<br><br>Pouvez-vous me rappeler svp<br><br>De : Nicolas Lechopier<br>Envoyé : mercredi 16 septembre 2026 11:44<br>À : secretariat@drcourty.fr<br>Objet : RE: Demande de rendez-vous<br><br>Voici le document demandé.</div>";
+        let html = "<div>Bonjour Mr EXEMPLE,<br><br>Pouvez-vous me rappeler svp<br><br>De : Alice Exemple<br>Envoyé : mercredi 16 septembre 2026 11:44<br>À : secretariat@example.fr<br>Objet : RE: Demande de rendez-vous<br><br>Voici le document demandé.</div>";
         let out = fold_quoted_history(html);
         assert!(out.contains("rm-mail-folded-quote"));
         assert!(out.find("rappeler").unwrap() < out.find("rm-mail-folded-quote").unwrap());
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn folds_wrote_line_without_blockquote() {
-        let html = r#"<div><p>Oui, je confirme le créneau de jeudi.</p><p>Le 14 septembre 2026 13:21:22 GMT+02:00, Nicolas Lechopier a écrit :</p><p>Peux-tu relire le paragraphe 2 ?</p></div>"#;
+        let html = r#"<div><p>Oui, je confirme le créneau de jeudi.</p><p>Le 14 septembre 2026 13:21:22 GMT+02:00, Alice Exemple a écrit :</p><p>Peux-tu relire le paragraphe 2 ?</p></div>"#;
         let out = fold_quoted_history(html);
         assert!(out.contains("rm-mail-folded-quote"));
         assert!(out.contains("créneau"));

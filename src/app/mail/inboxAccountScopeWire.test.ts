@@ -22,7 +22,7 @@ describe("rail compte dépliable", () => {
   beforeEach(() => {
     state.accounts = [
       account("demo", "Démo pro (local)", "playground@demo.rustymail.app"),
-      account("perso", "Nicolas Lechopier", "nicolas@exemple.fr"),
+      account("perso", "Alice Exemple", "alice@exemple.fr"),
     ];
     state.selectedAccountId = "demo";
     state.selectedMailbox = "INBOX";

@@ -32,6 +32,7 @@ beforeEach(() => {
   digestCut.notice = "";
   digestCut.paintZone = null;
   digestCut.paintPick = null;
+  digestCut.zoneStudioOpen = false;
   state.selectedThread = undefined;
   state.selectedAccountId = undefined;
   state.accounts = [];
@@ -92,6 +93,7 @@ describe("renderDigestCutPanel", () => {
     expect(html).toContain("Rendre lisible (IA)");
     expect(html).toContain('aria-pressed="true">Afficher');
     expect(html).toContain("Voir la découpe");
+    expect(html).toContain("Ajuster les zones en grand");
     expect(html).toContain("Découpe");
     expect(html).not.toContain('id="digest-cut-yaml"');
     digestCut.reformattedHtml = '<article class="rm-digest"><h2>Livré</h2></article>';

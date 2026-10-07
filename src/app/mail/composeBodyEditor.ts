@@ -543,6 +543,28 @@ export function appendComposePlainText(text: string): void {
   assignComposeSource(base ? `${base}\n\n${trimmed}` : trimmed);
 }
 
+/** Remplace la dernière occurrence d’un segment texte brut appendu (dictée → réécriture). */
+export function replaceLastComposePlainSegment(oldText: string, newText: string): boolean {
+  const oldT = oldText.trim();
+  const newT = newText.trim();
+  if (!oldT || !newT || oldT === newT) return false;
+  const current = state.composeCanonicalBody || state.draft?.markdownBody || state.composeBody || "";
+  if (isComposeHtmlSource(current)) {
+    const html = unwrapComposeHtml(current);
+    const needle = `<p>${escapeHtml(oldT)}</p>`;
+    const idx = html.lastIndexOf(needle);
+    if (idx < 0) return false;
+    const next =
+      html.slice(0, idx) + `<p>${escapeHtml(newT)}</p>` + html.slice(idx + needle.length);
+    assignComposeSource(markComposeHtml(next));
+    return true;
+  }
+  const idx = current.lastIndexOf(oldT);
+  if (idx < 0) return false;
+  assignComposeSource(current.slice(0, idx) + newT + current.slice(idx + oldT.length));
+  return true;
+}
+
 export function replaceComposeWithModelText(text: string): void {
   const trimmed = text.trim();
   if (!trimmed) {

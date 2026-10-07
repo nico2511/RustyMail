@@ -5,11 +5,9 @@ use serde::Deserialize;
 use crate::ai_agent_prepare_reply::AgentIntentResult;
 use crate::ai_llm_contracts::ensure_mail_body_output;
 use crate::ai_llm_util::{
-    gen_params_for_tier, gen_params_text_echo_for_prompt, parse_model_json, truncate_chars,
+    generate_fil_json, gen_params_text_echo_for_prompt, parse_model_json, truncate_chars,
 };
-use rustymail_domain::{
-    AssistLlmTier, AssistRecommendation, AssistUserPrefs, MailSecuritySeverity,
-};
+use rustymail_domain::{AssistRecommendation, AssistUserPrefs, MailSecuritySeverity};
 use rustymail_llm::{LlmEngine, LlmError};
 
 #[derive(Deserialize)]
@@ -37,18 +35,21 @@ pub fn extract_action_items_with_llm(
 ) -> Result<Vec<AssistRecommendation>, LlmError> {
     let lang = user_prefs.lang.trim();
     let lang = if lang.is_empty() { "fr" } else { lang };
-    let ctx = truncate_chars(thread_context, 20_000);
     let hint = prior_intent
         .map(|i| format!("\nDetected intent: {}", i.intent))
         .unwrap_or_default();
     let system = crate::prompts::system_prompt_for_language("assist_actions", lang);
-    let user = format!("Fil :\n{ctx}{hint}");
-    let raw = engine.generate(
+    // Light tier ≈ 512–4096 ; calage pour éviter max_tokens=1 sur fils longs.
+    let dto: ActionItemsDto = generate_fil_json(
+        engine,
         system.as_str(),
-        &user,
-        &gen_params_for_tier(engine, system.as_str(), &user, AssistLlmTier::Light),
+        thread_context,
+        "Fil :\n",
+        &hint,
+        20_000,
+        512,
+        4096,
     )?;
-    let dto: ActionItemsDto = parse_model_json(&raw)?;
     let mut out = Vec::new();
     for a in dto.actions.into_iter().take(6) {
         let text = a.text.trim();

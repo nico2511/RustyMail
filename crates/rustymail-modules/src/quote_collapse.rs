@@ -227,33 +227,33 @@ mod tests {
     #[test]
     fn folds_outlook_header_and_wrote_chain_after_the_reply() {
         let input = "\
-Bonjour Mr LECHOPIER,
+Bonjour Mr EXEMPLE,
 
 Pouvez-vous me rappeler svp
 
 Merci
 Cordialement
 
-De : Nicolas Lechopier
+De : Alice Exemple
 Envoyé : mercredi 16 septembre 2026 11:44
-À : secretariat@drcourty.fr
+À : secretariat@example.fr
 Objet : RE: Demande de rendez-vous
 
 Bonjour,
 
 Merci pour votre retour.
 
-Le 14 septembre 2026 13:21:22 GMT+02:00, Nicolas Lechopier <nicolas@cmabois.me> a écrit :
+Le 14 septembre 2026 13:21:22 GMT+02:00, Alice Exemple <alice@exemple.me> a écrit :
 
 Voici le document demandé.
 ";
         let out = collapse_quotes(input);
         assert!(out.visible_text.contains("Pouvez-vous me rappeler"));
-        assert!(out.visible_text.contains("Bonjour Mr LECHOPIER"));
+        assert!(out.visible_text.contains("Bonjour Mr EXEMPLE"));
         assert!(!out.visible_text.contains("document demandé"));
         assert!(!out.visible_text.contains("De :"));
         assert_eq!(out.collapsed_quotes.len(), 1);
-        assert!(out.collapsed_quotes[0].contains("De : Nicolas"));
+        assert!(out.collapsed_quotes[0].contains("De : Alice"));
         assert!(out.collapsed_quotes[0].contains("a écrit"));
         assert!(out.collapsed_quotes[0].contains("document demandé"));
     }

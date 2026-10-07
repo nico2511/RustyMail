@@ -8,12 +8,15 @@ use crate::ai_llm_contracts::{
     normalize_org_suggested_action, untrusted_mail_content_block, validate_org_orientation_shape,
     OrgOrientationActionShape, ORG_ORIENTATION_JSON_GBNF,
 };
-use crate::ai_llm_util::{gen_params_json_for_prompt, parse_model_json, untrusted_mail_for_engine};
+use crate::ai_llm_util::{
+    gen_params_json, json_truncation_retryable, output_room_after_prompt, parse_model_json,
+    resolve_max_output_tokens, truncate_chars, untrusted_mail_for_engine,
+};
 use rustymail_domain::{
     OrgOrientation, OrgProposal, OrgProposalKind, OrgProposalSource, OrgSuggestedAction,
     OrgThreadRef,
 };
-use rustymail_llm::{LlmEngine, LlmError};
+use rustymail_llm::{LlmEngine, LlmError, LlmGenParams};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +45,9 @@ struct LlmOrgOrientationResponse {
 /// Réserve tokens pour la sortie JSON lors du rognage du catalogue (`n_ctx` − réserve − marge).
 const ORG_LLM_OUTPUT_RESERVE: u32 = 2048;
 const ORG_LLM_PROMPT_SLACK: u32 = 384;
+/// Place minimale pour un JSON d’orientation complet (évite `max_tokens=1` → `{` seul).
+const MIN_ORG_OUTPUT_ROOM: u32 = 512;
+const ORG_CTX_OVERFLOW_ERR: &str = "Contexte Organiser trop large pour le modèle (n_ctx). Essayez un modèle avec une fenêtre plus grande, ou réduisez le catalogue synchronisé.";
 
 #[derive(Debug, Clone)]
 pub struct ParsedOrgOrientation {
@@ -49,34 +55,8 @@ pub struct ParsedOrgOrientation {
     pub actions: Vec<OrgProposal>,
 }
 
-fn trim_catalog_to_n_ctx(
-    engine: &LlmEngine,
-    account_label: &str,
-    heuristic_context: &str,
-    thread_catalog: &str,
-    prior_decisions: &str,
-    system: &str,
-) -> String {
-    let n_ctx = engine.n_ctx().max(1024);
-    trim_catalog_for_budget(
-        n_ctx,
-        |text| engine.token_count(text),
-        |catalog| {
-            render_org_orientation_user_prompt(
-                engine,
-                account_label,
-                heuristic_context,
-                catalog,
-                prior_decisions,
-            )
-        },
-        thread_catalog,
-        system,
-    )
-}
-
-/// Rogne le catalogue seulement. Le bloc de décisions est déjà dans le prompt mesuré,
-/// donc son budget est réservé avant ce rognage.
+/// Rogne le catalogue jusqu’à tenir dans le budget. Plus de plancher artificiel à 8 lignes :
+/// un HEAD déjà gros (aperçu + heuristiques + décisions) doit pouvoir vider le catalogue.
 fn trim_catalog_for_budget(
     n_ctx: u32,
     token_count: impl Fn(&str) -> usize,
@@ -90,11 +70,95 @@ fn trim_catalog_for_budget(
         let catalog = lines.join("\n");
         let user = user_prompt(&catalog);
         let used = (token_count(system) + token_count(&user)) as u32;
-        if used <= budget || lines.len() <= 8 {
+        if used <= budget || lines.is_empty() {
             return catalog;
         }
         lines.pop();
     }
+}
+
+struct FittedOrgPrompt {
+    user: String,
+    params: LlmGenParams,
+}
+
+/// Calage prompt : catalogue → heuristiques → décisions, jusqu’à laisser de la place pour le JSON.
+fn fit_org_orientation_prompt(
+    engine: &LlmEngine,
+    system: &str,
+    account_label: &str,
+    heuristic_context: &str,
+    thread_catalog: &str,
+    prior_decisions: &str,
+) -> Result<FittedOrgPrompt, String> {
+    let mut heur = heuristic_context.to_string();
+    let mut decisions = prior_decisions.to_string();
+    let mut catalog_lines: Vec<&str> = thread_catalog.lines().filter(|l| !l.is_empty()).collect();
+
+    for _ in 0..96 {
+        let catalog = catalog_lines.join("\n");
+        let user = render_org_orientation_user_prompt(
+            engine,
+            account_label,
+            &heur,
+            &catalog,
+            &decisions,
+        );
+        let room = output_room_after_prompt(engine, system, &user, 64);
+        let max_tokens = resolve_max_output_tokens(engine, system, &user, 512, 2048, 64);
+        if room >= MIN_ORG_OUTPUT_ROOM && max_tokens >= MIN_ORG_OUTPUT_ROOM {
+            return Ok(FittedOrgPrompt {
+                user,
+                params: gen_params_json(max_tokens),
+            });
+        }
+        if catalog_lines.len() > 1 {
+            catalog_lines.pop();
+            continue;
+        }
+        if !catalog_lines.is_empty() {
+            catalog_lines.clear();
+            continue;
+        }
+        if heur.chars().count() > 480 {
+            let keep = (heur.chars().count() * 2 / 3).max(240);
+            heur = truncate_chars(&heur, keep);
+            continue;
+        }
+        if !decisions.trim().is_empty() {
+            decisions.clear();
+            continue;
+        }
+        if heur.chars().count() > 120 {
+            heur = truncate_chars(&heur, 120);
+            continue;
+        }
+        return Err(ORG_CTX_OVERFLOW_ERR.into());
+    }
+    Err(ORG_CTX_OVERFLOW_ERR.into())
+}
+
+fn compact_org_heuristic_context(heuristic_context: &str) -> String {
+    let mut lines: Vec<&str> = heuristic_context
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    // Garde threadCount + quelques dossiers / candidats.
+    if lines.len() > 10 {
+        lines.truncate(10);
+    }
+    let joined = lines.join("\n");
+    truncate_chars(&joined, 900)
+}
+
+fn compact_org_catalog(thread_catalog: &str) -> String {
+    thread_catalog
+        .lines()
+        .filter(|l| !l.is_empty())
+        .take(24)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Prompt utilisateur d’orientation. `prior_decisions` est enveloppé comme donnée non fiable
@@ -148,7 +212,26 @@ pub fn parse_org_orientation_json(
 ) -> Result<ParsedOrgOrientation, LlmError> {
     use crate::ai_llm_contracts::{normalize_org_diagnosis, repair_short_org_diagnosis};
 
-    let parsed: LlmOrgOrientationResponse = parse_model_json(raw)?;
+    let parsed: LlmOrgOrientationResponse = match parse_model_json(raw) {
+        Ok(v) => v,
+        Err(LlmError::InvalidJson(msg)) => {
+            let trimmed = raw.trim();
+            let looks_truncated = trimmed.is_empty()
+                || trimmed == "{"
+                || trimmed == "{}"
+                || (trimmed.starts_with('{') && !trimmed.contains("diagnosis"));
+            if looks_truncated
+                || msg.contains("EOF")
+                || msg.contains("missing field 'diagnosis'")
+            {
+                return Err(LlmError::InvalidJson(format!(
+                    "Réponse d’orientation incomplète ou tronquée ({msg}). Relancez l’analyse ; si ça revient, augmentez n_ctx du modèle."
+                )));
+            }
+            return Err(LlmError::InvalidJson(msg));
+        }
+        Err(e) => return Err(e),
+    };
     let mut recommendations: Vec<String> = parsed
         .recommendations
         .iter()
@@ -270,26 +353,50 @@ pub fn org_orientation_with_llm(
     output_language: &str,
 ) -> Result<ParsedOrgOrientation, String> {
     let system = crate::prompts::system_prompt_for_language("org_proposals", output_language);
-    let catalog = trim_catalog_to_n_ctx(
+    let fitted = fit_org_orientation_prompt(
         engine,
+        system.as_str(),
         account_label,
         heuristic_context,
         thread_catalog,
         prior_decisions,
-        system.as_str(),
-    );
-    let user = render_org_orientation_user_prompt(
-        engine,
-        account_label,
-        heuristic_context,
-        &catalog,
-        prior_decisions,
-    );
-    let p = gen_params_json_for_prompt(engine, system.as_str(), &user, 512, 2048);
+    )?;
     let raw = engine
-        .generate_with_schema(system.as_str(), &user, &p, ORG_ORIENTATION_JSON_GBNF)
+        .generate_with_schema(
+            system.as_str(),
+            &fitted.user,
+            &fitted.params,
+            ORG_ORIENTATION_JSON_GBNF,
+        )
         .map_err(|e| e.to_string())?;
-    parse_org_orientation_json(&raw, valid_thread_ids).map_err(|e| e.to_string())
+    match parse_org_orientation_json(&raw, valid_thread_ids) {
+        Ok(parsed) => Ok(parsed),
+        Err(first) if json_truncation_retryable(&first) => {
+            // Repli : contexte compact (souvent la 1ʳᵉ analyse avec n_ctx saturé / sortie tronquée).
+            let compact_heur = compact_org_heuristic_context(heuristic_context);
+            let compact_catalog = compact_org_catalog(thread_catalog);
+            let fitted2 = fit_org_orientation_prompt(
+                engine,
+                system.as_str(),
+                account_label,
+                &compact_heur,
+                &compact_catalog,
+                "",
+            )?;
+            let raw2 = engine
+                .generate_with_schema(
+                    system.as_str(),
+                    &fitted2.user,
+                    &fitted2.params,
+                    ORG_ORIENTATION_JSON_GBNF,
+                )
+                .map_err(|e| format!("{first} — nouvel essai: {e}"))?;
+            parse_org_orientation_json(&raw2, valid_thread_ids).map_err(|e2| {
+                format!("{first} — nouvel essai: {e2}")
+            })
+        }
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 #[cfg(test)]
@@ -439,7 +546,65 @@ Note : ceci n’est pas une seconde action.
         );
         assert_eq!(without.lines().count(), 20);
         assert!(with_decisions.lines().count() < without.lines().count());
-        assert!(with_decisions.lines().count() >= 8);
+    }
+
+    #[test]
+    fn catalog_trim_can_go_below_eight_when_head_is_huge() {
+        let catalog = (0..20)
+            .map(|i| format!("row-{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        // HEAD énorme : même avec 0 ligne de catalogue on dépasse le budget → catalogue vide.
+        let n_ctx = ORG_LLM_OUTPUT_RESERVE + ORG_LLM_PROMPT_SLACK + 200;
+        let trimmed = trim_catalog_for_budget(
+            n_ctx,
+            str::len,
+            |cat| format!("{}\n{cat}", "H".repeat(2_000)),
+            &catalog,
+            "sys",
+        );
+        assert!(trimmed.is_empty(), "expected empty catalog, got {} lines", trimmed.lines().count());
+    }
+
+    #[test]
+    fn fit_org_prompt_leaves_output_room_on_small_ctx() {
+        let mut engine = LlmEngine::open_ai_compatible(
+            "http://127.0.0.1:8080/v1".into(),
+            "test".into(),
+            String::new(),
+        )
+        .expect("engine");
+        engine.set_n_ctx_probe(4096);
+        let system = crate::prompts::system_prompt_for_language("org_proposals", "fr");
+        let mut catalog = String::new();
+        for i in 0..120 {
+            catalog.push_str(&format!(
+                "tid-{i};INBOX;sender{i}@example.com;Sujet assez long pour saturer le contexte {i}\n"
+            ));
+        }
+        let heur = format!(
+            "threadCount=938\n{}\n{}",
+            "dossier ".repeat(80),
+            (0..12)
+                .map(|i| format!("- candidat {i} | archive | count=40 | ids=t{i}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        let fitted = fit_org_orientation_prompt(
+            &engine,
+            system.as_str(),
+            "acc",
+            &heur,
+            &catalog,
+            "applied ×3 | archive → Archive",
+        )
+        .expect("fit");
+        let room = output_room_after_prompt(&engine, system.as_str(), &fitted.user, 64);
+        assert!(
+            room >= MIN_ORG_OUTPUT_ROOM,
+            "output room collapsed ({room}); orientation JSON cannot complete"
+        );
+        assert!(fitted.params.max_tokens >= 128, "max_tokens={}", fitted.params.max_tokens);
     }
 
     #[test]

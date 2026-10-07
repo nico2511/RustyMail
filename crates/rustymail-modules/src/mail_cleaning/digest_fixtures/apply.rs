@@ -89,6 +89,12 @@ fn email_domain(email: &str) -> Option<String> {
     Some(domain.to_string())
 }
 
+/// Aperçu d’essai : le même gabarit HTML peut venir d’un autre expéditeur.
+/// La lecture réelle continue de passer par [`apply_fixtures`], qui exige le domaine.
+pub(super) fn apply_ignoring_sender(fixture: &DigestFixture, html: &str) -> Option<String> {
+    apply_one(fixture, html)
+}
+
 fn apply_one(fixture: &DigestFixture, html: &str) -> Option<String> {
     let doc = Html::parse_fragment(html);
     let children = root_children(&doc, fixture)?;

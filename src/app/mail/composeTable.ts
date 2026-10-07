@@ -6,6 +6,9 @@ import TableRow from "@tiptap/extension-table-row";
 
 const CELL_BORDER = "1px solid #787775";
 const CELL_PAD = "6px 8px";
+/** Fond clair d’en-tête e-mail — texte sombre obligatoire (le compositeur hérite sinon de `--text` clair). */
+const HEADER_BG = "#f2f0ec";
+const HEADER_FG = "#1c1b19";
 
 /** Tableau TipTap avec attrs e-mail (bordures / en-tête) pour survivre à l’envoi. */
 export const ComposeTable = Table.extend({
@@ -31,10 +34,10 @@ export const ComposeTableHeader = TableHeader.extend({
     return [
       "th",
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        bgcolor: "#f2f0ec",
+        bgcolor: HEADER_BG,
         align: "left",
         valign: "top",
-        style: `border:${CELL_BORDER};padding:${CELL_PAD};vertical-align:top;background:#f2f0ec;font-weight:650;`,
+        style: `border:${CELL_BORDER};padding:${CELL_PAD};vertical-align:top;background:${HEADER_BG};color:${HEADER_FG};font-weight:650;`,
       }),
       0,
     ];

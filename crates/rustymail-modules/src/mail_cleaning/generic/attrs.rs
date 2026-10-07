@@ -24,6 +24,9 @@ fn retain_structural_class_attr(value: &str) -> Option<String> {
                 || c.starts_with("rm-deblock-")
                 || c.starts_with("rm-github-")
                 || matches!(*c, "gmail_quote" | "gmail_quote_container")
+                || c.ends_with("_gmail_quote")
+                || c.ends_with("_gmail_quote_container")
+                || *c == "x_gmail_quote"
         })
         .collect();
     if kept.is_empty() {

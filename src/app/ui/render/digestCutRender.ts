@@ -1,4 +1,5 @@
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
+import { emphasizeReadingHtml, supplementReadingFacts } from "../../mail/emphasizeReading";
 import { sanitizeEmailHtml } from "../../mail/mailEmailHtmlSanitizeCoreRun";
 import { decorateMailHtmlForCut } from "../../mail/digestCutPaint";
 import { checkSummaryFr } from "../../mail/digestCutValidate";
@@ -124,7 +125,11 @@ function previewPane(): string {
     const note = digestCut.reformattedHtml.trim()
       ? `<p class="digest-cut__reformat-note dim">Article de lecture — signal en avant.</p>`
       : `<p class="digest-cut__reformat-note dim">Aperçu de la découpe (zones). Puis Rendre lisible.</p>`;
-    return `${note}${sanitizeEmailHtml(digestCut.previewHtml).html}`;
+    const safe = emphasizeReadingHtml(sanitizeEmailHtml(digestCut.previewHtml).html);
+    const withFacts = digestCut.reformattedHtml.trim()
+      ? supplementReadingFacts(safe, digestCut.html)
+      : safe;
+    return `${note}${withFacts}`;
   }
   return `<p class="digest-cut__empty-hint">Ajustez si besoin, puis <strong>Rendre lisible (IA)</strong>.</p>`;
 }
@@ -300,12 +305,38 @@ function adjustSection(): string {
                  ? ""
                  : `<button type="button" class="ghost-button" data-action="digest-cut-preview" ${busy ? "disabled" : ""}>${digestCut.previewing ? "Aperçu…" : "Voir la découpe"}</button>`
              }
+             <button type="button" class="ghost-button" data-action="digest-cut-zone-studio">${digestCut.zoneStudioOpen ? "Fermer l’éditeur" : "Ajuster les zones en grand"}</button>
              <button type="button" class="ghost-button" data-action="digest-cut-toggle-code" aria-pressed="${digestCut.showCode ? "true" : "false"}">${digestCut.showCode ? "Masquer le code" : "Détails techniques"}</button>
            </div>
-           <p class="digest-bench__fine dim">L’IA construit un article : IDs voyants, faits, liens utiles — sans le blabla.</p>`
+           <p class="digest-bench__fine dim">L’IA construit un article : IDs voyants, faits, liens utiles — sans le blabla. Les zones se règlent plus clairement en grand.</p>`
         : `<p class="digest-cut__empty-hint">Après l’étape 2, vous pouvez ajuster puis rendre le mail lisible.</p>`
     }
   </section>`;
+}
+
+function zoneStudio(rendered: string, paintClass: string): string {
+  if (!digestCut.zoneStudioOpen || !digestCut.proposal) return "";
+  return `<div class="modal-backdrop digest-cut-studio" role="presentation">
+    <div class="modal digest-cut-studio__panel modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="digest-cut-studio-title">
+      <header class="modal-header">
+        <h3 id="digest-cut-studio-title">Ajuster les zones</h3>
+        <button type="button" class="ghost-button" data-action="digest-cut-zone-studio">Fermer</button>
+      </header>
+      <div class="digest-cut-studio__body">
+        <div class="digest-cut-studio__mail mail digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}</div>
+        <aside class="digest-cut-studio__side">
+          <p class="digest-bench__fine">Cliquez un bloc du mail. <strong>Plus grand</strong> / <strong>Plus petit</strong> changent sa taille, puis assignez-le.</p>
+          <div class="digest-cut__legend" aria-hidden="true">
+            <span class="digest-cut__legend-item digest-cut__legend-item--header">En-tête</span>
+            <span class="digest-cut__legend-item digest-cut__legend-item--body">Corps</span>
+            <span class="digest-cut__legend-item digest-cut__legend-item--footer">Pied</span>
+          </div>
+          <div class="digest-cut__zones">${zoneRow("header")}${zoneRow("body")}${zoneRow("footer")}</div>
+          ${paintBar()}
+        </aside>
+      </div>
+    </div>
+  </div>`;
 }
 
 export function renderDigestCutPanel(): string {
@@ -317,6 +348,10 @@ export function renderDigestCutPanel(): string {
   const editing = Boolean(digestCut.proposal && loaded);
   const paintClass = editing || digestCut.paintZone ? " digest-cut__mail-source--painting" : "";
   const step = currentStep();
+  const studio = digestCut.zoneStudioOpen && editing;
+  const mailPane = studio
+    ? `<p class="digest-cut__empty-hint">Le mail est ouvert dans l’éditeur de zones. Fermez-le pour revenir à cet aperçu.</p>`
+    : rendered;
 
   return `<div class="settings-page digest-cut">
     <article class="settings-card surface-sm digest-cut__shell">
@@ -331,8 +366,8 @@ export function renderDigestCutPanel(): string {
       </div>
       <div class="digest-cut__preview digest-bench__compare digest-bench__compare--split">
         <section class="digest-bench__pane">
-          <h4 class="digest-bench__pane-title">Mail d’origine${editing ? " · cliquez une zone colorée" : ""}</h4>
-          <div class="digest-bench__pane-body mail digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}</div>
+          <h4 class="digest-bench__pane-title">Mail d’origine${editing && !studio ? " · cliquez une zone colorée" : ""}</h4>
+          <div class="digest-bench__pane-body mail digest-cut__mail-source${studio ? "" : paintClass}" ${studio ? "" : `data-digest-cut-mail="1"`}>${mailPane}</div>
         </section>
         <section class="digest-bench__pane">
           <h4 class="digest-bench__pane-title">${escapeHtml(previewPaneTitle())}</h4>
@@ -341,5 +376,6 @@ export function renderDigestCutPanel(): string {
       </div>
       ${codeBlock()}
     </article>
+    ${zoneStudio(rendered, paintClass)}
   </div>`;
 }

@@ -8,8 +8,8 @@ use crate::ai_assist_facts::{facts_block_for_draft, sender_proposes_meeting};
 use crate::ai_assist_thread::facts_support_scheduling;
 use crate::ai_llm_contracts::{ensure_reply_draft_output, introduces_llm_meta};
 use crate::ai_llm_util::{
-    budget_report, cancelled_llm_err, gen_params_json_for_prompt, gen_params_text_for_prompt,
-    parse_model_json, truncate_chars,
+    budget_report, cancelled_llm_err, generate_fil_json, gen_params_text,
+    output_room_after_prompt, resolve_max_output_tokens, truncate_chars,
 };
 use rustymail_domain::{AssistFactsSnapshot, AssistUserPrefs};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -112,17 +112,21 @@ fn default_tone_hint() -> String {
 
 #[derive(Deserialize)]
 struct SlotsDto {
+    #[serde(default)]
     slots: Vec<String>,
 }
 
+const MIN_DRAFT_OUTPUT_ROOM: u32 = 320;
+const DRAFT_CTX_OVERFLOW_ERR: &str = "Brouillon impossible : fenêtre de contexte trop pleine. Augmentez n_ctx dans Paramètres → IA, ou ouvrez un fil plus court.";
+
 fn draft_reply_prompts(
+    engine: &LlmEngine,
     thread_context: &str,
     prior_intent: Option<&AgentIntentResult>,
     draft_language: &str,
     user_prefs: &AssistUserPrefs,
     prior_facts: Option<&AssistFactsSnapshot>,
-) -> (String, String) {
-    let ctx = truncate_chars(thread_context, 24_000);
+) -> Result<(String, String, rustymail_llm::LlmGenParams), LlmError> {
     let tone = user_prefs.tone.trim();
     let tone = if tone.is_empty() { "neutre" } else { tone };
     let facts_hint = prior_facts.map(facts_block_for_draft).unwrap_or_default();
@@ -154,12 +158,26 @@ fn draft_reply_prompts(
     let mut system = crate::prompts::system_prompt_for_language("agent_draft", &lang);
     system = system.replace("{draft_language}", draft_language.trim());
     let system = format!("{system}{scheduling_note}{role_note}");
-    let user = format!(
-        "Rôle : tu es le destinataire du fil (propriétaire de la boîte, « vous » dans le fil = toi). Rédige ta réponse au dernier expéditeur entrant.\n\
+    let system = system.trim().to_string();
+    let prefix = "Rôle : tu es le destinataire du fil (propriétaire de la boîte, « vous » dans le fil = toi). Rédige ta réponse au dernier expéditeur entrant.\n\
 Interdiction : ne reformule pas leur message, ne signe pas à leur place, ne réécris pas leur lettre.\n\
-Contexte fil :\n{ctx}{hint}"
-    );
-    (system.trim().to_string(), user)
+Contexte fil :\n";
+    let mut max_chars = thread_context.chars().count().min(24_000).max(400);
+    for _ in 0..24 {
+        let ctx = truncate_chars(thread_context, max_chars);
+        let user = format!("{prefix}{ctx}{hint}");
+        let room = output_room_after_prompt(engine, system.as_str(), &user, 64);
+        let max_tokens =
+            resolve_max_output_tokens(engine, system.as_str(), &user, 320, 1_200, 64);
+        if room >= MIN_DRAFT_OUTPUT_ROOM && max_tokens >= 128 {
+            return Ok((system, user, gen_params_text(max_tokens)));
+        }
+        if max_chars <= 500 {
+            return Err(LlmError::Msg(DRAFT_CTX_OVERFLOW_ERR.into()));
+        }
+        max_chars = (max_chars * 2 / 3).max(500);
+    }
+    Err(LlmError::Msg(DRAFT_CTX_OVERFLOW_ERR.into()))
 }
 
 /// Brouillon étape 2 avec fragments streamés (même sortie que l’appel synchrone).
@@ -173,19 +191,20 @@ pub fn agent_draft_reply_streaming(
     cancelled: &AtomicBool,
     mut on_chunk: impl FnMut(&str),
 ) -> Result<AgentDraftResult, LlmError> {
-    let (system, user) = draft_reply_prompts(
+    let (system, user, params) = draft_reply_prompts(
+        engine,
         thread_context,
         prior_intent,
         draft_language,
         user_prefs,
         prior_facts,
-    );
+    )?;
     let mut streamed = String::new();
     // Budget de réponse courte (pas un echo de la longueur du fil — sinon le modèle réécrit le mail).
     let raw = engine.generate_streaming(
         system.as_str(),
         &user,
-        &gen_params_text_for_prompt(engine, system.as_str(), &user, 320, 1_200),
+        &params,
         |piece| -> ControlFlow<Result<(), Infallible>> {
             if cancelled.load(Ordering::Relaxed) {
                 return ControlFlow::Break(Ok(()));
@@ -231,13 +250,16 @@ pub fn agent_prepare_reply_step(
     match step {
         AgentPrepareReplyStep::AnalyzeIntent => {
             let system = crate::prompts::system_prompt_for_language("agent_intent", lang);
-            let user = format!("Fil :\n{ctx}");
-            let raw = engine.generate(
+            let dto: IntentDto = generate_fil_json(
+                engine,
                 system.as_str(),
-                &user,
-                &gen_params_json_for_prompt(engine, system.as_str(), &user, 256, 768),
+                &ctx,
+                "Fil :\n",
+                "",
+                24_000,
+                256,
+                768,
             )?;
-            let dto: IntentDto = parse_model_json(&raw)?;
             let intent: String = dto.intent.trim().chars().take(600).collect();
             if intent.is_empty() {
                 return Err(LlmError::InvalidJson(
@@ -290,15 +312,16 @@ pub fn agent_prepare_reply_step(
             }
             let mut system = crate::prompts::system_prompt_for_language("agent_slots", lang);
             system = system.replace("{timezone}", tz);
-            let user = format!(
-                "Fil :\n{ctx}\nPropose des créneaux pertinents pour répondre à la demande de rendez-vous."
-            );
-            let raw = engine.generate(
+            let dto: SlotsDto = generate_fil_json(
+                engine,
                 system.as_str(),
-                &user,
-                &gen_params_json_for_prompt(engine, system.as_str(), &user, 256, 768),
+                &ctx,
+                "Fil :\n",
+                "\nPropose des créneaux pertinents pour répondre à la demande de rendez-vous.",
+                24_000,
+                256,
+                768,
             )?;
-            let dto: SlotsDto = parse_model_json(&raw)?;
             let slots: Vec<String> = dto
                 .slots
                 .into_iter()
@@ -384,13 +407,22 @@ mod tests {
             confidence: 0.9,
         };
         let i = intent("sender_proposes_meeting");
-        let (system, user) = draft_reply_prompts(
+        let mut engine = LlmEngine::open_ai_compatible(
+            "http://127.0.0.1:8080/v1".into(),
+            "test".into(),
+            String::new(),
+        )
+        .expect("engine");
+        engine.set_n_ctx_probe(8192);
+        let (system, user, _) = draft_reply_prompts(
+            &engine,
             "[message_id=m1] ...",
             Some(&i),
             "fr",
             &AssistUserPrefs::default(),
             Some(&facts),
-        );
+        )
+        .expect("fit");
         assert!(system.contains("PROPOSE"));
         assert!(system.contains("accepte, confirme"));
         assert!(!system.contains("disponibilité générale"));
@@ -400,13 +432,22 @@ mod tests {
     #[test]
     fn draft_prompt_owner_must_propose_has_no_inversion_note() {
         let i = intent("owner_must_propose");
-        let (system, _) = draft_reply_prompts(
+        let mut engine = LlmEngine::open_ai_compatible(
+            "http://127.0.0.1:8080/v1".into(),
+            "test".into(),
+            String::new(),
+        )
+        .expect("engine");
+        engine.set_n_ctx_probe(8192);
+        let (system, _, _) = draft_reply_prompts(
+            &engine,
             "[message_id=m1] ...",
             Some(&i),
             "fr",
             &AssistUserPrefs::default(),
             None,
-        );
+        )
+        .expect("fit");
         assert!(system.contains("C’est à toi"));
         assert!(!system.contains("PROPOSE un rendez-vous"));
     }

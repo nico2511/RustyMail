@@ -545,8 +545,7 @@ body.clarity-dark {
   max-width: none;
 }
 
-.thread-reading .message.thread-msg--folded .thread-msg-card,
-.thread-reading .message.thread-msg--folded .thread-msg-head-actions {
+.thread-reading .message.thread-msg--folded .thread-msg-card {
   display: none;
 }
 
@@ -712,6 +711,15 @@ body.clarity-dark {
   align-items: center;
 }
 
+/* Ruban d’actions : dans la carte (fond gris), au-dessus du papier clair. */
+.thread-reading.thread-reading--reading-layout .thread-msg-card > .thread-msg-head-actions {
+  width: 100%;
+  justify-content: flex-end;
+  margin: 0 0 12px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--border-weak);
+}
+
 .thread-reading.thread-reading--reading-layout .thread-more-actions .action-bar + .action-bar::before,
 .thread-reading.thread-reading--reading-layout .thread-reading-nav-actions .action-bar + .action-bar::before {
   content: "";
@@ -848,7 +856,7 @@ body.clarity-dark {
 
 .thread-reading.thread-reading--reading-layout .message-head-row {
   min-height: 28px;
-  margin-bottom: 2px;
+  margin-bottom: 8px;
   gap: 8px;
 }
 

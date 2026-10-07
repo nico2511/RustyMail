@@ -5,14 +5,14 @@
 //! | Couche | Module | Rôle |
 //! |--------|--------|------|
 //! | **HTML** | [`pipeline`](pipeline), [`generic`](generic), [`signature_html`](signature_html) | Produit `cleanedHtmlBody` (discussion : citations pliées, signature atténuée) |
-//! | **Texte** | [`reading_text`](reading_text) si HTML, sinon plain (`signature_detection`, `quote_collapse`) | `cleanedText` = substance visible du corps affiché |
+//! | **Texte** | [`reading_text`](reading_text) si HTML (omit `.rm-mail-folded-quote`), sinon plain | `cleanedText` = substance visible (pas l’historique / citation repliés) |
 //! | **Affichage** | DOMPurify + shadow `.mail` | Sécurité ; `.rm-mail-folded-quote` se déplie, `.rm-mail-signature` est masquée |
 //!
 //! Le générique sert la **lecture en discussion**. Les digests ne s’étendent pas au courrier personne-à-personne. Deblock est une fixture ; Amazon et GitHub restent des plugins.
 //!
 //! ## Ordre du pipeline HTML ([`clean_html_for_markdown`](pipeline::clean_html_for_markdown))
 //!
-//! 1. [`generic::generic_html_clean`] — MSO/VML, citations Gmail/Apple repliées, scripts, trackers
+//! 1. [`generic::generic_html_clean`] — MSO/VML, citations Gmail/Apple/`x_gmail_quote` repliées, scripts, trackers
 //! 2. Fixture locale seulement si « Activer en lecture » a installé un YAML déjà accepté — sinon cette étape est vide
 //! 3. Plugin si détecté (Amazon, GitHub, fixture Deblock) — digest structuré, inchangé ensuite
 //! 4. Garde qualité (masse de texte)

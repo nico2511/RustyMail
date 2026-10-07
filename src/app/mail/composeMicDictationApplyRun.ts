@@ -1,6 +1,6 @@
 import type { MicDictationTarget } from "../types";
 import { state } from "../state";
-import { appendComposePlainText } from "./composeBodyEditor";
+import { appendComposePlainText, replaceLastComposePlainSegment } from "./composeBodyEditor";
 import { composePreviewPaneActive, schedulePreviewUpdate } from "./composeComposerBridge";
 
 export function micTargetFromView(explicit?: MicDictationTarget): MicDictationTarget {
@@ -27,4 +27,33 @@ export function applyDictationToTarget(text: string, target: MicDictationTarget)
   }
   appendComposePlainText(trimmed);
   if (composePreviewPaneActive()) schedulePreviewUpdate(0);
+}
+
+/** Remplace le dernier segment dicté (après réécriture LLM optionnelle). */
+export function replaceDictatedSegmentInTarget(
+  raw: string,
+  rewritten: string,
+  target: MicDictationTarget,
+): void {
+  const oldT = raw.trim();
+  const newT = rewritten.trim();
+  if (!oldT || !newT || oldT === newT) return;
+  if (target === "thread-qa") {
+    const ta = document.querySelector<HTMLTextAreaElement>("#thread-qa-input");
+    const current = ta?.value ?? state.threadQaDraft;
+    const idx = current.lastIndexOf(oldT);
+    if (idx < 0) return;
+    const next = current.slice(0, idx) + newT + current.slice(idx + oldT.length);
+    state.threadQaDraft = next;
+    if (ta) {
+      ta.value = next;
+      ta.focus();
+      const end = idx + newT.length;
+      ta.setSelectionRange(end, end);
+    }
+    return;
+  }
+  if (replaceLastComposePlainSegment(oldT, newT) && composePreviewPaneActive()) {
+    schedulePreviewUpdate(0);
+  }
 }

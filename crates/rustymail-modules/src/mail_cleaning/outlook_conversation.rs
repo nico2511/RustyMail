@@ -42,7 +42,11 @@ static SEL_SIGNATURE: LazyLock<Selector> = LazyLock::new(|| {
 });
 
 static SEL_FWD_HEADER: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("#divRplyFwdMsg, #x_divRplyFwdMsg").expect("outlook forward header selector")
+    // Outlook préfixe parfois plusieurs fois (`x_`, `x_x_`) lors des réponses imbriquées.
+    Selector::parse(
+        "#divRplyFwdMsg, #x_divRplyFwdMsg, [id$='divRplyFwdMsg'], [id*='divRplyFwdMsg']",
+    )
+    .expect("outlook forward header selector")
 });
 
 static SEL_INLINE_QUOTE_BLOCKS: LazyLock<Selector> =
@@ -224,72 +228,102 @@ fn build_report(turns: Vec<Turn>) -> ConversationReport {
     html.push_str("<article class=\"rm-conversation-report\">\n");
 
     let mut plain = String::new();
-    for (i, turn) in turns.iter().enumerate() {
-        let n = i + 1;
-        let cited = i > 0;
-        let depth_attr = if cited {
-            format!(" data-depth=\"{n}\"")
-        } else {
-            String::new()
-        };
-        // Tours structurés (enveloppes, intervenants) : lisibles, pas repliés
-        // dans la citation. L’analyse « qui a les infos » reste à part du pli.
-        html.push_str(&format!(
-            "<section class=\"rm-conversation-turn{}\" data-turn=\"{n}\"{depth_attr}>\n",
-            if cited {
-                " rm-conversation-turn--cited"
-            } else {
-                ""
-            }
-        ));
-        if cited || turn.envelope.has_any() {
-            html.push_str("<table class=\"rm-conversation-envelope\"><tbody>\n");
-            if !turn.envelope.from.is_empty() {
-                html.push_str(&envelope_participants_row("De", &turn.envelope.from));
-            }
-            if !turn.envelope.sent.is_empty() {
-                html.push_str(&envelope_text_row("Envoyé", &turn.envelope.sent));
-            }
-            if !turn.envelope.to.is_empty() {
-                html.push_str(&envelope_participants_row("À", &turn.envelope.to));
-            }
-            if !turn.envelope.cc.is_empty() {
-                html.push_str(&envelope_participants_row("Cc", &turn.envelope.cc));
-            }
-            if !turn.envelope.bcc.is_empty() {
-                html.push_str(&envelope_participants_row("Cci", &turn.envelope.bcc));
-            }
-            if !turn.envelope.subject.is_empty() {
-                html.push_str(&envelope_text_row("Objet", &turn.envelope.subject));
-            }
-            html.push_str("</tbody></table>\n");
-        }
-        if !turn.body_html.trim().is_empty() {
-            html.push_str("<div class=\"rm-conversation-body\">\n");
-            html.push_str(&turn.body_html);
-            html.push_str("\n</div>\n");
-        }
-        html.push_str("</section>\n");
+    let (latest, history) = turns.split_first().map_or((None, &[][..]), |(h, t)| (Some(h), t));
 
-        if i > 0 {
-            plain.push_str("\n--- cité ---\n\n");
-        }
-        plain.push_str(&format!(
-            "=== [{n}] {} · {} · {} ===\n",
-            format_participants_plain(&turn.envelope.from),
-            turn.envelope.sent.trim(),
-            turn.envelope.subject.trim()
-        ));
-        plain.push_str(turn.body_text.trim());
-        if !turn.body_text.ends_with('\n') {
-            plain.push('\n');
-        }
+    if let Some(turn) = latest {
+        html.push_str(&render_turn_html(turn, 1, false, 0));
+        // Texte de lecture = tour visible seulement (comme citation Gmail repliée).
+        append_turn_plain(&mut plain, turn, 1, false);
     }
+
+    // Historique : replié comme Gmail, arbre indenté à l’ouverture.
+    // Hors de `plain_text` : le fil IMAP porte déjà les messages antérieurs.
+    if !history.is_empty() {
+        let n_hist = history.len();
+        let summary = if n_hist == 1 {
+            "Historique (1 message)".to_string()
+        } else {
+            format!("Historique ({n_hist} messages)")
+        };
+        html.push_str(&format!(
+            "<details class=\"rm-mail-folded-quote rm-conversation-history\"><summary>{}</summary>\n\
+             <div class=\"rm-mail-quote-body rm-conversation-history-tree\">\n",
+            escape_html_text(&summary)
+        ));
+        for (i, turn) in history.iter().enumerate() {
+            let n = i + 2;
+            let depth = i + 1;
+            html.push_str(&render_turn_html(turn, n, true, depth));
+        }
+        html.push_str("</div></details>\n");
+    }
+
     html.push_str("</article>\n");
 
     ConversationReport {
         html,
         plain_text: plain.trim().to_string(),
+    }
+}
+
+fn render_turn_html(turn: &Turn, n: usize, cited: bool, depth: usize) -> String {
+    let depth_attr = if cited && depth > 0 {
+        format!(" data-depth=\"{depth}\"")
+    } else {
+        String::new()
+    };
+    let mut html = format!(
+        "<section class=\"rm-conversation-turn{}\" data-turn=\"{n}\"{depth_attr}>\n",
+        if cited {
+            " rm-conversation-turn--cited"
+        } else {
+            ""
+        }
+    );
+    if cited || turn.envelope.has_any() {
+        html.push_str("<table class=\"rm-conversation-envelope\"><tbody>\n");
+        if !turn.envelope.from.is_empty() {
+            html.push_str(&envelope_participants_row("De", &turn.envelope.from));
+        }
+        if !turn.envelope.sent.is_empty() {
+            html.push_str(&envelope_text_row("Envoyé", &turn.envelope.sent));
+        }
+        if !turn.envelope.to.is_empty() {
+            html.push_str(&envelope_participants_row("À", &turn.envelope.to));
+        }
+        if !turn.envelope.cc.is_empty() {
+            html.push_str(&envelope_participants_row("Cc", &turn.envelope.cc));
+        }
+        if !turn.envelope.bcc.is_empty() {
+            html.push_str(&envelope_participants_row("Cci", &turn.envelope.bcc));
+        }
+        if !turn.envelope.subject.is_empty() {
+            html.push_str(&envelope_text_row("Objet", &turn.envelope.subject));
+        }
+        html.push_str("</tbody></table>\n");
+    }
+    if !turn.body_html.trim().is_empty() {
+        html.push_str("<div class=\"rm-conversation-body\">\n");
+        html.push_str(&turn.body_html);
+        html.push_str("\n</div>\n");
+    }
+    html.push_str("</section>\n");
+    html
+}
+
+fn append_turn_plain(plain: &mut String, turn: &Turn, n: usize, cited: bool) {
+    if cited {
+        plain.push_str("\n--- cité ---\n\n");
+    }
+    plain.push_str(&format!(
+        "=== [{n}] {} · {} · {} ===\n",
+        format_participants_plain(&turn.envelope.from),
+        turn.envelope.sent.trim(),
+        turn.envelope.subject.trim()
+    ));
+    plain.push_str(turn.body_text.trim());
+    if !turn.body_text.ends_with('\n') {
+        plain.push('\n');
     }
 }
 
@@ -544,11 +578,17 @@ fn normalize_probe(s: &str) -> String {
 }
 
 fn collect_boundaries(doc: &Html) -> Vec<NodeId> {
-    let mut ids: Vec<NodeId> = doc.select(&SEL_FWD_HEADER).map(|e| e.id()).collect();
+    // Ignorer les ancres déjà dans un pli Gmail : elles restent dans le corps du tour.
+    let mut ids: Vec<NodeId> = doc
+        .select(&SEL_FWD_HEADER)
+        .filter(|el| !inside_folded_quote(*el))
+        .map(|e| e.id())
+        .collect();
 
     let mut inline: Vec<(usize, NodeId)> = doc
         .select(&SEL_INLINE_QUOTE_BLOCKS)
         .filter(|el| !ids.contains(&el.id()))
+        .filter(|el| !inside_folded_quote(*el))
         .filter(|el| {
             block_looks_like_outlook_inline_quote_header(*el)
                 || block_looks_like_wrote_attribution(*el)
@@ -575,6 +615,18 @@ fn collect_boundaries(doc: &Html) -> Vec<NodeId> {
     ids.sort_by_key(|id| order.iter().position(|&x| x == *id).unwrap_or(usize::MAX));
     ids.dedup();
     ids
+}
+
+fn inside_folded_quote(el: ElementRef<'_>) -> bool {
+    el.ancestors().any(|a| {
+        ElementRef::wrap(a).is_some_and(|anc| {
+            anc.value()
+                .attr("class")
+                .unwrap_or("")
+                .split_whitespace()
+                .any(|c| c == "rm-mail-folded-quote" || c == "rm-mail-quote-body")
+        })
+    })
 }
 
 fn block_looks_like_wrote_attribution(el: ElementRef<'_>) -> bool {
@@ -1063,6 +1115,8 @@ fn sanitize_conversation_body_html(html: &str) -> String {
     let mut doc = Html::parse_fragment(html);
     detach_outlook_trace_images(&mut doc);
     strip_noise_blocks_from_body_html(&mut doc);
+    // Citations Gmail / `x_gmail_quote` encore présentes dans un tour → même pli que le fil Gmail.
+    super::generic::gmail::clean_gmail_noise(&mut doc);
     prune_empty_spans(&mut doc);
     scrub_leaked_headers_from_html(&doc.html())
 }
@@ -1189,10 +1243,43 @@ mod tests {
         assert!(!report.html.contains("a@example.com<"));
         assert!(report.html.contains("Message transféré"));
         assert!(report.html.contains("brief logistique"));
+        assert!(report.html.contains("rm-mail-folded-quote"));
+        assert!(report.html.contains("rm-conversation-history"));
+        assert!(report.html.contains("data-depth=\"1\""));
         assert!(!report.html.contains("Signature"));
         assert!(!report.html.contains("divRplyFwdMsg"));
         assert!(report.plain_text.contains("=== [1]"));
-        assert!(report.plain_text.contains("--- cité ---"));
+        assert!(report.plain_text.contains("Message transféré"));
+        assert!(
+            !report.plain_text.contains("--- cité ---"),
+            "l’historique replié ne doit pas polluer cleanedText / le fil"
+        );
+        assert!(!report.plain_text.contains("brief logistique"));
+        let reply_at = report.html.find("Message transféré").unwrap();
+        let fold_at = report.html.find("rm-mail-folded-quote").unwrap();
+        assert!(reply_at < fold_at);
+    }
+
+    #[test]
+    fn folds_nested_x_x_div_rply_fwd_msg() {
+        let html = r#"<div>
+<p>Dernière réponse visible.</p>
+<div id="divRplyFwdMsg"><b>De :</b> Alice &lt;a@example.com&gt;<br><b>Envoyé :</b> mardi<br><b>Objet :</b> RE: Sujet</div>
+<div><p>Réponse intermédiaire.</p>
+<div id="x_x_divRplyFwdMsg"><b>De :</b> Bob &lt;b@example.com&gt;<br><b>Envoyé :</b> lundi<br><b>Objet :</b> Sujet</div>
+<p>Message d’origine.</p>
+</div>
+</div>"#;
+        let report = try_build_report(html).expect("report");
+        assert!(report.html.contains("Dernière réponse"));
+        assert!(report.html.contains("Message d’origine") || report.html.contains("Message d'origine"));
+        assert!(report.html.contains("rm-mail-folded-quote"));
+        assert!(report.html.contains("data-depth=\"1\""));
+        assert!(
+            report.html.contains("data-depth=\"2\"")
+                || report.html.matches("rm-conversation-turn--cited").count() >= 2
+        );
+        assert!(!report.plain_text.contains("--- cité ---"));
     }
 
     #[test]
@@ -1250,9 +1337,13 @@ mod tests {
         assert!(!report.html.contains("cid:image001"));
         assert!(report.html.contains("Ligne un"));
         assert!(report.html.contains("Ligne deux"));
+        assert!(report.html.contains("Cité"));
         assert!(report.plain_text.contains("Ligne un"));
         assert!(report.plain_text.contains("Ligne deux"));
-        assert!(report.plain_text.contains("Cité"));
+        assert!(
+            !report.plain_text.contains("Cité"),
+            "corps cité replié hors du texte de lecture"
+        );
     }
 
     #[test]
@@ -1337,7 +1428,12 @@ mod tests {
         assert!(report.html.contains("15:01"));
         assert!(report.html.contains("28 mai 2026"));
         assert!(!report.plain_text.contains("\nColine Exemple\n"));
-        assert!(report.plain_text.matches("--- cité ---").count() >= 3);
+        assert!(report.plain_text.contains("7000 pièces"));
+        assert!(
+            !report.plain_text.contains("--- cité ---"),
+            "tours cités hors du texte de lecture"
+        );
+        assert!(!report.plain_text.contains("heures de régie"));
     }
 
     #[test]

@@ -159,7 +159,7 @@ fn zone_excerpts(
     let yaml = proposal_to_fixture_yaml(&as_is).unwrap_or_default();
     let preview = preview_candidate_fixture(&yaml, html, sender_email);
     let reading = preview.html.unwrap_or_default();
-    let plain = strip_tags_to_plain(&reading);
+    let plain = reading_source_plain(&reading, preview.applicable, html);
     let subject = subject.split_whitespace().collect::<Vec<_>>().join(" ");
     let header = if subject.is_empty() {
         truncate_chars(&plain, EXCERPT_CHARS / 3)
@@ -176,6 +176,20 @@ fn zone_excerpts(
     }
 }
 
+/// Texte pour l’article. Si la découpe ne s’applique pas, on garde le mail entier.
+fn reading_source_plain(cut_html: &str, cut_applicable: bool, source_html: &str) -> String {
+    let cut = strip_tags_to_plain(cut_html);
+    if cut_applicable && cut.chars().count() >= 40 {
+        return cut;
+    }
+    let full = strip_tags_to_plain(source_html);
+    if full.chars().count() > cut.chars().count() {
+        full
+    } else {
+        cut
+    }
+}
+
 fn strip_tags_to_plain(html: &str) -> String {
     let mut out = String::new();
     let mut in_tag = false;
@@ -187,7 +201,19 @@ fn strip_tags_to_plain(html: &str) -> String {
             _ => {}
         }
     }
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
+    out.split_whitespace()
+        .filter(|word| !looks_like_attr_token(word))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn looks_like_attr_token(word: &str) -> bool {
+    let folded = word.to_ascii_lowercase();
+    folded.contains("target=")
+        || folded.contains("style=")
+        || folded.contains("data-block")
+        || folded.contains("text-decoration")
+        || folded.contains("href=")
 }
 
 fn reformat_with_llm(
@@ -379,6 +405,104 @@ fn tag_header_roles(zone: &mut DigestCutZone) {
     }
 }
 
+fn looks_like_markup_leak(text: &str) -> bool {
+    let folded = text.to_ascii_lowercase();
+    folded.contains("target=")
+        || folded.contains("data-block")
+        || folded.contains("text-decoration")
+        || folded.contains("style=")
+        || folded.contains("href=")
+        || text.contains('<')
+        || text.contains('>')
+}
+
+fn scrub_reformat_fields(dto: &mut ReformatDto) {
+    if looks_like_markup_leak(&dto.title) {
+        dto.title.clear();
+    }
+    if looks_like_markup_leak(&dto.amount) {
+        dto.amount.clear();
+    }
+    if looks_like_markup_leak(&dto.highlight_label) {
+        dto.highlight_label.clear();
+    }
+    if looks_like_markup_leak(&dto.highlight_value) {
+        dto.highlight_value.clear();
+    }
+    dto.rows
+        .retain(|row| !looks_like_markup_leak(&row.label) && !looks_like_markup_leak(&row.value));
+    dto.paragraphs.retain(|p| !looks_like_markup_leak(p));
+    dto.actions.retain(|a| !looks_like_markup_leak(&a.label));
+    dto.contacts
+        .retain(|row| !looks_like_markup_leak(&row.label) && !looks_like_markup_leak(&row.value));
+}
+
+fn already_mentions(dto: &ReformatDto, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    dto.highlight_value.contains(needle)
+        || dto.title.contains(needle)
+        || dto.amount.contains(needle)
+        || dto.rows
+            .iter()
+            .any(|row| row.label.contains(needle) || row.value.contains(needle))
+        || dto.paragraphs.iter().any(|p| p.contains(needle))
+        || dto
+            .actions
+            .iter()
+            .any(|a| a.url.contains(needle) || a.label.contains(needle))
+}
+
+fn fill_missing_facts(dto: &mut ReformatDto, excerpts: &ZoneExcerpts) {
+    let blob = format!("{} {}", excerpts.header, excerpts.body);
+    let date_re = regex::Regex::new(r"\d{1,2}/\d{1,2}/\d{4}").expect("date");
+    for found in date_re.find_iter(&blob) {
+        if dto.rows.len() >= 8 {
+            break;
+        }
+        let value = found.as_str();
+        if already_mentions(dto, value) {
+            continue;
+        }
+        dto.rows.push(ReformatRowDto {
+            label: "Date".into(),
+            value: value.to_string(),
+        });
+    }
+    let name_re = regex::Regex::new(
+        r"(?i)\b(?:(?:MR|M\.|MME|MONSIEUR|MADAME)\s+[A-ZÀ-Ý][A-ZÀ-Ý' -]{2,40}|(?:Bonjour|Hello)\s+[A-ZÀ-Ý][a-zà-ÿ'’-]{1,24}(?:\s+[A-ZÀ-Ý][a-zà-ÿ'’-]{1,24})?)",
+    )
+    .expect("name");
+    if dto.rows.len() < 8 {
+        if let Some(found) = name_re.find(&blob) {
+            let value = found.as_str().split_whitespace().collect::<Vec<_>>().join(" ");
+            if !already_mentions(dto, &value) {
+                dto.rows.push(ReformatRowDto {
+                    label: "Destinataire".into(),
+                    value,
+                });
+            }
+        }
+    }
+    if dto.actions.len() < MAX_ACTIONS {
+        let site_re =
+            regex::Regex::new(r"(?i)\bwww\.[a-z0-9.-]+\.[a-z]{2,}\b").expect("site");
+        if let Some(found) = site_re.find(&blob) {
+            let host = found.as_str();
+            if !already_mentions(dto, host) {
+                let url = format!("https://{host}");
+                if !href_looks_like_unsubscribe(&url) {
+                    dto.actions.push(ReformatActionDto {
+                        label: host.to_string(),
+                        url,
+                    });
+                }
+            }
+        }
+    }
+}
+
 fn enrich_dto_with_local_signal(
     dto: &mut ReformatDto,
     subject: &str,
@@ -386,6 +510,7 @@ fn enrich_dto_with_local_signal(
     excerpts: &ZoneExcerpts,
     candidates: &[LinkCandidate],
 ) {
+    scrub_reformat_fields(dto);
     dto.actions = sanitize_actions(std::mem::take(&mut dto.actions), candidates);
     if dto.actions.is_empty() {
         dto.actions = actions_from_candidates(candidates);
@@ -396,6 +521,9 @@ fn enrich_dto_with_local_signal(
             dto.highlight_value = value;
         }
     }
+    fill_missing_facts(dto, excerpts);
+    dto.rows.truncate(8);
+    dto.paragraphs.truncate(4);
     dto.actions.truncate(MAX_ACTIONS);
     dto.contacts.truncate(MAX_CONTACTS);
 }
@@ -949,5 +1077,44 @@ mod tests {
         assert!(!dto.actions.is_empty());
         assert!(dto.hide_footer);
         assert!(validate_reformat_dto(&dto).is_ok());
+    }
+
+    #[test]
+    fn drops_attribute_soup_and_keeps_plain_facts() {
+        let mut dto = empty_dto();
+        dto.title = "Duplicata".into();
+        dto.paragraphs = vec![
+            "a\" target=\"_blank\" style=\"text-decoration:none\" data-block".into(),
+            "Phrase utile.".into(),
+        ];
+        let excerpts = ZoneExcerpts {
+            header: "Le 01/02/2020. MR EXEMPLE MARTIN".into(),
+            body: "Achat du 03/02/2020 sur www.exemple-boutique.fr".into(),
+            footer: String::new(),
+        };
+        scrub_reformat_fields(&mut dto);
+        fill_missing_facts(&mut dto, &excerpts);
+        assert_eq!(dto.paragraphs, vec!["Phrase utile.".to_string()]);
+        assert!(dto.rows.iter().any(|row| row.value == "01/02/2020"));
+        assert!(dto.rows.iter().any(|row| row.value == "03/02/2020"));
+        assert!(dto
+            .rows
+            .iter()
+            .any(|row| row.label == "Destinataire" && row.value.contains("EXEMPLE")));
+        assert!(dto
+            .actions
+            .iter()
+            .any(|action| action.url == "https://www.exemple-boutique.fr"));
+    }
+
+    #[test]
+    fn failed_cut_still_feeds_the_mail_text() {
+        let source = "<p>Bonjour Camille Martin. Facture du 04/05/2021.</p><p>a\" target=\"_blank\" style=\"text-decoration:none\"</p>";
+        let plain = reading_source_plain("", false, source);
+        assert!(plain.contains("Camille Martin"));
+        assert!(plain.contains("04/05/2021"));
+        assert!(!plain.contains("text-decoration"));
+        let cut = "Titre court et corps déjà assez long pour rester la source.";
+        assert_eq!(reading_source_plain(cut, true, source), cut);
     }
 }

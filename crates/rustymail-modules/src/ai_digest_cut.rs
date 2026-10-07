@@ -89,7 +89,8 @@ pub fn propose_digest_cut_zones(
             output_language,
             current,
         ) {
-            Ok(llm) => {
+            Ok(mut llm) => {
+                align_sender_hint(&mut llm, sender_email);
                 if proposal_to_fixture_yaml(&llm).is_ok() {
                     return DigestCutModelOutcome {
                         proposal: llm,
@@ -117,6 +118,7 @@ pub fn propose_digest_cut_zones(
         );
     }
     let mut proposal = fallback;
+    align_sender_hint(&mut proposal, sender_email);
     if proposal.explanation_fr.trim().is_empty() {
         proposal.explanation_fr = french_explanation(&proposal);
     }
@@ -338,6 +340,38 @@ fn slim_current_proposal_json(proposal: &DigestCutProposal) -> String {
         },
     });
     serde_json::to_string(&value).unwrap_or_else(|_| "{}".into())
+}
+
+/// Le domaine est un indice. S’il ne correspond pas à l’expéditeur du mail, on le remplace.
+/// La structure (racine, zones) reste celle choisie pour le gabarit.
+fn align_sender_hint(proposal: &mut DigestCutProposal, sender_email: &str) {
+    let Some(domain) = email_domain(sender_email) else {
+        return;
+    };
+    let hinted = proposal.match_.sender_domains.iter().any(|rule| {
+        if rule
+            .exact
+            .as_deref()
+            .is_some_and(|exact| exact.eq_ignore_ascii_case(&domain))
+        {
+            return true;
+        }
+        if let Some(suffix) = rule.suffix.as_deref() {
+            let suffix = suffix.trim().trim_start_matches('.').to_ascii_lowercase();
+            if !suffix.is_empty() && (domain == suffix || domain.ends_with(&format!(".{suffix}"))) {
+                return true;
+            }
+        }
+        false
+    });
+    if hinted {
+        return;
+    }
+    proposal.fixture_id = slug_from_domain(&domain);
+    proposal.match_.sender_domains = vec![DomainRuleDto {
+        exact: Some(domain),
+        suffix: None,
+    }];
 }
 
 fn inject_digest_cut_defaults(value: &mut Value, default_fixture_id: &str, domain: &str) {

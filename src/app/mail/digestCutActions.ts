@@ -72,6 +72,7 @@ function clearCutResult(): void {
   digestCut.paintZone = null;
   digestCut.paintPick = null;
   digestCut.paintCheck = null;
+  digestCut.zoneStudioOpen = false;
   digestCut.zoneChecks = { header: null, body: null, footer: null };
 }
 
@@ -584,6 +585,10 @@ export async function handleDigestCutAction(action: string, element?: HTMLElemen
       return true;
     case "digest-cut-toggle-code":
       toggleDigestCutCode();
+      return true;
+    case "digest-cut-zone-studio":
+      digestCut.zoneStudioOpen = Boolean(digestCut.proposal) && !digestCut.zoneStudioOpen;
+      render();
       return true;
     case "digest-cut-zone": {
       const zone = element?.dataset.zone as DigestCutZoneName | undefined;

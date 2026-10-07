@@ -76,25 +76,25 @@ describe("diff de la boucle entre deux mails", () => {
   });
 
   it("signale un nouvel intervenant sur le message où il apparaît", () => {
-    const secretariat = addr("Secrétariat", "secretariat@drcourty.fr");
+    const secretariat = addr("Secrétariat", "secretariat@example.fr");
     const messages = [
       msg("m1", "2026-09-17T09:00:00", alice, group()),
       msg("m2", "2026-09-17T10:00:00", bob, [alice, me, carol, dave, secretariat]),
     ];
     const events = diff(messages);
     expect(emails(messages, "m1", "added")).toEqual([]);
-    expect(events.get("m2")?.added).toEqual([{ name: "Secrétariat", email: "secretariat@drcourty.fr" }]);
+    expect(events.get("m2")?.added).toEqual([{ name: "Secrétariat", email: "secretariat@example.fr" }]);
     expect(events.get("m2")?.removed).toEqual([]);
     expect(events.has("m1")).toBe(false);
   });
 
   it("signale un expéditeur qui n’était pas déjà dans la boucle", () => {
-    const secretariat = addr("secretariat@drcourty.fr", "secretariat@drcourty.fr");
+    const secretariat = addr("secretariat@example.fr", "secretariat@example.fr");
     const events = diff([
       msg("m1", "2026-09-17T09:00:00", alice, group()),
       msg("m2", "2026-09-17T10:00:00", secretariat, [alice, me, bob, carol, dave]),
     ]);
-    expect(events.get("m2")?.added).toEqual([{ name: null, email: "secretariat@drcourty.fr" }]);
+    expect(events.get("m2")?.added).toEqual([{ name: null, email: "secretariat@example.fr" }]);
   });
 
   it("ne refait pas apparaître quelqu’un qui était déjà en copie et qui écrit", () => {
@@ -156,12 +156,12 @@ describe("diff de la boucle entre deux mails", () => {
   });
 
   it("peut à la fois ajouter et retirer sur un reply-all", () => {
-    const secretariat = addr("Secrétariat", "secretariat@drcourty.fr");
+    const secretariat = addr("Secrétariat", "secretariat@example.fr");
     const events = diff([
       msg("m1", "2026-09-17T09:00:00", alice, group()),
       msg("m2", "2026-09-17T10:00:00", secretariat, [alice, me, bob, dave]),
     ]);
-    expect(events.get("m2")?.added.map((person) => person.email)).toEqual(["secretariat@drcourty.fr"]);
+    expect(events.get("m2")?.added.map((person) => person.email)).toEqual(["secretariat@example.fr"]);
     expect(events.get("m2")?.removed.map((person) => person.email)).toEqual(["carol@exemple.fr"]);
   });
 
@@ -203,8 +203,8 @@ describe("diff de la boucle entre deux mails", () => {
 
   it("déduplique la casse et un nom déjà égal à l’adresse", () => {
     const events = diff([
-      msg("m1", "2026-09-17T09:00:00", alice, [me, bob, addr("Secretariat@DrCourty.fr", "Secretariat@DrCourty.fr"), dave]),
-      msg("m2", "2026-09-17T10:00:00", bob, [alice, me, addr("secretariat@drcourty.fr", "secretariat@drcourty.fr"), dave]),
+      msg("m1", "2026-09-17T09:00:00", alice, [me, bob, addr("Secretariat@Example.fr", "Secretariat@Example.fr"), dave]),
+      msg("m2", "2026-09-17T10:00:00", bob, [alice, me, addr("secretariat@example.fr", "secretariat@example.fr"), dave]),
     ]);
     expect(events.size).toBe(0);
   });
@@ -220,12 +220,12 @@ describe("diff de la boucle entre deux mails", () => {
   });
 
   it("signale quand même un nouvel expéditeur si l’enveloppe To/Cc manque", () => {
-    const secretariat = addr("secretariat@drcourty.fr", "secretariat@drcourty.fr");
+    const secretariat = addr("secretariat@example.fr", "secretariat@example.fr");
     const events = diff([
       msg("m1", "2026-09-17T09:00:00", alice, group()),
       msg("m2", "2026-09-17T10:00:00", secretariat, []),
     ]);
-    expect(events.get("m2")?.added).toEqual([{ name: null, email: "secretariat@drcourty.fr" }]);
+    expect(events.get("m2")?.added).toEqual([{ name: null, email: "secretariat@example.fr" }]);
   });
 
   it("ne prend pas le premier message sans en-têtes pour une arrivée de tout le groupe", () => {
@@ -248,18 +248,18 @@ describe("diff de la boucle entre deux mails", () => {
 
 describe("libellé d’un participant", () => {
   it("n’écrit pas l’adresse deux fois quand le nom est l’adresse", () => {
-    expect(formatParticipantIdentity("secretariat@drcourty.fr", "secretariat@drcourty.fr")).toEqual({
-      label: "secretariat@drcourty.fr",
+    expect(formatParticipantIdentity("secretariat@example.fr", "secretariat@example.fr")).toEqual({
+      label: "secretariat@example.fr",
       detail: null,
     });
-    expect(formatParticipantIdentity("Secretariat@DrCourty.fr", "secretariat@drcourty.fr")).toEqual({
-      label: "secretariat@drcourty.fr",
+    expect(formatParticipantIdentity("Secretariat@Example.fr", "secretariat@example.fr")).toEqual({
+      label: "secretariat@example.fr",
       detail: null,
     });
-    const html = renderParticipantMention("secretariat@drcourty.fr", "secretariat@drcourty.fr");
-    expect(html).toBe("<strong>secretariat@drcourty.fr</strong>");
-    expect(html).not.toContain("(secretariat@drcourty.fr)");
-    expect(html).not.toContain("&lt;secretariat@drcourty.fr&gt;");
+    const html = renderParticipantMention("secretariat@example.fr", "secretariat@example.fr");
+    expect(html).toBe("<strong>secretariat@example.fr</strong>");
+    expect(html).not.toContain("(secretariat@example.fr)");
+    expect(html).not.toContain("&lt;secretariat@example.fr&gt;");
   });
 
   it("garde le nom lisible et l’adresse une seule fois", () => {
@@ -279,14 +279,14 @@ describe("libellé d’un participant", () => {
 
   it("dit ajouté ou exclu de la boucle, sans répéter l’adresse", () => {
     const html = renderThreadLoopChangeNote({
-      added: [{ name: "secretariat@drcourty.fr", email: "secretariat@drcourty.fr" }],
+      added: [{ name: "secretariat@example.fr", email: "secretariat@example.fr" }],
       removed: [{ name: "Carol Martin", email: "carol@exemple.fr" }],
     });
     expect(html).toContain("Ajouté à la boucle");
     expect(html).toContain("Exclu de la boucle");
     expect(html).not.toContain("Première apparition");
     expect(html).not.toContain("+ To/Cc");
-    expect(html).not.toContain("(secretariat@drcourty.fr)");
+    expect(html).not.toContain("(secretariat@example.fr)");
     expect(html).toContain("thread-timeline-note__kicker--add");
     expect(html).toContain("thread-timeline-note__kicker--rem");
     expect(html).toContain("Carol Martin");
