@@ -2622,6 +2622,12 @@ pub fn run() {
             let _ = std::fs::create_dir_all(&llm_models_dir);
             rustymail_infrastructure::init_semantic_model_dir(models_dir.clone());
             rustymail_infrastructure::init_oauth_tokens_dir(data_dir.join("oauth_tokens"));
+            if let Ok(conn) = rustymail_infrastructure::open_sqlite_migrated_public(&db_path) {
+                let now = rustymail_infrastructure::unix_secs(SystemTime::now());
+                if let Err(e) = rustymail_infrastructure::prune_stored_sends(&conn, now) {
+                    log::warn!("send_attempts prune: {e}");
+                }
+            }
             if let Err(e) = rustymail_infrastructure::sqlite_ai_cache_purge_expired(&db_path) {
                 log::warn!("ai_cache purge: {e}");
             }

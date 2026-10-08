@@ -209,9 +209,9 @@ pub use semantic_search::{
     SemanticEmbeddingCountsSnapshot, SemanticReindexStats,
 };
 pub use send_attempt::{
-    current_send_launch_id, draft_send_fingerprint, load_stored_sends_since, prune_stored_sends,
-    unix_secs, upsert_stored_send, SendAttemptBook, SendBegin, SendSlot, StoredSendAttempt,
-    SEND_ATTEMPT_TTL, SEND_INFLIGHT_STALE,
+    cleanup_send_spool, current_send_launch_id, draft_send_fingerprint, load_stored_sends_since,
+    prune_stored_sends, unix_secs, upsert_stored_send, SendAttemptBook, SendBegin, SendSlot,
+    StoredSendAttempt, SEND_ATTEMPT_TTL, SEND_INFLIGHT_STALE,
 };
 
 pub use demo_playground::{

@@ -14,7 +14,8 @@
 //!
 //! Risque restant : plantage après acceptation SMTP mais avant l'écriture `smtp_accepted`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -388,14 +389,102 @@ pub fn upsert_stored_send(conn: &Connection, row: &StoredSendAttempt) -> Result<
     Ok(())
 }
 
-/// Supprime les tentatives plus vieilles que le TTL pour que la table ne grossisse pas sans fin.
+/// Supprime les tentatives plus vieilles que le TTL, puis les fichiers `send-spool` trop vieux
+/// ou dont la ligne n'existe plus.
 pub fn prune_stored_sends(conn: &Connection, now_unix: i64) -> Result<usize, String> {
     let cutoff = now_unix.saturating_sub(SEND_ATTEMPT_TTL.as_secs() as i64);
-    conn.execute(
-        "DELETE FROM send_attempts WHERE at_unix < ?1",
-        params![cutoff],
-    )
-    .map_err(|e| e.to_string())
+    let n = conn
+        .execute(
+            "DELETE FROM send_attempts WHERE at_unix < ?1",
+            params![cutoff],
+        )
+        .map_err(|e| e.to_string())?;
+    match cleanup_send_spool(conn, now_unix) {
+        Ok(files) if files > 0 => log::info!("send-spool : {files} fichier(s) supprimé(s)"),
+        Ok(_) => {}
+        Err(e) => log::warn!("send-spool : {e}"),
+    }
+    Ok(n)
+}
+
+fn send_spool_dir(conn: &Connection) -> Result<Option<PathBuf>, String> {
+    let path: String = conn
+        .query_row(
+            "SELECT file FROM pragma_database_list WHERE name = 'main'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if path.is_empty() {
+        return Ok(None);
+    }
+    Ok(Path::new(&path).parent().map(|dir| dir.join("send-spool")))
+}
+
+fn spool_send_id(file_name: &str) -> Option<&str> {
+    let id = file_name
+        .strip_suffix(".rfc822")
+        .or_else(|| file_name.strip_suffix(".mid"))?;
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+        return None;
+    }
+    Some(id)
+}
+
+fn live_send_ids(conn: &Connection) -> Result<HashSet<String>, String> {
+    let mut stmt = conn
+        .prepare("SELECT send_id FROM send_attempts")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<HashSet<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+/// Efface les fichiers `send-spool/<id>.rfc822` et `.mid` de plus d'une heure,
+/// et ceux dont l'identifiant n'a plus de ligne `send_attempts`.
+pub fn cleanup_send_spool(conn: &Connection, now_unix: i64) -> Result<usize, String> {
+    let Some(dir) = send_spool_dir(conn)? else {
+        return Ok(0);
+    };
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Ok(0);
+    };
+    let live = live_send_ids(conn)?;
+    let cutoff = now_unix.saturating_sub(SEND_ATTEMPT_TTL.as_secs() as i64);
+    let mut removed = 0usize;
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(send_id) = spool_send_id(name) else {
+            continue;
+        };
+        let aged = entry
+            .metadata()
+            .ok()
+            .and_then(|meta| meta.modified().ok())
+            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+            .map(|age| (age.as_secs() as i64) < cutoff)
+            .unwrap_or(false);
+        let orphan = !live.contains(send_id);
+        if !aged && !orphan {
+            continue;
+        }
+        if std::fs::remove_file(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    Ok(removed)
 }
 
 pub fn load_stored_sends_since(
@@ -737,6 +826,75 @@ mod tests {
             book.begin_owned("id", "fp", SystemTime::now(), "launch-b"),
             SendBegin::Accepted
         );
+    }
+
+    #[test]
+    fn prune_deletes_old_and_orphan_spool_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("mail.db");
+        let conn = crate::open_sqlite_migrated(&db_path).expect("db");
+        let now = unix_secs(SystemTime::now());
+        let keep = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+        let old = "11111111-2222-4333-8444-555555555555";
+        let orphan = "99999999-8888-4777-8666-555555555555";
+        let aged_kept_row = "22222222-3333-4444-8555-666666666666";
+        for id in [keep, old, aged_kept_row] {
+            let at = if id == old {
+                now - SEND_ATTEMPT_TTL.as_secs() as i64 - 30
+            } else {
+                now
+            };
+            conn.execute(
+                "INSERT INTO send_attempts (send_id, fingerprint, state, imap_notice, error, at_unix, launch_id)
+                 VALUES (?1, 'fp', 'smtp_accepted', NULL, NULL, ?2, 'launch')",
+                params![id, at],
+            )
+            .expect("row");
+        }
+        let spool = dir.path().join("send-spool");
+        std::fs::create_dir(&spool).expect("spool");
+        let write = |id: &str, aged: bool| {
+            for suffix in [".rfc822", ".mid"] {
+                let path = spool.join(format!("{id}{suffix}"));
+                std::fs::write(&path, b"secret").expect("write");
+                if aged {
+                    let file = std::fs::File::options()
+                        .write(true)
+                        .open(&path)
+                        .expect("open");
+                    let stamp = SystemTime::now() - SEND_ATTEMPT_TTL - Duration::from_secs(120);
+                    file.set_modified(stamp).expect("mtime");
+                }
+            }
+        };
+        write(keep, false);
+        write(old, true);
+        write(orphan, false);
+        write(aged_kept_row, true);
+        std::fs::write(spool.join("notes.txt"), b"leave").expect("notes");
+
+        let removed_rows = prune_stored_sends(&conn, now).expect("prune");
+        assert_eq!(removed_rows, 1);
+        assert!(spool.join(format!("{keep}.rfc822")).is_file());
+        assert!(spool.join(format!("{keep}.mid")).is_file());
+        assert!(!spool.join(format!("{old}.rfc822")).exists());
+        assert!(!spool.join(format!("{old}.mid")).exists());
+        assert!(!spool.join(format!("{orphan}.rfc822")).exists());
+        assert!(!spool.join(format!("{orphan}.mid")).exists());
+        assert!(
+            !spool.join(format!("{aged_kept_row}.rfc822")).exists(),
+            "un fichier de plus d'une heure part même si la ligne est encore là"
+        );
+        assert!(!spool.join(format!("{aged_kept_row}.mid")).exists());
+        assert!(spool.join("notes.txt").is_file());
+        let left: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM send_attempts WHERE send_id = ?1",
+                params![aged_kept_row],
+                |row| row.get(0),
+            )
+            .expect("count");
+        assert_eq!(left, 1);
     }
 
     fn sample_draft(
