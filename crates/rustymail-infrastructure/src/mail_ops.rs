@@ -1146,6 +1146,9 @@ pub struct BulkThreadRef {
 pub struct BulkSeenOutcome {
     pub done: usize,
     pub errors: Vec<String>,
+    /// Fils dont le drapeau local a été écrit. Sert à mettre à jour le cache mémoire.
+    #[serde(default)]
+    pub updated_thread_ids: Vec<String>,
 }
 
 /// Regroupe les fils par dossier (première occurrence), sans doublon de `thread_id`.
@@ -1188,16 +1191,27 @@ pub async fn set_threads_seen_bulk(
 ) -> Result<BulkSeenOutcome, String> {
     let mut done = 0usize;
     let mut errors = Vec::new();
+    let mut updated_thread_ids = Vec::new();
     for (mailbox, thread_ids) in group_bulk_threads_by_mailbox(items) {
         match mark_mailbox_threads_seen(path, account, &mailbox, &thread_ids, seen).await {
             Ok((n, mailbox_errors)) => {
                 done += n;
+                for tid in &thread_ids {
+                    let prefix = format!("{tid}:");
+                    if !mailbox_errors.iter().any(|err| err.starts_with(&prefix)) {
+                        updated_thread_ids.push(tid.clone());
+                    }
+                }
                 errors.extend(mailbox_errors);
             }
             Err(error) => errors.push(format!("{mailbox}: {error}")),
         }
     }
-    Ok(BulkSeenOutcome { done, errors })
+    Ok(BulkSeenOutcome {
+        done,
+        errors,
+        updated_thread_ids,
+    })
 }
 
 async fn mark_mailbox_threads_seen(

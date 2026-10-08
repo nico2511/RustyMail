@@ -208,7 +208,10 @@ pub use semantic_search::{
     semantic_embedding_counts_snapshot, semantic_model_present, sqlite_search_threads_unified,
     SemanticEmbeddingCountsSnapshot, SemanticReindexStats,
 };
-pub use send_attempt::{SendAttemptBook, SendBegin, SendSlot};
+pub use send_attempt::{
+    draft_send_fingerprint, load_stored_sends_since, unix_secs, upsert_stored_send,
+    SendAttemptBook, SendBegin, SendSlot, StoredSendAttempt, SEND_ATTEMPT_TTL, SEND_INFLIGHT_STALE,
+};
 
 pub use demo_playground::{
     sqlite_remove_demo_playground, sqlite_reset_demo_playground, DEMO_PLAYGROUND_ACCOUNT_ID,
@@ -1413,6 +1416,16 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
         -- Lignes supprimées à la suppression du compte et au reset UIDVALIDITY.
         CREATE INDEX IF NOT EXISTS idx_messages_account_msgid
             ON messages(account_id, message_id_header);
+        CREATE TABLE IF NOT EXISTS send_attempts (
+            send_id TEXT PRIMARY KEY,
+            fingerprint TEXT NOT NULL,
+            state TEXT NOT NULL,
+            imap_notice TEXT,
+            error TEXT,
+            at_unix INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_send_attempts_fp
+            ON send_attempts(fingerprint, at_unix);
         ",
     )?;
     backfill_contact_profile_v2_ttl(connection)?;
