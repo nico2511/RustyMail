@@ -924,6 +924,7 @@ fn hydrate_send_book(db: &std::path::Path) {
         return;
     };
     let now = rustymail_infrastructure::unix_secs(SystemTime::now());
+    let _ = rustymail_infrastructure::prune_stored_sends(&conn, now);
     let since = now.saturating_sub(rustymail_infrastructure::SEND_ATTEMPT_TTL.as_secs() as i64);
     let Ok(rows) = rustymail_infrastructure::load_stored_sends_since(&conn, since) else {
         return;
