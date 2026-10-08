@@ -17,12 +17,7 @@ import {
   composeSendDraftRunDeps,
   finishComposeAfterSuccessfulSend,
 } from "./composeSendDraftFinishRun";
-import { releaseSendAttempt, sendIdForDraft } from "./composeSendId";
-
-function isInvokeTimeout(message: string): boolean {
-  const lower = message.toLowerCase();
-  return message === "Tauri command timeout" || lower.includes("timeout") || lower.includes("délai");
-}
+import { isSendStillInFlightMessage, releaseSendAttempt, sendIdForDraft } from "./composeSendId";
 
 /** Plafond de sondage. Au-delà, l'indicateur local est levé mais l'id du brouillon reste. */
 export const sendDraftPoll = {
@@ -85,7 +80,7 @@ async function pollSendDraftStatus(
   if (!status) {
     state.sendDraftInFlight = false;
     state.composeMessage =
-      "Vérification interrompue : le même brouillon garde son identifiant d'envoi.";
+      "Envoi toujours en cours : le même identifiant est conservé, pas de nouvel envoi.";
     render();
     return;
   }
@@ -127,8 +122,8 @@ export async function invokeSendDraft(accountId: string | null, draftOutbound: D
     await finishSuccessfulSend(sendOutcome, keepThreadId, toEmails, draftId);
   } catch (error) {
     const message = tauriErrorMessage(error);
-    if (isInvokeTimeout(message)) {
-      state.composeMessage = "Statut d'envoi inconnu : vérification…";
+    if (isSendStillInFlightMessage(message)) {
+      state.composeMessage = "Envoi toujours en cours…";
       render();
       await pollSendDraftStatus(sendId, keepThreadId, toEmails, draftId);
       return;

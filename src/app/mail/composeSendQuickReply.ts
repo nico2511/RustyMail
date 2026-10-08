@@ -11,6 +11,7 @@ import { loadMailView, loadMailboxUnread } from "./mailListView";
 import { currentThreadIdForReply } from "./composeThreadReply";
 import { toastSendDraftImapNotice } from "./sendDraftImapNotice";
 import { pollSendDraftUntilTerminal } from "./composeSendDraftInvokeRun";
+import { isSendStillInFlightMessage } from "./composeSendId";
 
 let quickReplyInFlight = false;
 const quickReplyIds = new Map<string, string>();
@@ -74,15 +75,13 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
       terminal = true;
     } catch (error) {
       const message = tauriErrorMessage(error);
-      const lower = message.toLowerCase();
-      const timedOut = message === "Tauri command timeout" || lower.includes("timeout") || lower.includes("délai");
-      if (!timedOut) {
+      if (!isSendStillInFlightMessage(message)) {
         terminal = true;
         throw error;
       }
       const status = await pollSendDraftUntilTerminal(sendId);
       if (!status || status.state === "inFlight" || status.state === "unknown") {
-        toast.warning("Vérification interrompue : la même réponse garde son identifiant d'envoi.");
+        toast.warning("Envoi toujours en cours : le même identifiant est conservé, pas de nouvel envoi.");
         return;
       }
       if (status.state === "failed") {

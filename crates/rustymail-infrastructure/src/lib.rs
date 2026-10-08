@@ -209,9 +209,9 @@ pub use semantic_search::{
     SemanticEmbeddingCountsSnapshot, SemanticReindexStats,
 };
 pub use send_attempt::{
-    draft_send_fingerprint, load_stored_sends_since, prune_stored_sends, unix_secs,
-    upsert_stored_send, SendAttemptBook, SendBegin, SendSlot, StoredSendAttempt, SEND_ATTEMPT_TTL,
-    SEND_INFLIGHT_STALE,
+    current_send_launch_id, draft_send_fingerprint, load_stored_sends_since, prune_stored_sends,
+    unix_secs, upsert_stored_send, SendAttemptBook, SendBegin, SendSlot, StoredSendAttempt,
+    SEND_ATTEMPT_TTL, SEND_INFLIGHT_STALE,
 };
 
 pub use demo_playground::{
@@ -1423,12 +1423,19 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
             state TEXT NOT NULL,
             imap_notice TEXT,
             error TEXT,
-            at_unix INTEGER NOT NULL
+            at_unix INTEGER NOT NULL,
+            launch_id TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_send_attempts_fp
             ON send_attempts(fingerprint, at_unix);
         ",
     )?;
+    // Bases déjà créées avant `launch_id` : la colonne manque, l'ALTER l'ajoute.
+    // Une base neuve a déjà la colonne : l'erreur est ignorée.
+    let _ = connection.execute(
+        "ALTER TABLE send_attempts ADD COLUMN launch_id TEXT NOT NULL DEFAULT ''",
+        [],
+    );
     backfill_contact_profile_v2_ttl(connection)?;
 
     Ok(())

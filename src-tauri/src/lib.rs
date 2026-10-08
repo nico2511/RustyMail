@@ -943,6 +943,15 @@ fn hydrate_send_book(db: &std::path::Path) {
             "inflight" => SendSlot::InFlight {
                 started: at,
                 fingerprint: row.fingerprint,
+                launch_id: row.launch_id,
+            },
+            "smtp_accepted" => SendSlot::SmtpAccepted {
+                at,
+                value: SendDraftOutcome {
+                    imap_notice: row.imap_notice,
+                },
+                fingerprint: row.fingerprint,
+                launch_id: row.launch_id,
             },
             "failed" => SendSlot::Failed {
                 at,
@@ -962,6 +971,77 @@ fn persist_send_row(db: &std::path::Path, row: &StoredSendAttempt) {
     if let Err(e) = rustymail_infrastructure::upsert_stored_send(&conn, row) {
         log::warn!("send_attempts : {e}");
     }
+}
+
+fn send_spool_paths(
+    db: &std::path::Path,
+    send_id: &str,
+) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+    if send_id.is_empty() || !send_id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+        return None;
+    }
+    let dir = db.parent()?.join("send-spool");
+    Some((
+        dir.join(format!("{send_id}.rfc822")),
+        dir.join(format!("{send_id}.mid")),
+    ))
+}
+
+fn write_send_spool(db: &std::path::Path, send_id: &str, rfc822: &[u8], message_id: &str) {
+    let Some((body, mid)) = send_spool_paths(db, send_id) else {
+        return;
+    };
+    if let Some(dir) = body.parent() {
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            log::warn!("send spool : {e}");
+            return;
+        }
+    }
+    if let Err(e) = std::fs::write(&body, rfc822) {
+        log::warn!("send spool rfc822 : {e}");
+        return;
+    }
+    if let Err(e) = std::fs::write(&mid, message_id.as_bytes()) {
+        log::warn!("send spool message-id : {e}");
+    }
+}
+
+fn read_send_spool(db: &std::path::Path, send_id: &str) -> Option<(Vec<u8>, String)> {
+    let (body, mid) = send_spool_paths(db, send_id)?;
+    let rfc = std::fs::read(&body).ok()?;
+    let message_id = std::fs::read_to_string(&mid).unwrap_or_default();
+    if rfc.is_empty() || message_id.trim().is_empty() {
+        return None;
+    }
+    Some((rfc, message_id))
+}
+
+fn discard_send_spool(db: &std::path::Path, send_id: &str) {
+    if let Some((body, mid)) = send_spool_paths(db, send_id) {
+        let _ = std::fs::remove_file(body);
+        let _ = std::fs::remove_file(mid);
+    }
+}
+
+fn record_send_done(db: &std::path::Path, id: &str, outcome: &SendDraftOutcome) {
+    let now = SystemTime::now();
+    let mut book = lock_send_book();
+    book.complete_ok(id, outcome.clone(), now);
+    let fp = book.fingerprint_of(id).unwrap_or_default();
+    drop(book);
+    persist_send_row(
+        db,
+        &StoredSendAttempt {
+            send_id: id.to_string(),
+            fingerprint: fp,
+            state: "done".into(),
+            imap_notice: outcome.imap_notice.clone(),
+            error: None,
+            at_unix: rustymail_infrastructure::unix_secs(now),
+            launch_id: String::new(),
+        },
+    );
+    discard_send_spool(db, id);
 }
 
 #[derive(serde::Serialize)]
@@ -1002,7 +1082,9 @@ async fn send_draft(
         hydrate_send_book(&db_path);
         let decision = lock_send_book().begin_payload(&id, &fingerprint, SystemTime::now());
         match decision {
-            SendBegin::InFlight => return Err("Envoi déjà en cours".into()),
+            SendBegin::InFlight | SendBegin::AlreadyInFlight => {
+                return Err("Envoi déjà en cours".into());
+            }
             SendBegin::IdReused => {
                 return Err(
                     "Identifiant d'envoi déjà utilisé pour un autre message. Rouvrez le brouillon."
@@ -1014,6 +1096,9 @@ async fn send_draft(
                     .replay(&id)
                     .ok_or_else(|| "Envoi déjà enregistré".to_string());
             }
+            SendBegin::Accepted => {
+                return finish_smtp_accepted(paths, &db_path, account_id, &id).await;
+            }
             SendBegin::Start => {
                 persist_send_row(
                     &db_path,
@@ -1024,14 +1109,35 @@ async fn send_draft(
                         imap_notice: None,
                         error: None,
                         at_unix: rustymail_infrastructure::unix_secs(SystemTime::now()),
+                        launch_id: rustymail_infrastructure::current_send_launch_id().to_string(),
                     },
                 );
             }
         }
     }
-    let result = send_draft_once(paths, core, account_id, draft, send_ack).await;
+    let result = send_draft_once(
+        paths,
+        core,
+        account_id,
+        draft,
+        send_ack,
+        tracked.clone(),
+        fingerprint.clone(),
+    )
+    .await;
     if let Some(id) = tracked.as_deref() {
         let now = SystemTime::now();
+        let already_accepted = matches!(
+            lock_send_book().get(id, now),
+            Some(SendSlot::SmtpAccepted { .. } | SendSlot::Done { .. })
+        );
+        if already_accepted && result.is_err() {
+            let outcome = lock_send_book()
+                .replay(id)
+                .unwrap_or(SendDraftOutcome { imap_notice: None });
+            record_send_done(&db_path, id, &outcome);
+            return Ok(outcome);
+        }
         let mut book = lock_send_book();
         match &result {
             Ok(outcome) => book.complete_ok(id, outcome.clone(), now),
@@ -1040,31 +1146,61 @@ async fn send_draft(
         let fp = book.fingerprint_of(id).unwrap_or(fingerprint);
         drop(book);
         match &result {
-            Ok(outcome) => persist_send_row(
-                &db_path,
-                &StoredSendAttempt {
-                    send_id: id.to_string(),
-                    fingerprint: fp,
-                    state: "done".into(),
-                    imap_notice: outcome.imap_notice.clone(),
-                    error: None,
-                    at_unix: rustymail_infrastructure::unix_secs(now),
-                },
-            ),
-            Err(error) => persist_send_row(
-                &db_path,
-                &StoredSendAttempt {
-                    send_id: id.to_string(),
-                    fingerprint: fp,
-                    state: "failed".into(),
-                    imap_notice: None,
-                    error: Some(error.clone()),
-                    at_unix: rustymail_infrastructure::unix_secs(now),
-                },
-            ),
+            Ok(outcome) => {
+                record_send_done(&db_path, id, outcome);
+            }
+            Err(error) => {
+                discard_send_spool(&db_path, id);
+                persist_send_row(
+                    &db_path,
+                    &StoredSendAttempt {
+                        send_id: id.to_string(),
+                        fingerprint: fp,
+                        state: "failed".into(),
+                        imap_notice: None,
+                        error: Some(error.clone()),
+                        at_unix: rustymail_infrastructure::unix_secs(now),
+                        launch_id: String::new(),
+                    },
+                );
+            }
         }
     }
     result
+}
+
+/// SMTP déjà accepté : aucun second envoi. Un autre lancement peut retenter seulement la copie Envoyés.
+async fn finish_smtp_accepted(
+    paths: State<'_, AppPaths>,
+    db_path: &std::path::Path,
+    account_id: Option<String>,
+    id: &str,
+) -> Result<SendDraftOutcome, String> {
+    let owner = lock_send_book().launch_of(id).unwrap_or_default();
+    let foreign = owner != rustymail_infrastructure::current_send_launch_id();
+    if foreign {
+        if let Some((rfc822, message_id)) = read_send_spool(db_path, id) {
+            let account = resolve_account_from_paths(&paths, account_id)?;
+            let imap_copy = rustymail_infrastructure::imap_append_sent_copy(
+                &account,
+                &rfc822,
+                message_id.trim(),
+            )
+            .await;
+            let outcome = SendDraftOutcome {
+                imap_notice: send_draft_imap_notice(&imap_copy),
+            };
+            record_send_done(db_path, id, &outcome);
+            return Ok(outcome);
+        }
+    }
+    let outcome = lock_send_book()
+        .replay(id)
+        .unwrap_or(SendDraftOutcome { imap_notice: None });
+    if foreign {
+        record_send_done(db_path, id, &outcome);
+    }
+    Ok(outcome)
 }
 
 #[tauri::command]
@@ -1078,6 +1214,8 @@ async fn send_draft_status(
     Ok(match slot {
         None => SendDraftStatusView::Unknown,
         Some(SendSlot::InFlight { .. }) => SendDraftStatusView::InFlight,
+        // SMTP déjà accepté : l'UI continue de sonder jusqu'au `done` (copie Envoyés comprise).
+        Some(SendSlot::SmtpAccepted { .. }) => SendDraftStatusView::InFlight,
         Some(SendSlot::Done { value, .. }) => SendDraftStatusView::Done {
             imap_notice: value.imap_notice.clone(),
         },
@@ -1091,6 +1229,8 @@ async fn send_draft_once(
     account_id: Option<String>,
     draft: Draft,
     send_ack: Option<String>,
+    tracked_send_id: Option<String>,
+    fingerprint: String,
 ) -> Result<SendDraftOutcome, String> {
     ipc_guard::validate_send_draft_ack(send_ack.as_deref())?;
     let mut draft = draft;
@@ -1134,6 +1274,29 @@ async fn send_draft_once(
         }
     };
     eprintln!("[RustyMail] smtp send ok");
+    if let Some(id) = tracked_send_id.as_deref() {
+        let now = SystemTime::now();
+        {
+            let mut book = lock_send_book();
+            book.mark_smtp_accepted(id, SendDraftOutcome { imap_notice: None }, now);
+            let launch = book.launch_of(id).unwrap_or_default();
+            let fp = book.fingerprint_of(id).unwrap_or(fingerprint);
+            drop(book);
+            persist_send_row(
+                &paths.db_path,
+                &StoredSendAttempt {
+                    send_id: id.to_string(),
+                    fingerprint: fp,
+                    state: "smtp_accepted".into(),
+                    imap_notice: None,
+                    error: None,
+                    at_unix: rustymail_infrastructure::unix_secs(now),
+                    launch_id: launch,
+                },
+            );
+        }
+        write_send_spool(&paths.db_path, id, &sent.rfc822, sent.message_id.trim());
+    }
     let imap_copy = rustymail_infrastructure::imap_append_sent_copy(
         &account,
         &sent.rfc822,

@@ -119,4 +119,20 @@ describe("sendQuickReply", () => {
     expect(ids).toHaveLength(2);
     expect(ids[1]).not.toBe(ids[0]);
   });
+
+  it("« déjà en cours » conserve l'id et sonde", async () => {
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "prepare_reply") return Promise.resolve({ ...prepared });
+      return Promise.reject(new Error("Envoi déjà en cours"));
+    });
+    pollMock.mockResolvedValue(null);
+    await sendQuickReply("reply");
+    const input = document.querySelector<HTMLInputElement>("[data-quick-reply]");
+    if (input) input.value = "Merci";
+    await sendQuickReply("reply");
+    const ids = sendIds();
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).toBe(ids[0]);
+    expect(pollMock).toHaveBeenCalled();
+  });
 });
