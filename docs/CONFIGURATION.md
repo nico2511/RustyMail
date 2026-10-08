@@ -47,7 +47,7 @@ See [AI_AND_MODELS.md](AI_AND_MODELS.md) for full detail. Summary:
 
 Tauri commands expose paths for support (use carefully in production logs):
 
-- `app_status` — vault location, capabilities summary
+- `app_status` — vault location, capabilities summary, and `versionBackupNotice` when the pre-version database copy did not succeed
 - `app_paths` — database, prefs, model directories
 
 ## Environment variables (OAuth clients)

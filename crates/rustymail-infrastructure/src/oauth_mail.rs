@@ -146,7 +146,9 @@ pub fn bind_oauth_tokens_for_account(account: &rustymail_domain::Account) -> Res
         if let Ok(tokens) = load_oauth_tokens_at(&alt) {
             log::info!(
                 target: "rustymail_infrastructure::oauth",
-                "oauth: jetons trouvés sous {alt}, copie vers {primary}"
+                "oauth: jetons trouvés sous un alias ({}), copie vers le compte ({})",
+                oauth_log_ref(&alt),
+                oauth_log_ref(&primary)
             );
             return store_oauth_tokens_at(&primary, &tokens);
         }
@@ -156,6 +158,12 @@ pub fn bind_oauth_tokens_for_account(account: &rustymail_domain::Account) -> Res
             .to_string()
     })?;
     Ok(())
+}
+
+/// Référence courte pour les journaux (pas l'adresse, pas le chemin du fichier).
+fn oauth_log_ref(id: &str) -> String {
+    let digest = Sha256::digest(id.trim().to_ascii_lowercase().as_bytes());
+    format!("ref:{}", hex::encode(&digest[..4]))
 }
 
 fn oauth_keyring_username(account_id: &str) -> String {
@@ -283,13 +291,17 @@ fn decrypt_oauth_blob(key: &[u8], blob: &[u8]) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("oauth déchiffrement: {e}"))
 }
 
+/// Nom unique par écriture (pid + compteur). Un `*.tmp` fixe serait partagé entre
+/// deux enregistrements concurrents du même compte.
 fn oauth_token_tmp_path(path: &Path) -> PathBuf {
-    let mut name = path
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(1);
+    let n = SEQ.fetch_add(1, Ordering::Relaxed);
+    let stem = path
         .file_name()
-        .map(|s| s.to_os_string())
-        .unwrap_or_else(|| "oauth-tokens".into());
-    name.push(".tmp");
-    path.with_file_name(name)
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "oauth-tokens".to_string());
+    path.with_file_name(format!("{stem}.{}.{n}.tmp", std::process::id()))
 }
 
 fn replace_file(from: &Path, to: &Path) -> Result<(), String> {
@@ -496,7 +508,8 @@ fn store_oauth_tokens_in_file(
     keyring_oauth_set(&oauth_keyring_username_part(id, "meta"), &meta_json)?;
     log::info!(
         target: "rustymail_infrastructure::oauth",
-        "oauth: jetons pour {id} → fichier local ({path:?}, limite trousseau Windows)"
+        "oauth: jetons enregistrés dans le fichier local ({})",
+        oauth_log_ref(id)
     );
     Ok(())
 }
@@ -626,7 +639,9 @@ pub fn load_oauth_tokens(account_id: &str) -> Result<StoredMailOAuthTokens, Stri
             if key != id {
                 log::info!(
                     target: "rustymail_infrastructure::oauth",
-                    "oauth: jetons chargés depuis {key} pour compte {id}"
+                    "oauth: jetons chargés depuis un alias ({}) pour le compte ({})",
+                    oauth_log_ref(&key),
+                    oauth_log_ref(&id)
                 );
             }
             return Ok(tokens);
@@ -656,10 +671,16 @@ fn load_oauth_tokens_at(id: &str) -> Result<StoredMailOAuthTokens, String> {
         if let Ok(tokens) = try_load_legacy_monolithic_oauth(id) {
             log::info!(
                 target: "rustymail_infrastructure::oauth",
-                "oauth: migration ancien format trousseau → fichier pour {id}"
+                "oauth: migration ancien format trousseau → stockage chiffré ({})",
+                oauth_log_ref(id)
             );
-            let _ = store_oauth_tokens_at(id, &tokens);
-            keyring_oauth_delete(&oauth_keyring_username(id));
+            match store_oauth_tokens_at(id, &tokens) {
+                Ok(()) => keyring_oauth_delete(&oauth_keyring_username(id)),
+                Err(e) => log::warn!(
+                    target: "rustymail_infrastructure::oauth",
+                    "oauth: migration non écrite, ancien jeton conservé ({e})"
+                ),
+            }
             return Ok(tokens);
         }
     }
@@ -727,7 +748,8 @@ pub fn store_oauth_tokens(account_id: &str, tokens: &StoredMailOAuthTokens) -> R
         if let Err(e) = store_oauth_tokens_at(&key, &tokens) {
             log::warn!(
                 target: "rustymail_infrastructure::oauth",
-                "oauth: copie jetons vers alias {key}: {e}"
+                "oauth: copie jetons vers alias ({}): {e}",
+                oauth_log_ref(&key)
             );
         }
     }
@@ -1884,7 +1906,12 @@ mod tests {
         let bytes = std::fs::read(&path).expect("reread");
         assert!(bytes.starts_with(b"RMOT1"));
         assert!(!String::from_utf8_lossy(&bytes).contains("secret-refresh"));
-        assert!(!super::oauth_token_tmp_path(&path).exists());
+        let names: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, vec!["tokens.json".to_string()]);
         let again = super::read_oauth_token_file_with_key(&path, &key).expect("reread");
         assert_eq!(again, json);
     }
@@ -1895,15 +1922,29 @@ mod tests {
         let path = dir.path().join("tokens.json");
         let legacy = r#"{"access_token":"keep","refresh_token":"still-here"}"#;
         std::fs::write(&path, legacy).expect("legacy");
-        let tmp = super::oauth_token_tmp_path(&path);
-        std::fs::write(&tmp, b"refresh_token=secret").expect("tmp");
+        let fixed = path.with_file_name("tokens.json.tmp");
+        std::fs::write(&fixed, b"refresh_token=secret").expect("tmp");
         assert!(super::decrypt_oauth_blob(&[0x44u8; 32], b"refresh_token=secret").is_err());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), legacy);
         let key = [0x44u8; 32];
         let blob = super::encrypt_oauth_blob(&key, legacy.as_bytes()).unwrap();
+        let a = super::oauth_token_tmp_path(&path);
+        let b = super::oauth_token_tmp_path(&path);
+        assert_ne!(a, b, "chaque écriture a son propre temporaire");
+        assert_ne!(a, fixed);
         super::atomic_write_bytes(&path, &blob).expect("commit");
-        assert!(!tmp.exists());
+        assert!(
+            fixed.is_file(),
+            "un .tmp fixe préexistant n'est pas écrasé ni repris"
+        );
         assert!(std::fs::read(&path).unwrap().starts_with(b"RMOT1"));
+        let leftovers: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.contains(".tmp") && n != "tokens.json.tmp")
+            .collect();
+        assert!(leftovers.is_empty(), "{leftovers:?}");
     }
 
     #[test]

@@ -29,7 +29,7 @@ Before publishing an installable bundle (MSI/NSIS):
 
 ### Local data
 
-9. After upgrade: confirm `rustymail.sqlite3` opens (SQLCipher). A plaintext `*.pre-sqlcipher.bak` is removed after two successful launches. A version change keeps a single encrypted `*.pre-<version>.bak`.
+9. After upgrade: confirm `rustymail.sqlite3` opens (SQLCipher). A plaintext `*.pre-sqlcipher.bak` is removed after two successful launches. A version change keeps a single encrypted `*.pre-<version>.bak` (about 1× the database file; the copy is skipped when free space is below that size, and the app shows the stored notice until a later launch succeeds).
 10. IMAP push: new mail detected without manual Sync (check `imap-push` in logs).
 
 ### Functional smoke tests
@@ -51,11 +51,14 @@ Before publishing an installable bundle (MSI/NSIS):
 - `rusqlite` with `bundled-sqlcipher-vendored-openssl`
 - 256-bit key in OS keyring (`sqlcipher-db-v1` / service `RustyMail`)
 - A keyring error other than a missing entry does not overwrite the key. The UI shows « Base verrouillée : trousseau inaccessible, réessayer ».
+- A missing keyring entry creates a key only when no database file exists yet, or the file is still plaintext SQLite, and there is no staging file (`*.encrypting` / `*.encrypt-staging`), migrating marker, or `*.bak`. If an encrypted database is already on disk, startup fails with the same locked message: no new key is stored and the file is not quarantined.
 - Migrating plaintext DB: marker `*.sqlcipher-migrating`, `ATTACH` + `sqlcipher_export`, backup `*.pre-sqlcipher.bak`
 - That plaintext backup is deleted after two verified opens of the encrypted database
-- Restore from `*.pre-sqlcipher.bak` only when a plaintext→encrypted migration was interrupted (staging `*.encrypting` / `*.encrypt-staging`, or the migrating marker). An unreadable encrypted file is renamed `*.unreadable-<timestamp>` and is not overwritten
-- Before a schema migration when `app_meta.last_app_version` differs, one encrypted copy `*.pre-<version>.bak` is kept (older version copies are removed). The copy is skipped when free space is under twice the database size
-- OAuth token files (`oauth_tokens/*.json`) are AES-256-GCM (`RMOT1` header). The 32-byte key `oauth-file-key-v1` lives in the OS keyring and is created only when the entry is missing. Writes are atomic (`*.tmp`, then rename). A legacy plaintext JSON file is rewritten encrypted on read
+- Restore from `*.pre-sqlcipher.bak` only when a plaintext→encrypted migration was interrupted (staging `*.encrypting` / `*.encrypt-staging`, or the migrating marker). The current file is renamed `*.unreadable-<timestamp>` before the backup is copied (it is not deleted). An unreadable encrypted file outside that interrupted-migration path is also renamed and is not overwritten
+- Before a schema migration when `app_meta.last_app_version` differs, one encrypted copy `*.pre-<version>.bak` is kept (older version copies are removed). Free space required is **1×** the database file size (the live file is already allocated). `PRAGMA wal_checkpoint(TRUNCATE)` must report `busy = 0` before the copy. If the checkpoint is incomplete, space is short, or the copy fails, `last_app_version` is left unchanged (the next launch retries) and `app_meta.version_backup_notice` is set; the text is shown at startup
+- OAuth token files (`oauth_tokens/*.json`) are AES-256-GCM (`RMOT1` header). The 32-byte key `oauth-file-key-v1` lives in the OS keyring and is created only when the entry is missing. Writes use a unique temporary name (`<file>.<pid>.<n>.tmp`, then rename). A legacy plaintext JSON file is rewritten encrypted on read. A legacy monolithic keyring secret is deleted only after that encrypted store succeeds
+- Info logs for OAuth use a short hash (`ref:`) of the account id. They do not include the email address or the token-file path
+- IMAP UIDs that could not be parsed are stored in `imap_sync_skipped` and are not fetched again (`last_uid` moves past them). Those rows are deleted when the account is deleted and when that mailbox's UIDVALIDITY changes
 
 ### Keyring
 

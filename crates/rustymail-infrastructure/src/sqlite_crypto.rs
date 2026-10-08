@@ -18,6 +18,7 @@ const ENCRYPT_STAGING_ALT_SUFFIX: &str = ".encrypt-staging";
 const MIGRATING_MARKER_SUFFIX: &str = ".sqlcipher-migrating";
 const VERIFIED_OPENS_META_KEY: &str = "sqlcipher_verified_opens";
 const LAST_APP_VERSION_META_KEY: &str = "last_app_version";
+pub(crate) const VERSION_BACKUP_NOTICE_KEY: &str = "version_backup_notice";
 
 pub(crate) const DB_LOCKED_MESSAGE: &str = "Base verrouillée : trousseau inaccessible, réessayer";
 
@@ -47,6 +48,52 @@ pub(crate) fn decide_db_key(read: Result<String, keyring_core::Error>) -> KeyDec
     }
 }
 
+/// `CreateNew` n'est appliqué que s'il n'y a pas encore de base, ou si le fichier est encore
+/// du SQLite en clair, et qu'aucun artefact de migration / sauvegarde n'est présent.
+/// Sinon une entrée `NoEntry` ne doit pas écraser le trousseau : la base chiffrée resterait
+/// illisible et serait mise en quarantaine au prochain essai.
+pub(crate) fn provision_db_key(decision: KeyDecision, path: &Path) -> KeyDecision {
+    match decision {
+        KeyDecision::CreateNew if key_creation_allowed(path) => KeyDecision::CreateNew,
+        KeyDecision::CreateNew => KeyDecision::Fail(format!(
+            "{DB_LOCKED_MESSAGE} (base chiffrée présente, clé absente du trousseau — ne pas recréer)"
+        )),
+        other => other,
+    }
+}
+
+fn key_creation_allowed(path: &Path) -> bool {
+    if migration_interrupted(path)
+        || plaintext_backup_path(path).exists()
+        || version_backup_sibling_exists(path)
+    {
+        return false;
+    }
+    if !path.exists() {
+        return true;
+    }
+    is_plaintext_sqlite_file(path)
+}
+
+fn version_backup_sibling_exists(path: &Path) -> bool {
+    let Some(dir) = path.parent() else {
+        return false;
+    };
+    let stem = path
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if stem.is_empty() {
+        return false;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    entries
+        .flatten()
+        .any(|entry| is_version_backup_name(&entry.file_name().to_string_lossy(), &stem))
+}
+
 #[cfg(not(test))]
 fn db_keyring_entry() -> Result<keyring_core::Entry, String> {
     keyring::use_native_store(false).map_err(|e| format!("keyring native store failed: {e}"))?;
@@ -55,12 +102,13 @@ fn db_keyring_entry() -> Result<keyring_core::Entry, String> {
 }
 
 #[allow(clippy::needless_return)]
-fn load_or_create_db_key() -> Result<Vec<u8>, String> {
+fn load_or_create_db_key(path: &Path) -> Result<Vec<u8>, String> {
     if let Some(k) = DB_KEY_CACHE.get() {
         return Ok(k.clone());
     }
     #[cfg(test)]
     {
+        let _ = path;
         let key = vec![0xA7u8; 32];
         let _ = DB_KEY_CACHE.set(key.clone());
         return Ok(key);
@@ -71,10 +119,12 @@ fn load_or_create_db_key() -> Result<Vec<u8>, String> {
             Ok(entry) => entry,
             Err(e) => return Err(format!("{DB_LOCKED_MESSAGE} ({e})")),
         };
-        let decision = match entry.get_password() {
+        let read = match entry.get_password() {
             Ok(raw) => decide_db_key(Ok(raw)),
             Err(e) => decide_db_key(Err(e)),
         };
+        // `set_password` uniquement si `provision_db_key` laisse `CreateNew`.
+        let decision = provision_db_key(read, path);
         let key = match decision {
             KeyDecision::Use(bytes) => bytes,
             KeyDecision::Fail(message) => return Err(message),
@@ -221,11 +271,17 @@ fn try_restore_plaintext_backup(path: &Path) -> Result<(), String> {
     if !backup.is_file() || !is_plaintext_sqlite_file(&backup) {
         return Err("aucune sauvegarde plaintext utilisable".into());
     }
-    if path.exists() {
-        std::fs::remove_file(path)
-            .map_err(|e| format!("remove unreadable db before restore: {e}"))?;
+    let quarantined = if path.exists() {
+        Some(quarantine_unreadable(path)?)
+    } else {
+        None
+    };
+    if let Err(e) = std::fs::copy(&backup, path) {
+        if let Some(saved) = quarantined {
+            let _ = std::fs::rename(&saved, path);
+        }
+        return Err(format!("restore plaintext backup: {e}"));
     }
-    std::fs::copy(&backup, path).map_err(|e| format!("restore plaintext backup: {e}"))?;
     Ok(())
 }
 
@@ -363,7 +419,7 @@ fn open_with_key(path: &Path, key: &[u8]) -> Result<Connection, rusqlite::Error>
 
 /// Ouvre (ou crée) la base locale avec SQLCipher. Migre automatiquement une base en clair existante.
 pub fn open_sqlite_encrypted(path: &Path) -> Result<Connection, rusqlite::Error> {
-    let key = load_or_create_db_key().map_err(|e| rusqlite::Error::InvalidPath(e.into()))?;
+    let key = load_or_create_db_key(path).map_err(|e| rusqlite::Error::InvalidPath(e.into()))?;
     open_with_key(path, &key)
 }
 
@@ -371,14 +427,26 @@ pub fn open_sqlite_encrypted(path: &Path) -> Result<Connection, rusqlite::Error>
 pub(crate) enum VersionBackupOutcome {
     Unchanged,
     Copied,
-    SkippedNoSpace,
+    SkippedNoSpace(String),
     Failed(String),
 }
 
+/// Espace libre requis pour la copie : **1×** la taille du fichier (le fichier vivant est déjà alloué).
+/// `None` (espace inconnu) autorise la copie.
 pub(crate) fn version_backup_allowed(db_len: u64, free_bytes: Option<u64>) -> bool {
     match free_bytes {
-        Some(free) => free >= db_len.saturating_mul(2),
+        Some(free) => free >= db_len,
         None => true,
+    }
+}
+
+fn interpret_checkpoint_busy(busy: i64) -> Result<(), String> {
+    if busy != 0 {
+        Err(format!(
+            "checkpoint WAL incomplet avant sauvegarde (busy={busy}) — copie reportée"
+        ))
+    } else {
+        Ok(())
     }
 }
 
@@ -507,36 +575,82 @@ pub(crate) fn prepare_version_backup(conn: &Connection, path: &Path) -> VersionB
     if !path.is_file() {
         return VersionBackupOutcome::Unchanged;
     }
-    if let Err(e) = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);") {
-        let msg = format!("checkpoint avant sauvegarde de version : {e}");
-        log::warn!("{msg}");
+    let busy: i64 = match conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0)) {
+        Ok(busy) => busy,
+        Err(e) => {
+            return VersionBackupOutcome::Failed(format!(
+                "checkpoint avant sauvegarde de version : {e}"
+            ));
+        }
+    };
+    if let Err(msg) = interpret_checkpoint_busy(busy) {
         return VersionBackupOutcome::Failed(msg);
     }
     let db_len = match std::fs::metadata(path) {
         Ok(meta) => meta.len(),
         Err(e) => {
-            let msg = format!("taille base avant sauvegarde : {e}");
-            log::warn!("{msg}");
-            return VersionBackupOutcome::Failed(msg);
+            return VersionBackupOutcome::Failed(format!("taille base avant sauvegarde : {e}"));
         }
     };
     let free = volume_available_bytes(path);
     if !version_backup_allowed(db_len, free) {
-        log::warn!(
-            "sauvegarde pre-{current} ignorée : espace libre {:?} < 2 × {db_len} octets",
-            free
-        );
-        return VersionBackupOutcome::SkippedNoSpace;
+        return VersionBackupOutcome::SkippedNoSpace(format!(
+            "Sauvegarde pre-{current} ignorée : espace libre {free:?} < taille de la base ({db_len} octets). Une copie demande environ 1× la taille du fichier. Nouvel essai au prochain lancement."
+        ));
     }
     let dest = version_backup_path(path, current);
     if let Err(e) = std::fs::copy(path, &dest) {
-        let msg = format!("copie sauvegarde pre-{current} : {e}");
-        log::warn!("{msg}");
-        return VersionBackupOutcome::Failed(msg);
+        return VersionBackupOutcome::Failed(format!("copie sauvegarde pre-{current} : {e}"));
     }
     delete_older_version_backups(path, &dest);
-    log::info!("sauvegarde chiffrée écrite : {}", dest.display());
+    log::info!(
+        "sauvegarde chiffrée écrite ({})",
+        dest.file_name().unwrap_or_default().to_string_lossy()
+    );
     VersionBackupOutcome::Copied
+}
+
+/// Succès : fige `last_app_version` et efface l'avis. Échec ou manque de place : avis visible,
+/// version non figée (nouvel essai au prochain lancement).
+pub(crate) fn apply_version_backup_outcome(
+    conn: &Connection,
+    outcome: &VersionBackupOutcome,
+) -> Result<(), rusqlite::Error> {
+    match outcome {
+        VersionBackupOutcome::Unchanged | VersionBackupOutcome::Copied => {
+            write_last_app_version(conn)?;
+            clear_version_backup_notice(conn)?;
+        }
+        VersionBackupOutcome::SkippedNoSpace(msg) | VersionBackupOutcome::Failed(msg) => {
+            log::error!("{msg}");
+            write_version_backup_notice(conn, msg)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_app_meta(conn: &Connection, key: &str, value: &str) -> Result<(), rusqlite::Error> {
+    conn.execute(
+        "INSERT INTO app_meta(key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [key, value],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn write_version_backup_notice(
+    conn: &Connection,
+    message: &str,
+) -> Result<(), rusqlite::Error> {
+    write_app_meta(conn, VERSION_BACKUP_NOTICE_KEY, message)
+}
+
+pub(crate) fn clear_version_backup_notice(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.execute(
+        "DELETE FROM app_meta WHERE key = ?1",
+        [VERSION_BACKUP_NOTICE_KEY],
+    )?;
+    Ok(())
 }
 
 pub(crate) fn write_last_app_version(conn: &Connection) -> Result<(), rusqlite::Error> {
@@ -572,7 +686,7 @@ pub(crate) fn note_sqlcipher_verified_open(conn: &Connection, path: &Path) {
         match std::fs::remove_file(&backup) {
             Ok(()) => log::info!(
                 "sauvegarde en clair SQLCipher supprimée après {next} ouvertures vérifiées ({})",
-                backup.display()
+                backup.file_name().unwrap_or_default().to_string_lossy()
             ),
             Err(e) => log::warn!("suppression {} : {e}", backup.display()),
         }
@@ -626,10 +740,149 @@ mod tests {
     }
 
     #[test]
-    fn version_backup_skips_when_free_space_below_twice_db() {
-        assert!(!version_backup_allowed(100, Some(199)));
-        assert!(version_backup_allowed(100, Some(200)));
+    fn version_backup_skips_when_free_space_below_db_size() {
+        assert!(!version_backup_allowed(100, Some(99)));
+        assert!(version_backup_allowed(100, Some(100)));
         assert!(version_backup_allowed(100, None));
+    }
+
+    #[test]
+    fn checkpoint_busy_blocks_version_backup() {
+        assert!(interpret_checkpoint_busy(0).is_ok());
+        let err = interpret_checkpoint_busy(1).expect_err("busy");
+        assert!(err.contains("busy=1"), "{err}");
+    }
+
+    #[test]
+    fn noentry_on_encrypted_db_does_not_create_key_or_quarantine() {
+        let (_dir, path) = temp_db_path();
+        std::fs::write(&path, b"SQLCipher-not-plaintext!!").expect("encrypted-looking");
+        let decision = provision_db_key(KeyDecision::CreateNew, &path);
+        match decision {
+            KeyDecision::Fail(message) => {
+                assert!(message.starts_with(DB_LOCKED_MESSAGE), "{message}");
+                assert!(message.contains("ne pas recréer"), "{message}");
+            }
+            other => panic!("NoEntry + base chiffrée doit échouer : {other:?}"),
+        }
+        assert!(path.is_file(), "pas de quarantaine");
+        let quarantined = std::fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().contains(".unreadable-"));
+        assert!(!quarantined, "aucun fichier .unreadable-");
+    }
+
+    #[test]
+    fn noentry_creates_only_without_db_or_plaintext_and_without_artifacts() {
+        let (_dir, path) = temp_db_path();
+        assert!(matches!(
+            provision_db_key(KeyDecision::CreateNew, &path),
+            KeyDecision::CreateNew
+        ));
+        std::fs::write(&path, b"SQLite format 3\0pad").expect("plain header");
+        assert!(is_plaintext_sqlite_file(&path));
+        assert!(matches!(
+            provision_db_key(KeyDecision::CreateNew, &path),
+            KeyDecision::CreateNew
+        ));
+        std::fs::write(plaintext_backup_path(&path), b"bak").expect("bak");
+        assert!(
+            matches!(
+                provision_db_key(KeyDecision::CreateNew, &path),
+                KeyDecision::Fail(_)
+            ),
+            "un .bak bloque la création de clé"
+        );
+        let (_dir2, path2) = temp_db_path();
+        std::fs::write(staging_encrypt_path(&path2), b"stage").expect("stage");
+        assert!(matches!(
+            provision_db_key(KeyDecision::CreateNew, &path2),
+            KeyDecision::Fail(_)
+        ));
+        let (_dir3, path3) = temp_db_path();
+        std::fs::write(version_backup_path(&path3, "0.4.4"), b"vb").expect("vbak");
+        assert!(matches!(
+            provision_db_key(KeyDecision::CreateNew, &path3),
+            KeyDecision::Fail(_)
+        ));
+        let kept = [9u8; 32];
+        assert!(matches!(
+            provision_db_key(KeyDecision::Use(kept.to_vec()), &path),
+            KeyDecision::Use(bytes) if bytes == kept
+        ));
+    }
+
+    #[test]
+    fn restore_plaintext_backup_quarantines_current_file() {
+        let (_dir, path) = temp_db_path();
+        std::fs::write(&path, b"garbage-current").expect("garbage");
+        let bak = plaintext_backup_path(&path);
+        {
+            let conn = Connection::open(&bak).expect("bak");
+            conn.execute_batch("CREATE TABLE t (id INTEGER);")
+                .expect("ddl");
+        }
+        try_restore_plaintext_backup(&path).expect("restore");
+        assert!(is_plaintext_sqlite_file(&path));
+        let parent = path.parent().unwrap();
+        let quarantined = std::fs::read_dir(parent)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .find(|n| n.contains(".unreadable-"))
+            .expect("quarantaine");
+        assert_eq!(
+            std::fs::read(parent.join(&quarantined)).unwrap(),
+            b"garbage-current"
+        );
+    }
+
+    #[test]
+    fn failed_version_backup_sets_notice_and_keeps_old_stamp() {
+        let (_dir, path) = temp_db_path();
+        let conn = crate::open_sqlite_migrated(&path).expect("open");
+        conn.execute(
+            "UPDATE app_meta SET value = '0.4.3' WHERE key = 'last_app_version'",
+            [],
+        )
+        .expect("stamp");
+        let detail = "checkpoint WAL incomplet avant sauvegarde (busy=1) — copie reportée";
+        apply_version_backup_outcome(&conn, &VersionBackupOutcome::Failed(detail.into()))
+            .expect("notice");
+        let ver: String = conn
+            .query_row(
+                "SELECT value FROM app_meta WHERE key = 'last_app_version'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("ver");
+        assert_eq!(ver, "0.4.3");
+        let notice: String = conn
+            .query_row(
+                "SELECT value FROM app_meta WHERE key = 'version_backup_notice'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("notice row");
+        assert!(notice.contains("busy=1"), "{notice}");
+        apply_version_backup_outcome(&conn, &VersionBackupOutcome::Copied).expect("clear");
+        let ver: String = conn
+            .query_row(
+                "SELECT value FROM app_meta WHERE key = 'last_app_version'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("ver");
+        assert_eq!(ver, env!("CARGO_PKG_VERSION"));
+        let left: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM app_meta WHERE key = 'version_backup_notice'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("cleared");
+        assert_eq!(left, 0);
     }
 
     #[test]
