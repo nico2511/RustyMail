@@ -106,6 +106,9 @@ pub struct ZoneSpec {
     pub details_heading: Option<String>,
     #[serde(default)]
     pub rows: Option<RowSpec>,
+    /// Racine propre à la zone. Absente : `match.structure.root`.
+    #[serde(default)]
+    pub structure_root: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

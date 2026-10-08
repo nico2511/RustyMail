@@ -1,6 +1,15 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { exclusiveZoneHits, expandCutNode, pickFromElement, shrinkCutNode } from "./digestCutPaint";
+import {
+  cutRangeLabel,
+  exclusiveZoneHits,
+  expandCutNode,
+  pickFromElement,
+  picksFromElements,
+  shrinkCutNode,
+  snapDragRange,
+  unwrapSingleChildWrappers,
+} from "./digestCutPaint";
 
 function mount(html: string): HTMLElement {
   const root = document.createElement("div");
@@ -53,6 +62,60 @@ describe("digestCutPaint size", () => {
     expect(onTitle).toHaveLength(1);
     expect(onTitle[0]?.zone).toBe("header");
     expect(kept.some((hit) => hit.el === body)).toBe(true);
+    document.body.removeChild(root);
+  });
+});
+
+describe("snapDragRange", () => {
+  it("saute les enveloppes à un seul enfant et n’attrape jamais la racine", () => {
+    const root = mount(`
+      <div class="outer">
+        <div class="inner">
+          <p>Bonjour <span class="digest-cut__hover">mot</span></p>
+        </div>
+      </div>
+    `);
+    const span = root.querySelector("span")!;
+    const range = snapDragRange(root, span, span);
+    expect(range).toHaveLength(1);
+    expect(range[0]?.tagName.toLowerCase()).toBe("p");
+    expect(range[0]).not.toBe(root);
+    expect(unwrapSingleChildWrappers(root.querySelector(".outer")!, root).tagName.toLowerCase()).toBe("p");
+    expect(cutRangeLabel(range)).toBe("p");
+    expect(snapDragRange(root, root, root)).toEqual([]);
+    document.body.removeChild(root);
+  });
+
+  it("peint une plage de frères contigus, pas le parent", () => {
+    const root = mount(`
+      <div class="letter">
+        <div class="row">En-tête</div>
+        <div class="row">Corps utile</div>
+        <div class="row digest-cut__zone-hl">Pied légal</div>
+      </div>
+    `);
+    const rows = [...root.querySelectorAll(".row")];
+    const range = snapDragRange(root, rows[0], rows[2]);
+    expect(range.map((el) => el.textContent?.trim())).toEqual(["En-tête", "Corps utile", "Pied légal"]);
+    expect(range).not.toContain(root.querySelector(".letter"));
+    const picks = picksFromElements(range, root);
+    expect(picks).toHaveLength(3);
+    expect(new Set(picks.map((pick) => pick.index)).size).toBe(3);
+    expect(picks.every((pick) => !String(pick.classContains ?? "").includes("digest-cut__"))).toBe(true);
+    expect(cutRangeLabel(range)).toBe("3 blocs");
+    document.body.removeChild(root);
+  });
+
+  it("donne une racine nth-of-type quand le parent n’a pas de classe", () => {
+    const root = document.createElement("div");
+    root.setAttribute("data-digest-cut-mail", "1");
+    root.innerHTML = `<div><div><p>un</p></div><div><p>deux</p></div></div>`;
+    document.body.appendChild(root);
+    const second = root.querySelectorAll("div")[2]!;
+    const pick = pickFromElement(second, root);
+    expect(pick?.structureRoot ?? "").toMatch(/nth-of-type/);
+    expect(pick?.structureRoot).not.toBe("div");
+    expect(pick?.structureRoot).not.toBe("td");
     document.body.removeChild(root);
   });
 });

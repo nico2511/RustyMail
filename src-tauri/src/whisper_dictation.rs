@@ -25,13 +25,11 @@ struct CachedWhisperEngine {
 static WHISPER_ENGINE_CACHE: Mutex<Option<CachedWhisperEngine>> = Mutex::new(None);
 
 fn lock_whisper_cache() -> std::sync::MutexGuard<'static, Option<CachedWhisperEngine>> {
-    WHISPER_ENGINE_CACHE
-        .lock()
-        .unwrap_or_else(|poisoned| {
-            let mut guard = poisoned.into_inner();
-            *guard = None;
-            guard
-        })
+    WHISPER_ENGINE_CACHE.lock().unwrap_or_else(|poisoned| {
+        let mut guard = poisoned.into_inner();
+        *guard = None;
+        guard
+    })
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -409,9 +407,9 @@ fn reload_cached_engine_if_needed(
     flash_attn: bool,
     load: WhisperLoadParams,
 ) -> Result<(), WhisperError> {
-    let reuse = cache.as_ref().is_some_and(|c| {
-        c.path == path && c.use_gpu == use_gpu && c.flash_attn == flash_attn
-    });
+    let reuse = cache
+        .as_ref()
+        .is_some_and(|c| c.path == path && c.use_gpu == use_gpu && c.flash_attn == flash_attn);
     if reuse {
         return Ok(());
     }

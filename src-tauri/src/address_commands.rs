@@ -79,7 +79,7 @@ pub fn parse_address_list_cmd(raw: String) -> Vec<rustymail_domain::EmailAddress
 }
 
 #[tauri::command]
-pub fn list_address_contacts_scoped_cmd(
+pub async fn list_address_contacts_scoped_cmd(
     paths: State<'_, AppPaths>,
     account_id: String,
     query: String,
@@ -88,16 +88,21 @@ pub fn list_address_contacts_scoped_cmd(
     global_scope: Option<bool>,
 ) -> Result<ListAddressContactsScopedResult, String> {
     ipc_guard::validate_account_id(&account_id)?;
-    let prefs = load_app_prefs(&paths.prefs_path);
-    let global = global_scope.unwrap_or(prefs.general.address_book_global_scope);
-    list_address_contacts_scoped(
-        paths.db_path.as_path(),
-        account_id.trim(),
-        query.trim(),
-        offset.unwrap_or(0),
-        limit.unwrap_or(50).clamp(1, 100),
-        global,
-    )
+    let paths = Clone::clone(&*paths);
+    tauri::async_runtime::spawn_blocking(move || {
+        let prefs = load_app_prefs(&paths.prefs_path);
+        let global = global_scope.unwrap_or(prefs.general.address_book_global_scope);
+        list_address_contacts_scoped(
+            paths.db_path.as_path(),
+            account_id.trim(),
+            query.trim(),
+            offset.unwrap_or(0),
+            limit.unwrap_or(50).clamp(1, 100),
+            global,
+        )
+    })
+    .await
+    .map_err(|e| format!("list_address_contacts_scoped join: {e}"))?
 }
 
 #[tauri::command]
@@ -132,7 +137,7 @@ pub fn list_sender_emails_for_domain_cmd(
 }
 
 #[tauri::command]
-pub fn get_address_contact_detail_cmd(
+pub async fn get_address_contact_detail_cmd(
     paths: State<'_, AppPaths>,
     account_id: String,
     email: String,
@@ -140,18 +145,23 @@ pub fn get_address_contact_detail_cmd(
 ) -> Result<ContactDetailDto, String> {
     ipc_guard::validate_account_id(&account_id)?;
     ipc_guard::validate_contact_email(&email)?;
-    let prefs = load_app_prefs(&paths.prefs_path);
-    let global = global_scope.unwrap_or(prefs.general.address_book_global_scope);
-    get_address_contact_detail(
-        paths.db_path.as_path(),
-        account_id.trim(),
-        email.trim(),
-        global,
-    )
+    let paths = Clone::clone(&*paths);
+    tauri::async_runtime::spawn_blocking(move || {
+        let prefs = load_app_prefs(&paths.prefs_path);
+        let global = global_scope.unwrap_or(prefs.general.address_book_global_scope);
+        get_address_contact_detail(
+            paths.db_path.as_path(),
+            account_id.trim(),
+            email.trim(),
+            global,
+        )
+    })
+    .await
+    .map_err(|e| format!("get_address_contact_detail join: {e}"))?
 }
 
 #[tauri::command]
-pub fn list_address_contacts_cmd(
+pub async fn list_address_contacts_cmd(
     paths: State<'_, AppPaths>,
     account_id: String,
     query: String,
@@ -159,13 +169,18 @@ pub fn list_address_contacts_cmd(
     limit: Option<u32>,
 ) -> Result<ListAddressContactsResult, String> {
     ipc_guard::validate_account_id(&account_id)?;
-    list_address_contacts(
-        paths.db_path.as_path(),
-        account_id.trim(),
-        query.trim(),
-        offset.unwrap_or(0),
-        limit.unwrap_or(40).clamp(1, 100),
-    )
+    let db = paths.db_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        list_address_contacts(
+            db.as_path(),
+            account_id.trim(),
+            query.trim(),
+            offset.unwrap_or(0),
+            limit.unwrap_or(40).clamp(1, 100),
+        )
+    })
+    .await
+    .map_err(|e| format!("list_address_contacts join: {e}"))?
 }
 
 #[tauri::command]

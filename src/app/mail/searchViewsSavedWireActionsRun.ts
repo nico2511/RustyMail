@@ -15,6 +15,7 @@ import {
 } from "./searchViewBatch";
 import { openOrganizationV2View } from "./orgFolderWireActions";
 import { clearSearchAndReloadInbox } from "./searchCommitQuery";
+import { searchThreads } from "./searchThreadsRun";
 import { persistActiveSavedSearchUiState } from "./savedSearchPersistUiRun";
 
 export async function tryHandleSearchViewsSavedWire(action: string, element?: HTMLElement): Promise<boolean> {
@@ -29,6 +30,9 @@ export async function tryHandleSearchViewsSavedWire(action: string, element?: HT
       return true;
     case "clear-search-exit":
       void clearSearchAndReloadInbox();
+      return true;
+    case "search-load-more":
+      void searchThreads({ append: true });
       return true;
     case "apply-saved-search": {
       const sid = element?.dataset.savedSearchId?.trim();

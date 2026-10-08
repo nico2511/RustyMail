@@ -5,6 +5,30 @@ import { digestCut } from "./digestCutState";
 
 const SKIP_TAGS = new Set(["html", "head", "body", "script", "style", "br", "hr", "img", "svg", "path"]);
 
+const INLINE_TAGS = new Set([
+  "span",
+  "a",
+  "b",
+  "i",
+  "em",
+  "strong",
+  "u",
+  "font",
+  "small",
+  "mark",
+  "label",
+  "abbr",
+  "cite",
+  "code",
+  "kbd",
+  "samp",
+  "var",
+  "time",
+  "sub",
+  "sup",
+  "button",
+]);
+
 function meaningfulClass(el: Element): string | null {
   const raw = el.getAttribute("class") ?? "";
   for (const token of raw.split(/\s+/)) {
@@ -12,7 +36,7 @@ function meaningfulClass(el: Element): string | null {
       token &&
       token.length <= 40 &&
       /^[a-zA-Z][\w-]*$/.test(token) &&
-      !/^(x_|mso|outlook)/i.test(token)
+      !/^(x_|mso|outlook|digest-cut__)/i.test(token)
     ) {
       return token;
     }
@@ -20,11 +44,43 @@ function meaningfulClass(el: Element): string | null {
   return null;
 }
 
+function nthOfType(el: Element): number {
+  const tag = el.tagName;
+  let n = 1;
+  let sib = el.previousElementSibling;
+  while (sib) {
+    if (sib.tagName === tag) n += 1;
+    sib = sib.previousElementSibling;
+  }
+  return n;
+}
+
+/** Classe stable, sinon chaîne `:nth-of-type` (jamais un `div`/`td` nu). */
+function disambiguatedSelector(el: Element): string {
+  const stop = el.closest("[data-digest-cut-mail]");
+  const parts: string[] = [];
+  let cur: Element | null = el;
+  while (cur && cur !== stop) {
+    const tag = cur.tagName.toLowerCase();
+    if (tag === "html" || tag === "body" || tag === "head") break;
+    const cls = meaningfulClass(cur);
+    if (cls) {
+      parts.unshift(`${tag}.${cls}`);
+      return parts.join(" > ");
+    }
+    parts.unshift(`${tag}:nth-of-type(${nthOfType(cur)})`);
+    cur = cur.parentElement;
+    if (parts.length > 8) break;
+  }
+  return parts.join(" > ");
+}
+
 /** Même notion que `child_elements` côté Rust (table → lignes via thead/tbody/tfoot). */
 function structureChildren(root: Element): Element[] {
   const isTable = root.tagName.toLowerCase() === "table";
   const out: Element[] = [];
   for (const child of root.children) {
+    if (child.hasAttribute("data-digest-cut-overlay")) continue;
     const name = child.tagName.toLowerCase();
     if (isTable && (name === "thead" || name === "tbody" || name === "tfoot")) {
       out.push(...[...child.children]);
@@ -36,10 +92,7 @@ function structureChildren(root: Element): Element[] {
 }
 
 function uniqueSelectorFor(el: Element): string {
-  const tag = el.tagName.toLowerCase();
-  const cls = meaningfulClass(el);
-  if (cls) return `${tag}.${cls}`;
-  return tag;
+  return disambiguatedSelector(el);
 }
 
 /** Remonte vers une balise utile (table, section, div classé, fin de ligne). */
@@ -153,9 +206,152 @@ function textNeedlesFrom(el: Element): string[] {
 
 export function pickFromMailClick(target: EventTarget | null, mailRoot: HTMLElement): DigestCutPaintPick | null {
   if (!(target instanceof Element) || !mailRoot.contains(target)) return null;
-  const expanded = expandCutNode(target, mailRoot);
-  if (expanded === mailRoot) return null;
-  return pickFromElement(expanded, mailRoot);
+  const range = snapDragRange(mailRoot, target, target);
+  const el = range[0];
+  if (!el) return null;
+  return pickFromElement(el, mailRoot);
+}
+
+function blockChildren(el: Element): Element[] {
+  return structureChildren(el).filter((child) => {
+    const tag = child.tagName.toLowerCase();
+    return !SKIP_TAGS.has(tag) && tag !== "body" && tag !== "html";
+  });
+}
+
+function structureParent(el: Element, root: Element): Element | null {
+  const parent = el.parentElement;
+  if (!parent) return null;
+  const tag = parent.tagName.toLowerCase();
+  if ((tag === "thead" || tag === "tbody" || tag === "tfoot") && parent.parentElement) {
+    const table = parent.parentElement;
+    if (table.tagName.toLowerCase() === "table") return table === root ? root : table;
+  }
+  return parent;
+}
+
+/** Descend les enveloppes à un seul enfant. Le nœud utile est le bloc intérieur. */
+export function unwrapSingleChildWrappers(el: Element, root: Element): Element {
+  let cur = el;
+  while (cur !== root) {
+    const kids = blockChildren(cur).filter((kid) => !INLINE_TAGS.has(kid.tagName.toLowerCase()));
+    if (kids.length !== 1) break;
+    cur = kids[0];
+  }
+  return cur === root ? el : cur;
+}
+
+function climbToCutBoundary(start: Element, root: Element): Element | null {
+  let cur: Element | null = start;
+  while (cur && cur !== root) {
+    const tag = cur.tagName.toLowerCase();
+    if (tag === "body" || tag === "html" || SKIP_TAGS.has(tag) || INLINE_TAGS.has(tag)) {
+      cur = cur.parentElement;
+      continue;
+    }
+    const unwrapped = unwrapSingleChildWrappers(cur, root);
+    return unwrapped === root ? null : unwrapped;
+  }
+  return null;
+}
+
+/**
+ * Bloc minimal sous le pointeur, ou plage de frères contigus.
+ * Jamais `body` ni la racine du mail. Les classes d'éditeur ne servent pas de frontière.
+ */
+export function snapDragRange(root: HTMLElement, start: Element, end: Element): Element[] {
+  if (!root.contains(start) || start === root) return [];
+  const focus = root.contains(end) && end !== root ? end : start;
+  const a = climbToCutBoundary(start, root);
+  const b = climbToCutBoundary(focus, root);
+  if (!a || !b || a === root || b === root) return [];
+  if (a === b || a.contains(b)) return [b];
+  if (b.contains(a)) return [a];
+
+  const chain = new Set<Element>();
+  for (let node: Element | null = a; node && node !== root; node = structureParent(node, root)) {
+    chain.add(node);
+  }
+  let lca: Element | null = null;
+  for (let node: Element | null = b; node && node !== root; node = structureParent(node, root)) {
+    if (chain.has(node)) {
+      lca = node;
+      break;
+    }
+  }
+  const parent = lca ?? root;
+  const childOf = (node: Element): Element => {
+    let cur = node;
+    while (cur !== parent) {
+      const up = structureParent(cur, root);
+      if (!up || up === cur) break;
+      if (up === parent) return cur;
+      cur = up;
+    }
+    return cur;
+  };
+  const left = childOf(a);
+  const right = childOf(b);
+  if (structureParent(left, root) !== parent || structureParent(right, root) !== parent) return [a];
+  const kids = blockChildren(parent);
+  const i1 = kids.indexOf(left);
+  const i2 = kids.indexOf(right);
+  if (i1 < 0 || i2 < 0) return [a];
+  const lo = Math.min(i1, i2);
+  const hi = Math.max(i1, i2);
+  const range: Element[] = [];
+  for (const kid of kids.slice(lo, hi + 1)) {
+    if (kid === root || kid.tagName.toLowerCase() === "body") continue;
+    if (!range.includes(kid)) range.push(kid);
+  }
+  return range;
+}
+
+export function cutRangeLabel(elements: Element[]): string {
+  if (elements.length === 0) return "";
+  if (elements.length === 1) {
+    const el = elements[0];
+    const tag = el.tagName.toLowerCase();
+    const cls = meaningfulClass(el);
+    return cls ? `${tag}.${cls}` : tag;
+  }
+  return `${elements.length} blocs`;
+}
+
+export function adjacentCutElement(el: Element, delta: -1 | 1): Element | null {
+  const parent = el.parentElement;
+  if (!parent) return null;
+  const kids = blockChildren(parent).filter((kid) => !INLINE_TAGS.has(kid.tagName.toLowerCase()));
+  const idx = kids.indexOf(el);
+  if (idx < 0) return null;
+  return kids[idx + delta] ?? null;
+}
+
+function indexAmongShape(el: Element): number | null {
+  const parent = el.parentElement;
+  if (!parent) return 0;
+  const tag = el.tagName.toLowerCase();
+  const cls = meaningfulClass(el);
+  const kids = structureChildren(parent).filter((kid) => {
+    if (kid.tagName.toLowerCase() !== tag) return false;
+    if (!cls) return true;
+    return (kid.getAttribute("class") ?? "").split(/\s+/).includes(cls);
+  });
+  const idx = kids.indexOf(el);
+  return idx >= 0 ? idx : null;
+}
+
+/** Ancres d'une plage : index distincts pour que chaque frère reste résolvable. */
+export function picksFromElements(elements: Element[], root: HTMLElement): DigestCutPaintPick[] {
+  const picks: DigestCutPaintPick[] = [];
+  for (const el of elements) {
+    const pick = pickFromElement(el, root);
+    if (!pick) continue;
+    const indexed = indexAmongShape(el);
+    if (indexed != null) pick.index = indexed;
+    picks.push(pick);
+  }
+  return picks;
 }
 
 export function paintPickToAnchor(pick: DigestCutPaintPick): DigestCutAnchor {
@@ -195,12 +391,6 @@ export function ensurePaintProposalSkeleton(): DigestCutProposal {
 
 const ZONE_RANK: Record<DigestCutZoneName, number> = { header: 0, body: 1, footer: 2 };
 
-function zoneLabel(zone: DigestCutZoneName): string {
-  if (zone === "header") return "En-tête";
-  if (zone === "body") return "Corps";
-  return "Pied";
-}
-
 function visibleText(el: Element): string {
   return (el.textContent ?? "").replace(/\s+/g, " ").trim();
 }
@@ -231,62 +421,10 @@ export function exclusiveZoneHits(
   return kept;
 }
 
-/** Surligne les ancres connues + la sélection courante dans un clone DOM. */
+/** HTML affiché : aucune classe d'éditeur n'est écrite dans les nœuds du mail. */
 export function decorateMailHtmlForCut(rawHtml: string): string {
   if (!rawHtml.trim()) return rawHtml;
-  const wrap = document.createElement("div");
-  wrap.innerHTML = rawHtml;
-  const proposal = digestCut.proposal;
-  if (proposal) {
-    const zones: DigestCutZoneName[] = ["header", "body", "footer"];
-    const hits: Array<{ zone: DigestCutZoneName; el: Element }> = [];
-    for (const zone of zones) {
-      for (const anchor of proposal.zones[zone].anchors) {
-        const el = findAnchorElement(wrap, anchor, proposal.match.structureRoot);
-        if (el) hits.push({ zone, el });
-      }
-    }
-    for (const hit of exclusiveZoneHits(hits)) {
-      paintZoneFrame(hit.el, hit.zone);
-    }
-  }
-  if (digestCut.paintPick) {
-    markPaintPick(wrap, digestCut.paintPick);
-  }
-  return wrap.innerHTML;
-}
-
-function findAnchorElement(
-  root: HTMLElement,
-  anchor: DigestCutAnchor,
-  structureRoot: string,
-): Element | null {
-  const tag = (anchor.selector ?? "").trim().toLowerCase();
-  if (!tag) return null;
-  const scope = resolveStructureRootEl(root, structureRoot) ?? root;
-  const classNeedle = (anchor.classContains ?? "").trim().toLowerCase();
-  const candidates = structureChildren(scope).filter((el) => {
-    if (el.tagName.toLowerCase() !== tag) return false;
-    if (!classNeedle) return true;
-    return (el.getAttribute("class") ?? "").toLowerCase().split(/\s+/).some((t) => t.includes(classNeedle));
-  });
-  if (anchor.index != null && anchor.index >= 0 && anchor.index < candidates.length) {
-    return candidates[anchor.index];
-  }
-  return candidates[0] ?? null;
-}
-
-function paintZoneFrame(el: Element, zone: DigestCutZoneName): void {
-  el.classList.add("digest-cut__zone-hl", `digest-cut__zone-hl--${zone}`);
-  el.setAttribute("data-digest-cut-zone", zone);
-  el.setAttribute("data-digest-cut-label", zoneLabel(zone));
-  const check = digestCut.zoneChecks[zone];
-  if (check) {
-    el.setAttribute("data-digest-cut-check", check.status);
-  }
-  if (digestCut.paintZone === zone) {
-    el.classList.add("digest-cut__zone-hl--active");
-  }
+  return rawHtml.replace(/\s*digest-cut__[\w-]*/g, "");
 }
 
 function resolveStructureRootEl(root: HTMLElement, selector: string): Element | null {
@@ -299,8 +437,3 @@ function resolveStructureRootEl(root: HTMLElement, selector: string): Element | 
   }
 }
 
-function markPaintPick(root: HTMLElement, pick: DigestCutPaintPick): void {
-  const el = findElementForPick(root, pick);
-  if (!el) return;
-  el.classList.add("digest-cut__paint-pick");
-}

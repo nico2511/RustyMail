@@ -21,6 +21,8 @@ export type SearchQueryPayload = {
   hasAttachment?: boolean | null;
   minSecurityScore?: number | null;
   hybridLexicalWeight?: number | null;
+  offset?: number | null;
+  limit?: number | null;
 };
 
 export type SearchQueryBuildOpts = {
@@ -45,6 +47,8 @@ export type SearchQueryBuildOpts = {
   hybridLexicalWeight?: number | null;
   dateFrom?: string | null;
   dateTo?: string | null;
+  offset?: number | null;
+  limit?: number | null;
 };
 
 export function buildSearchQueryPayload(opts: SearchQueryBuildOpts): SearchQueryPayload {
@@ -94,6 +98,8 @@ export function buildSearchQueryPayload(opts: SearchQueryBuildOpts): SearchQuery
   }
   if (minSecurityScore != null) payload.minSecurityScore = minSecurityScore;
   if (hybridLexicalWeight != null) payload.hybridLexicalWeight = hybridLexicalWeight;
+  if (opts.offset != null && opts.offset > 0) payload.offset = Math.floor(opts.offset);
+  if (opts.limit != null && opts.limit > 0) payload.limit = Math.floor(opts.limit);
 
   return payload;
 }

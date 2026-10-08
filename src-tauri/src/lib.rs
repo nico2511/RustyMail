@@ -417,7 +417,7 @@ fn list_threads(
 }
 
 #[tauri::command]
-fn search_threads(
+async fn search_threads(
     paths: State<'_, AppPaths>,
     core: State<'_, Mutex<AppCore>>,
     query: SearchQuery,
@@ -429,8 +429,13 @@ fn search_threads(
         .map(|s| !s.trim().is_empty())
         .unwrap_or(false);
     if use_sqlite {
-        return rustymail_infrastructure::sqlite_search_threads_unified(&paths.db_path, &query)
-            .map_err(|e| e.to_string());
+        let db = paths.db_path.clone();
+        return tauri::async_runtime::spawn_blocking(move || {
+            rustymail_infrastructure::sqlite_search_threads_unified(&db, &query)
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| format!("search_threads join: {e}"))?;
     }
     let core = core.lock().map_err(|_| "core lock poisoned".to_string())?;
     Ok(core.search_threads(query))
@@ -2225,6 +2230,9 @@ pub fn run() {
             {
                 eprintln!("[RustyMail] ai_cache backfill expires_at: {e}");
             }
+            // Index FTS : table et déclencheurs déjà créés par la migration.
+            // Le remplissage des corps existants ne bloque pas l'affichage.
+            rustymail_infrastructure::spawn_messages_fts_backfill(&db_path);
             // Ne pas charger tout SQLite en RAM au démarrage (grosse base = IPC bloqué, comptes invisibles).
             // `list_threads` / sync rechargent le cache à la demande via `sqlite_app_core*`.
             let prefs_boot = prefs_path.clone();
@@ -2438,6 +2446,7 @@ pub fn run() {
             digest_bench::digest_bench_reject,
             digest_bench::digest_bench_enable_reading,
             digest_bench::digest_bench_disable_reading,
+            digest_cut::digest_cut_cleaned_html,
             digest_cut::digest_cut_builtin_sample,
             digest_cut::digest_cut_parse_eml,
             digest_cut::digest_cut_propose_zones,

@@ -25,6 +25,14 @@ struct SearchLlmPartial {
     mode: SearchMode,
     #[serde(default)]
     mailbox: Option<String>,
+    #[serde(default)]
+    date_from: Option<String>,
+    #[serde(default)]
+    date_to: Option<String>,
+    #[serde(default)]
+    relative_days: Option<i64>,
+    #[serde(default)]
+    has_attachment: Option<bool>,
 }
 
 pub fn nl_to_search_query(
@@ -35,7 +43,8 @@ pub fn nl_to_search_query(
 ) -> Result<SearchQuery, LlmError> {
     let trimmed = natural.trim();
     let system = crate::prompts::system_prompt_for_language("search_nl", output_language);
-    let user = trimmed.to_string();
+    let today = today_iso_utc();
+    let user = format!("Date du jour (AAAA-MM-JJ) : {today}\nRequête : {trimmed}");
 
     let raw = engine.generate(
         system.as_str(),
@@ -78,6 +87,10 @@ pub fn nl_to_search_query(
         .map(|m| m.trim().to_string())
         .filter(|m| !m.is_empty());
 
+    let date_from = sanitize_nl_date(partial.date_from.as_deref(), false);
+    let date_to = sanitize_nl_date(partial.date_to.as_deref(), true);
+    let relative_days = partial.relative_days.filter(|n| (1..=3650).contains(n));
+
     Ok(SearchQuery {
         text: text_lc,
         tags: partial.tags,
@@ -91,8 +104,52 @@ pub fn nl_to_search_query(
         mailbox,
         mode,
         language,
+        date_from,
+        date_to,
+        relative_days,
+        has_attachment: partial.has_attachment,
         ..Default::default()
     })
+}
+
+fn sanitize_nl_date(raw: Option<&str>, end_of_day: bool) -> Option<String> {
+    let v = raw?.trim();
+    if v.len() == 10
+        && v.as_bytes().get(4) == Some(&b'-')
+        && v.as_bytes().get(7) == Some(&b'-')
+        && v.bytes().all(|b| b.is_ascii_digit() || b == b'-')
+    {
+        return Some(if end_of_day {
+            format!("{v}T23:59:59Z")
+        } else {
+            format!("{v}T00:00:00Z")
+        });
+    }
+    None
+}
+
+fn today_iso_utc() -> String {
+    let days = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| (d.as_secs() / 86_400) as i64)
+        .unwrap_or(0);
+    iso_from_unix_days(days)
+}
+
+fn iso_from_unix_days(unix_days: i64) -> String {
+    let z = unix_days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let mut y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    if m <= 2 {
+        y += 1;
+    }
+    format!("{y:04}-{m:02}-{d:02}")
 }
 
 #[cfg(test)]
@@ -106,5 +163,16 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(q.text.as_deref(), Some("facture"));
+    }
+
+    #[test]
+    fn civil_date_from_unix_days() {
+        assert_eq!(super::iso_from_unix_days(0), "1970-01-01");
+        assert_eq!(super::iso_from_unix_days(10957), "2000-01-01");
+        let today = super::today_iso_utc();
+        assert!(
+            today.len() == 10 && today.as_bytes()[4] == b'-' && today.as_bytes()[7] == b'-',
+            "{today}"
+        );
     }
 }

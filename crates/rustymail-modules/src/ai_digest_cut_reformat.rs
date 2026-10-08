@@ -97,8 +97,7 @@ pub fn reformat_digest_cut_reading(
 ) -> DigestCutReformatOutcome {
     let excerpts = zone_excerpts(html, sender_email, subject, current);
     let candidates = extract_useful_link_candidates(html, 8);
-    let mut fallback_reason = None;
-    if let Some(engine) = engine {
+    let fallback_reason = if let Some(engine) = engine {
         match reformat_with_llm(
             engine,
             sender_email,
@@ -118,19 +117,16 @@ pub fn reformat_digest_cut_reading(
                     fallback_reason: None,
                 };
             }
-            Err(e) => {
-                fallback_reason = Some(match &e {
-                    LlmError::InputTooLarge { tokens, n_ctx } => format!(
-                        "contexte trop court pour reformater ({tokens} jetons / n_ctx={n_ctx})."
-                    ),
-                    other => format!("Le modèle n’a pas reformatté le texte : {other}"),
-                });
-            }
+            Err(e) => Some(match &e {
+                LlmError::InputTooLarge { tokens, n_ctx } => format!(
+                    "contexte trop court pour reformater ({tokens} jetons / n_ctx={n_ctx})."
+                ),
+                other => format!("Le modèle n’a pas reformatté le texte : {other}"),
+            }),
         }
     } else {
-        fallback_reason =
-            Some("Aucun moteur IA joignable pour le reformatage (Paramètres → IA).".into());
-    }
+        Some("Aucun moteur IA joignable pour le reformatage (Paramètres → IA).".to_string())
+    };
     let (proposal, reading_html) =
         heuristic_reformat(current, subject, html, &excerpts, &candidates);
     DigestCutReformatOutcome {
@@ -444,7 +440,8 @@ fn already_mentions(dto: &ReformatDto, needle: &str) -> bool {
     dto.highlight_value.contains(needle)
         || dto.title.contains(needle)
         || dto.amount.contains(needle)
-        || dto.rows
+        || dto
+            .rows
             .iter()
             .any(|row| row.label.contains(needle) || row.value.contains(needle))
         || dto.paragraphs.iter().any(|p| p.contains(needle))
@@ -476,7 +473,11 @@ fn fill_missing_facts(dto: &mut ReformatDto, excerpts: &ZoneExcerpts) {
     .expect("name");
     if dto.rows.len() < 8 {
         if let Some(found) = name_re.find(&blob) {
-            let value = found.as_str().split_whitespace().collect::<Vec<_>>().join(" ");
+            let value = found
+                .as_str()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
             if !already_mentions(dto, &value) {
                 dto.rows.push(ReformatRowDto {
                     label: "Destinataire".into(),
@@ -486,8 +487,7 @@ fn fill_missing_facts(dto: &mut ReformatDto, excerpts: &ZoneExcerpts) {
         }
     }
     if dto.actions.len() < MAX_ACTIONS {
-        let site_re =
-            regex::Regex::new(r"(?i)\bwww\.[a-z0-9.-]+\.[a-z]{2,}\b").expect("site");
+        let site_re = regex::Regex::new(r"(?i)\bwww\.[a-z0-9.-]+\.[a-z]{2,}\b").expect("site");
         if let Some(found) = site_re.find(&blob) {
             let host = found.as_str();
             if !already_mentions(dto, host) {

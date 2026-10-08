@@ -150,6 +150,10 @@ export type State = {
   /** Lot IMAP depuis une vue recherche (Affiner, etc.) — progression barre / sous-titre. */
   searchViewBatchJob: SearchViewBatchJob | null;
   search: string;
+  /** Décalage de la page de recherche déjà chargée. */
+  searchResultOffset: number;
+  /** La dernière page de recherche était pleine. */
+  searchHasMore: boolean;
   /** Texte dans la barre de recherche (non appliqué tant qu’Entrée / validation). */
   searchDraft: string;
   /** Contacts `@` (un ou plusieurs, OU logique). */

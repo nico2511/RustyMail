@@ -72,9 +72,12 @@ pub struct DigestCutZone {
     pub row_selector: Option<String>,
     #[serde(default)]
     pub rationale: Option<String>,
+    /// Racine propre à la zone. Absente : on retombe sur `match.structure_root`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structure_root: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DigestCutAnchor {
     #[serde(default)]
@@ -241,6 +244,7 @@ fn try_deblock_proposal(html: &str, sender_email: &str) -> Option<DigestCutPropo
                     "Premier titre et bloc montant dans div.f-fallback (structure Deblock)."
                         .to_string(),
                 ),
+                structure_root: None,
             },
             body: DigestCutZone {
                 action: ZoneAction::Show,
@@ -257,6 +261,7 @@ fn try_deblock_proposal(html: &str, sender_email: &str) -> Option<DigestCutPropo
                 rationale: Some(
                     "Lignes libellé/valeur après le second h3 jusqu'au pied.".to_string(),
                 ),
+                structure_root: None,
             },
             footer: DigestCutZone {
                 action: ZoneAction::Hide,
@@ -271,6 +276,7 @@ fn try_deblock_proposal(html: &str, sender_email: &str) -> Option<DigestCutPropo
                 details_heading: None,
                 row_selector: None,
                 rationale: Some("Pied marketing / avertissement (div.warning).".to_string()),
+                structure_root: None,
             },
         },
         explanation_fr: String::new(),
@@ -386,7 +392,8 @@ fn generic_proposal_from_dom(html: &str, sender_email: &str) -> Option<DigestCut
                 "Bloc de fin « {} ».",
                 quote_clip(&node_text(&children[index]))
             )),
-        },
+                        structure_root: None,
+            },
         None => DigestCutZone {
             action: ZoneAction::Hide,
             presentation: None,
@@ -397,7 +404,8 @@ fn generic_proposal_from_dom(html: &str, sender_email: &str) -> Option<DigestCut
                 "Aucun pied séparé repéré : le masquage ne retire rien tant qu'une ancre ne vise pas un bloc."
                     .to_string(),
             ),
-        },
+                        structure_root: None,
+            },
     };
     Some(DigestCutProposal {
         fixture_id: slug_from_domain(&domain),
@@ -419,6 +427,7 @@ fn generic_proposal_from_dom(html: &str, sender_email: &str) -> Option<DigestCut
                 details_heading: None,
                 row_selector: None,
                 rationale: Some(format!("Le titre « {} ».", quote_clip(&header_text))),
+                structure_root: None,
             },
             body: DigestCutZone {
                 action: ZoneAction::Show,
@@ -427,6 +436,7 @@ fn generic_proposal_from_dom(html: &str, sender_email: &str) -> Option<DigestCut
                 details_heading: None,
                 row_selector: None,
                 rationale: Some(body_rationale),
+                structure_root: None,
             },
             footer,
         },
@@ -529,10 +539,64 @@ fn unique_selector(doc: &Html, el: ElementRef<'_>) -> Option<String> {
             }
         }
     }
-    if selector_hits_first(doc, tag, el) {
-        return Some(tag.to_string());
+    disambiguated_path(doc, el)
+}
+
+/// Chemin `:nth-of-type` jusqu'à une correspondance unique. Un `div` / `td` nu
+/// vise toujours le premier élément et n'est pas une racine fiable.
+fn disambiguated_path(doc: &Html, el: ElementRef<'_>) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+    let mut current = el;
+    for _ in 0..12 {
+        let tag = current.value().name();
+        if tag.is_empty() || matches!(tag, "html" | "head" | "body" | "[document]") {
+            break;
+        }
+        parts.push(format!("{tag}:nth-of-type({})", nth_of_type(current)));
+        let selector = parts.iter().rev().cloned().collect::<Vec<_>>().join(" > ");
+        if selector_matches_only(doc, &selector, el) {
+            return Some(selector);
+        }
+        match parent_element(current) {
+            Some(parent) => current = parent,
+            None => break,
+        }
     }
-    None
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.into_iter().rev().collect::<Vec<_>>().join(" > "))
+    }
+}
+
+fn parent_element(el: ElementRef<'_>) -> Option<ElementRef<'_>> {
+    el.parent().and_then(ElementRef::wrap)
+}
+
+fn nth_of_type(el: ElementRef<'_>) -> usize {
+    let name = el.value().name();
+    let mut n = 1usize;
+    let mut sib = el.prev_sibling();
+    while let Some(node) = sib {
+        if let Some(elem) = ElementRef::wrap(node) {
+            if elem.value().name() == name {
+                n += 1;
+            }
+        }
+        sib = node.prev_sibling();
+    }
+    n
+}
+
+fn selector_matches_only(doc: &Html, selector: &str, el: ElementRef<'_>) -> bool {
+    let Ok(parsed) = Selector::parse(selector) else {
+        return false;
+    };
+    let mut hits = doc.select(&parsed);
+    match (hits.next(), hits.next()) {
+        (Some(hit), None) => hit.id() == el.id(),
+        _ => false,
+    }
 }
 
 fn selector_hits_first(doc: &Html, selector: &str, el: ElementRef<'_>) -> bool {
@@ -730,6 +794,7 @@ fn generic_proposal_from_outline(outline: &str, sender_email: &str) -> DigestCut
                 details_heading: None,
                 row_selector: None,
                 rationale: Some("Premier titre repéré dans la racine.".to_string()),
+                structure_root: None,
             },
             body: DigestCutZone {
                 action: ZoneAction::Show,
@@ -738,6 +803,7 @@ fn generic_proposal_from_outline(outline: &str, sender_email: &str) -> DigestCut
                 details_heading: None,
                 row_selector: None,
                 rationale: Some("Premier paragraphe de substance.".to_string()),
+                structure_root: None,
             },
             footer: DigestCutZone {
                 action: ZoneAction::Hide,
@@ -752,6 +818,7 @@ fn generic_proposal_from_outline(outline: &str, sender_email: &str) -> DigestCut
                 details_heading: None,
                 row_selector: None,
                 rationale: Some("Bloc pied probable (classe footer).".to_string()),
+                structure_root: None,
             },
         },
         explanation_fr: String::new(),
@@ -906,7 +973,13 @@ fn render_yaml(proposal: &DigestCutProposal) -> String {
         }
     }
     s.push_str("  structure:\n");
-    s.push_str(&format!("    root: {}\n", proposal.match_.structure_root));
+    let root = clean_selector(&proposal.match_.structure_root);
+    let root = if root.is_empty() {
+        "div".to_string()
+    } else {
+        root
+    };
+    s.push_str(&format!("    root: {}\n", yaml_scalar(&root)));
     s.push_str(&format!(
         "    min_children: {}\n",
         proposal.match_.min_children
@@ -927,18 +1000,36 @@ fn render_zone_yaml(out: &mut String, name: &str, zone: &DigestCutZone) {
             presentation_name(presentation)
         ));
     }
+    if let Some(root) = zone
+        .structure_root
+        .as_deref()
+        .map(clean_selector)
+        .filter(|s| !s.is_empty())
+    {
+        out.push_str(&format!("    structure_root: {}\n", yaml_scalar(&root)));
+    }
     if !zone.anchors.is_empty() {
         out.push_str("    anchors:\n");
         for anchor in &zone.anchors {
             out.push_str("      -\n");
-            if let Some(sel) = &anchor.selector {
-                out.push_str(&format!("        selector: {}\n", sel));
+            if let Some(sel) = anchor
+                .selector
+                .as_deref()
+                .map(clean_selector)
+                .filter(|s| !s.is_empty())
+            {
+                out.push_str(&format!("        selector: {}\n", yaml_scalar(&sel)));
             }
             if let Some(idx) = anchor.index {
                 out.push_str(&format!("        index: {}\n", idx));
             }
-            if let Some(cls) = &anchor.class_contains {
-                out.push_str(&format!("        class_contains: {}\n", cls));
+            if let Some(cls) = anchor
+                .class_contains
+                .as_deref()
+                .map(clean_class_token)
+                .filter(|s| !s.is_empty())
+            {
+                out.push_str(&format!("        class_contains: {}\n", yaml_scalar(&cls)));
             }
             if !anchor.text_contains_any.is_empty() {
                 out.push_str("        text_contains_any:\n");
@@ -963,6 +1054,52 @@ fn render_zone_yaml(out: &mut String, name: &str, zone: &DigestCutZone) {
         out.push_str("      label: \"b, strong\"\n");
         out.push_str("      value: after_br\n");
     }
+}
+
+fn unstable_class_token(token: &str) -> bool {
+    let t = token.trim();
+    // Seules les classes de l'éditeur. `rm-mail-*` / `rm-digest*` / `rm-conversation-*`
+    // sont les ancres stables conservées par le nettoyage HTML ; `x_` et `mso` n'y
+    // sont déjà plus.
+    t.is_empty() || t.starts_with("digest-cut__")
+}
+
+fn clean_class_token(token: &str) -> String {
+    token
+        .split_whitespace()
+        .filter(|part| !unstable_class_token(part))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn clean_selector(selector: &str) -> String {
+    let mut out = String::new();
+    let chars: Vec<char> = selector.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '.' {
+            let start = i + 1;
+            let mut end = start;
+            while end < chars.len()
+                && (chars[end].is_alphanumeric() || chars[end] == '_' || chars[end] == '-')
+            {
+                end += 1;
+            }
+            let token: String = chars[start..end].iter().collect();
+            if !unstable_class_token(&token) && !token.is_empty() {
+                out.push('.');
+                out.push_str(&token);
+            }
+            i = end;
+        } else {
+            out.push(chars[i]);
+            i += 1;
+        }
+    }
+    out.split_whitespace()
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn yaml_scalar(value: &str) -> String {
@@ -1047,6 +1184,7 @@ fn zone_from_spec(zone: &ZoneSpec) -> DigestCutZone {
             None
         },
         rationale: None,
+        structure_root: zone.structure_root.clone(),
     }
 }
 
@@ -1256,5 +1394,109 @@ zones:
         let fixture = parse_fixture(DEBLOCK_FIXTURE_YAML).expect("deblock");
         let yaml = proposal_to_fixture_yaml(&super::proposal_from_fixture(&fixture)).expect("yaml");
         assert!(yaml.contains("div.f-fallback"));
+    }
+
+    #[test]
+    fn fixture_yaml_never_contains_editor_highlight_classes() {
+        use super::{
+            DigestCutAnchor, DigestCutMatch, DigestCutProposal, DigestCutZone, DigestCutZones,
+            DomainRuleDto, ProposalSource,
+        };
+        use crate::mail_cleaning::digest_fixtures::{ZoneAction, ZonePresentation};
+
+        let anchor = |selector: &str, class_contains: Option<&str>| DigestCutAnchor {
+            selector: Some(selector.to_string()),
+            class_contains: class_contains.map(str::to_string),
+            index: Some(0),
+            text_contains_any: Vec::new(),
+            role: None,
+        };
+        let zone = |action: ZoneAction,
+                    selector: &str,
+                    class_contains: Option<&str>,
+                    root: Option<&str>| {
+            DigestCutZone {
+                action,
+                presentation: Some(ZonePresentation::AsIs),
+                anchors: vec![anchor(selector, class_contains)],
+                details_heading: None,
+                row_selector: None,
+                rationale: None,
+                structure_root: root.map(str::to_string),
+            }
+        };
+        let proposal = DigestCutProposal {
+            fixture_id: "exemple-fr".into(),
+            rule_set_version: "1".into(),
+            source: ProposalSource::Heuristic,
+            explanation_fr: String::new(),
+            match_: DigestCutMatch {
+                sender_domains: vec![DomainRuleDto {
+                    exact: Some("exemple.fr".into()),
+                    suffix: None,
+                }],
+                structure_root: "div.letter.digest-cut__hover-cand".into(),
+                min_children: 2,
+            },
+            zones: DigestCutZones {
+                header: zone(
+                    ZoneAction::Show,
+                    "h1.digest-cut__zone-hl",
+                    Some("digest-cut__zone-hl"),
+                    None,
+                ),
+                body: zone(
+                    ZoneAction::Show,
+                    "p.digest-cut__hover",
+                    Some("digest-cut__zone-hl body"),
+                    Some("div.letter"),
+                ),
+                footer: zone(
+                    ZoneAction::Hide,
+                    "div.rm-keep.digest-cut__footer",
+                    Some("x_footer digest-cut__zone-hl foot"),
+                    Some("section.digest-cut__mail-doc.foot"),
+                ),
+            },
+        };
+        let yaml = proposal_to_fixture_yaml(&proposal).expect("yaml");
+        assert!(
+            !yaml.contains("digest-cut__"),
+            "editor classes leaked into YAML:\n{yaml}"
+        );
+        assert!(yaml.contains("div.letter"));
+        assert!(yaml.contains("class_contains: body"));
+        assert!(
+            yaml.contains("x_footer foot"),
+            "x_ n'est plus retiré du sélecteur :\n{yaml}"
+        );
+        assert!(yaml.contains("section.foot"));
+        assert!(
+            yaml.contains("div.rm-keep"),
+            "les classes rm- stables doivent rester :\n{yaml}"
+        );
+    }
+
+    #[test]
+    fn clean_selector_keeps_spaces_utf8_and_rm_classes() {
+        assert_eq!(super::clean_selector("div.letter p"), "div.letter p");
+        assert_eq!(super::clean_selector("p.résumé"), "p.résumé");
+        assert_eq!(
+            super::clean_selector("div.rm-mail-body.digest-cut__hover"),
+            "div.rm-mail-body"
+        );
+        assert!(!super::clean_selector("div.letter p").contains("div.letterp"));
+    }
+
+    #[test]
+    fn bare_div_root_uses_nth_of_type_instead_of_first_match() {
+        use scraper::{Html, Selector};
+        let html = r#"<div><p>un</p><p>deux</p></div><div><p>trois</p><p>quatre</p></div>"#;
+        let doc = Html::parse_fragment(html);
+        let divs: Vec<_> = doc.select(&Selector::parse("div").unwrap()).collect();
+        assert!(divs.len() >= 2);
+        let sel = super::unique_selector(&doc, divs[1]).expect("selector");
+        assert!(sel.contains("nth-of-type"), "racine nue refusée : {sel}");
+        assert_ne!(sel, "div");
     }
 }

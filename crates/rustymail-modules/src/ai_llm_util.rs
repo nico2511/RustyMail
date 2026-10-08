@@ -217,7 +217,7 @@ pub(crate) fn json_truncation_retryable(err: &LlmError) -> bool {
                 || m.contains("missing field")
                 || m.contains("réparation")
                 || m.contains("expected")
-                ||             m.contains("tronqu")
+                || m.contains("tronqu")
                 || m.contains("incomplet")
                 || m.contains("intention vide")
                 || m.contains("diagnosis")
@@ -256,7 +256,10 @@ pub(crate) fn generate_fil_json<T: DeserializeOwned>(
         Ok(v) => Ok(v),
         Err(first) if json_truncation_retryable(&first) => {
             // Second essai : budget fil nettement plus petit que le premier calage.
-            let first_chars = thread_context.chars().count().min(initial_max_chars.max(400));
+            let first_chars = thread_context
+                .chars()
+                .count()
+                .min(initial_max_chars.max(400));
             let compact_chars = ((first_chars * 2) / 5).clamp(800, 2_400);
             let (user2, params2) = fit_fil_context_user(
                 engine,
@@ -289,6 +292,7 @@ pub(crate) fn gen_params_json_with_grammar(
         top_p: 0.92,
         stop: Vec::new(),
         grammar_gbnf: grammar_gbnf.map(str::to_string),
+        expect_json: true,
     }
 }
 
@@ -299,6 +303,7 @@ pub(crate) fn gen_params_text(max_tokens: u32) -> LlmGenParams {
         top_p: 0.92,
         stop: Vec::new(),
         grammar_gbnf: None,
+        expect_json: false,
     }
 }
 
@@ -852,17 +857,9 @@ mod tests {
         engine.set_n_ctx_probe(4096);
         let system = "Tu analyses un fil et réponds en JSON.";
         let huge = "x".repeat(80_000);
-        let (user, params) = fit_fil_context_user(
-            &engine,
-            system,
-            &huge,
-            "Fil :\n",
-            "",
-            24_000,
-            256,
-            768,
-        )
-        .expect("fit");
+        let (user, params) =
+            fit_fil_context_user(&engine, system, &huge, "Fil :\n", "", 24_000, 256, 768)
+                .expect("fit");
         let room = output_room_after_prompt(&engine, system, &user, 64);
         assert!(
             room >= MIN_ASSIST_JSON_OUTPUT_ROOM,

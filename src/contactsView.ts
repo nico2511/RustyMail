@@ -78,6 +78,8 @@ function addressBookGlobalScope(): boolean {
 }
 let contactsDetail: ContactDetailDto | null = null;
 let contactsDetailLoading = false;
+let contactsDetailError = "";
+let contactsDetailReq = 0;
 let contactsKeywordDraft = "";
 
 export type ContactProfileResult = {
@@ -89,23 +91,33 @@ export type ContactProfileResult = {
 
 let contactsProfile: ContactProfileResult | null = null;
 let contactsProfileLoading = false;
+let contactsProfileError = "";
+let contactsProfileReq = 0;
 
 export function clearContactProfile(): void {
+  contactsProfileReq += 1;
   contactsProfile = null;
   contactsProfileLoading = false;
+  contactsProfileError = "";
 }
 
 export async function loadContactProfile(accountId: string, email: string): Promise<void> {
+  const req = ++contactsProfileReq;
   contactsProfileLoading = true;
   contactsProfile = null;
+  contactsProfileError = "";
   try {
-    contactsProfile = await invoke<ContactProfileResult>("llm_contact_profile", {
+    const profile = await invoke<ContactProfileResult>("llm_contact_profile", {
       payload: { accountId, email },
     });
-  } catch {
+    if (req !== contactsProfileReq) return;
+    contactsProfile = profile;
+  } catch (error) {
+    if (req !== contactsProfileReq) return;
     contactsProfile = null;
+    contactsProfileError = error instanceof Error ? error.message : "Profil IA indisponible.";
   } finally {
-    contactsProfileLoading = false;
+    if (req === contactsProfileReq) contactsProfileLoading = false;
   }
 }
 
@@ -279,19 +291,25 @@ export async function loadContactsList(
 }
 
 export async function loadContactDetail(accountId: string, email: string): Promise<ContactDetailDto | null> {
+  const req = ++contactsDetailReq;
   contactsDetailLoading = true;
+  contactsDetailError = "";
   contactsDetail = null;
   try {
-    contactsDetail = await invoke<ContactDetailDto>("get_address_contact_detail_cmd", {
+    const detail = await invoke<ContactDetailDto>("get_address_contact_detail_cmd", {
       accountId,
       email,
     });
-    return contactsDetail;
-  } catch {
+    if (req !== contactsDetailReq) return contactsDetail;
+    contactsDetail = detail;
+    return detail;
+  } catch (error) {
+    if (req !== contactsDetailReq) return contactsDetail;
     contactsDetail = null;
+    contactsDetailError = error instanceof Error ? error.message : "Impossible de charger le contact.";
     return null;
   } finally {
-    contactsDetailLoading = false;
+    if (req === contactsDetailReq) contactsDetailLoading = false;
   }
 }
 
@@ -403,7 +421,13 @@ export function renderContactDetailPage(): string {
       <header class="thread-reading-head contacts-view__head">
         ${navRenderTrailHtml("Contact", escapeHtml, escapeAttr, { navClass: "secondary-view-nav" })}
       </header>
-      <p class="dim contacts-view__status">${contactsDetailLoading ? "Chargement…" : "Contact introuvable."}</p>
+      <p class="dim contacts-view__status">${
+        contactsDetailLoading
+          ? "Chargement…"
+          : contactsDetailError
+            ? escapeHtml(contactsDetailError)
+            : "Contact introuvable."
+      }</p>
     </section>`;
   }
   const label = d.displayName?.trim() || d.email;
@@ -412,7 +436,9 @@ export function renderContactDetailPage(): string {
   const rules = d.matchedRuleLabels.map((r) => `<li class="mono">${escapeHtml(r)}</li>`).join("");
   const profileBlock = contactsProfileLoading
     ? `<p class="dim">Profil IA…</p>`
-    : contactsProfile
+    : contactsProfileError
+      ? `<p class="dim">Profil IA : ${escapeHtml(contactsProfileError)}</p>`
+      : contactsProfile
       ? `<h2 class="thread-kicker">Profil IA</h2>
           <p>${escapeHtml(contactsProfile.summary)}</p>
           ${

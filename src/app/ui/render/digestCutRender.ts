@@ -78,6 +78,20 @@ function zoneCheckBadge(name: DigestCutZoneName): string {
   return `<span class="digest-cut__check digest-cut__check--${check.status}" title="${escapeAttr(check.message)}">${escapeHtml(label)}</span>`;
 }
 
+function anchorRemoveList(name: DigestCutZoneName): string {
+  const anchors = digestCut.proposal?.zones[name].anchors ?? [];
+  if (!anchors.length) return "";
+  return `<ul class="digest-cut__anchor-list">${anchors
+    .map((anchor, index) => {
+      const label =
+        [anchor.selector, anchor.classContains, anchor.index != null ? `#${anchor.index}` : ""]
+          .filter((part) => part != null && String(part).trim() !== "")
+          .join(" · ") || "repère";
+      return `<li><span>${escapeHtml(label)}</span><button type="button" class="ghost-button" data-action="digest-cut-anchor-remove" data-zone="${name}" data-anchor-index="${index}">Retirer</button></li>`;
+    })
+    .join("")}</ul>`;
+}
+
 function zoneRow(name: DigestCutZoneName): string {
   const zone = digestCut.proposal?.zones[name];
   const action = zone?.action ?? "show";
@@ -103,6 +117,7 @@ function zoneRow(name: DigestCutZoneName): string {
         ? `<p class="digest-cut__zone-check-msg dim">${escapeHtml(check.message)}</p>`
         : `<p class="digest-cut__zone-anchors dim" title="Repères techniques dans le HTML">Repères : ${escapeHtml(anchors)}</p>`
     }
+    ${anchorRemoveList(name)}
     <div class="digest-cut__zone-actions" role="group" aria-label="${escapeAttr(`Zone ${label}`)}">
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="show" aria-pressed="${pressed("show")}">Afficher</button>
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="hide" aria-pressed="${pressed("hide")}">Masquer</button>
@@ -193,7 +208,7 @@ function paintBar(): string {
   if (!zone && !pick) {
     return `<div class="digest-cut__paint-bar digest-cut__paint-bar--idle">
       <p class="digest-cut__paint-title">Ajuster visuellement</p>
-      <p class="digest-bench__fine dim">Survolez le mail : le cadre suit le <strong>bloc HTML complet</strong>. Cliquez une zone colorée, puis <strong>Plus grand</strong> / <strong>Plus petit</strong>. Chaque choix est contrôlé (balise ouverte/fermée).</p>
+      <p class="digest-bench__fine dim">Glissez sur le mail : le cadre suit le <strong>bloc HTML complet</strong> ou une plage de blocs voisins. <strong>Alt</strong> + flèches : parent, enfant, frère. Puis assignez la zone.</p>
     </div>`;
   }
   const zoneHint = zone ? ZONE_LABEL[zone] : "non assignée";
@@ -264,8 +279,10 @@ function proposeSection(loaded: boolean): string {
     <p class="digest-bench__fine">On sépare le <strong>signal</strong> (titre, faits, analyse utile) du <strong>bruit</strong> (pied promo / légal).</p>
     <div class="digest-cut__actions">
       <button type="button" class="primary-button" data-action="digest-cut-propose" ${loaded && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy}>${digestCut.proposing ? "Analyse…" : ready ? "Repérer à nouveau" : "Repérer l’essentiel"}</button>
-      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && ready && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy} title="Le modèle local revérifie les zones">Revérifier (IA)</button>
+      <button type="button" class="ghost-button" data-action="digest-cut-refine" ${loaded && ready && !digestCut.proposing && !digestCut.reformatting ? "" : "disabled"} ${busy} title="Le modèle affine la proposition">Affiner</button>
     </div>
+    <label class="digest-bench__label" for="digest-cut-feedback">Ce qui ne va pas (optionnel)</label>
+    <textarea id="digest-cut-feedback" class="digest-cut__feedback" rows="2" placeholder="Ex. le pied est encore dans le corps">${escapeHtml(digestCut.refineFeedback)}</textarea>
     <p class="digest-bench__fine dim">Rien n’est activé en lecture automatique depuis cet écran.</p>
   </section>`;
 }
@@ -317,15 +334,17 @@ function adjustSection(): string {
 function zoneStudio(rendered: string, paintClass: string): string {
   if (!digestCut.zoneStudioOpen || !digestCut.proposal) return "";
   return `<div class="modal-backdrop digest-cut-studio" role="presentation">
-    <div class="modal digest-cut-studio__panel modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="digest-cut-studio-title">
+    <div class="modal surface-elevated digest-cut-studio__panel modal-shell-stop-prop" role="dialog" aria-modal="true" aria-labelledby="digest-cut-studio-title">
       <header class="modal-header">
         <h3 id="digest-cut-studio-title">Ajuster les zones</h3>
         <button type="button" class="ghost-button" data-action="digest-cut-zone-studio">Fermer</button>
       </header>
       <div class="digest-cut-studio__body">
-        <div class="digest-cut-studio__mail mail digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}</div>
+        <div class="digest-cut__mail-frame">
+          <div class="digest-cut-studio__mail mail digest-cut__mail-doc digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}<div class="digest-cut__overlay" data-digest-cut-overlay="1" hidden></div></div>
+        </div>
         <aside class="digest-cut-studio__side">
-          <p class="digest-bench__fine">Cliquez un bloc du mail. <strong>Plus grand</strong> / <strong>Plus petit</strong> changent sa taille, puis assignez-le.</p>
+          <p class="digest-bench__fine">Glissez pour peindre une zone. <strong>Alt</strong> + flèches élargit vers le parent, l’enfant ou le frère.</p>
           <div class="digest-cut__legend" aria-hidden="true">
             <span class="digest-cut__legend-item digest-cut__legend-item--header">En-tête</span>
             <span class="digest-cut__legend-item digest-cut__legend-item--body">Corps</span>
@@ -366,8 +385,16 @@ export function renderDigestCutPanel(): string {
       </div>
       <div class="digest-cut__preview digest-bench__compare digest-bench__compare--split">
         <section class="digest-bench__pane">
-          <h4 class="digest-bench__pane-title">Mail d’origine${editing && !studio ? " · cliquez une zone colorée" : ""}</h4>
-          <div class="digest-bench__pane-body mail digest-cut__mail-source${studio ? "" : paintClass}" ${studio ? "" : `data-digest-cut-mail="1"`}>${mailPane}</div>
+          <h4 class="digest-bench__pane-title">Mail d’origine${editing && !studio ? " · glissez pour peindre une zone" : ""}</h4>
+          <div class="digest-bench__pane-body">
+            ${
+              studio
+                ? mailPane
+                : `<div class="digest-cut__mail-frame">
+                    <div class="mail digest-cut__mail-doc digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${mailPane}<div class="digest-cut__overlay" data-digest-cut-overlay="1" hidden></div></div>
+                  </div>`
+            }
+          </div>
         </section>
         <section class="digest-bench__pane">
           <h4 class="digest-bench__pane-title">${escapeHtml(previewPaneTitle())}</h4>

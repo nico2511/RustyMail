@@ -5,7 +5,6 @@ use serde_json::{json, Value};
 
 use crate::ai_llm_util::{
     gen_params_json_for_prompt, output_room_after_prompt, parse_model_json, truncate_chars,
-    untrusted_mail_for_engine,
 };
 use crate::mail_cleaning::digest_fixtures::proposal::{
     analyze_html_structure_heuristic, email_domain, french_explanation, proposal_to_fixture_yaml,
@@ -54,6 +53,8 @@ struct DigestCutZoneDto {
     details_heading: Option<String>,
     row_selector: Option<String>,
     rationale: Option<String>,
+    #[serde(default)]
+    structure_root: Option<String>,
 }
 
 /// Résultat d'une proposition. `from_model` est faux si le moteur manque ou si le JSON est refusé.
@@ -67,7 +68,7 @@ pub struct DigestCutModelOutcome {
 /// Propose des zones. Sans moteur, ou si le JSON est refusé : heuristique, ou la proposition
 /// déjà ajustée par l'utilisateur quand elle est fournie.
 ///
-/// Le prompt est calibré pour un modèle local de la classe Llama 3.2 (contexte court).
+/// Le prompt vise un modèle local quelconque (JSON structuré, contexte configurable).
 pub fn propose_digest_cut_zones(
     engine: Option<&mut LlmEngine>,
     html: &str,
@@ -75,12 +76,13 @@ pub fn propose_digest_cut_zones(
     subject: &str,
     output_language: &str,
     current: Option<&DigestCutProposal>,
+    feedback: Option<&str>,
+    locked_zones: &[String],
 ) -> DigestCutModelOutcome {
     let fallback = current
         .cloned()
         .unwrap_or_else(|| analyze_html_structure_heuristic(html, sender_email));
-    let mut fallback_reason: Option<String> = None;
-    if let Some(engine) = engine {
+    let fallback_reason = if let Some(engine) = engine {
         match propose_with_llm(
             engine,
             html,
@@ -88,9 +90,14 @@ pub fn propose_digest_cut_zones(
             subject,
             output_language,
             current,
+            feedback,
+            locked_zones,
         ) {
             Ok(mut llm) => {
                 align_sender_hint(&mut llm, sender_email);
+                if let Some(base) = current {
+                    llm = merge_refined_proposal(base, llm, locked_zones);
+                }
                 if proposal_to_fixture_yaml(&llm).is_ok() {
                     return DigestCutModelOutcome {
                         proposal: llm,
@@ -98,25 +105,23 @@ pub fn propose_digest_cut_zones(
                         fallback_reason: None,
                     };
                 }
-                fallback_reason = Some(
-                    "Le modèle a répondu, mais la proposition JSON/YAML a été refusée.".into(),
-                );
+                Some(
+                    "Le modèle a répondu, mais la proposition JSON/YAML a été refusée.".to_string(),
+                )
             }
-            Err(e) => {
-                fallback_reason = Some(match &e {
-                    LlmError::InputTooLarge { tokens, n_ctx } => format!(
-                        "contexte trop court pour ce mail ({tokens} jetons utilisés / n_ctx={n_ctx}). Augmentez n_ctx dans Paramètres → IA, ou chargez un mail plus court."
-                    ),
-                    other => format!("Le modèle n’a pas produit de découpe : {other}"),
-                });
-            }
+            Err(e) => Some(match &e {
+                LlmError::InputTooLarge { tokens, n_ctx } => format!(
+                    "contexte trop court pour ce mail ({tokens} jetons utilisés / n_ctx={n_ctx}). Augmentez n_ctx dans Paramètres → IA, ou chargez un mail plus court."
+                ),
+                other => format!("Le modèle n’a pas produit de découpe : {other}"),
+            }),
         }
     } else {
-        fallback_reason = Some(
+        Some(
             "Aucun moteur IA joignable pour la découpe (Paramètres → IA : mode + Tester la connexion)."
-                .into(),
-        );
-    }
+                .to_string(),
+        )
+    };
     let mut proposal = fallback;
     align_sender_hint(&mut proposal, sender_email);
     if proposal.explanation_fr.trim().is_empty() {
@@ -129,12 +134,9 @@ pub fn propose_digest_cut_zones(
     }
 }
 
-/// Outline + petit extrait HTML. Llama 3.2 / n_ctx courts : shrink en cascade
-/// (HTML → outline → proposition courante) pour garder de la place à la sortie JSON.
-const LLM_HTML_CHARS_MAX: usize = 1_200;
+/// Outline structurel. Pas de tête HTML/CSS brute. La proposition courante part entière.
 const LLM_OUTLINE_CHARS_MAX: usize = 1_400;
 const LLM_OUTLINE_CHARS_MIN: usize = 400;
-const LLM_CURRENT_CHARS_MAX: usize = 900;
 const MIN_OUTPUT_TOKENS: u32 = 512;
 const MAX_OUTPUT_TOKENS: u32 = 1_536;
 /// JSON de découpe typique ~350–700 jetons ; 320 laisse une marge sur n_ctx 2k/4k.
@@ -147,43 +149,35 @@ fn propose_with_llm(
     subject: &str,
     output_language: &str,
     current: Option<&DigestCutProposal>,
+    feedback: Option<&str>,
+    locked_zones: &[String],
 ) -> Result<DigestCutProposal, LlmError> {
     let outline_full = structure_outline_for_llm(html);
     let system = crate::prompts::system_prompt_for_language("digest_cut", output_language);
     let domain = email_domain(sender_email).unwrap_or_else(|| "example.com".to_string());
     let default_fixture_id = slug_from_domain(&domain);
-    let current_slim = current.map(slim_current_proposal_json).unwrap_or_default();
+    let current_json = current.map(full_current_proposal_json).unwrap_or_default();
 
-    let mut html_budget = LLM_HTML_CHARS_MAX;
     let mut outline_budget = LLM_OUTLINE_CHARS_MAX;
-    let mut current_budget = if current_slim.is_empty() {
-        0
-    } else {
-        LLM_CURRENT_CHARS_MAX
-    };
 
     let raw = loop {
         let outline = truncate_chars(&outline_full, outline_budget);
-        let current_block = if current_budget == 0 || current_slim.is_empty() {
+        let current_block = if current_json.is_empty() {
             String::new()
         } else {
-            let clipped = truncate_chars(&current_slim, current_budget);
+            let note = feedback.unwrap_or("").trim();
+            let locked = if locked_zones.is_empty() {
+                "none".to_string()
+            } else {
+                locked_zones.join(", ")
+            };
             format!(
-                "\n\nCurrent proposal (slim JSON — keep zone actions / fixtureId / sender domain):\n{clipped}\n"
+                "\n\nCurrent proposal JSON (complete). Copy locked zones unchanged ({locked}). User note about what is wrong: {note}\n{current_json}\n"
             )
         };
-        let user = build_digest_cut_user(
-            engine,
-            sender_email,
-            subject,
-            &outline,
-            &current_block,
-            html,
-            html_budget,
-        );
+        let user = build_digest_cut_user(engine, sender_email, subject, &outline, &current_block);
         let room = output_room_after_prompt(engine, system.as_str(), &user, 64);
-        let fully_shrunk =
-            html_budget == 0 && outline_budget <= LLM_OUTLINE_CHARS_MIN && current_budget == 0;
+        let fully_shrunk = outline_budget <= LLM_OUTLINE_CHARS_MIN;
         if room >= MIN_OUTPUT_ROOM || fully_shrunk {
             if room < MIN_OUTPUT_ROOM {
                 let n_ctx = engine.n_ctx();
@@ -204,15 +198,10 @@ fn propose_with_llm(
                 ),
             )?;
         }
-        // Cascade : d’abord HTML, puis outline, puis proposition courante.
-        if html_budget > 0 {
-            html_budget = html_budget.saturating_sub(400);
-        } else if outline_budget > LLM_OUTLINE_CHARS_MIN {
+        if outline_budget > LLM_OUTLINE_CHARS_MIN {
             outline_budget = outline_budget
                 .saturating_sub(350)
                 .max(LLM_OUTLINE_CHARS_MIN);
-        } else if current_budget > 0 {
-            current_budget = current_budget.saturating_sub(450);
         } else {
             // Sécurité : ne pas boucler.
             let n_ctx = engine.n_ctx();
@@ -252,6 +241,12 @@ fn propose_with_llm(
         },
         explanation_fr: clip_explanation(dto.explanation_fr),
     };
+    if let Ok(yaml) = proposal_to_fixture_yaml(&proposal) {
+        if let Ok(fixture) = crate::mail_cleaning::digest_fixtures::parse_fixture(&yaml) {
+            let notes = crate::mail_cleaning::digest_fixtures::cut_resolution_notes(&fixture, html);
+            proposal.explanation_fr = with_diagnostics(&proposal.explanation_fr, &notes);
+        }
+    }
     if proposal.fixture_id.is_empty() {
         proposal.fixture_id = default_fixture_id;
     }
@@ -265,81 +260,75 @@ fn propose_with_llm(
 }
 
 fn build_digest_cut_user(
-    engine: &LlmEngine,
+    _engine: &LlmEngine,
     sender_email: &str,
     subject: &str,
     outline: &str,
     current_block: &str,
-    html: &str,
-    html_budget: usize,
 ) -> String {
-    let html_block = if html_budget == 0 {
-        String::new()
-    } else {
-        let clipped = truncate_chars(html, html_budget);
-        format!(
-            "\n{}",
-            untrusted_mail_for_engine(engine, "digest-cut-mail-html", &clipped)
-        )
-    };
     let subject_line = subject.split_whitespace().collect::<Vec<_>>().join(" ");
     format!(
-        "Sender email (for domain matching and fixtureId slug only): {}\nSubject (identity hint only): {}\n\nDOM outline (tags/classes/order — primary signal):\n{}{}{}",
+        "Sender email (for domain matching and fixtureId slug only): {}\nSubject (identity hint only): {}\n\nDOM outline (tags/classes/order — primary signal):\n{}{}",
         sender_email.trim(),
         truncate_chars(&subject_line, 160),
         outline,
-        current_block,
-        html_block
+        current_block
     )
 }
 
-/// Proposition courante allégée : actions + ancres essentielles, sans dump massif.
-fn slim_current_proposal_json(proposal: &DigestCutProposal) -> String {
-    fn slim_zone(zone: &DigestCutZone) -> Value {
-        let anchors: Vec<Value> = zone
-            .anchors
-            .iter()
-            .take(4)
-            .map(|a| {
-                let mut o = serde_json::Map::new();
-                if let Some(sel) = a
-                    .selector
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                {
-                    o.insert("selector".into(), json!(sel));
-                }
-                if let Some(idx) = a.index {
-                    o.insert("index".into(), json!(idx));
-                }
-                if let Some(role) = &a.role {
-                    o.insert("role".into(), json!(role));
-                }
-                Value::Object(o)
-            })
-            .collect();
-        json!({
-            "action": zone.action,
-            "presentation": zone.presentation,
-            "anchors": anchors,
-        })
+fn full_current_proposal_json(proposal: &DigestCutProposal) -> String {
+    serde_json::to_string(proposal).unwrap_or_else(|_| "{}".into())
+}
+
+pub(crate) fn merge_refined_proposal(
+    current: &DigestCutProposal,
+    mut next: DigestCutProposal,
+    locked_zones: &[String],
+) -> DigestCutProposal {
+    let match_root = current.match_.structure_root.trim();
+    for name in locked_zones {
+        let mut zone = match name.trim() {
+            "header" => current.zones.header.clone(),
+            "body" => current.zones.body.clone(),
+            "footer" => current.zones.footer.clone(),
+            _ => continue,
+        };
+        // Une zone verrouillée sans racine propre suivait `match.structure_root`.
+        // On fige cette racine : un modèle qui change le match ne casse pas les ancres.
+        if zone
+            .structure_root
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or("")
+            .is_empty()
+            && !match_root.is_empty()
+        {
+            zone.structure_root = Some(match_root.to_string());
+        }
+        match name.trim() {
+            "header" => next.zones.header = zone,
+            "body" => next.zones.body = zone,
+            "footer" => next.zones.footer = zone,
+            _ => {}
+        }
     }
-    let value = json!({
-        "fixtureId": proposal.fixture_id,
-        "ruleSetVersion": proposal.rule_set_version,
-        "match": {
-            "senderDomains": proposal.match_.sender_domains,
-            "structureRoot": proposal.match_.structure_root,
-            "minChildren": proposal.match_.min_children,
-        },
-        "zones": {
-            "header": slim_zone(&proposal.zones.header),
-            "body": slim_zone(&proposal.zones.body),
-            "footer": slim_zone(&proposal.zones.footer),
-        },
-    });
-    serde_json::to_string(&value).unwrap_or_else(|_| "{}".into())
+    if !current.fixture_id.trim().is_empty() {
+        next.fixture_id = current.fixture_id.clone();
+    }
+    next
+}
+
+fn with_diagnostics(explanation: &str, notes: &[String]) -> String {
+    let base = explanation
+        .split(" Diagnostic:")
+        .next()
+        .unwrap_or(explanation)
+        .trim();
+    if notes.is_empty() {
+        return base.to_string();
+    }
+    let clipped: String = notes.join("; ").chars().take(400).collect();
+    format!("{base} Diagnostic: {clipped}.")
 }
 
 /// Le domaine est un indice. S’il ne correspond pas à l’expéditeur du mail, on le remplace.
@@ -428,6 +417,7 @@ fn zone_from_dto(zone: DigestCutZoneDto) -> DigestCutZone {
         details_heading: zone.details_heading,
         row_selector: zone.row_selector,
         rationale: clip_rationale(zone.rationale),
+        structure_root: zone.structure_root,
     }
 }
 
@@ -500,8 +490,8 @@ fn validate_digest_cut_dto(dto: &DigestCutDto) -> Result<(), LlmError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        inject_digest_cut_defaults, response_is_empty_json, slim_current_proposal_json,
-        validate_digest_cut_dto,
+        full_current_proposal_json, inject_digest_cut_defaults, merge_refined_proposal,
+        response_is_empty_json, validate_digest_cut_dto,
     };
     use crate::mail_cleaning::digest_fixtures::proposal::proposal_to_fixture_yaml;
     use crate::mail_cleaning::digest_fixtures::{set_installed_reading_fixture, ZoneAction};
@@ -526,6 +516,7 @@ mod tests {
                     details_heading: None,
                     row_selector: None,
                     rationale: None,
+                    structure_root: None,
                 },
                 body: super::DigestCutZoneDto {
                     action: ZoneAction::Show,
@@ -534,6 +525,7 @@ mod tests {
                     details_heading: None,
                     row_selector: None,
                     rationale: None,
+                    structure_root: None,
                 },
                 footer: super::DigestCutZoneDto {
                     action: ZoneAction::Hide,
@@ -542,6 +534,7 @@ mod tests {
                     details_heading: None,
                     row_selector: None,
                     rationale: None,
+                    structure_root: None,
                 },
             },
         };
@@ -571,20 +564,35 @@ mod tests {
     }
 
     #[test]
-    fn slim_current_keeps_actions_and_caps_anchors() {
-        let proposal = crate::mail_cleaning::digest_fixtures::analyze_html_structure_heuristic(
+    fn full_current_keeps_class_contains_and_merge_is_stable() {
+        let mut proposal = crate::mail_cleaning::digest_fixtures::analyze_html_structure_heuristic(
             include_str!("../tests/fixtures/deblock/receive_200eur.html"),
             "support@deblock.com",
         );
-        let slim = slim_current_proposal_json(&proposal);
-        assert!(slim.contains("fixtureId"));
-        assert!(slim.contains("structureRoot"));
-        assert!(slim.len() < serde_json::to_string(&proposal).unwrap().len() + 8);
-        let v: serde_json::Value = serde_json::from_str(&slim).expect("json");
-        assert!(
-            v["zones"]["header"]["action"].is_string()
-                || v["zones"]["header"]["action"].is_object()
+        proposal.zones.footer.anchors.push(
+            crate::mail_cleaning::digest_fixtures::proposal::DigestCutAnchor {
+                selector: Some("div".into()),
+                class_contains: Some("footer-legal".into()),
+                index: Some(2),
+                text_contains_any: vec!["désabonnement".into()],
+                role: None,
+            },
         );
+        let full = full_current_proposal_json(&proposal);
+        assert!(full.contains("classContains"));
+        assert!(full.contains("textContainsAny"));
+        assert!(full.contains("footer-legal"));
+        let mut rewritten = proposal.clone();
+        rewritten.zones.footer.anchors.clear();
+        rewritten.zones.header.rationale = Some("autre".into());
+        let once = merge_refined_proposal(&proposal, rewritten, &["footer".into()]);
+        let twice = merge_refined_proposal(&proposal, once.clone(), &["footer".into()]);
+        assert_eq!(once.zones.footer.anchors, proposal.zones.footer.anchors);
+        assert_eq!(
+            serde_json::to_string(&once.zones).unwrap(),
+            serde_json::to_string(&twice.zones).unwrap()
+        );
+        assert_eq!(once.zones.header.rationale.as_deref(), Some("autre"));
     }
 
     #[test]

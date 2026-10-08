@@ -7,9 +7,8 @@ use scraper::{ElementRef, Html, Node, Selector};
 static SEL_ALL_ELEMENTS: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("*").expect("universal element selector"));
 
-static SEL_RM_MAIL_DATA_TABLE: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("table.rm-mail-data").expect("rm-mail-data table selector")
-});
+static SEL_RM_MAIL_DATA_TABLE: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("table.rm-mail-data").expect("rm-mail-data table selector"));
 
 /// Classes conservées après strip (marqueurs RustyMail / Gmail quote — ciblés par le CSS d’affichage).
 fn retain_structural_class_attr(value: &str) -> Option<String> {

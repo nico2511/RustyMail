@@ -8,8 +8,8 @@ use crate::ai_assist_facts::{facts_block_for_draft, sender_proposes_meeting};
 use crate::ai_assist_thread::facts_support_scheduling;
 use crate::ai_llm_contracts::{ensure_reply_draft_output, introduces_llm_meta};
 use crate::ai_llm_util::{
-    budget_report, cancelled_llm_err, generate_fil_json, gen_params_text,
-    output_room_after_prompt, resolve_max_output_tokens, truncate_chars,
+    budget_report, cancelled_llm_err, gen_params_text, generate_fil_json, output_room_after_prompt,
+    resolve_max_output_tokens, truncate_chars,
 };
 use rustymail_domain::{AssistFactsSnapshot, AssistUserPrefs};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -167,8 +167,7 @@ Contexte fil :\n";
         let ctx = truncate_chars(thread_context, max_chars);
         let user = format!("{prefix}{ctx}{hint}");
         let room = output_room_after_prompt(engine, system.as_str(), &user, 64);
-        let max_tokens =
-            resolve_max_output_tokens(engine, system.as_str(), &user, 320, 1_200, 64);
+        let max_tokens = resolve_max_output_tokens(engine, system.as_str(), &user, 320, 1_200, 64);
         if room >= MIN_DRAFT_OUTPUT_ROOM && max_tokens >= 128 {
             return Ok((system, user, gen_params_text(max_tokens)));
         }

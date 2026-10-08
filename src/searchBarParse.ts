@@ -190,6 +190,27 @@ export function parseSearchBarDraft(draft: string, newsletterRules: NewsletterRu
     rest = stripToken(rest, RX_HAS_ATTACHMENT);
   }
 
+  // Opérateurs (`from:`, `to:`, `subject:`, `before:`, `after:`, `"phrase"`, `-mot`)
+  // restent dans le texte pour le parseur Rust. On les retire avant les e-mails nus
+  // pour que `from:alice@x.com` ne devienne pas un filtre expéditeur.
+  const preservedOps: string[] = [];
+  rest = rest.replace(/"([^"]+)"/g, (_full, phrase: string) => {
+    const p = phrase.trim();
+    if (p) preservedOps.push(`"${p}"`);
+    return " ";
+  });
+  rest = rest.replace(
+    /(^|[\s])((?:from|to|subject|before|after):)(\S+)/gi,
+    (_full, _lead: string, key: string, value: string) => {
+      preservedOps.push(`${key.toLowerCase()}${value}`);
+      return " ";
+    },
+  );
+  rest = rest.replace(/(^|[\s])-([^\s-][^\s]*)/g, (_full, _lead: string, term: string) => {
+    if (term.length >= 2) preservedOps.push(`-${term}`);
+    return " ";
+  });
+
   let ruleMatch: RegExpExecArray | null;
   RX_RULE_STAR.lastIndex = 0;
   while ((ruleMatch = RX_RULE_STAR.exec(rest)) !== null) {
@@ -230,6 +251,7 @@ export function parseSearchBarDraft(draft: string, newsletterRules: NewsletterRu
     RX_DOMAIN_TOKEN.lastIndex = 0;
   }
 
-  out.text = rest.replace(/\s+/g, " ").trim();
+  const text = rest.replace(/\s+/g, " ").trim();
+  out.text = [text, ...preservedOps].filter(Boolean).join(" ");
   return out;
 }

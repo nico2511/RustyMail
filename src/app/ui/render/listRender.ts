@@ -318,6 +318,11 @@ export function renderList(mode: "full" | "threads-only" | "filters-only" = "ful
                 </div>`
           }
         </div>
+        ${
+          d.isSearchActive() && state.searchHasMore
+            ? `<div class="inbox-load-more"><button type="button" class="ghost-button" data-action="search-load-more">Charger la suite</button></div>`
+            : ""
+        }
         <div class="inbox-panel-footer">
           ${inboxListFooterInnerHtml(draftBoxVirtual, total)}
         </div>

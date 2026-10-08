@@ -9,6 +9,7 @@ export type AppShellScrollSnapshot = {
   hadAiModal: boolean;
   settingsBodyTop: number;
   hadSettingsBody: boolean;
+  cutPaneTops: number[];
 };
 
 export function snapshotAppShellScroll(): AppShellScrollSnapshot {
@@ -24,6 +25,11 @@ export function snapshotAppShellScroll(): AppShellScrollSnapshot {
     hadAiModal: Boolean(state.settingsAiModal),
     settingsBodyTop: state.view === "settings" ? (settingsBody?.scrollTop ?? 0) : 0,
     hadSettingsBody: state.view === "settings" && Boolean(settingsBody),
+    cutPaneTops: [
+      ...document.querySelectorAll<HTMLElement>(
+        ".digest-bench__pane, .digest-bench__pane-body, .digest-cut-studio__mail, .digest-cut__mail-frame",
+      ),
+    ].map((el) => el.scrollTop),
   };
 }
 
@@ -49,8 +55,19 @@ export function restoreScrollAfterRender(prev: AppShellScrollSnapshot): void {
   if (nextSettingsBody && prev.settingsBodyTop > 0) {
     nextSettingsBody.scrollTop = prev.settingsBodyTop;
   }
+  const cutPanes = document.querySelectorAll<HTMLElement>(
+    ".digest-bench__pane, .digest-bench__pane-body, .digest-cut-studio__mail, .digest-cut__mail-frame",
+  );
+  cutPanes.forEach((el, index) => {
+    const top = prev.cutPaneTops[index] ?? 0;
+    if (top > 0) el.scrollTop = top;
+  });
   window.requestAnimationFrame(() => {
     navApplyPendingScrollRestore();
+    cutPanes.forEach((el, index) => {
+      const top = prev.cutPaneTops[index] ?? 0;
+      if (top > 0) el.scrollTop = top;
+    });
     if (nextOrgPanel && prev.orgTop > 0) {
       nextOrgPanel.scrollTop = prev.orgTop;
     }

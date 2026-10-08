@@ -37,6 +37,12 @@ pub struct DigestCutProposePayload {
     /// Proposition déjà ajustée. Conservée si le modèle ne répond pas.
     #[serde(default)]
     pub current: Option<DigestCutProposal>,
+    /// Ce qui ne va pas, en texte libre. Vide = affinage sans consigne.
+    #[serde(default)]
+    pub feedback: Option<String>,
+    /// Zones peintes par l'utilisateur : `header`, `body`, `footer`. Jamais écrasées.
+    #[serde(default)]
+    pub locked_zones: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,6 +94,12 @@ pub struct DigestCutReformatView {
 
 /// Conservé pour un test interne. L'écran ne l'appelle pas : le mail vient de la boîte, du message ouvert, ou d'un `.eml`.
 #[tauri::command]
+pub fn digest_cut_cleaned_html(html: String) -> Result<String, String> {
+    validate_html(&html)?;
+    Ok(rustymail_modules::mail_cleaning::generic_html_clean(&html))
+}
+
+#[tauri::command]
 pub fn digest_cut_builtin_sample() -> DigestCutSampleView {
     DigestCutSampleView {
         html: SAMPLE_HTML.to_string(),
@@ -96,9 +108,8 @@ pub fn digest_cut_builtin_sample() -> DigestCutSampleView {
     }
 }
 
-#[tauri::command]
-pub fn digest_cut_propose_zones(
-    paths: State<'_, AppPaths>,
+fn digest_cut_propose_zones_compute(
+    paths: &AppPaths,
     payload: DigestCutProposePayload,
 ) -> Result<DigestCutProposeView, String> {
     validate_html(&payload.html)?;
@@ -107,6 +118,8 @@ pub fn digest_cut_propose_zones(
     let lang = prefs.ai.draft_language.trim();
     let lang = if lang.is_empty() { "fr" } else { lang };
     let current = payload.current.as_ref();
+    let feedback = payload.feedback.as_deref();
+    let locked = payload.locked_zones.as_slice();
     let outcome = if payload.use_llm {
         match build_llm_engine(&prefs, &paths) {
             Ok(mut engine) => propose_digest_cut_zones(
@@ -116,6 +129,8 @@ pub fn digest_cut_propose_zones(
                 &payload.subject,
                 lang,
                 current,
+                feedback,
+                locked,
             ),
             Err(e) => {
                 let mut out = propose_digest_cut_zones(
@@ -125,6 +140,8 @@ pub fn digest_cut_propose_zones(
                     &payload.subject,
                     lang,
                     current,
+                    feedback,
+                    locked,
                 );
                 out.fallback_reason = Some(format!(
                     "Moteur IA indisponible pour la découpe : {e}. Même chemin que Paramètres → IA → Tester la connexion."
@@ -140,6 +157,8 @@ pub fn digest_cut_propose_zones(
             &payload.subject,
             lang,
             None,
+            None,
+            &[],
         )
     };
     Ok(DigestCutProposeView {
@@ -147,6 +166,17 @@ pub fn digest_cut_propose_zones(
         from_model: outcome.from_model,
         fallback_reason: outcome.fallback_reason,
     })
+}
+
+#[tauri::command]
+pub async fn digest_cut_propose_zones(
+    paths: State<'_, AppPaths>,
+    payload: DigestCutProposePayload,
+) -> Result<DigestCutProposeView, String> {
+    let paths = Clone::clone(&*paths);
+    tauri::async_runtime::spawn_blocking(move || digest_cut_propose_zones_compute(&paths, payload))
+        .await
+        .map_err(|e| format!("digest_cut_propose_zones join: {e}"))?
 }
 
 /// Import optionnel d'un fichier `.eml` choisi par l'utilisateur. Ne charge aucun échantillon embarqué.
@@ -179,9 +209,8 @@ pub fn digest_cut_preview(
 }
 
 /// Après les zones : réécrit / reformate le texte pour la lecture (IA ou repli local).
-#[tauri::command]
-pub fn digest_cut_reformat(
-    paths: State<'_, AppPaths>,
+fn digest_cut_reformat_compute(
+    paths: &AppPaths,
     payload: DigestCutReformatPayload,
 ) -> Result<DigestCutReformatView, String> {
     validate_html(&payload.html)?;
@@ -219,6 +248,17 @@ pub fn digest_cut_reformat(
         from_model: outcome.from_model,
         fallback_reason: outcome.fallback_reason,
     })
+}
+
+#[tauri::command]
+pub async fn digest_cut_reformat(
+    paths: State<'_, AppPaths>,
+    payload: DigestCutReformatPayload,
+) -> Result<DigestCutReformatView, String> {
+    let paths = Clone::clone(&*paths);
+    tauri::async_runtime::spawn_blocking(move || digest_cut_reformat_compute(&paths, payload))
+        .await
+        .map_err(|e| format!("digest_cut_reformat join: {e}"))?
 }
 
 #[cfg(test)]

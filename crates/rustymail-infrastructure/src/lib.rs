@@ -88,9 +88,9 @@ pub use attachment_policy::{
 };
 pub use contact_detail::{
     contact_message_samples, count_address_contacts_scoped, get_address_contact_detail,
-    list_address_contacts_scoped, list_sender_emails_for_domain, live_message_count_for_sender,
-    AddressContactListRow, ContactDetailDto, ContactEntitySnippet, ContactThreadSnippet,
-    ListAddressContactsScopedResult,
+    latest_message_id_for_sender, list_address_contacts_scoped, list_sender_emails_for_domain,
+    live_message_count_for_sender, AddressContactListRow, ContactDetailDto, ContactEntitySnippet,
+    ContactThreadSnippet, ListAddressContactsScopedResult,
 };
 pub use dictation::{
     decode_audio_base64, dictation_api_key_clear, dictation_api_key_get, dictation_api_key_present,
@@ -1369,31 +1369,44 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
 fn migrate_messages_fts(connection: &Connection) -> Result<(), rusqlite::Error> {
     connection.execute_batch(
         "
-        CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
-            message_id UNINDEXED,
-            thread_id UNINDEXED,
-            account_id UNINDEXED,
-            subject,
-            body_text,
-            sender,
-            tokenize = 'unicode61'
+        CREATE TABLE IF NOT EXISTS app_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         );
         ",
     )?;
-    let count: i64 = connection
-        .query_row("SELECT COUNT(*) FROM messages_fts", [], |r| r.get(0))
-        .unwrap_or(0);
-    if count == 0 {
+    let contentless = fts_contentless_supported(connection);
+    let fts_sql: String = connection
+        .query_row(
+            "SELECT COALESCE(sql, '') FROM sqlite_master WHERE type = 'table' AND name = 'messages_fts'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or_default();
+    let schema_ok = messages_fts_schema_current(&fts_sql, contentless);
+    if !schema_ok {
         let _ = connection.execute_batch(
             "
-            INSERT INTO messages_fts(message_id, thread_id, account_id, subject, body_text, sender)
-            SELECT id, thread_id, account_id,
-                   COALESCE(subject, ''),
-                   COALESCE(body_plain, body, ''),
-                   COALESCE(sender_email, '')
-            FROM messages;
+            DROP TRIGGER IF EXISTS messages_ai_fts;
+            DROP TRIGGER IF EXISTS messages_ad_fts;
+            DROP TRIGGER IF EXISTS messages_au_fts;
+            DROP TABLE IF EXISTS messages_fts;
             ",
         );
+        create_messages_fts(connection, contentless)?;
+    }
+    install_messages_fts_triggers(connection)?;
+    let has_messages: i64 =
+        connection.query_row("SELECT EXISTS(SELECT 1 FROM messages LIMIT 1)", [], |r| {
+            r.get(0)
+        })?;
+    if !schema_ok {
+        // Table + déclencheurs tout de suite. Le remplissage des corps existants
+        // part en arrière-plan (voir `spawn_messages_fts_backfill`) pour ne pas
+        // bloquer l'ouverture de la fenêtre.
+        set_messages_fts_sync_flag(connection, has_messages == 0)?;
+    } else if has_messages == 0 {
+        set_messages_fts_sync_flag(connection, true)?;
     }
     // Cache score sécurité sur les fils (0–100, -1 = inconnu).
     let _ = connection.execute(
@@ -1413,6 +1426,234 @@ fn migrate_messages_fts(connection: &Connection) -> Result<(), rusqlite::Error> 
         "ALTER TABLE draft_revisions ADD COLUMN chars_delta INTEGER NOT NULL DEFAULT 0",
         [],
     );
+    Ok(())
+}
+
+fn fts_contentless_supported(connection: &Connection) -> bool {
+    let ok = connection
+        .execute_batch(
+            "
+            CREATE VIRTUAL TABLE IF NOT EXISTS _rm_fts_probe USING fts5(
+                c, content='', contentless_delete=1
+            );
+            DROP TABLE IF EXISTS _rm_fts_probe;
+            ",
+        )
+        .is_ok();
+    if !ok {
+        let _ = connection.execute_batch("DROP TABLE IF EXISTS _rm_fts_probe;");
+    }
+    ok
+}
+
+fn messages_fts_schema_current(sql: &str, contentless: bool) -> bool {
+    let sql_l = sql.to_ascii_lowercase();
+    if sql_l.is_empty() || sql_l.contains("message_id") {
+        return false;
+    }
+    let cols_ok = [
+        "subject",
+        "body_text",
+        "sender",
+        "sender_name",
+        "recipients",
+    ]
+    .iter()
+    .all(|col| sql_l.contains(col));
+    if !cols_ok || !sql_l.contains("remove_diacritics") {
+        return false;
+    }
+    if contentless {
+        sql_l.contains("content=") && sql_l.contains("contentless_delete")
+    } else {
+        !sql_l.contains("content=")
+    }
+}
+
+fn create_messages_fts(connection: &Connection, contentless: bool) -> Result<(), rusqlite::Error> {
+    if contentless {
+        connection.execute_batch(
+            "
+            CREATE VIRTUAL TABLE messages_fts USING fts5(
+                subject,
+                body_text,
+                sender,
+                sender_name,
+                recipients,
+                content='',
+                contentless_delete=1,
+                tokenize = 'unicode61 remove_diacritics 2'
+            );
+            ",
+        )
+    } else {
+        connection.execute_batch(
+            "
+            CREATE VIRTUAL TABLE messages_fts USING fts5(
+                subject,
+                body_text,
+                sender,
+                sender_name,
+                recipients,
+                tokenize = 'unicode61 remove_diacritics 2'
+            );
+            ",
+        )
+    }
+}
+
+fn install_messages_fts_triggers(connection: &Connection) -> Result<(), rusqlite::Error> {
+    // Adressage par rowid (pas par message_id UNINDEXED). UPDATE limité aux
+    // colonnes indexées : is_read, mailbox, flags ne réécrivent pas l'index.
+    connection.execute_batch(
+        "
+        DROP TRIGGER IF EXISTS messages_ai_fts;
+        DROP TRIGGER IF EXISTS messages_ad_fts;
+        DROP TRIGGER IF EXISTS messages_au_fts;
+        CREATE TRIGGER messages_ai_fts AFTER INSERT ON messages BEGIN
+            INSERT INTO messages_fts(rowid, subject, body_text, sender, sender_name, recipients)
+            VALUES (
+                new.rowid,
+                COALESCE(new.subject, ''),
+                COALESCE(new.body_plain, new.body, ''),
+                COALESCE(new.sender_email, ''),
+                COALESCE(new.sender_name, ''),
+                trim(COALESCE(new.to_header, '') || ' ' || COALESCE(new.cc_header, ''))
+            );
+        END;
+        CREATE TRIGGER messages_ad_fts AFTER DELETE ON messages BEGIN
+            DELETE FROM messages_fts WHERE rowid = old.rowid;
+        END;
+        CREATE TRIGGER messages_au_fts AFTER UPDATE OF
+            subject, body_plain, body, sender_email, sender_name,
+            to_header, cc_header, thread_id, account_id
+        ON messages BEGIN
+            DELETE FROM messages_fts WHERE rowid = old.rowid;
+            INSERT INTO messages_fts(rowid, subject, body_text, sender, sender_name, recipients)
+            VALUES (
+                new.rowid,
+                COALESCE(new.subject, ''),
+                COALESCE(new.body_plain, new.body, ''),
+                COALESCE(new.sender_email, ''),
+                COALESCE(new.sender_name, ''),
+                trim(COALESCE(new.to_header, '') || ' ' || COALESCE(new.cc_header, ''))
+            );
+        END;
+        CREATE INDEX IF NOT EXISTS idx_messages_account_sender_norm
+            ON messages(account_id, lower(trim(sender_email)));
+        CREATE INDEX IF NOT EXISTS idx_messages_account_sender_received
+            ON messages(account_id, lower(trim(sender_email)), received_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_messages_sender_norm_received
+            ON messages(lower(trim(sender_email)), received_at DESC);
+        ",
+    )
+}
+
+fn set_messages_fts_sync_flag(connection: &Connection, ready: bool) -> Result<(), rusqlite::Error> {
+    connection.execute(
+        "INSERT INTO app_meta(key, value) VALUES ('messages_fts_sync_v3', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [if ready { "1" } else { "0" }],
+    )?;
+    Ok(())
+}
+
+/// Vrai quand l'index FTS est aligné sur `messages` (recherche MATCH fiable).
+pub(crate) fn messages_fts_index_ready(connection: &Connection) -> bool {
+    connection
+        .query_row(
+            "SELECT value FROM app_meta WHERE key = 'messages_fts_sync_v3'",
+            [],
+            |r| r.get::<_, String>(0),
+        )
+        .ok()
+        .as_deref()
+        == Some("1")
+}
+
+/// Recrée un index vide. VACUUM renumérote les rowid : l'ancien FTS ne peut plus
+/// être joint. Le remplissage est relancé en arrière-plan.
+pub(crate) fn reset_messages_fts_after_vacuum(connection: &Connection) -> Result<(), String> {
+    connection
+        .execute_batch(
+            "
+            DROP TRIGGER IF EXISTS messages_ai_fts;
+            DROP TRIGGER IF EXISTS messages_ad_fts;
+            DROP TRIGGER IF EXISTS messages_au_fts;
+            DROP TABLE IF EXISTS messages_fts;
+            ",
+        )
+        .map_err(|e| e.to_string())?;
+    let contentless = fts_contentless_supported(connection);
+    create_messages_fts(connection, contentless).map_err(|e| e.to_string())?;
+    install_messages_fts_triggers(connection).map_err(|e| e.to_string())?;
+    let has_messages: i64 = connection
+        .query_row("SELECT EXISTS(SELECT 1 FROM messages LIMIT 1)", [], |r| {
+            r.get(0)
+        })
+        .map_err(|e| e.to_string())?;
+    set_messages_fts_sync_flag(connection, has_messages == 0).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn backfill_guard() -> &'static Mutex<HashSet<String>> {
+    static GUARD: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    GUARD.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// Remplit `messages_fts` par lots, hors du chemin d'ouverture de la fenêtre.
+pub fn spawn_messages_fts_backfill(db_path: impl AsRef<Path>) {
+    let path = db_path.as_ref().to_path_buf();
+    let key = path.to_string_lossy().to_string();
+    {
+        let mut guard = match backfill_guard().lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        if !guard.insert(key.clone()) {
+            return;
+        }
+    }
+    std::thread::spawn(move || {
+        if let Err(e) = backfill_messages_fts(&path) {
+            eprintln!("[RustyMail] indexation FTS : {e}");
+        }
+        let mut guard = match backfill_guard().lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        guard.remove(&key);
+    });
+}
+
+fn backfill_messages_fts(path: &Path) -> Result<(), String> {
+    let connection = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
+    if messages_fts_index_ready(&connection) {
+        return Ok(());
+    }
+    loop {
+        let inserted = connection
+            .execute(
+                "
+                INSERT INTO messages_fts(rowid, subject, body_text, sender, sender_name, recipients)
+                SELECT m.rowid,
+                       COALESCE(m.subject, ''),
+                       COALESCE(m.body_plain, m.body, ''),
+                       COALESCE(m.sender_email, ''),
+                       COALESCE(m.sender_name, ''),
+                       trim(COALESCE(m.to_header, '') || ' ' || COALESCE(m.cc_header, ''))
+                FROM messages m
+                WHERE m.rowid NOT IN (SELECT rowid FROM messages_fts)
+                LIMIT 400
+                ",
+                [],
+            )
+            .map_err(|e| e.to_string())?;
+        if inserted == 0 {
+            set_messages_fts_sync_flag(&connection, true).map_err(|e| e.to_string())?;
+            break;
+        }
+    }
     Ok(())
 }
 
@@ -1581,6 +1822,9 @@ pub fn delete_account(db_path: impl AsRef<Path>, account_id: &str) -> Result<(),
     connection
         .execute("VACUUM", [])
         .map_err(|e| format!("vacuum après suppression compte: {e}"))?;
+    // VACUUM renumérote les rowid : l'index FTS adressé par rowid est périmé.
+    reset_messages_fts_after_vacuum(&connection)?;
+    spawn_messages_fts_backfill(db_path.as_ref());
     Ok(())
 }
 

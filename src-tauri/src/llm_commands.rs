@@ -975,9 +975,21 @@ pub struct LlmContactProfilePayload {
     pub global_scope: Option<bool>,
 }
 
-fn ai_cache_contact_profile_key(prefs: &AppPrefs, account_id: &str, email: &str) -> String {
+fn ai_cache_contact_profile_key(
+    prefs: &AppPrefs,
+    account_id: &str,
+    email: &str,
+    global: bool,
+    latest_message_id: &str,
+) -> String {
+    let scope = if global { "global" } else { "account" };
+    let latest = if latest_message_id.trim().is_empty() {
+        "none"
+    } else {
+        latest_message_id.trim()
+    };
     format!(
-        "contact_profile:v1:{}:{}:{}",
+        "contact_profile:v2:{}:{scope}:{}:{}:{latest}",
         ai_cache_model_segment(prefs),
         account_id.trim(),
         email.trim().to_ascii_lowercase()
@@ -995,7 +1007,15 @@ fn llm_contact_profile_compute(
     let global = payload
         .global_scope
         .unwrap_or(prefs.general.address_book_global_scope);
-    let cache_key = ai_cache_contact_profile_key(&prefs, &payload.account_id, &payload.email);
+    let latest = rustymail_infrastructure::latest_message_id_for_sender(
+        paths.db_path.as_path(),
+        payload.account_id.trim(),
+        payload.email.trim(),
+        global,
+    )
+    .unwrap_or_default();
+    let cache_key =
+        ai_cache_contact_profile_key(&prefs, &payload.account_id, &payload.email, global, &latest);
     if let Ok(Some(cached)) =
         rustymail_infrastructure::sqlite_ai_cache_get(&paths.db_path, &cache_key)
     {

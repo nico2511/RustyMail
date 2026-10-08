@@ -64,6 +64,20 @@ describe("parseSearchBarDraft", () => {
     ]);
   });
 
+  it("laisse from:/to:/subject: et une phrase dans le texte sans les prendre pour un expéditeur nu", () => {
+    const p = parseSearchBarDraft(
+      'from:alice@x.com to:bob@ex.fr subject:commande "bon de commande" -publicité devis*',
+      noRules,
+    );
+    expect(p.senders).toEqual([]);
+    expect(p.text).toContain("from:alice@x.com");
+    expect(p.text).toContain("to:bob@ex.fr");
+    expect(p.text).toContain("subject:commande");
+    expect(p.text).toContain('"bon de commande"');
+    expect(p.text).toContain("-publicité");
+    expect(p.text).toContain("devis*");
+  });
+
   it("parse #archive en mailboxPrefix Archive", () => {
     const p = parseSearchBarDraft("facture #archive", noRules);
     expect(p.mailboxPrefix).toBe("Archive");

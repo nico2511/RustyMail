@@ -91,20 +91,113 @@ fn email_domain(email: &str) -> Option<String> {
 
 /// Aperçu d’essai : le même gabarit HTML peut venir d’un autre expéditeur.
 /// La lecture réelle continue de passer par [`apply_fixtures`], qui exige le domaine.
+pub fn cut_resolution_notes(fixture: &DigestFixture, html: &str) -> Vec<String> {
+    let doc = Html::parse_fragment(html);
+    let global = root_children(&doc, fixture);
+    let mut notes = Vec::new();
+    note_ambiguous_root(
+        &mut notes,
+        "match",
+        fixture.match_.structure.root.as_str(),
+        &doc,
+    );
+    for (name, zone) in [
+        ("header", &fixture.zones.header),
+        ("body", &fixture.zones.body),
+        ("footer", &fixture.zones.footer),
+    ] {
+        if let Some(root) = zone.structure_root.as_deref() {
+            note_ambiguous_root(&mut notes, name, root, &doc);
+        }
+        let Some(children) = zone_children(zone, &doc, global.as_deref()) else {
+            notes.push(format!("{name}: racine introuvable"));
+            continue;
+        };
+        for (i, anchor) in zone.anchors.iter().enumerate() {
+            if find_anchor(&children, anchor).is_none() {
+                let label = anchor
+                    .selector
+                    .clone()
+                    .unwrap_or_else(|| "sans sélecteur".into());
+                notes.push(format!("{name} ancre {i} non résolue ({label})"));
+            }
+        }
+    }
+    notes
+}
+
+fn note_ambiguous_root(notes: &mut Vec<String>, label: &str, selector: &str, doc: &Html) {
+    let sel = selector.trim();
+    if sel.is_empty() || !sel.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return;
+    }
+    let Ok(parsed) = Selector::parse(sel) else {
+        return;
+    };
+    let n = doc.select(&parsed).count();
+    if n > 1 {
+        notes.push(format!(
+            "{label}: racine « {sel} » ambiguë ({n} correspondances) — préférez un chemin :nth-of-type"
+        ));
+    }
+}
+
 pub(super) fn apply_ignoring_sender(fixture: &DigestFixture, html: &str) -> Option<String> {
     apply_one(fixture, html)
 }
 
 fn apply_one(fixture: &DigestFixture, html: &str) -> Option<String> {
     let doc = Html::parse_fragment(html);
-    let children = root_children(&doc, fixture)?;
-    let header = render_zone(&fixture.zones.header, &children, ZoneKind::Header)?;
-    let body = render_zone(&fixture.zones.body, &children, ZoneKind::Body)?;
-    let footer = render_zone(&fixture.zones.footer, &children, ZoneKind::Footer)?;
+    let global = root_children(&doc, fixture);
+    let header = render_zone_in(
+        &fixture.zones.header,
+        &doc,
+        global.as_deref(),
+        ZoneKind::Header,
+    )?;
+    let body = render_zone_in(&fixture.zones.body, &doc, global.as_deref(), ZoneKind::Body)?;
+    let footer = render_zone_in(
+        &fixture.zones.footer,
+        &doc,
+        global.as_deref(),
+        ZoneKind::Footer,
+    )?;
     if header.is_empty() && body.is_empty() {
         return None;
     }
     Some(render_article(fixture, &header, &body, &footer))
+}
+
+fn render_zone_in(
+    zone: &ZoneSpec,
+    doc: &Html,
+    global: Option<&[ElementRef<'_>]>,
+    kind: ZoneKind,
+) -> Option<String> {
+    let children = match zone_children(zone, doc, global) {
+        Some(children) => children,
+        None if zone.resolved_action() == ZoneAction::Hide => Vec::new(),
+        None => return None,
+    };
+    render_zone(zone, &children, kind)
+}
+
+fn zone_children<'a>(
+    zone: &ZoneSpec,
+    doc: &'a Html,
+    global: Option<&[ElementRef<'a>]>,
+) -> Option<Vec<ElementRef<'a>>> {
+    if let Some(root) = zone
+        .structure_root
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        let selector = Selector::parse(root).ok()?;
+        let el = doc.select(&selector).next()?;
+        return Some(child_elements(el));
+    }
+    global.map(|children| children.to_vec())
 }
 
 #[derive(Clone, Copy)]
@@ -384,4 +477,93 @@ fn esc_html_pcdata(text: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod zone_root_tests {
+    use super::apply_ignoring_sender;
+    use crate::mail_cleaning::digest_fixtures::parse_fixture;
+
+    const HTML: &str = r#"<div class="letter"><section class="head"><h1>Titre</h1></section><section class="main"><p>Corps utile.</p></section><section class="foot"><p>Désabonnement</p></section></div>"#;
+
+    fn yaml(footer_selector: &str) -> String {
+        format!(
+            r#"
+id: demo
+rule_set_version: "1"
+match:
+  sender:
+    domains:
+      - exact: example.com
+  structure:
+    root: div.letter
+    min_children: 1
+zones:
+  header:
+    action: show
+    structure_root: section.head
+    anchors:
+      - selector: h1
+  body:
+    action: show
+    structure_root: section.main
+    anchors:
+      - selector: p
+  footer:
+    action: hide
+    structure_root: section.foot
+    anchors:
+      - selector: {footer_selector}
+"#
+        )
+    }
+
+    #[test]
+    fn painting_footer_does_not_change_header_or_body() {
+        let a = parse_fixture(&yaml("p")).expect("yaml a");
+        let b = parse_fixture(&yaml("div")).expect("yaml b");
+        let html_a = apply_ignoring_sender(&a, HTML).expect("apply a");
+        let html_b = apply_ignoring_sender(&b, HTML).expect("apply b");
+        assert!(html_a.contains("Titre"));
+        assert!(html_a.contains("Corps utile"));
+        assert!(!html_a.contains("Désabonnement"));
+        assert_eq!(html_a, html_b);
+    }
+
+    #[test]
+    fn bare_tag_root_is_diagnosed_when_ambiguous() {
+        let yaml = r#"
+id: demo
+rule_set_version: "1"
+match:
+  sender:
+    domains:
+      - exact: example.com
+  structure:
+    root: div
+    min_children: 1
+zones:
+  header:
+    action: show
+    anchors:
+      - selector: h1
+  body:
+    action: show
+    anchors:
+      - selector: p
+  footer:
+    action: hide
+    anchors:
+      - selector: p
+"#;
+        let fixture = parse_fixture(yaml).expect("yaml");
+        let html = r#"<div><h1>A</h1><p>un</p></div><div><h1>B</h1><p>deux</p></div>"#;
+        let notes = super::cut_resolution_notes(&fixture, html);
+        assert!(
+            notes
+                .iter()
+                .any(|n| n.contains("ambiguë") && n.contains("nth-of-type")),
+            "{notes:?}"
+        );
+    }
 }

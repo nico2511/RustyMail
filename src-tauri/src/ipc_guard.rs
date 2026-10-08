@@ -35,7 +35,12 @@ const ACK_DELETE_MAILBOX_WITH_CONTENTS: &str = "delete-mailbox-with-contents";
 const ACK_SEND_DRAFT: &str = "send-draft";
 const ACK_OPEN_ATTACHMENT: &str = "open-attachment";
 const ACK_BULK_TRASH_ORG: &str = "bulk-trash-org";
-const AI_CACHE_KEY_PREFIXES: &[&str] = &["summary:v2:", "translate:v2:", "contact_profile:v1:"];
+const AI_CACHE_KEY_PREFIXES: &[&str] = &[
+    "summary:v2:",
+    "translate:v2:",
+    "contact_profile:v1:",
+    "contact_profile:v2:",
+];
 
 fn reject_nul(label: &'static str, s: &str) -> Result<(), String> {
     if s.as_bytes().contains(&0) {

@@ -228,7 +228,9 @@ fn build_report(turns: Vec<Turn>) -> ConversationReport {
     html.push_str("<article class=\"rm-conversation-report\">\n");
 
     let mut plain = String::new();
-    let (latest, history) = turns.split_first().map_or((None, &[][..]), |(h, t)| (Some(h), t));
+    let (latest, history) = turns
+        .split_first()
+        .map_or((None, &[][..]), |(h, t)| (Some(h), t));
 
     if let Some(turn) = latest {
         html.push_str(&render_turn_html(turn, 1, false, 0));
@@ -266,14 +268,51 @@ fn build_report(turns: Vec<Turn>) -> ConversationReport {
     }
 }
 
+fn sender_hue_slot(email: &str) -> u32 {
+    let mut h: u32 = 2_166_136_261;
+    let key = email.trim().to_ascii_lowercase();
+    let bytes = if key.is_empty() {
+        "unknown"
+    } else {
+        key.as_str()
+    };
+    for b in bytes.bytes() {
+        h ^= u32::from(b);
+        h = h.wrapping_mul(16_777_619);
+    }
+    (h % 6) + 1
+}
+
 fn render_turn_html(turn: &Turn, n: usize, cited: bool, depth: usize) -> String {
+    let email = turn
+        .envelope
+        .from
+        .first()
+        .map(|p| p.email.as_str())
+        .unwrap_or("");
+    let hue = sender_hue_slot(email);
     let depth_attr = if cited && depth > 0 {
-        format!(" data-depth=\"{depth}\"")
+        let parity = if depth.is_multiple_of(2) {
+            "even"
+        } else {
+            "odd"
+        };
+        let over = if depth > 4 {
+            " data-depth-over=\"1\""
+        } else {
+            ""
+        };
+        format!(" data-depth=\"{depth}\" data-depth-parity=\"{parity}\" data-sender-hue=\"{hue}\"{over}")
+    } else {
+        String::new()
+    };
+    let badge = if cited && depth > 4 {
+        format!("<span class=\"rm-hist-depth-badge\">{depth}</span>\n")
     } else {
         String::new()
     };
     let mut html = format!(
-        "<section class=\"rm-conversation-turn{}\" data-turn=\"{n}\"{depth_attr}>\n",
+        "<section class=\"rm-conversation-turn{}\" data-turn=\"{n}\"{depth_attr}>\n{badge}",
         if cited {
             " rm-conversation-turn--cited"
         } else {
@@ -1272,7 +1311,9 @@ mod tests {
 </div>"#;
         let report = try_build_report(html).expect("report");
         assert!(report.html.contains("Dernière réponse"));
-        assert!(report.html.contains("Message d’origine") || report.html.contains("Message d'origine"));
+        assert!(
+            report.html.contains("Message d’origine") || report.html.contains("Message d'origine")
+        );
         assert!(report.html.contains("rm-mail-folded-quote"));
         assert!(report.html.contains("data-depth=\"1\""));
         assert!(

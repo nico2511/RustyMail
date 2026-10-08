@@ -421,6 +421,39 @@ fn is_noisy_entity_value(value: &str) -> bool {
     false
 }
 
+pub fn latest_message_id_for_sender(
+    db_path: &Path,
+    account_id: &str,
+    email: &str,
+    global_scope: bool,
+) -> Result<String, String> {
+    let email = email.trim().to_ascii_lowercase();
+    if email.is_empty() {
+        return Ok(String::new());
+    }
+    let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
+    let account_filter = if global_scope {
+        String::new()
+    } else {
+        " AND m.account_id = ?2 ".to_string()
+    };
+    let sql = format!(
+        "SELECT id FROM messages m WHERE lower(trim(m.sender_email)) = ?1 {account_filter} ORDER BY m.received_at DESC, m.id DESC LIMIT 1"
+    );
+    let id = if global_scope {
+        conn.query_row(&sql, params![email], |r| r.get::<_, String>(0))
+    } else {
+        conn.query_row(&sql, params![email, account_id.trim()], |r| {
+            r.get::<_, String>(0)
+        })
+    };
+    match id {
+        Ok(v) => Ok(v),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(String::new()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 pub fn live_message_count_for_sender(
     conn: &Connection,
     email: &str,
@@ -734,9 +767,7 @@ pub fn list_address_contacts_scoped(
     };
 
     let mut items = Vec::with_capacity(rows.len());
-    for mut row in rows {
-        row.message_count =
-            live_message_count_for_sender(&conn, &row.email, account_id, global_scope);
+    for row in rows {
         let rule_match = matches_newsletter_email(&row.email, &rules);
         let kind = if rule_match {
             "auto".to_string()
@@ -757,6 +788,7 @@ fn list_global_contacts(
     offset: u32,
     limit: u32,
 ) -> Result<(Vec<AddressContactRow>, u32), String> {
+    let q = crate::address_contacts::fold_latin(q.trim());
     let like = if q.is_empty() {
         "%".to_string()
     } else {
@@ -767,6 +799,9 @@ fn list_global_contacts(
                 .replace('_', "\\_")
         )
     };
+    let email_fold = crate::address_contacts::sql_latin_fold("email");
+    let name_fold = crate::address_contacts::sql_latin_fold("display_name");
+    let notes_fold = crate::address_contacts::sql_latin_fold("notes");
     let total: u32 = if q.is_empty() {
         conn.query_row(
             "SELECT COUNT(DISTINCT email) FROM address_contacts",
@@ -776,50 +811,68 @@ fn list_global_contacts(
         .map_err(|e| e.to_string())? as u32
     } else {
         conn.query_row(
-            "
+            &format!(
+                "
             SELECT COUNT(DISTINCT email) FROM address_contacts
-            WHERE email LIKE ?1 ESCAPE '\\'
-               OR lower(display_name) LIKE ?1 ESCAPE '\\'
-               OR lower(notes) LIKE ?1 ESCAPE '\\'
-            ",
+            WHERE {email_fold} LIKE ?1 ESCAPE '\\'
+               OR {name_fold} LIKE ?1 ESCAPE '\\'
+               OR {notes_fold} LIKE ?1 ESCAPE '\\'
+            "
+            ),
             params![like],
             |r| r.get::<_, i64>(0),
         )
         .map_err(|e| e.to_string())? as u32
     };
 
+    let live = "
+        LEFT JOIN (
+            SELECT lower(trim(sender_email)) AS email_norm, COUNT(*) AS n
+            FROM messages
+            GROUP BY email_norm
+        ) lc ON lc.email_norm = lower(trim(ac.email))
+    ";
     let sql = if q.is_empty() {
-        "
-        SELECT MIN(account_id) AS account_id, email,
-               COALESCE(MAX(CASE WHEN display_name != '' THEN display_name END), '') AS display_name,
-               COALESCE(SUM(message_count), 0) AS mc,
-               COALESCE(MAX(last_seen_at), ''), COALESCE(MAX(last_source), ''),
-               COALESCE(MAX(is_favorite), 0), COALESCE(MAX(notes), ''),
-               COALESCE(MAX(source), ''), COALESCE(MAX(updated_at), '')
-        FROM address_contacts
-        GROUP BY email
-        ORDER BY MAX(is_favorite) DESC, mc DESC, MAX(last_seen_at) DESC, email ASC
+        format!(
+            "
+        SELECT MIN(ac.account_id) AS account_id, ac.email,
+               COALESCE(MAX(CASE WHEN ac.display_name != '' THEN ac.display_name END), '') AS display_name,
+               COALESCE(MAX(lc.n), 0) AS mc,
+               COALESCE(MAX(ac.last_seen_at), ''), COALESCE(MAX(ac.last_source), ''),
+               COALESCE(MAX(ac.is_favorite), 0), COALESCE(MAX(ac.notes), ''),
+               COALESCE(MAX(ac.source), ''), COALESCE(MAX(ac.updated_at), '')
+        FROM address_contacts ac
+        {live}
+        GROUP BY ac.email
+        ORDER BY MAX(ac.is_favorite) DESC, COALESCE(MAX(lc.n), 0) DESC, MAX(ac.last_seen_at) DESC, ac.email ASC
         LIMIT ?1 OFFSET ?2
         "
+        )
     } else {
-        "
-        SELECT MIN(account_id) AS account_id, email,
-               COALESCE(MAX(CASE WHEN display_name != '' THEN display_name END), '') AS display_name,
-               COALESCE(SUM(message_count), 0) AS mc,
-               COALESCE(MAX(last_seen_at), ''), COALESCE(MAX(last_source), ''),
-               COALESCE(MAX(is_favorite), 0), COALESCE(MAX(notes), ''),
-               COALESCE(MAX(source), ''), COALESCE(MAX(updated_at), '')
-        FROM address_contacts
-        WHERE email LIKE ?1 ESCAPE '\\'
-           OR lower(display_name) LIKE ?1 ESCAPE '\\'
-           OR lower(notes) LIKE ?1 ESCAPE '\\'
-        GROUP BY email
-        ORDER BY MAX(is_favorite) DESC, mc DESC, MAX(last_seen_at) DESC, email ASC
+        let email_fold = crate::address_contacts::sql_latin_fold("ac.email");
+        let name_fold = crate::address_contacts::sql_latin_fold("ac.display_name");
+        let notes_fold = crate::address_contacts::sql_latin_fold("ac.notes");
+        format!(
+            "
+        SELECT MIN(ac.account_id) AS account_id, ac.email,
+               COALESCE(MAX(CASE WHEN ac.display_name != '' THEN ac.display_name END), '') AS display_name,
+               COALESCE(MAX(lc.n), 0) AS mc,
+               COALESCE(MAX(ac.last_seen_at), ''), COALESCE(MAX(ac.last_source), ''),
+               COALESCE(MAX(ac.is_favorite), 0), COALESCE(MAX(ac.notes), ''),
+               COALESCE(MAX(ac.source), ''), COALESCE(MAX(ac.updated_at), '')
+        FROM address_contacts ac
+        {live}
+        WHERE {email_fold} LIKE ?1 ESCAPE '\\'
+           OR {name_fold} LIKE ?1 ESCAPE '\\'
+           OR {notes_fold} LIKE ?1 ESCAPE '\\'
+        GROUP BY ac.email
+        ORDER BY MAX(ac.is_favorite) DESC, COALESCE(MAX(lc.n), 0) DESC, MAX(ac.last_seen_at) DESC, ac.email ASC
         LIMIT ?2 OFFSET ?3
         "
+        )
     };
 
-    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = if q.is_empty() {
         stmt.query_map(params![limit, offset], map_grouped_contact_row)
     } else {
@@ -979,6 +1032,76 @@ mod list_scope_tests {
             .iter()
             .any(|i| i.row.email == "bare@example.com"));
         assert!(local.items.iter().all(|i| i.row.email != "bob@example.com"));
+    }
+
+    #[test]
+    fn list_sorts_by_live_count_and_folds_accents() {
+        let (_dir, path) = temp_db();
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        conn.execute(
+            "INSERT INTO accounts (id, display_name, email, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security) VALUES ('a1', 'Me', 'me@x.com', 'h', 993, 'tls', 'h', 587, 'tls')",
+            [],
+        )
+        .expect("account");
+        upsert_contact(
+            &conn,
+            "a1",
+            "eric@example.com",
+            Some("Éric Martin"),
+            "2024-01-01T00:00:00Z",
+            "from",
+        )
+        .expect("eric");
+        upsert_contact(
+            &conn,
+            "a1",
+            "zoe@example.com",
+            Some("Zoe"),
+            "2024-01-02T00:00:00Z",
+            "from",
+        )
+        .expect("zoe");
+        conn.execute(
+            "UPDATE address_contacts SET message_count = 100 WHERE email = 'eric@example.com'",
+            [],
+        )
+        .expect("inflate");
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, subject, tags) VALUES ('t1', 'a1', 'INBOX', 's', '')",
+            [],
+        )
+        .expect("thread");
+        for i in 0..3 {
+            conn.execute(
+                "INSERT INTO messages (id, thread_id, account_id, mailbox, sender_name, sender_email, subject, received_at, body, position, is_read) VALUES (?1, 't1', 'a1', 'INBOX', 'Zoe', 'zoe@example.com', 's', '2024-06-01T00:00:00Z', 'b', 0, 1)",
+                rusqlite::params![format!("m{i}")],
+            )
+            .expect("msg");
+        }
+        conn.execute(
+            "INSERT INTO messages (id, thread_id, account_id, mailbox, sender_name, sender_email, subject, received_at, body, position, is_read) VALUES ('m-eric', 't1', 'a1', 'INBOX', 'Éric', 'eric@example.com', 's', '2024-06-01T00:00:00Z', 'b', 0, 1)",
+            [],
+        )
+        .expect("eric msg");
+        drop(conn);
+
+        let local = list_address_contacts_scoped(&path, "a1", "", 0, 50, false).expect("list");
+        let counts: Vec<(&str, u32)> = local
+            .items
+            .iter()
+            .map(|i| (i.row.email.as_str(), i.row.message_count))
+            .collect();
+        assert_eq!(
+            counts,
+            vec![("zoe@example.com", 3), ("eric@example.com", 1)],
+            "sort follows the live count shown, not the stored counter"
+        );
+
+        let found =
+            list_address_contacts_scoped(&path, "a1", "eric", 0, 50, false).expect("search");
+        assert_eq!(found.items.len(), 1);
+        assert_eq!(found.items[0].row.email, "eric@example.com");
+        assert_eq!(found.total, 1);
     }
 }
 

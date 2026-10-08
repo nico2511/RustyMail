@@ -337,6 +337,9 @@ pub fn count_new_for_saved_search(db_path: &Path, saved: &SavedSearch) -> Result
 }
 
 pub fn count_unread_for_saved_search(db_path: &Path, saved: &SavedSearch) -> Result<usize, String> {
-    let items = crate::semantic_search::sqlite_search_threads_unified(db_path, &saved.query)?;
+    let mut query = saved.query.clone();
+    query.limit = Some(u32::MAX);
+    query.offset = Some(0);
+    let items = crate::semantic_search::sqlite_search_threads_unified(db_path, &query)?;
     Ok(items.iter().filter(|t| t.unread).count())
 }

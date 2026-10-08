@@ -6,11 +6,14 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { state } from "../state";
 import {
+  adjacentCutElement,
   ensurePaintProposalSkeleton,
   expandCutNode,
   findElementForPick,
   pickFromElement,
+  picksFromElements,
   shrinkCutNode,
+  snapDragRange,
 } from "./digestCutPaint";
 import {
   applyValidatedPickToZone,
@@ -25,6 +28,7 @@ import {
   captureDigestCutDom,
   digestCut,
   explainZonesFr,
+  type DigestCutPaintPick,
   type DigestCutProposal,
   type DigestCutSourceKind,
   type DigestCutZoneAction,
@@ -70,7 +74,10 @@ function clearCutResult(): void {
   digestCut.previewError = "";
   digestCut.showCode = false;
   digestCut.paintZone = null;
+  digestCut.lockedZones = [];
+  digestCut.refineFeedback = "";
   digestCut.paintPick = null;
+  digestCut.paintPicks = [];
   digestCut.paintCheck = null;
   digestCut.zoneStudioOpen = false;
   digestCut.zoneChecks = { header: null, body: null, footer: null };
@@ -91,10 +98,28 @@ export function loadDigestCutMail(input: {
   clearCutResult();
   digestCut.sourceKind = input.sourceKind;
   digestCut.html = input.html;
+  void alignDigestCutHtml(input.html);
   digestCut.senderEmail = input.senderEmail;
   digestCut.subject = input.subject;
   digestCut.selectedMessageId = input.messageId ?? digestCut.selectedMessageId;
   digestCut.notice = input.notice;
+}
+
+let digestCutCleanReq = 0;
+
+async function alignDigestCutHtml(raw: string): Promise<void> {
+  if (!isTauriRuntime() || !raw.trim()) return;
+  const req = ++digestCutCleanReq;
+  try {
+    const cleaned = await invoke<string>("digest_cut_cleaned_html", { html: raw });
+    if (req !== digestCutCleanReq || digestCut.html !== raw) return;
+    if (cleaned.trim() && cleaned !== raw) {
+      digestCut.html = cleaned;
+      render();
+    }
+  } catch {
+    /* le HTML brut reste affiché si le nettoyage échoue */
+  }
 }
 
 export async function searchDigestCutMailbox(): Promise<void> {
@@ -264,6 +289,8 @@ export async function proposeDigestCutZones(refine = false): Promise<void> {
         subject: digestCut.subject,
         useLlm: true,
         current: refine ? digestCut.proposal : null,
+        feedback: refine ? digestCut.refineFeedback.trim() : null,
+        lockedZones: refine ? digestCut.lockedZones : [],
       },
     });
     digestCut.proposal = view.proposal;
@@ -327,18 +354,30 @@ function zoneLabelFr(zone: DigestCutZoneName): string {
   return zone === "header" ? "En-tête" : zone === "body" ? "Corps" : "Pied";
 }
 
+function currentPaintPicks(): DigestCutPaintPick[] {
+  if (digestCut.paintPicks.length) return digestCut.paintPicks;
+  return digestCut.paintPick ? [digestCut.paintPick] : [];
+}
+
 function applyPaintPickAndPreview(): void {
   const zone = digestCut.paintZone;
-  const pick = digestCut.paintPick;
+  const picks = currentPaintPicks();
   const root = mailRootEl();
-  if (!zone || !pick || !root) {
+  if (!zone || !picks.length || !root) {
     render();
     return;
   }
   ensurePaintProposalSkeleton();
-  const check = applyValidatedPickToZone(zone, pick, root);
-  if (check.status === "bad") {
-    digestCut.notice = `Refusé — ${check.message}`;
+  let check = digestCut.paintCheck;
+  for (const pick of picks) {
+    check = applyValidatedPickToZone(zone, pick, root);
+    if (check.status === "bad") {
+      digestCut.notice = `Refusé — ${check.message}`;
+      render();
+      return;
+    }
+  }
+  if (!check) {
     render();
     return;
   }
@@ -358,52 +397,52 @@ export function setDigestCutPaintZone(zone: DigestCutZoneName): void {
   digestCut.paintZone = digestCut.paintZone === zone ? null : zone;
   if (digestCut.paintZone) {
     ensurePaintProposalSkeleton();
-    digestCut.notice = `Survolez le mail, puis cliquez un bloc complet pour « ${zoneLabelFr(zone)} ».`;
+    digestCut.notice = `Glissez sur le mail pour « ${zoneLabelFr(zone)} ». Le cadre s’accroche aux blocs HTML.`;
   } else {
     digestCut.notice = "Sélection annulée.";
   }
   render();
 }
 
-export function handleDigestCutMailClick(target: EventTarget | null): void {
+function rememberPaintRange(elements: Element[], root: HTMLElement): boolean {
+  const picks = picksFromElements(elements, root);
+  if (!picks.length) return false;
+  digestCut.paintPicks = picks;
+  digestCut.paintPick = picks[0];
+  digestCut.paintCheck = validateElementForZone(elements[0], root, digestCut.paintZone);
+  return true;
+}
+
+export function handleDigestCutMailRange(elements: Element[]): void {
   const root = mailRootEl();
-  if (!root || !(target instanceof Element)) return;
-
-  const zoneEl = target.closest<HTMLElement>("[data-digest-cut-zone]");
-  if (zoneEl && root.contains(zoneEl) && !digestCut.paintZone) {
-    const zone = zoneEl.getAttribute("data-digest-cut-zone");
-    if (zone === "header" || zone === "body" || zone === "footer") {
-      const snapped = snapToCuttableBlock(zoneEl, root) ?? zoneEl;
-      const pick = pickFromElement(snapped, root);
-      if (!pick) return;
-      digestCut.paintZone = zone;
-      digestCut.paintPick = pick;
-      digestCut.paintCheck = validateElementForZone(snapped, root, zone);
-      digestCut.notice = `Zone « ${zoneLabelFr(zone)} » — Plus grand / Plus petit, ou Valider avec l’IA.`;
-      render();
-      return;
-    }
-  }
-
-  const snapped = snapToCuttableBlock(target, root);
-  if (!snapped) {
-    digestCut.notice = "Cliquez un bloc HTML complet (balise ouverte et fermée), pas un mot isolé.";
+  if (!root || !elements.length) {
+    digestCut.notice = "Glissez sur un bloc du mail — pas la page entière.";
     render();
     return;
   }
-  const pick = pickFromElement(snapped, root);
-  if (!pick) return;
-  digestCut.paintPick = pick;
-  digestCut.paintCheck = validateElementForZone(snapped, root, digestCut.paintZone);
+  if (!rememberPaintRange(elements, root)) return;
   if (digestCut.paintZone) {
     applyPaintPickAndPreview();
     return;
   }
-  const pair = hasCompleteTagPair(snapped);
-  digestCut.notice = pair.ok
-    ? "Bloc complet sélectionné — assignez-le (→ En-tête / Corps / Pied) ou ajustez sa taille."
-    : pair.message;
+  const count = digestCut.paintPicks.length;
+  digestCut.notice =
+    count > 1
+      ? `${count} blocs sélectionnés — assignez-les (→ En-tête / Corps / Pied).`
+      : "Bloc sélectionné — assignez-le (→ En-tête / Corps / Pied) ou ajustez sa taille.";
   render();
+}
+
+export function handleDigestCutMailClick(target: EventTarget | null): void {
+  const root = mailRootEl();
+  if (!root || !(target instanceof Element)) return;
+  const range = snapDragRange(root, target, target);
+  if (!range.length) {
+    digestCut.notice = "Choisissez un bloc HTML complet (balise ouverte et fermée), pas un mot isolé.";
+    render();
+    return;
+  }
+  handleDigestCutMailRange(range);
 }
 
 export function expandDigestCutPaintPick(): void {
@@ -411,9 +450,10 @@ export function expandDigestCutPaintPick(): void {
   const pick = digestCut.paintPick;
   if (!root || !pick) return;
   const el = findElementForPick(root, pick);
-  if (!el?.parentElement || el.parentElement === root) return;
-  const expanded = snapToCuttableBlock(el.parentElement, root) ?? expandCutNode(el.parentElement, root);
-  if (!hasCompleteTagPair(expanded).ok) {
+  const parent = el?.parentElement;
+  if (!el || !parent || parent === root) return;
+  const expanded = snapToCuttableBlock(parent, root) ?? expandCutNode(parent, root);
+  if (expanded === root || !hasCompleteTagPair(expanded).ok) {
     digestCut.notice = "Impossible d’agrandir sans casser le balisage.";
     render();
     return;
@@ -421,8 +461,10 @@ export function expandDigestCutPaintPick(): void {
   const next = pickFromElement(expanded, root);
   if (!next || next.label === pick.label) return;
   digestCut.paintPick = next;
+  digestCut.paintPicks = [next];
   digestCut.paintCheck = validatePaintPick(next, root, digestCut.paintZone);
-  applyPaintPickAndPreview();
+  if (digestCut.paintZone) applyPaintPickAndPreview();
+  else render();
 }
 
 export function shrinkDigestCutPaintPick(): void {
@@ -440,12 +482,33 @@ export function shrinkDigestCutPaintPick(): void {
   const next = pickFromElement(shrunk, root);
   if (!next) return;
   digestCut.paintPick = next;
+  digestCut.paintPicks = [next];
   digestCut.paintCheck = validatePaintPick(next, root, digestCut.paintZone);
-  applyPaintPickAndPreview();
+  if (digestCut.paintZone) applyPaintPickAndPreview();
+  else render();
+}
+
+export function shiftDigestCutPaintSibling(delta: -1 | 1): void {
+  const root = mailRootEl();
+  const pick = digestCut.paintPick;
+  if (!root || !pick) return;
+  const el = findElementForPick(root, pick);
+  if (!el) return;
+  const nextEl = adjacentCutElement(el, delta);
+  if (!nextEl || nextEl === root) return;
+  const next = pickFromElement(nextEl, root);
+  if (!next) return;
+  const indexed = picksFromElements([nextEl], root)[0];
+  digestCut.paintPick = indexed ?? next;
+  digestCut.paintPicks = [digestCut.paintPick];
+  digestCut.paintCheck = validateElementForZone(nextEl, root, digestCut.paintZone);
+  if (digestCut.paintZone) applyPaintPickAndPreview();
+  else render();
 }
 
 export function clearDigestCutPaint(): void {
   digestCut.paintPick = null;
+  digestCut.paintPicks = [];
   digestCut.paintZone = null;
   digestCut.paintCheck = null;
   render();
@@ -590,6 +653,16 @@ export async function handleDigestCutAction(action: string, element?: HTMLElemen
       digestCut.zoneStudioOpen = Boolean(digestCut.proposal) && !digestCut.zoneStudioOpen;
       render();
       return true;
+    case "digest-cut-anchor-remove": {
+      const zone = element?.dataset.zone as DigestCutZoneName | undefined;
+      const index = Number(element?.dataset.anchorIndex);
+      const anchors = zone ? digestCut.proposal?.zones[zone].anchors : undefined;
+      if (anchors && Number.isInteger(index) && index >= 0 && index < anchors.length) {
+        anchors.splice(index, 1);
+        render();
+      }
+      return true;
+    }
     case "digest-cut-zone": {
       const zone = element?.dataset.zone as DigestCutZoneName | undefined;
       const zoneAction = element?.dataset.zoneAction as DigestCutZoneAction | undefined;
