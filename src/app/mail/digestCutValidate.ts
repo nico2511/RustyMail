@@ -260,7 +260,7 @@ export function revalidateProposalFromHtml(
 export function checkSummaryFr(check: DigestCutZoneCheck | null | undefined): string {
   if (!check) return "";
   if (check.status === "ok") {
-    return check.source === "llm" ? "Validé (IA)" : "Validé (structure)";
+    return "Structure OK";
   }
   if (check.status === "warn") return "À confirmer";
   return "Incomplet";
@@ -278,12 +278,18 @@ export function applyValidatedPickToZone(
   if (check.status === "bad") return check;
   const proposal = digestCut.proposal;
   if (!proposal) return check;
-  proposal.zones[zone].anchors = [paintPickToAnchor(pick)];
+  const anchor = paintPickToAnchor(pick);
+  const anchors = proposal.zones[zone].anchors;
+  const key = `${anchor.selector ?? ""}|${anchor.index ?? ""}|${anchor.classContains ?? ""}`;
+  const already = anchors.some(
+    (item) => `${item.selector ?? ""}|${item.index ?? ""}|${item.classContains ?? ""}` === key,
+  );
+  if (!already) anchors.push(anchor);
   proposal.zones[zone].rationale = `${checkSummaryFr(check)} — ${check.message}`;
-  proposal.source = "heuristic";
   if (pick.structureRoot?.trim()) {
-    proposal.match.structureRoot = pick.structureRoot.trim();
-    proposal.match.minChildren = Math.max(2, proposal.match.minChildren || 2);
+    proposal.zones[zone].structureRoot = pick.structureRoot.trim();
   }
+  if (!digestCut.lockedZones.includes(zone)) digestCut.lockedZones.push(zone);
+  proposal.source = "heuristic";
   return check;
 }

@@ -120,6 +120,7 @@ body.clarity-dark .ai-quick-panel-backdrop {
 body.clarity-dark .message-html {
   background: #ebe6dc;
   color: #1a1d22;
+  --rm-paper: #ebe6dc;
   --text: #1a1d22;
   --dim: #4a5560;
   --muted: #3d4652;
@@ -134,6 +135,11 @@ body.clarity-dark .message-html {
 
 body.clarity-dark .message-html.message-html--clean {
   background: #e4dfd4;
+  --rm-paper: #e4dfd4;
+}
+
+body.clarity-dark .message-text--clean .rm-history-fold__panel {
+  --rm-paper: var(--surface, #22262e);
 }
 
 body.clarity-dark .message-html-caption {

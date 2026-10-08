@@ -25,6 +25,14 @@ struct SearchLlmPartial {
     mode: SearchMode,
     #[serde(default)]
     mailbox: Option<String>,
+    #[serde(default)]
+    date_from: Option<String>,
+    #[serde(default)]
+    date_to: Option<String>,
+    #[serde(default)]
+    relative_days: Option<i64>,
+    #[serde(default)]
+    has_attachment: Option<bool>,
 }
 
 pub fn nl_to_search_query(
@@ -78,6 +86,10 @@ pub fn nl_to_search_query(
         .map(|m| m.trim().to_string())
         .filter(|m| !m.is_empty());
 
+    let date_from = sanitize_nl_date(partial.date_from.as_deref(), false);
+    let date_to = sanitize_nl_date(partial.date_to.as_deref(), true);
+    let relative_days = partial.relative_days.filter(|n| (1..=3650).contains(n));
+
     Ok(SearchQuery {
         text: text_lc,
         tags: partial.tags,
@@ -91,8 +103,28 @@ pub fn nl_to_search_query(
         mailbox,
         mode,
         language,
+        date_from,
+        date_to,
+        relative_days,
+        has_attachment: partial.has_attachment,
         ..Default::default()
     })
+}
+
+fn sanitize_nl_date(raw: Option<&str>, end_of_day: bool) -> Option<String> {
+    let v = raw?.trim();
+    if v.len() == 10
+        && v.as_bytes().get(4) == Some(&b'-')
+        && v.as_bytes().get(7) == Some(&b'-')
+        && v.bytes().all(|b| b.is_ascii_digit() || b == b'-')
+    {
+        return Some(if end_of_day {
+            format!("{v}T23:59:59Z")
+        } else {
+            format!("{v}T00:00:00Z")
+        });
+    }
+    None
 }
 
 #[cfg(test)]

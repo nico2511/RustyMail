@@ -26,6 +26,7 @@ pub mod digest_fixtures;
 mod dom;
 mod error;
 mod generic;
+pub use generic::generic_html_clean;
 mod outlook_conversation;
 mod outlook_forward;
 pub mod pipeline;

@@ -50,6 +50,10 @@ export type NlSearchQueryInput = {
   language?: string | null;
   mailbox?: string | null;
   accountId?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  relativeDays?: number | null;
+  hasAttachment?: boolean | null;
 };
 
 /** Mots-clés si le LLM n’a pas rempli `text` (aligné sur `nl_search_text_fallback` Rust). */
@@ -158,6 +162,20 @@ export function applyNlSearchQueryToState(
   if (aid && accountExists(aid)) {
     s.searchAccountOverrideId = aid;
     s.searchScope = "account";
+  }
+  if (typeof sq.relativeDays === "number" && sq.relativeDays > 0) {
+    s.searchRelativeDays = Math.floor(sq.relativeDays);
+  }
+  if (sq.hasAttachment === true || sq.hasAttachment === false) {
+    s.searchHasAttachment = sq.hasAttachment;
+  }
+  const dateBits: string[] = [];
+  const from = sq.dateFrom?.trim();
+  const to = sq.dateTo?.trim();
+  if (from && /^\d{4}-\d{2}-\d{2}/.test(from)) dateBits.push(`after:${from.slice(0, 10)}`);
+  if (to && /^\d{4}-\d{2}-\d{2}/.test(to)) dateBits.push(`before:${to.slice(0, 10)}`);
+  if (dateBits.length) {
+    s.search = [s.search, ...dateBits].filter(Boolean).join(" ");
   }
 }
 

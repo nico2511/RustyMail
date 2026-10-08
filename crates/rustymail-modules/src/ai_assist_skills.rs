@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::ai_agent_prepare_reply::AgentIntentResult;
 use crate::ai_llm_contracts::ensure_mail_body_output;
 use crate::ai_llm_util::{
-    generate_fil_json, gen_params_text_echo_for_prompt, parse_model_json, truncate_chars,
+    gen_params_text_echo_for_prompt, generate_fil_json, parse_model_json, truncate_chars,
 };
 use rustymail_domain::{AssistRecommendation, AssistUserPrefs, MailSecuritySeverity};
 use rustymail_llm::{LlmEngine, LlmError};

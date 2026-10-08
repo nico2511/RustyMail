@@ -10,6 +10,23 @@ const FROM = /^(?:de|from)\s*:/i;
 
 type HistoryTurn = { kicker: string | null; body: string };
 
+/** FNV-1a 32 bits, même formule que `sender_hue_slot` côté Rust. */
+export function senderHueSlot(email: string): number {
+  let h = 2166136261;
+  const key = (email.trim().toLowerCase() || "unknown");
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 6) + 1;
+}
+
+function emailFromKicker(kicker: string | null): string {
+  if (!kicker) return "";
+  const m = kicker.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return m ? m[0].toLowerCase() : "";
+}
+
 /** Historique cité, séparé du dernier message et lisible une fois ouvert. */
 export function renderHistoryFold(blocks: readonly string[] | undefined): string {
   const text = (blocks ?? [])
@@ -19,14 +36,19 @@ export function renderHistoryFold(blocks: readonly string[] | undefined): string
   if (!text.trim()) return "";
   const turns = splitHistoryTurns(text);
   const body = turns
-    .map((turn) => {
+    .map((turn, index) => {
+      const depth = index + 1;
+      const hue = senderHueSlot(emailFromKicker(turn.kicker));
+      const parity = depth % 2 === 0 ? "even" : "odd";
+      const over = depth > 4 ? ` data-depth-over="1"` : "";
+      const badge = depth > 4 ? `<span class="rm-hist-depth-badge">${depth}</span>` : "";
       const kicker = turn.kicker
         ? `<p class="rm-history-kicker">${escapeHtml(turn.kicker).replace(/\n/g, "<br>")}</p>`
         : "";
       const prose = turn.body
         ? `<div class="rm-history-turn__body">${escapeHtml(turn.body)}</div>`
         : "";
-      return `<section class="rm-history-turn">${kicker}${prose}</section>`;
+      return `<section class="rm-history-turn" data-depth="${depth}" data-depth-parity="${parity}" data-sender-hue="${hue}"${over}>${badge}${kicker}${prose}</section>`;
     })
     .join("");
   return `<details class="rm-history-fold"><summary>Historique</summary><div class="rm-history-fold__panel">${body}</div></details>`;

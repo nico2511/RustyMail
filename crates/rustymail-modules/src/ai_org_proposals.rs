@@ -95,15 +95,12 @@ fn fit_org_orientation_prompt(
     let mut decisions = prior_decisions.to_string();
     let mut catalog_lines: Vec<&str> = thread_catalog.lines().filter(|l| !l.is_empty()).collect();
 
-    for _ in 0..96 {
+    // Un catalogue long se rogne d'une ligne par tour : le plafond doit dépasser
+    // le nombre de lignes, sinon on abandonne avant d'avoir vidé le prompt.
+    for _ in 0..4_096 {
         let catalog = catalog_lines.join("\n");
-        let user = render_org_orientation_user_prompt(
-            engine,
-            account_label,
-            &heur,
-            &catalog,
-            &decisions,
-        );
+        let user =
+            render_org_orientation_user_prompt(engine, account_label, &heur, &catalog, &decisions);
         let room = output_room_after_prompt(engine, system, &user, 64);
         let max_tokens = resolve_max_output_tokens(engine, system, &user, 512, 2048, 64);
         if room >= MIN_ORG_OUTPUT_ROOM && max_tokens >= MIN_ORG_OUTPUT_ROOM {
@@ -220,10 +217,7 @@ pub fn parse_org_orientation_json(
                 || trimmed == "{"
                 || trimmed == "{}"
                 || (trimmed.starts_with('{') && !trimmed.contains("diagnosis"));
-            if looks_truncated
-                || msg.contains("EOF")
-                || msg.contains("missing field 'diagnosis'")
-            {
+            if looks_truncated || msg.contains("EOF") || msg.contains("missing field 'diagnosis'") {
                 return Err(LlmError::InvalidJson(format!(
                     "Réponse d’orientation incomplète ou tronquée ({msg}). Relancez l’analyse ; si ça revient, augmentez n_ctx du modèle."
                 )));
@@ -391,9 +385,8 @@ pub fn org_orientation_with_llm(
                     ORG_ORIENTATION_JSON_GBNF,
                 )
                 .map_err(|e| format!("{first} — nouvel essai: {e}"))?;
-            parse_org_orientation_json(&raw2, valid_thread_ids).map_err(|e2| {
-                format!("{first} — nouvel essai: {e2}")
-            })
+            parse_org_orientation_json(&raw2, valid_thread_ids)
+                .map_err(|e2| format!("{first} — nouvel essai: {e2}"))
         }
         Err(e) => Err(e.to_string()),
     }
@@ -563,7 +556,11 @@ Note : ceci n’est pas une seconde action.
             &catalog,
             "sys",
         );
-        assert!(trimmed.is_empty(), "expected empty catalog, got {} lines", trimmed.lines().count());
+        assert!(
+            trimmed.is_empty(),
+            "expected empty catalog, got {} lines",
+            trimmed.lines().count()
+        );
     }
 
     #[test]
@@ -604,7 +601,11 @@ Note : ceci n’est pas une seconde action.
             room >= MIN_ORG_OUTPUT_ROOM,
             "output room collapsed ({room}); orientation JSON cannot complete"
         );
-        assert!(fitted.params.max_tokens >= 128, "max_tokens={}", fitted.params.max_tokens);
+        assert!(
+            fitted.params.max_tokens >= 128,
+            "max_tokens={}",
+            fitted.params.max_tokens
+        );
     }
 
     #[test]

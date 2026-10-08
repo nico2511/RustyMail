@@ -149,7 +149,10 @@ fn is_quote_container(el: ElementRef<'_>) -> bool {
 
 fn quote_signal(el: ElementRef<'_>) -> bool {
     if el
-        .select(&Selector::parse(".gmail_quote, .x_gmail_quote, [class*='gmail_quote'], blockquote").unwrap())
+        .select(
+            &Selector::parse(".gmail_quote, .x_gmail_quote, [class*='gmail_quote'], blockquote")
+                .unwrap(),
+        )
         .next()
         .is_some()
     {

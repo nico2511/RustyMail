@@ -459,6 +459,96 @@ pub(crate) fn map_contact_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Addre
     })
 }
 
+pub(crate) fn fold_latin(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            'à' | 'á' | 'â' | 'ä' | 'ã' | 'å' | 'À' | 'Á' | 'Â' | 'Ä' | 'Ã' | 'Å' => {
+                out.push('a')
+            }
+            'è' | 'é' | 'ê' | 'ë' | 'È' | 'É' | 'Ê' | 'Ë' => out.push('e'),
+            'ì' | 'í' | 'î' | 'ï' | 'Ì' | 'Í' | 'Î' | 'Ï' => out.push('i'),
+            'ò' | 'ó' | 'ô' | 'ö' | 'õ' | 'Ò' | 'Ó' | 'Ô' | 'Ö' | 'Õ' => out.push('o'),
+            'ù' | 'ú' | 'û' | 'ü' | 'Ù' | 'Ú' | 'Û' | 'Ü' => out.push('u'),
+            'ý' | 'ÿ' | 'Ý' | 'Ÿ' => out.push('y'),
+            'ç' | 'Ç' => out.push('c'),
+            'ñ' | 'Ñ' => out.push('n'),
+            'œ' | 'Œ' => out.push_str("oe"),
+            'æ' | 'Æ' => out.push_str("ae"),
+            other => out.push(other.to_ascii_lowercase()),
+        }
+    }
+    out
+}
+
+pub(crate) fn sql_latin_fold(expr: &str) -> String {
+    let pairs = [
+        ("À", "a"),
+        ("Á", "a"),
+        ("Â", "a"),
+        ("Ä", "a"),
+        ("Ã", "a"),
+        ("Å", "a"),
+        ("à", "a"),
+        ("á", "a"),
+        ("â", "a"),
+        ("ä", "a"),
+        ("ã", "a"),
+        ("å", "a"),
+        ("È", "e"),
+        ("É", "e"),
+        ("Ê", "e"),
+        ("Ë", "e"),
+        ("è", "e"),
+        ("é", "e"),
+        ("ê", "e"),
+        ("ë", "e"),
+        ("Ì", "i"),
+        ("Í", "i"),
+        ("Î", "i"),
+        ("Ï", "i"),
+        ("ì", "i"),
+        ("í", "i"),
+        ("î", "i"),
+        ("ï", "i"),
+        ("Ò", "o"),
+        ("Ó", "o"),
+        ("Ô", "o"),
+        ("Ö", "o"),
+        ("Õ", "o"),
+        ("ò", "o"),
+        ("ó", "o"),
+        ("ô", "o"),
+        ("ö", "o"),
+        ("õ", "o"),
+        ("Ù", "u"),
+        ("Ú", "u"),
+        ("Û", "u"),
+        ("Ü", "u"),
+        ("ù", "u"),
+        ("ú", "u"),
+        ("û", "u"),
+        ("ü", "u"),
+        ("Ý", "y"),
+        ("Ÿ", "y"),
+        ("ý", "y"),
+        ("ÿ", "y"),
+        ("Ç", "c"),
+        ("ç", "c"),
+        ("Ñ", "n"),
+        ("ñ", "n"),
+        ("Œ", "oe"),
+        ("œ", "oe"),
+        ("Æ", "ae"),
+        ("æ", "ae"),
+    ];
+    let mut e = expr.to_string();
+    for (from, to) in pairs {
+        e = format!("replace({e}, '{from}', '{to}')");
+    }
+    format!("lower({e})")
+}
+
 pub fn list_address_contacts(
     db_path: &Path,
     account_id: &str,
@@ -486,13 +576,16 @@ pub(crate) fn list_address_contacts_conn(
     }
     let limit = limit.clamp(1, 100);
     let offset = offset;
-    let q = query.trim().to_ascii_lowercase();
+    let q = fold_latin(query.trim());
     let like = format!(
         "%{}%",
         q.replace('\\', "\\\\")
             .replace('%', "\\%")
             .replace('_', "\\_")
     );
+    let email_fold = sql_latin_fold("ac.email");
+    let name_fold = sql_latin_fold("ac.display_name");
+    let notes_fold = sql_latin_fold("ac.notes");
 
     let total: u32 = if q.is_empty() {
         conn.query_row(
@@ -503,43 +596,55 @@ pub(crate) fn list_address_contacts_conn(
         .map_err(|e| e.to_string())? as u32
     } else {
         conn.query_row(
+            &format!(
+                "
+            SELECT count(*) FROM address_contacts ac
+            WHERE ac.account_id = ?1
+              AND ({email_fold} LIKE ?2 ESCAPE '\\' OR {name_fold} LIKE ?2 ESCAPE '\\'
+                   OR {notes_fold} LIKE ?2 ESCAPE '\\')
             "
-            SELECT count(*) FROM address_contacts
-            WHERE account_id = ?1
-              AND (email LIKE ?2 ESCAPE '\\' OR lower(display_name) LIKE ?2 ESCAPE '\\'
-                   OR lower(notes) LIKE ?2 ESCAPE '\\')
-            ",
+            ),
             params![account_id, like],
             |r| r.get::<_, i64>(0),
         )
         .map_err(|e| e.to_string())? as u32
     };
 
-    let mut stmt = if q.is_empty() {
-        conn.prepare(
-            "
-            SELECT account_id, email, display_name, message_count, last_seen_at, last_source,
-                   is_favorite, notes, source, updated_at
-            FROM address_contacts
+    let live = "
+        LEFT JOIN (
+            SELECT lower(trim(sender_email)) AS email_norm, COUNT(*) AS n
+            FROM messages
             WHERE account_id = ?1
-            ORDER BY is_favorite DESC, message_count DESC, last_seen_at DESC, email ASC
+            GROUP BY email_norm
+        ) lc ON lc.email_norm = lower(trim(ac.email))
+    ";
+    let mut stmt = if q.is_empty() {
+        conn.prepare(&format!(
+            "
+            SELECT ac.account_id, ac.email, ac.display_name, COALESCE(lc.n, 0), ac.last_seen_at, ac.last_source,
+                   ac.is_favorite, ac.notes, ac.source, ac.updated_at
+            FROM address_contacts ac
+            {live}
+            WHERE ac.account_id = ?1
+            ORDER BY ac.is_favorite DESC, COALESCE(lc.n, 0) DESC, ac.last_seen_at DESC, ac.email ASC
             LIMIT ?2 OFFSET ?3
-            ",
-        )
+            "
+        ))
         .map_err(|e| e.to_string())?
     } else {
-        conn.prepare(
+        conn.prepare(&format!(
             "
-            SELECT account_id, email, display_name, message_count, last_seen_at, last_source,
-                   is_favorite, notes, source, updated_at
-            FROM address_contacts
-            WHERE account_id = ?1
-              AND (email LIKE ?2 ESCAPE '\\' OR lower(display_name) LIKE ?2 ESCAPE '\\'
-                   OR lower(notes) LIKE ?2 ESCAPE '\\')
-            ORDER BY is_favorite DESC, message_count DESC, last_seen_at DESC, email ASC
+            SELECT ac.account_id, ac.email, ac.display_name, COALESCE(lc.n, 0), ac.last_seen_at, ac.last_source,
+                   ac.is_favorite, ac.notes, ac.source, ac.updated_at
+            FROM address_contacts ac
+            {live}
+            WHERE ac.account_id = ?1
+              AND ({email_fold} LIKE ?2 ESCAPE '\\' OR {name_fold} LIKE ?2 ESCAPE '\\'
+                   OR {notes_fold} LIKE ?2 ESCAPE '\\')
+            ORDER BY ac.is_favorite DESC, COALESCE(lc.n, 0) DESC, ac.last_seen_at DESC, ac.email ASC
             LIMIT ?3 OFFSET ?4
-            ",
-        )
+            "
+        ))
         .map_err(|e| e.to_string())?
     };
 

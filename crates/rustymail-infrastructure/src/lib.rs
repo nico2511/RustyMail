@@ -88,9 +88,9 @@ pub use attachment_policy::{
 };
 pub use contact_detail::{
     contact_message_samples, count_address_contacts_scoped, get_address_contact_detail,
-    list_address_contacts_scoped, list_sender_emails_for_domain, live_message_count_for_sender,
-    AddressContactListRow, ContactDetailDto, ContactEntitySnippet, ContactThreadSnippet,
-    ListAddressContactsScopedResult,
+    latest_message_id_for_sender, list_address_contacts_scoped, list_sender_emails_for_domain,
+    live_message_count_for_sender, AddressContactListRow, ContactDetailDto, ContactEntitySnippet,
+    ContactThreadSnippet, ListAddressContactsScopedResult,
 };
 pub use dictation::{
     decode_audio_base64, dictation_api_key_clear, dictation_api_key_get, dictation_api_key_present,
@@ -1369,6 +1369,42 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
 fn migrate_messages_fts(connection: &Connection) -> Result<(), rusqlite::Error> {
     connection.execute_batch(
         "
+        CREATE TABLE IF NOT EXISTS app_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        ",
+    )?;
+    let fts_sql: String = connection
+        .query_row(
+            "SELECT COALESCE(sql, '') FROM sqlite_master WHERE type = 'table' AND name = 'messages_fts'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or_default();
+    let synced: String = connection
+        .query_row(
+            "SELECT COALESCE(value, '') FROM app_meta WHERE key = 'messages_fts_sync_v2'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or_default();
+    let needs_rebuild = synced != "1"
+        || !fts_sql.contains("sender_name")
+        || !fts_sql.contains("recipients")
+        || !fts_sql.contains("remove_diacritics");
+    if needs_rebuild {
+        let _ = connection.execute_batch(
+            "
+            DROP TRIGGER IF EXISTS messages_ai_fts;
+            DROP TRIGGER IF EXISTS messages_ad_fts;
+            DROP TRIGGER IF EXISTS messages_au_fts;
+            DROP TABLE IF EXISTS messages_fts;
+            ",
+        );
+    }
+    connection.execute_batch(
+        "
         CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
             message_id UNINDEXED,
             thread_id UNINDEXED,
@@ -1376,25 +1412,68 @@ fn migrate_messages_fts(connection: &Connection) -> Result<(), rusqlite::Error> 
             subject,
             body_text,
             sender,
-            tokenize = 'unicode61'
+            sender_name,
+            recipients,
+            tokenize = 'unicode61 remove_diacritics 2'
         );
         ",
     )?;
-    let count: i64 = connection
-        .query_row("SELECT COUNT(*) FROM messages_fts", [], |r| r.get(0))
-        .unwrap_or(0);
-    if count == 0 {
-        let _ = connection.execute_batch(
+    if needs_rebuild {
+        connection.execute_batch(
             "
-            INSERT INTO messages_fts(message_id, thread_id, account_id, subject, body_text, sender)
+            INSERT INTO messages_fts(
+                message_id, thread_id, account_id, subject, body_text, sender, sender_name, recipients
+            )
             SELECT id, thread_id, account_id,
                    COALESCE(subject, ''),
                    COALESCE(body_plain, body, ''),
-                   COALESCE(sender_email, '')
+                   COALESCE(sender_email, ''),
+                   COALESCE(sender_name, ''),
+                   trim(COALESCE(to_header, '') || ' ' || COALESCE(cc_header, ''))
             FROM messages;
+            INSERT INTO app_meta(key, value) VALUES ('messages_fts_sync_v2', '1')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             ",
-        );
+        )?;
     }
+    // Triggers après le rebuild : un INSERT/UPDATE/DELETE de message tient l'index à jour.
+    connection.execute_batch(
+        "
+        DROP TRIGGER IF EXISTS messages_ai_fts;
+        DROP TRIGGER IF EXISTS messages_ad_fts;
+        DROP TRIGGER IF EXISTS messages_au_fts;
+        CREATE TRIGGER messages_ai_fts AFTER INSERT ON messages BEGIN
+            INSERT INTO messages_fts(
+                message_id, thread_id, account_id, subject, body_text, sender, sender_name, recipients
+            ) VALUES (
+                new.id, new.thread_id, new.account_id,
+                COALESCE(new.subject, ''),
+                COALESCE(new.body_plain, new.body, ''),
+                COALESCE(new.sender_email, ''),
+                COALESCE(new.sender_name, ''),
+                trim(COALESCE(new.to_header, '') || ' ' || COALESCE(new.cc_header, ''))
+            );
+        END;
+        CREATE TRIGGER messages_ad_fts AFTER DELETE ON messages BEGIN
+            DELETE FROM messages_fts WHERE message_id = old.id;
+        END;
+        CREATE TRIGGER messages_au_fts AFTER UPDATE ON messages BEGIN
+            DELETE FROM messages_fts WHERE message_id = old.id;
+            INSERT INTO messages_fts(
+                message_id, thread_id, account_id, subject, body_text, sender, sender_name, recipients
+            ) VALUES (
+                new.id, new.thread_id, new.account_id,
+                COALESCE(new.subject, ''),
+                COALESCE(new.body_plain, new.body, ''),
+                COALESCE(new.sender_email, ''),
+                COALESCE(new.sender_name, ''),
+                trim(COALESCE(new.to_header, '') || ' ' || COALESCE(new.cc_header, ''))
+            );
+        END;
+        CREATE INDEX IF NOT EXISTS idx_messages_account_sender_norm
+            ON messages(account_id, lower(trim(sender_email)));
+        ",
+    )?;
     // Cache score sécurité sur les fils (0–100, -1 = inconnu).
     let _ = connection.execute(
         "ALTER TABLE threads ADD COLUMN security_score REAL NOT NULL DEFAULT -1",

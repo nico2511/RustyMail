@@ -2,8 +2,8 @@ use serde::Deserialize;
 
 use crate::ai_llm_contracts::validate_contact_profile_shape;
 use crate::ai_llm_util::{
-    gen_params_json_for_prompt, parse_model_json, truncate_chars, untrusted_mail_for_engine,
-    user_text_for_engine,
+    gen_params_json_for_prompt, output_room_after_prompt, parse_model_json, truncate_chars,
+    untrusted_mail_for_engine, user_text_for_engine,
 };
 use rustymail_llm::{LlmEngine, LlmError};
 
@@ -31,13 +31,21 @@ pub fn contact_profile_with_llm(
     message_samples: &str,
     output_language: &str,
 ) -> Result<ContactProfileResult, LlmError> {
-    let samples = truncate_chars(message_samples, 16_000);
     let system = crate::prompts::system_prompt_for_language("contact_profile", output_language);
-    let user = format!(
-        "Contact : {}\n\n{}",
-        user_text_for_engine(engine, email.trim()),
-        untrusted_mail_for_engine(engine, "contact-samples", &samples)
-    );
+    let mut budget = 16_000usize;
+    let user = loop {
+        let samples = truncate_chars(message_samples, budget);
+        let candidate = format!(
+            "Contact : {}\n\n{}",
+            user_text_for_engine(engine, email.trim()),
+            untrusted_mail_for_engine(engine, "contact-samples", &samples)
+        );
+        let room = output_room_after_prompt(engine, system.as_str(), &candidate, 64);
+        if room >= 256 || budget <= 800 {
+            break candidate;
+        }
+        budget = (budget * 2 / 3).max(800);
+    };
     let raw = engine.generate(
         system.as_str(),
         &user,

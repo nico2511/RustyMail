@@ -22,6 +22,7 @@ export type DigestCutZone = {
   detailsHeading?: string | null;
   rowSelector?: string | null;
   rationale?: string | null;
+  structureRoot?: string | null;
 };
 
 export type DigestCutProposal = {
@@ -96,8 +97,14 @@ export const digestCut = {
   notice: "",
   /** Zone en cours de peinture visuelle (null = navigation seule). */
   paintZone: null as DigestCutZoneName | null,
+  /** Zones peintes à la main : l'affinage ne les réécrit pas. */
+  lockedZones: [] as DigestCutZoneName[],
+  /** Consigne libre pour l'affinage. */
+  refineFeedback: "",
   /** Nœud sélectionné dans le panneau Mail. */
   paintPick: null as DigestCutPaintPick | null,
+  /** Plage peinte (un bloc, ou des frères contigus). */
+  paintPicks: [] as DigestCutPaintPick[],
   /** Contrôle du bloc sous le curseur / sélection. */
   paintCheck: null as DigestCutZoneCheck | null,
   /** Éditeur de zones en plein écran. */
@@ -129,8 +136,10 @@ export function formatAnchorSummary(anchors: DigestCutAnchor[]): string {
 export function captureDigestCutDom(): void {
   const query = document.querySelector<HTMLInputElement>("#digest-cut-query");
   const yaml = document.querySelector<HTMLTextAreaElement>("#digest-cut-yaml");
+  const feedback = document.querySelector<HTMLTextAreaElement>("#digest-cut-feedback");
   if (query) digestCut.queryDraft = query.value;
   if (yaml) digestCut.yaml = yaml.value;
+  if (feedback) digestCut.refineFeedback = feedback.value;
 }
 
 const ZONE_LABEL: Record<DigestCutZoneName, string> = {

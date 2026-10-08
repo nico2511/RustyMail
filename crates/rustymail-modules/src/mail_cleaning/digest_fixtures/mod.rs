@@ -14,6 +14,7 @@ pub mod proposal;
 
 use std::sync::{Mutex, OnceLock};
 
+pub use apply::cut_resolution_notes;
 pub use model::{
     parse_fixture, AnchorRole, DigestFixture, FixtureError, ZoneAction, ZonePresentation,
 };
@@ -112,8 +113,9 @@ pub fn preview_candidate_fixture(yaml: &str, raw_html: &str, sender_email: &str)
     match parse_fixture(yaml) {
         Ok(fixture) => {
             let id = fixture.id.clone();
-            let rendered = apply::apply_fixtures(std::slice::from_ref(&fixture), &cleaned, sender_email)
-                .or_else(|| apply::apply_ignoring_sender(&fixture, &cleaned));
+            let rendered =
+                apply::apply_fixtures(std::slice::from_ref(&fixture), &cleaned, sender_email)
+                    .or_else(|| apply::apply_ignoring_sender(&fixture, &cleaned));
             match rendered {
                 Some(html) => FixturePreview {
                     applicable: true,

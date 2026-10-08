@@ -315,6 +315,223 @@ pub struct SearchQuery {
     /// Pondération lexicale pour le mode hybride (0.0–1.0). Défaut applicatif : 0.55.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hybrid_lexical_weight: Option<f32>,
+    /// Filtre sujet (`subject:`). Cherche dans la colonne sujet, pas dans le corps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+    /// Destinataires (`to:`), e-mails ou domaines.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recipients: Vec<String>,
+    /// Termes exclus (`-mot`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_terms: Vec<String>,
+    /// Phrases exactes (`"…"`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phrases: Vec<String>,
+    /// Page de résultats (0 = début). Défaut applicatif : 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<u32>,
+    /// Taille de page. Défaut applicatif : 200, plafond 500.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+/// Extrait `from:`, `to:`, `subject:`, `before:`, `after:`, `"phrase"`, `-mot` du texte libre.
+/// Les termes restants (y compris `prefix*`) restent dans `text`.
+pub fn absorb_search_operators(query: &mut SearchQuery) {
+    let Some(raw) = query.text.clone() else {
+        return;
+    };
+    let parsed = parse_search_operators(&raw);
+    if parsed.from.is_empty()
+        && parsed.to.is_empty()
+        && parsed.subject.is_empty()
+        && parsed.exclude.is_empty()
+        && parsed.phrases.is_empty()
+        && parsed.before.is_none()
+        && parsed.after.is_none()
+    {
+        return;
+    }
+    for sender in parsed.from {
+        if !query
+            .senders
+            .iter()
+            .any(|s| s.eq_ignore_ascii_case(&sender))
+        {
+            query.senders.push(sender);
+        }
+    }
+    for recipient in parsed.to {
+        if !query
+            .recipients
+            .iter()
+            .any(|s| s.eq_ignore_ascii_case(&recipient))
+        {
+            query.recipients.push(recipient);
+        }
+    }
+    if !parsed.subject.is_empty() {
+        let extra = parsed.subject.join(" ");
+        query.subject = Some(match query.subject.take() {
+            Some(prev) if !prev.trim().is_empty() => format!("{prev} {extra}"),
+            _ => extra,
+        });
+    }
+    for term in parsed.exclude {
+        if !query
+            .exclude_terms
+            .iter()
+            .any(|s| s.eq_ignore_ascii_case(&term))
+        {
+            query.exclude_terms.push(term);
+        }
+    }
+    for phrase in parsed.phrases {
+        if !query.phrases.iter().any(|s| s == &phrase) {
+            query.phrases.push(phrase);
+        }
+    }
+    if query.date_from.is_none() {
+        query.date_from = parsed.after;
+    }
+    if query.date_to.is_none() {
+        query.date_to = parsed.before;
+    }
+    let rest = parsed.rest.trim();
+    query.text = if rest.is_empty() {
+        None
+    } else {
+        Some(rest.to_string())
+    };
+}
+
+struct ParsedOperators {
+    rest: String,
+    from: Vec<String>,
+    to: Vec<String>,
+    subject: Vec<String>,
+    exclude: Vec<String>,
+    phrases: Vec<String>,
+    before: Option<String>,
+    after: Option<String>,
+}
+
+fn parse_search_operators(raw: &str) -> ParsedOperators {
+    let mut out = ParsedOperators {
+        rest: String::new(),
+        from: Vec::new(),
+        to: Vec::new(),
+        subject: Vec::new(),
+        exclude: Vec::new(),
+        phrases: Vec::new(),
+        before: None,
+        after: None,
+    };
+    let chars: Vec<char> = raw.chars().collect();
+    let mut i = 0;
+    let mut rest: Vec<char> = Vec::new();
+    while i < chars.len() {
+        if chars[i].is_whitespace() {
+            rest.push(chars[i]);
+            i += 1;
+            continue;
+        }
+        if chars[i] == '"' {
+            let mut phrase = String::new();
+            i += 1;
+            while i < chars.len() && chars[i] != '"' {
+                phrase.push(chars[i]);
+                i += 1;
+            }
+            if i < chars.len() && chars[i] == '"' {
+                i += 1;
+            }
+            let phrase = phrase.trim();
+            if !phrase.is_empty() {
+                out.phrases.push(phrase.to_ascii_lowercase());
+            }
+            continue;
+        }
+        let start = i;
+        while i < chars.len() && !chars[i].is_whitespace() {
+            i += 1;
+        }
+        let token: String = chars[start..i].iter().collect();
+        if let Some(rest_tok) = token.strip_prefix('-') {
+            let term = rest_tok.trim().trim_matches('"');
+            if term.len() >= 2 {
+                out.exclude.push(term.to_ascii_lowercase());
+                continue;
+            }
+        }
+        if let Some((key, value)) = split_operator(&token) {
+            let value = value.trim().trim_matches('"').to_string();
+            if value.is_empty() {
+                continue;
+            }
+            match key {
+                "from" => out.from.push(value.to_ascii_lowercase()),
+                "to" => out.to.push(value.to_ascii_lowercase()),
+                "subject" => out.subject.push(value.to_ascii_lowercase()),
+                "before" => {
+                    if out.before.is_none() {
+                        out.before = Some(normalize_search_date(&value, true));
+                    }
+                }
+                "after" => {
+                    if out.after.is_none() {
+                        out.after = Some(normalize_search_date(&value, false));
+                    }
+                }
+                _ => {
+                    rest.extend(token.chars());
+                }
+            }
+            continue;
+        }
+        rest.extend(token.chars());
+    }
+    out.rest = rest
+        .into_iter()
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    out
+}
+
+fn split_operator(token: &str) -> Option<(&str, &str)> {
+    let (key, value) = token.split_once(':')?;
+    let key = key.trim().to_ascii_lowercase();
+    if matches!(key.as_str(), "from" | "to" | "subject" | "before" | "after") {
+        Some((
+            match key.as_str() {
+                "from" => "from",
+                "to" => "to",
+                "subject" => "subject",
+                "before" => "before",
+                "after" => "after",
+                _ => return None,
+            },
+            value,
+        ))
+    } else {
+        None
+    }
+}
+
+/// `YYYY-MM-DD` → borne RFC3339 (début ou fin de journée UTC).
+fn normalize_search_date(value: &str, end_of_day: bool) -> String {
+    let v = value.trim();
+    if v.len() == 10 && v.as_bytes().get(4) == Some(&b'-') && v.as_bytes().get(7) == Some(&b'-') {
+        if end_of_day {
+            format!("{v}T23:59:59Z")
+        } else {
+            format!("{v}T00:00:00Z")
+        }
+    } else {
+        v.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -356,5 +573,25 @@ mod tests {
             nl_query_requests_language_filter("mails en français sur le projet").as_deref(),
             Some("fr")
         );
+    }
+
+    #[test]
+    fn operators_leave_keywords_and_fill_structured_fields() {
+        let mut q = SearchQuery {
+            text: Some(
+                "facture* from:ada@ex.fr to:bob@ex.fr subject:commande \"bon de commande\" -pub after:2024-01-01 before:2024-06-30"
+                    .into(),
+            ),
+            ..Default::default()
+        };
+        absorb_search_operators(&mut q);
+        assert_eq!(q.text.as_deref(), Some("facture*"));
+        assert_eq!(q.senders, vec!["ada@ex.fr".to_string()]);
+        assert_eq!(q.recipients, vec!["bob@ex.fr".to_string()]);
+        assert_eq!(q.subject.as_deref(), Some("commande"));
+        assert_eq!(q.phrases, vec!["bon de commande".to_string()]);
+        assert_eq!(q.exclude_terms, vec!["pub".to_string()]);
+        assert_eq!(q.date_from.as_deref(), Some("2024-01-01T00:00:00Z"));
+        assert_eq!(q.date_to.as_deref(), Some("2024-06-30T23:59:59Z"));
     }
 }

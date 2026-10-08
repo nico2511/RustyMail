@@ -40,11 +40,22 @@ struct ChatCompletionRequest<'a> {
     /// Ollama : `num_predict` borne la génération même si `max_tokens` est ignoré.
     #[serde(skip_serializing_if = "Option::is_none")]
     options: Option<OllamaGenOptions>,
+    /// Ollama : sortie JSON structurée quand l’appelant attend un objet.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    response_format: Option<JsonObjectFormat>,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonObjectFormat {
+    #[serde(rename = "type")]
+    kind: &'static str,
 }
 
 #[derive(Debug, Serialize)]
 struct OllamaGenOptions {
     num_predict: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    num_ctx: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -531,6 +542,26 @@ impl HttpChatEngine {
         }
     }
 
+    fn ollama_options(&self, p: &LlmGenParams) -> Option<OllamaGenOptions> {
+        match self.kind {
+            HttpChatBackendKind::Ollama => Some(OllamaGenOptions {
+                num_predict: p.max_tokens.max(1),
+                num_ctx: Some(self.n_ctx()),
+            }),
+            _ => None,
+        }
+    }
+
+    fn ollama_json_format(&self, p: &LlmGenParams) -> Option<JsonObjectFormat> {
+        if self.kind == HttpChatBackendKind::Ollama && p.expect_json {
+            Some(JsonObjectFormat {
+                kind: "json_object",
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn generate(
         &mut self,
         system: &str,
@@ -567,12 +598,8 @@ impl HttpChatEngine {
                 HttpChatBackendKind::Ollama => Some(false),
                 _ => None,
             },
-            options: match self.kind {
-                HttpChatBackendKind::Ollama => Some(OllamaGenOptions {
-                    num_predict: p.max_tokens.max(1),
-                }),
-                _ => None,
-            },
+            options: self.ollama_options(p),
+            response_format: self.ollama_json_format(p),
         };
 
         let attempts = self.max_http_attempts();
@@ -678,8 +705,14 @@ impl HttpChatEngine {
                 obj.insert("think".into(), json!(false));
                 obj.insert(
                     "options".into(),
-                    json!({ "num_predict": p.max_tokens.max(1) }),
+                    json!({
+                        "num_predict": p.max_tokens.max(1),
+                        "num_ctx": self.n_ctx(),
+                    }),
                 );
+                if p.expect_json {
+                    obj.insert("response_format".into(), json!({ "type": "json_object" }));
+                }
             }
         }
 

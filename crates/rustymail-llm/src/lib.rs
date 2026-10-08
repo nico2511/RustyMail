@@ -62,6 +62,9 @@ pub struct LlmGenParams {
     pub stop: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grammar_gbnf: Option<String>,
+    /// Ollama : `response_format: json_object` quand l’appelant attend du JSON.
+    #[serde(default)]
+    pub expect_json: bool,
 }
 
 impl Default for LlmGenParams {
@@ -72,6 +75,7 @@ impl Default for LlmGenParams {
             top_p: 0.9,
             stop: Vec::new(),
             grammar_gbnf: None,
+            expect_json: false,
         }
     }
 }

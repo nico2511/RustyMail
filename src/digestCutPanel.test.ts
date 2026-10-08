@@ -89,7 +89,10 @@ describe("renderDigestCutPanel", () => {
     expect(html).toContain('data-action="digest-cut-paint-zone"');
     expect(html).toContain("Changer le bloc");
     expect(html).toContain("bloc HTML complet");
-    expect(html).toContain("Revérifier (IA)");
+    expect(html).toContain("Affiner");
+    expect(html).toContain('id="digest-cut-feedback"');
+    expect(html).toContain("Ce qui ne va pas");
+    expect(html).not.toContain("Revérifier (IA)");
     expect(html).toContain("Rendre lisible (IA)");
     expect(html).toContain('aria-pressed="true">Afficher');
     expect(html).toContain("Voir la découpe");

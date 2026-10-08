@@ -30,8 +30,8 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
     : "";
   return `
       <style>
-        :host{display:block;box-sizing:border-box;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif;padding:20px 24px 24px}
-        .mail{padding:0;line-height:1.62;font-size:15px;background:transparent}
+        :host{display:block;box-sizing:border-box;color:var(--text);font-family:var(--font-sans,"IBM Plex Sans","Segoe UI",sans-serif);padding:20px 24px 24px;--rm-hist-indent:14px}
+        .mail{padding:0;line-height:1.62;font-size:15px;background:transparent;font-family:var(--font-serif,Literata,Georgia,serif)}
         .mail.mail--clean{font-size:15.5px;line-height:1.68}
         .mail :is(p, ul, ol, blockquote, pre, table){margin:0 0 10px}
         .mail :is(h1,h2,h3){margin:8px 0 10px;font-family:ui-serif,Georgia,Cambria,"Times New Roman",serif;font-weight:400;letter-spacing:-0.02em}
@@ -96,20 +96,24 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail article.rm-amazon-digest tbody tr:not(:first-child) th,.mail article.rm-amazon-digest tbody tr:not(:first-child) td,
         .mail article.rm-github-digest tbody tr:not(:first-child) th,.mail article.rm-github-digest tbody tr:not(:first-child) td{border-top:1px solid rgba(120,119,117,.16)}
         .mail article.rm-conversation-report{display:flex;flex-direction:column;gap:14px;margin:0}
-        .mail article.rm-conversation-report .rm-conversation-turn{padding:14px 16px;border:1px solid rgba(120,119,117,.14);border-radius:10px;background:rgba(255,255,255,.025)}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited{border-left:2px solid rgba(232,228,223,.14)}
+        .mail article.rm-conversation-report .rm-conversation-turn{padding:14px 16px;border:1px solid rgba(120,119,117,.14);border-radius:10px;background:transparent}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited{position:relative;border-left:3px solid var(--rm-hue,#1d4f8a);background:color-mix(in srgb, var(--text,#16191e) 4%, var(--rm-paper,#fff))}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth-parity="even"]{background:color-mix(in srgb, var(--text,#16191e) 8%, var(--rm-paper,#fff))}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-sender-hue="1"]{--rm-hue:#1d4f8a}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-sender-hue="2"]{--rm-hue:#1b6b45}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-sender-hue="3"]{--rm-hue:#8a4b12}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-sender-hue="4"]{--rm-hue:#7a2f68}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-sender-hue="5"]{--rm-hue:#1a5c72}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-sender-hue="6"]{--rm-hue:#8a3030}
         .mail article.rm-conversation-report .rm-conversation-history{margin-top:0}
         .mail article.rm-conversation-report .rm-conversation-history-tree{display:flex;flex-direction:column;gap:10px;padding:10px 12px 8px}
-        .mail article.rm-conversation-report .rm-conversation-history-tree .rm-conversation-turn{background:rgba(255,255,255,.015)}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="1"]{margin-left:12px}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="2"]{margin-left:24px}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="3"]{margin-left:36px}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="4"]{margin-left:48px}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="5"]{margin-left:60px}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="6"]{margin-left:72px}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="7"]{margin-left:84px}
-        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="8"]{margin-left:96px}
-        .mail article.rm-conversation-report .rm-conversation-envelope{width:100%;border-collapse:collapse;font-size:12px;margin:0 0 10px}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="1"]{margin-left:var(--rm-hist-indent,14px)}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="2"]{margin-left:calc(var(--rm-hist-indent,14px) * 2)}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="3"]{margin-left:calc(var(--rm-hist-indent,14px) * 3)}
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth="4"],
+        .mail article.rm-conversation-report .rm-conversation-turn--cited[data-depth-over="1"]{margin-left:calc(var(--rm-hist-indent,14px) * 4)}
+        .mail article.rm-conversation-report .rm-hist-depth-badge{position:absolute;top:8px;right:8px;font-family:var(--font-sans,"IBM Plex Sans",sans-serif);font-size:11px;font-weight:650;line-height:1;padding:3px 6px;border-radius:999px;background:color-mix(in srgb, var(--text,#16191e) 10%, var(--rm-paper,#fff));color:var(--text,#16191e)}
+        .mail article.rm-conversation-report .rm-conversation-envelope{width:100%;border-collapse:collapse;font-size:12px;margin:0 0 10px;font-family:var(--font-sans,"IBM Plex Sans",sans-serif)}
         .mail article.rm-conversation-report .rm-conversation-envelope th,.mail article.rm-conversation-report .rm-conversation-envelope td{padding:4px 12px 4px 0;border:0;vertical-align:top;text-align:left;line-height:1.45;background:transparent}
         .mail article.rm-conversation-report .rm-conversation-envelope th{font-weight:600;white-space:nowrap;width:1%;color:var(--dim,rgba(238,240,238,.58))}
         .mail article.rm-conversation-report .rm-conversation-envelope tr:not(:first-child) th,.mail article.rm-conversation-report .rm-conversation-envelope tr:not(:first-child) td{border-top:1px solid rgba(120,119,117,.12)}
@@ -122,9 +126,14 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail table.rm-mail-data{width:100%;font-size:12.5px;margin:8px 0 12px}
         .mail table.rm-mail-data th,.mail table.rm-mail-data td{padding:6px 8px;border:1px solid rgba(120,119,117,.35);vertical-align:top;text-align:left;line-height:1.4}
         .mail table.rm-mail-data th{font-weight:650;background:rgba(255,255,255,.04)}
-        .mail blockquote{padding:8px 12px;border-left:2px solid rgba(232,228,223,.12);background:rgba(255,255,255,.02);border-radius:10px}
+        .mail blockquote{padding:8px 12px;border-left:3px solid var(--rm-hue,#1d4f8a);background:color-mix(in srgb, var(--text,#16191e) 4%, var(--rm-paper,#fff));border-radius:10px}
+        .mail details.rm-mail-folded-quote blockquote{margin-left:var(--rm-hist-indent,14px)}
+        .mail details.rm-mail-folded-quote blockquote blockquote{margin-left:var(--rm-hist-indent,14px);background:color-mix(in srgb, var(--text,#16191e) 8%, var(--rm-paper,#fff))}
+        .mail details.rm-mail-folded-quote blockquote blockquote blockquote{margin-left:var(--rm-hist-indent,14px);background:color-mix(in srgb, var(--text,#16191e) 4%, var(--rm-paper,#fff))}
+        .mail details.rm-mail-folded-quote blockquote blockquote blockquote blockquote{margin-left:var(--rm-hist-indent,14px)}
+        .mail details.rm-mail-folded-quote blockquote blockquote blockquote blockquote blockquote{margin-left:0}
         .mail details.rm-mail-folded-quote{margin:1.45rem 0 0}
-        .mail details.rm-mail-folded-quote > summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.04em;line-height:1.4;color:var(--dim,rgba(238,240,238,.62))}
+        .mail details.rm-mail-folded-quote > summary{cursor:pointer;font-family:var(--font-sans,"IBM Plex Sans",sans-serif);font-size:11px;font-weight:600;letter-spacing:.04em;line-height:1.4;color:var(--dim,rgba(238,240,238,.62))}
         .mail details.rm-mail-folded-quote.rm-conversation-history > summary{letter-spacing:.08em;text-transform:uppercase}
         .mail details.rm-mail-folded-quote[open] > summary{margin-bottom:0.7rem}
         .mail details.rm-mail-folded-quote > .rm-mail-quote-body{margin:0;padding:12px 14px 4px;border-radius:12px;border:1px solid rgba(120,119,117,.2);background:rgba(120,119,117,.07);color:var(--text);font-size:inherit;line-height:1.62}
