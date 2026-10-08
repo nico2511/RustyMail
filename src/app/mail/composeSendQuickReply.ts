@@ -15,13 +15,18 @@ import { pollSendDraftUntilTerminal } from "./composeSendDraftInvokeRun";
 let quickReplyInFlight = false;
 const quickReplyIds = new Map<string, string>();
 
-function quickReplySendId(threadId: string, body: string): string {
+export function quickReplySendId(threadId: string, body: string): string {
   const key = `${threadId}\0${body}`;
   const existing = quickReplyIds.get(key);
   if (existing) return existing;
   const id = globalThis.crypto.randomUUID();
   quickReplyIds.set(key, id);
   return id;
+}
+
+/** Done ou Failed : le prochain « Merci » est un nouvel envoi. */
+export function releaseQuickReplySendId(threadId: string, body: string): void {
+  quickReplyIds.delete(`${threadId}\0${body}`);
 }
 
 export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void> {
@@ -50,8 +55,10 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
     return;
   }
   draft.markdownBody = `${body}\n`;
-  const sendId = quickReplySendId(threadId, draft.markdownBody);
+  const replyBody = draft.markdownBody;
+  const sendId = quickReplySendId(threadId, replyBody);
   quickReplyInFlight = true;
+  let terminal = false;
   try {
     let sendOutcome: SendDraftOutcome;
     try {
@@ -64,16 +71,26 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
         }),
         MAIL_ACTION_TIMEOUT_MS,
       );
+      terminal = true;
     } catch (error) {
       const message = tauriErrorMessage(error);
       const lower = message.toLowerCase();
       const timedOut = message === "Tauri command timeout" || lower.includes("timeout") || lower.includes("délai");
-      if (!timedOut) throw error;
+      if (!timedOut) {
+        terminal = true;
+        throw error;
+      }
       const status = await pollSendDraftUntilTerminal(sendId);
-      if (!status || status.state !== "done") {
+      if (!status || status.state === "inFlight" || status.state === "unknown") {
         toast.warning("Vérification interrompue : la même réponse garde son identifiant d'envoi.");
         return;
       }
+      if (status.state === "failed") {
+        terminal = true;
+        toast.error(`Envoi échoué: ${status.error}`);
+        return;
+      }
+      terminal = true;
       sendOutcome = { imapNotice: status.imapNotice ?? null };
     }
     toast.success(kind === "reply" ? "Réponse envoyée." : "Réponse à tous envoyée.");
@@ -91,6 +108,7 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
     console.error("send_draft (quick reply)", error);
     toast.error(`Envoi échoué: ${tauriErrorMessage(error)}`);
   } finally {
+    if (terminal) releaseQuickReplySendId(threadId, replyBody);
     quickReplyInFlight = false;
   }
 }

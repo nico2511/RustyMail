@@ -17,7 +17,7 @@ import {
   composeSendDraftRunDeps,
   finishComposeAfterSuccessfulSend,
 } from "./composeSendDraftFinishRun";
-import { currentComposeSendId } from "./composeSendId";
+import { releaseSendAttempt, sendIdForDraft } from "./composeSendId";
 
 function isInvokeTimeout(message: string): boolean {
   const lower = message.toLowerCase();
@@ -48,9 +48,14 @@ export async function pollSendDraftUntilTerminal(sendId: string): Promise<SendDr
   return null;
 }
 
-async function finishSuccessfulSend(sendOutcome: SendDraftOutcome, keepThreadId: string | undefined, toEmails: string[]) {
+async function finishSuccessfulSend(
+  sendOutcome: SendDraftOutcome,
+  keepThreadId: string | undefined,
+  toEmails: string[],
+  draftId: string,
+) {
   state.sendDraftInFlight = false;
-  state.composeSendId = "";
+  releaseSendAttempt(draftId);
   state.composeMessage = "Email envoyé";
   toast(state.composeMessage);
   toastSendDraftImapNotice(sendOutcome);
@@ -70,7 +75,12 @@ async function finishSuccessfulSend(sendOutcome: SendDraftOutcome, keepThreadId:
   render();
 }
 
-async function pollSendDraftStatus(sendId: string, keepThreadId: string | undefined, toEmails: string[]) {
+async function pollSendDraftStatus(
+  sendId: string,
+  keepThreadId: string | undefined,
+  toEmails: string[],
+  draftId: string,
+) {
   const status = await pollSendDraftUntilTerminal(sendId);
   if (!status) {
     state.sendDraftInFlight = false;
@@ -80,11 +90,12 @@ async function pollSendDraftStatus(sendId: string, keepThreadId: string | undefi
     return;
   }
   if (status.state === "done") {
-    await finishSuccessfulSend({ imapNotice: status.imapNotice ?? null }, keepThreadId, toEmails);
+    await finishSuccessfulSend({ imapNotice: status.imapNotice ?? null }, keepThreadId, toEmails, draftId);
     return;
   }
   if (status.state === "failed") {
     state.sendDraftInFlight = false;
+    releaseSendAttempt(draftId);
     state.composeMessage = `Envoi échoué: ${status.error}`;
     toast(state.composeMessage);
     render();
@@ -96,7 +107,8 @@ async function pollSendDraftStatus(sendId: string, keepThreadId: string | undefi
 }
 
 export async function invokeSendDraft(accountId: string | null, draftOutbound: Draft): Promise<void> {
-  const sendId = currentComposeSendId();
+  const draftId = draftOutbound.id ?? "";
+  const sendId = sendIdForDraft(draftOutbound);
   const keepThreadId = state.selectedThreadId;
   const toEmails = draftOutbound.to.map((x) => x.email?.trim()).filter(Boolean);
   state.sendDraftInFlight = true;
@@ -112,17 +124,18 @@ export async function invokeSendDraft(accountId: string | null, draftOutbound: D
       }),
       MAIL_ACTION_TIMEOUT_MS,
     );
-    await finishSuccessfulSend(sendOutcome, keepThreadId, toEmails);
+    await finishSuccessfulSend(sendOutcome, keepThreadId, toEmails, draftId);
   } catch (error) {
     const message = tauriErrorMessage(error);
     if (isInvokeTimeout(message)) {
       state.composeMessage = "Statut d'envoi inconnu : vérification…";
       render();
-      await pollSendDraftStatus(sendId, keepThreadId, toEmails);
+      await pollSendDraftStatus(sendId, keepThreadId, toEmails, draftId);
       return;
     }
     console.error("send_draft", error);
     state.sendDraftInFlight = false;
+    releaseSendAttempt(draftId);
     state.composeMessage = `Envoi échoué: ${message}`;
     toast(state.composeMessage);
     render();
