@@ -1310,6 +1310,8 @@ fn build_mailbox_import(
     }
 }
 
+/// Mémorise les UID dont le MIME n'a pas pu être lu. Pas de nouvel essai : `last_uid`
+/// avance au-delà. Les lignes partent avec le compte ou quand l'UIDVALIDITY change.
 fn persist_imap_sync_skipped(
     db_path: &Path,
     account_id: &str,
