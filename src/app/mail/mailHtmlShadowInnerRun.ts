@@ -24,8 +24,8 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
   const blockedRemoteImages = !allowRemoteImages && sanitized.includes("data-remote-src=");
   const remoteImageBanner = blockedRemoteImages
     ? `<div class="remote-images">
-        <span>Images distantes bloquées pour protéger votre confidentialité.</span>
-        <button type="button" class="mail-load-remote-images">Charger les images</button>
+        <span>Des images distantes sont bloquées.</span>
+        <button type="button" class="mail-load-remote-images">Afficher les images</button>
       </div>`
     : "";
   return `
@@ -77,11 +77,14 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
         .mail img:not([width]){
           width:auto;
         }
-        .mail img.mail-remote-image-blocked,.mail img.mail-image-blocked,.mail img.mail-cid-missing{
+        .mail img.mail-image-blocked,.mail img.mail-cid-missing{
           min-height:42px;
           padding:10px;
           cursor:default;
           background:rgba(255,255,255,.035);
+        }
+        .mail img.mail-remote-image-blocked{
+          display:none !important;
         }
         .mail img.mail-cid-pending{opacity:.55}
         .mail code{background:rgba(255,255,255,.065);padding:3px 7px;border-radius:6px;font-size:12px}
