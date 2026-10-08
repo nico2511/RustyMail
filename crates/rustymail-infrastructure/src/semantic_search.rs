@@ -2169,9 +2169,11 @@ mod sender_search_tests {
             200,
             "chaque is_read ne doit toucher que la ligne message, pas l'index FTS"
         );
+        // Linux CI reste sous 1,5 s ; Windows smoke est plus lent (~5 s observés).
+        let budget_ms = if cfg!(windows) { 15_000 } else { 1_500 };
         assert!(
-            elapsed.as_millis() < 1500,
-            "200 marquages lus trop lents : {elapsed:?}"
+            elapsed.as_millis() < budget_ms,
+            "200 marquages lus trop lents : {elapsed:?} (budget {budget_ms} ms)"
         );
         drop(conn);
         let hits = sqlite_search_threads_unified(
