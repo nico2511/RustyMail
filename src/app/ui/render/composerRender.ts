@@ -269,7 +269,7 @@ export function renderComposer() {
               ? `<button type="button" class="ghost-button compose-fs-save-saved-draft" data-action="save-saved-draft" title="Enregistrer dans la liste Brouillons sauvegardés (barre latérale)">Enregistrer</button>`
               : ""
           }
-          <button type="button" class="primary-button compose-fs-send compose-send" data-action="send">Envoyer</button>
+          <button type="button" class="primary-button compose-fs-send compose-send" data-action="send"${state.sendDraftInFlight ? " disabled" : ""}>Envoyer</button>
         </div>
       </header>
       <div class="compose-workspace">

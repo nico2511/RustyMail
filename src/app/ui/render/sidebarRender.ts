@@ -63,6 +63,14 @@ export function renderSidebar(): string {
           }
         </div>
       </div>
+      ${
+        state.mailboxListError
+          ? `<div class="sidebar-mailbox-error" role="status">
+              <p class="dim" style="margin:8px 12px">Dossiers indisponibles : ${escapeHtml(state.mailboxListError)}</p>
+              <button type="button" class="ghost-button" data-action="retry-mailbox-list" style="margin:0 12px 8px">Réessayer</button>
+            </div>`
+          : ""
+      }
       <nav class="folder-list${multiAccount ? " folder-list--account-fold" : ""}" aria-label="Folders">
         ${renderRailAccountScopeHtml()}
         ${

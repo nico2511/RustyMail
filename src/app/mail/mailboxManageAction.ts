@@ -1,8 +1,7 @@
 import { deleteBlockedReason, renameBlockedReason } from "../../mailboxLock";
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import { currentAccount } from "../core/accountContext";
-import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
-import { safeInvoke, tauriErrorMessage } from "../lib/tauriCommand";
+import { tauriErrorMessage } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
@@ -10,6 +9,7 @@ import { state } from "../state";
 import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 import { invokeMailboxManageKind } from "./mailboxManageKindInvokeRun";
 import { requireMailboxManageActionDeps } from "./mailboxManageActionContext";
+import { refreshMailboxes } from "./refreshMailboxesRun";
 
 export async function mailboxManageAction(
   kind: "create" | "rename" | "delete" | "subscribe",
@@ -47,7 +47,7 @@ export async function mailboxManageAction(
     const msg = await invokeMailboxManageKind(kind, account);
     if (msg === null) return;
     toast(msg);
-    state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: account.id }, [], BOOT_INVOKE_TIMEOUT_MS);
+    await refreshMailboxes(account.id);
     ensureValidSelectedMailbox();
     state.mailboxManageOpen = false;
     await d.loadMailboxUnread();

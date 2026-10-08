@@ -1,9 +1,8 @@
 import type { InboxFilterHit } from "../../hashAutocomplete";
-import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
-import { safeInvoke } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { state } from "../state";
 import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
+import { refreshMailboxes } from "./refreshMailboxesRun";
 import { requireSearchLaunchDeps } from "./searchLaunchContext";
 import { applySearchBarIfCriteriaAndRender } from "./searchLaunchHashHitRefreshRun";
 
@@ -15,7 +14,7 @@ export async function tryApplyHashHitMailboxOrAccount(hit: InboxFilterHit): Prom
   }
   if (hit.id.startsWith("account:")) {
     const id = hit.id.slice(8);
-    state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: id }, [], BOOT_INVOKE_TIMEOUT_MS);
+    await refreshMailboxes(id);
     ensureValidSelectedMailbox();
     const acc = state.accounts.find((a) => a.id === id);
     toast.info(`Compte : ${acc?.email ?? id}`);

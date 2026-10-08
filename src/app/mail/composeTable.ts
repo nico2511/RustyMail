@@ -1,4 +1,6 @@
 import { mergeAttributes } from "@tiptap/core";
+import { openTextPromptModal } from "../modals/promptConfirm";
+import { toast } from "../lib/toast";
 import Table from "@tiptap/extension-table";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
@@ -63,14 +65,35 @@ export function clampComposeTableDim(n: number, fallback: number): number {
   return Math.max(1, Math.min(20, Math.round(n)));
 }
 
-/** Demande lignes × colonnes (défaut 3×3). Annuler → null. */
-export function promptComposeTableSize(): { rows: number; cols: number } | null {
-  const rowsRaw = window.prompt("Nombre de lignes du tableau (1–20) :", "3");
+function parseComposeTableDim(raw: string): number | null {
+  const n = Number(raw.trim());
+  if (!Number.isInteger(n) || n < 1 || n > 20) return null;
+  return n;
+}
+
+/** Demande lignes × colonnes (défaut 3×3). Annuler ou valeur hors 1–20 → null (pas d'insertion). */
+export async function promptComposeTableSize(): Promise<{ rows: number; cols: number } | null> {
+  const rowsRaw = await openTextPromptModal({
+    title: "Insérer un tableau",
+    label: "Nombre de lignes (1–20)",
+    defaultValue: "3",
+  });
   if (rowsRaw == null) return null;
-  const colsRaw = window.prompt("Nombre de colonnes du tableau (1–20) :", "3");
+  const rows = parseComposeTableDim(rowsRaw);
+  if (rows == null) {
+    toast.warning("Nombre de lignes : entier entre 1 et 20.");
+    return null;
+  }
+  const colsRaw = await openTextPromptModal({
+    title: "Insérer un tableau",
+    label: "Nombre de colonnes (1–20)",
+    defaultValue: "3",
+  });
   if (colsRaw == null) return null;
-  return {
-    rows: clampComposeTableDim(Number(rowsRaw.trim()), 3),
-    cols: clampComposeTableDim(Number(colsRaw.trim()), 3),
-  };
+  const cols = parseComposeTableDim(colsRaw);
+  if (cols == null) {
+    toast.warning("Nombre de colonnes : entier entre 1 et 20.");
+    return null;
+  }
+  return { rows, cols };
 }

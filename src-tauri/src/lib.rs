@@ -14,8 +14,9 @@ use rustymail_infrastructure::{
     migrate_locked_mailboxes_after_rename, normalized_chat_backend, openrouter_api_key_clear,
     openrouter_api_key_present, openrouter_api_key_set, peek_attachment_identity,
     persist_allow_invalid_tls_from_ui_checkbox, prefs_path_from_db_dir, save_app_prefs,
-    save_app_prefs_validated, transcribe_and_maybe_translate, AppPrefs, DraftRevisionListItem,
-    ImapSyncResult, NewsletterRule, SavedDraftListItem, SavedDraftOpenResult, SemanticReindexStats,
+    save_app_prefs_validated, transcribe_and_maybe_translate, AppPrefs, BulkSeenOutcome,
+    BulkThreadRef, DraftRevisionListItem, ImapSyncResult, NewsletterRule, SavedDraftListItem,
+    SavedDraftOpenResult, SemanticReindexStats, SendAttemptBook, SendBegin, SendSlot,
     SyncMailboxesOutcome, PREFIX_RISK_CONFIRM,
 };
 mod activity_commands;
@@ -40,7 +41,8 @@ mod webview_microphone;
 mod whisper_dictation;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
+use std::time::SystemTime;
 
 use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::Emitter;
@@ -886,15 +888,92 @@ fn send_draft_imap_notice(out: &rustymail_infrastructure::ImapSentCopyOutcome) -
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SendDraftOutcome {
     #[serde(skip_serializing_if = "Option::is_none")]
     imap_notice: Option<String>,
 }
 
+fn send_attempt_book() -> &'static Mutex<SendAttemptBook<SendDraftOutcome>> {
+    static BOOK: OnceLock<Mutex<SendAttemptBook<SendDraftOutcome>>> = OnceLock::new();
+    BOOK.get_or_init(|| Mutex::new(SendAttemptBook::default()))
+}
+
+fn lock_send_book() -> std::sync::MutexGuard<'static, SendAttemptBook<SendDraftOutcome>> {
+    match send_attempt_book().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+#[derive(serde::Serialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+enum SendDraftStatusView {
+    Unknown,
+    InFlight,
+    Done {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        imap_notice: Option<String>,
+    },
+    Failed {
+        error: String,
+    },
+}
+
 #[tauri::command]
 async fn send_draft(
+    paths: State<'_, AppPaths>,
+    core: State<'_, Mutex<AppCore>>,
+    account_id: Option<String>,
+    draft: Draft,
+    send_ack: Option<String>,
+    send_id: Option<String>,
+) -> Result<SendDraftOutcome, String> {
+    ipc_guard::validate_send_id(send_id.as_deref())?;
+    let tracked = send_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(str::to_string);
+    if let Some(id) = tracked.as_deref() {
+        let decision = lock_send_book().begin(id, SystemTime::now());
+        match decision {
+            SendBegin::InFlight => return Err("Envoi déjà en cours".into()),
+            SendBegin::Replay => {
+                return lock_send_book()
+                    .replay(id)
+                    .ok_or_else(|| "Envoi déjà en cours".to_string());
+            }
+            SendBegin::Start => {}
+        }
+    }
+    let result = send_draft_once(paths, core, account_id, draft, send_ack).await;
+    if let Some(id) = tracked.as_deref() {
+        let mut book = lock_send_book();
+        match &result {
+            Ok(outcome) => book.complete_ok(id, outcome.clone(), SystemTime::now()),
+            Err(error) => book.complete_err(id, error.clone(), SystemTime::now()),
+        }
+    }
+    result
+}
+
+#[tauri::command]
+async fn send_draft_status(send_id: String) -> Result<SendDraftStatusView, String> {
+    ipc_guard::validate_send_id(Some(&send_id))?;
+    let slot = lock_send_book().get(send_id.trim(), SystemTime::now());
+    Ok(match slot {
+        None => SendDraftStatusView::Unknown,
+        Some(SendSlot::InFlight { .. }) => SendDraftStatusView::InFlight,
+        Some(SendSlot::Done { value, .. }) => SendDraftStatusView::Done {
+            imap_notice: value.imap_notice.clone(),
+        },
+        Some(SendSlot::Failed { error, .. }) => SendDraftStatusView::Failed { error },
+    })
+}
+
+async fn send_draft_once(
     paths: State<'_, AppPaths>,
     core: State<'_, Mutex<AppCore>>,
     account_id: Option<String>,
@@ -1978,6 +2057,29 @@ async fn thread_mark_read(
     Ok(result)
 }
 
+#[tauri::command]
+async fn threads_mark_read_bulk(
+    paths: State<'_, AppPaths>,
+    core: State<'_, Mutex<AppCore>>,
+    account_id: Option<String>,
+    items: Vec<BulkThreadRef>,
+    seen: bool,
+) -> Result<BulkSeenOutcome, String> {
+    let pairs: Vec<(&str, &str)> = items
+        .iter()
+        .map(|item| (item.mailbox.as_str(), item.thread_id.as_str()))
+        .collect();
+    ipc_guard::validate_thread_mailbox_batch(account_id.as_deref(), &pairs)?;
+    let account = resolve_account_from_paths(&paths, account_id)?;
+    let outcome =
+        rustymail_infrastructure::set_threads_seen_bulk(&paths.db_path, &account, &items, seen)
+            .await?;
+    let refreshed =
+        rustymail_infrastructure::sqlite_app_core(&paths.db_path).map_err(|e| e.to_string())?;
+    *core.lock().map_err(|_| "core lock poisoned".to_string())? = refreshed;
+    Ok(outcome)
+}
+
 /// Bascule (ou force) le drapeau « suivi » local d’un fil (table SQLite `threads.is_followed`).
 /// Aucun appel IMAP : flag stable face aux resyncs et indépendant des serveurs.
 #[tauri::command]
@@ -2308,6 +2410,8 @@ pub fn run() {
             saved_draft_delete,
             saved_draft_open,
             send_draft,
+            send_draft_status,
+            threads_mark_read_bulk,
             plan_split_send,
             execute_split_send_cmd,
             download_attachment,

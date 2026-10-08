@@ -4,6 +4,7 @@ import { markSavedSearchSeenCmd, upsertSavedSearchCmd } from "../../savedSearche
 import { tauriErrorMessage } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
+import { openTextPromptModal } from "../modals/promptConfirm";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { buildSearchQueryFromCurrentState, searchAccountIdForQuery } from "./searchQueryContext";
@@ -28,16 +29,28 @@ export async function saveCurrentSearchView(): Promise<void> {
     return;
   }
   const defaultName = suggestSavedSearchName();
-  const name = window.prompt("Nom de la vue enregistrée", defaultName);
+  const name = await openTextPromptModal({
+    title: "Enregistrer la vue",
+    label: "Nom de la vue",
+    defaultValue: defaultName,
+  });
   if (name === null) return;
   const trimmed = name.trim();
   if (!trimmed) {
     toast.error("Nom de vue invalide.");
     return;
   }
-  const iconRaw = window.prompt("Icône courte (2–4 caractères)", "Vu");
+  const iconRaw = await openTextPromptModal({
+    title: "Enregistrer la vue",
+    label: "Icône courte (2–4 caractères)",
+    defaultValue: "Vu",
+  });
   if (iconRaw === null) return;
-  const icon = (iconRaw.trim() || "Vu").slice(0, 4);
+  const icon = iconRaw.trim();
+  if (icon.length < 2 || icon.length > 4) {
+    toast.error("Icône : 2 à 4 caractères.");
+    return;
+  }
   const query = buildSearchQueryFromCurrentState();
   const ui = buildSavedSearchUiState({
     listFilter: state.listFilter,

@@ -1,13 +1,12 @@
 import { clearAccountOAuthWizard } from "../account/accountWizardState";
 import { clearDiscoveredServerSnap } from "../account/discoveredServerSnap";
-import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { isTauriRuntime } from "../lib/tauriRuntime";
-import { safeInvoke } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import type { Account } from "../../accountSetup";
 import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
+import { refreshMailboxes } from "./refreshMailboxesRun";
 import { navigateToInbox } from "./appNavigationStack";
 import { syncInbox } from "./syncInboxRun";
 import { setOAuthWizardPhase } from "./accountOAuthWizardPhaseRun";
@@ -34,12 +33,7 @@ export async function finalizeOAuthNewAccountAfterSave(saved: Account): Promise<
   navigateToInbox({ resetStack: true });
 
   if (isTauriRuntime()) {
-    state.mailboxes = await safeInvoke<string[]>(
-      "list_imap_mailboxes",
-      { accountId: saved.id },
-      [],
-      BOOT_INVOKE_TIMEOUT_MS,
-    );
+    await refreshMailboxes(saved.id);
     ensureValidSelectedMailbox();
   }
 

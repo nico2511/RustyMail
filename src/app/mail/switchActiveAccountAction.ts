@@ -1,5 +1,3 @@
-import { safeInvoke } from "../lib/tauriCommand";
-import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { state } from "../state";
 import {
   cancelMailboxDigestLiveDebounce,
@@ -11,6 +9,7 @@ import { syncActivityRecordingPrefs } from "./threadActivityTracking";
 import { isUnifiedInboxMailbox } from "../../mailboxKinds";
 import { defaultListFilterFromPrefs, ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 import { loadAddressBookSidebarCount } from "./loadAddressBookSidebarCount";
+import { refreshMailboxes } from "./refreshMailboxesRun";
 
 export type SwitchActiveAccountDeps = {
   loadMailView: (append?: boolean) => Promise<void>;
@@ -38,7 +37,7 @@ export async function switchActiveAccount(accountId: string): Promise<void> {
   state.selectedAccountId = id;
   state.railAccountSectionOpen = true;
   if (isUnifiedInboxMailbox(state.selectedMailbox)) state.selectedMailbox = "INBOX";
-  state.mailboxes = await safeInvoke<string[]>("list_imap_mailboxes", { accountId: id }, [], BOOT_INVOKE_TIMEOUT_MS);
+  await refreshMailboxes(id);
   ensureValidSelectedMailbox();
   state.search = "";
   state.searchDraft = "";

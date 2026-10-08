@@ -2,16 +2,17 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Account } from "../../accountSetup";
 import { clearAccountOAuthWizard } from "../account/accountWizardState";
 import { clearDiscoveredServerSnap } from "../account/discoveredServerSnap";
-import { ACCOUNT_INVOKE_TIMEOUT_MS, BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
+import { ACCOUNT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { currentAccount } from "../core/accountContext";
 import { isTauriRuntime } from "../lib/tauriRuntime";
-import { safeInvoke, tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
+import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 import { normalizeAccountRow } from "./accountRowNormalize";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
+import { refreshMailboxes } from "./refreshMailboxesRun";
 import type { ValidatedAccountSaveForm } from "./accountSaveFormRequestRun";
 
 export async function persistAccountSaveForm(validated: ValidatedAccountSaveForm): Promise<void> {
@@ -49,12 +50,7 @@ export async function persistAccountSaveForm(validated: ValidatedAccountSaveForm
     clearAccountOAuthWizard();
     state.accountOAuthWizardRetry = null;
     if (isTauriRuntime()) {
-      state.mailboxes = await safeInvoke<string[]>(
-        "list_imap_mailboxes",
-        { accountId: currentAccount()?.id ?? null },
-        [],
-        BOOT_INVOKE_TIMEOUT_MS,
-      );
+      await refreshMailboxes(currentAccount()?.id ?? null);
       ensureValidSelectedMailbox();
       await loadMailView();
       await loadMailboxUnread();

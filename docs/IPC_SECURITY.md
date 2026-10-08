@@ -77,7 +77,8 @@ Front-end reads via **`invokeAiCacheGet`** (`ipc_bridge.ts`) with dedup and time
 | Digest bench (`digest_fixture_preview`, `digest_bench_*`) | R mail HTML, W two local files | YAML ≤ 64 KiB, schema-validated, no code. Accept does not change reading. Enable/disable is a separate command |
 | Digest cut editor (`digest_cut_*`) | R sample HTML, optional Net (LLM propose) | Bounded HTML/YAML; proposal does not write reading registry; preview reuses bench preview |
 | Drafts | R/W | Follow-up: body/HTML bounds on all draft commands |
-| Send | SMTP, FS | `validate_draft_for_ipc`; send ack backend |
+| Send | SMTP, FS | `validate_draft_for_ipc`; send ack backend ; `send_draft` accepte `sendId` (UUID, registre mémoire 1 h) ; `send_draft_status` lit ce registre |
+| `threads_mark_read_bulk` | Net, W | `validate_thread_mailbox_batch` (≤ 500) ; une session IMAP par dossier ; un rechargement du cœur |
 | Attachments | FS, OS | Sanitized names; CID image-only limits |
 | Prefs/secrets | W prefs, keyring | URL validation; secrets in keyring |
 | Dictation/models | audio, Net/CPU | Bounded audio payload |

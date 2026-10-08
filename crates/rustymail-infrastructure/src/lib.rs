@@ -46,6 +46,7 @@ mod saved_drafts;
 mod saved_searches;
 mod search_history;
 mod semantic_search;
+mod send_attempt;
 mod smtp_send;
 mod split_send;
 mod sqlite_crypto;
@@ -163,9 +164,10 @@ pub use mail_classify::{
     sender_is_transactional, subject_looks_transactional,
 };
 pub use mail_ops::{
-    empty_trash_mailbox, is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive,
-    move_thread_to_mailbox, move_thread_to_trash, move_thread_unarchive, pick_archive_folder,
-    pick_trash_folder, set_thread_seen, ArchiveDestination, ArchiveMoveResult,
+    empty_trash_mailbox, group_bulk_threads_by_mailbox, is_sent_like_mailbox,
+    is_trash_like_mailbox, move_thread_to_archive, move_thread_to_mailbox, move_thread_to_trash,
+    move_thread_unarchive, pick_archive_folder, pick_trash_folder, set_thread_seen,
+    set_threads_seen_bulk, ArchiveDestination, ArchiveMoveResult, BulkSeenOutcome, BulkThreadRef,
     ThreadMailboxMoveResult,
 };
 pub use mailbox_local_cache::{
@@ -206,6 +208,7 @@ pub use semantic_search::{
     semantic_embedding_counts_snapshot, semantic_model_present, sqlite_search_threads_unified,
     SemanticEmbeddingCountsSnapshot, SemanticReindexStats,
 };
+pub use send_attempt::{SendAttemptBook, SendBegin, SendSlot};
 
 pub use demo_playground::{
     sqlite_remove_demo_playground, sqlite_reset_demo_playground, DEMO_PLAYGROUND_ACCOUNT_ID,
@@ -697,7 +700,7 @@ pub fn ai_cache_ttl_secs_for_key(key: &str) -> i64 {
         7 * 24 * 3600
     } else if k.starts_with("translate:v2:") {
         30 * 24 * 3600
-    } else if k.starts_with("contact_profile:v1:") {
+    } else if k.starts_with("contact_profile:") {
         14 * 24 * 3600
     } else {
         7 * 24 * 3600
@@ -729,7 +732,7 @@ pub fn sqlite_ai_cache_backfill_null_expires(db_path: impl AsRef<Path>) -> Resul
             "UPDATE ai_cache SET expires_at = datetime(created_at,
                 CASE
                   WHEN trim(cache_key) LIKE 'translate:v2:%' THEN '+2592000 seconds'
-                  WHEN trim(cache_key) LIKE 'contact_profile:v1:%' THEN '+1209600 seconds'
+                  WHEN trim(cache_key) LIKE 'contact_profile:%' THEN '+1209600 seconds'
                   ELSE '+604800 seconds'
                 END)
              WHERE expires_at IS NULL AND trim(cache_key) != ''",
@@ -1140,6 +1143,13 @@ pub fn open_sqlite_migrated_public(path: &Path) -> Result<Connection, rusqlite::
     open_sqlite_migrated(path)
 }
 
+/// Date civile locale `AAAA-MM-JJ` (fuseau de l'OS).
+pub fn local_today_iso() -> String {
+    use chrono::Datelike;
+    let date = chrono::Local::now().date_naive();
+    format!("{:04}-{:02}-{:02}", date.year(), date.month(), date.day())
+}
+
 fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
     connection.execute_batch(
         "
@@ -1393,9 +1403,36 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
             at TEXT NOT NULL,
             PRIMARY KEY (account_id, mailbox, uid)
         );
+        CREATE INDEX IF NOT EXISTS idx_messages_account_msgid
+            ON messages(account_id, message_id_header);
         ",
     )?;
+    backfill_contact_profile_v2_ttl(connection)?;
 
+    Ok(())
+}
+
+fn backfill_contact_profile_v2_ttl(connection: &Connection) -> Result<(), rusqlite::Error> {
+    let done: Option<String> = connection
+        .query_row(
+            "SELECT value FROM app_meta WHERE key = 'contact_profile_v2_ttl_14d'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if done.as_deref() == Some("1") {
+        return Ok(());
+    }
+    connection.execute(
+        "UPDATE ai_cache SET expires_at = datetime(created_at, '+1209600 seconds')
+         WHERE cache_key LIKE 'contact_profile:v2:%'",
+        [],
+    )?;
+    connection.execute(
+        "INSERT INTO app_meta(key, value) VALUES ('contact_profile_v2_ttl_14d', '1')
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [],
+    )?;
     Ok(())
 }
 
@@ -1629,9 +1666,76 @@ pub(crate) fn reset_messages_fts_after_vacuum(connection: &Connection) -> Result
     Ok(())
 }
 
-fn backfill_guard() -> &'static Mutex<HashSet<String>> {
-    static GUARD: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-    GUARD.get_or_init(|| Mutex::new(HashSet::new()))
+#[derive(Default)]
+struct FtsBackfillSlot {
+    running: bool,
+    rerun: bool,
+}
+
+fn backfill_slots() -> &'static Mutex<std::collections::HashMap<String, FtsBackfillSlot>> {
+    static GUARD: OnceLock<Mutex<std::collections::HashMap<String, FtsBackfillSlot>>> =
+        OnceLock::new();
+    GUARD.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+fn fts_maintenance_mutex() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn fts_maintenance_lock() -> std::sync::MutexGuard<'static, ()> {
+    match fts_maintenance_mutex().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+#[cfg(test)]
+fn fts_backfill_hold_paths() -> &'static Mutex<HashSet<String>> {
+    static PATHS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    PATHS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+#[cfg(test)]
+fn fts_backfill_hold(path: &Path) -> bool {
+    let key = path.to_string_lossy().to_string();
+    let guard = match fts_backfill_hold_paths().lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    guard.contains(&key)
+}
+
+#[cfg(test)]
+pub(crate) fn set_fts_backfill_hold_for_tests(path: &Path, hold: bool) {
+    let key = path.to_string_lossy().to_string();
+    let mut guard = match fts_backfill_hold_paths().lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    if hold {
+        guard.insert(key);
+    } else {
+        guard.remove(&key);
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn fts_backfill_running_for_tests(db_path: &Path) -> bool {
+    let key = db_path.to_string_lossy().to_string();
+    let guard = match backfill_slots().lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    guard.get(&key).is_some_and(|slot| slot.running)
+}
+
+fn is_fts_schema_error(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("no such table")
+        || lower.contains("no such column")
+        || lower.contains("malformed")
+        || lower.contains("schema")
 }
 
 /// Remplit `messages_fts` par lots, hors du chemin d'ouverture de la fenêtre.
@@ -1639,53 +1743,126 @@ pub fn spawn_messages_fts_backfill(db_path: impl AsRef<Path>) {
     let path = db_path.as_ref().to_path_buf();
     let key = path.to_string_lossy().to_string();
     {
-        let mut guard = match backfill_guard().lock() {
+        let mut guard = match backfill_slots().lock() {
             Ok(g) => g,
             Err(p) => p.into_inner(),
         };
-        if !guard.insert(key.clone()) {
+        let slot = guard.entry(key.clone()).or_default();
+        if slot.running {
+            slot.rerun = true;
             return;
         }
+        slot.running = true;
+        slot.rerun = false;
     }
     std::thread::spawn(move || {
-        if let Err(e) = backfill_messages_fts(&path) {
-            eprintln!("[RustyMail] indexation FTS : {e}");
+        let started = std::time::Instant::now();
+        log::info!("FTS backfill démarré");
+        loop {
+            #[cfg(test)]
+            while fts_backfill_hold(&path) {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            if let Err(e) = backfill_messages_fts(&path) {
+                log::warn!("indexation FTS : {e}");
+            }
+            let mut guard = match backfill_slots().lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            let slot = guard.entry(key.clone()).or_default();
+            if slot.rerun {
+                slot.rerun = false;
+                continue;
+            }
+            slot.running = false;
+            log::info!("FTS backfill worker arrêté en {:?}", started.elapsed());
+            break;
         }
-        let mut guard = match backfill_guard().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
-        guard.remove(&key);
     });
 }
 
+const FTS_BACKFILL_SQL: &str = "
+INSERT INTO messages_fts(rowid, subject, body_text, sender, sender_name, recipients)
+SELECT m.rowid,
+       COALESCE(m.subject, ''),
+       COALESCE(m.body_plain, m.body, ''),
+       COALESCE(m.sender_email, ''),
+       COALESCE(m.sender_name, ''),
+       trim(COALESCE(m.to_header, '') || ' ' || COALESCE(m.cc_header, ''))
+FROM messages m
+WHERE m.rowid > ?1
+  AND m.rowid <= ?2
+  AND NOT EXISTS (SELECT 1 FROM messages_fts_docsize d WHERE d.id = m.rowid)
+";
+
 fn backfill_messages_fts(path: &Path) -> Result<(), String> {
+    let started = std::time::Instant::now();
     let connection = open_sqlite_migrated(path).map_err(|e| e.to_string())?;
     if messages_fts_index_ready(&connection) {
         return Ok(());
     }
+    let mut cursor: i64 = 0;
+    let mut batches = 0usize;
+    let mut schema_retries = 0u32;
     loop {
-        let inserted = connection
-            .execute(
-                "
-                INSERT INTO messages_fts(rowid, subject, body_text, sender, sender_name, recipients)
-                SELECT m.rowid,
-                       COALESCE(m.subject, ''),
-                       COALESCE(m.body_plain, m.body, ''),
-                       COALESCE(m.sender_email, ''),
-                       COALESCE(m.sender_name, ''),
-                       trim(COALESCE(m.to_header, '') || ' ' || COALESCE(m.cc_header, ''))
+        let _maintenance = fts_maintenance_lock();
+        let batch_max = connection.query_row(
+            "
+            SELECT MAX(rowid) FROM (
+                SELECT m.rowid
                 FROM messages m
-                WHERE m.rowid NOT IN (SELECT rowid FROM messages_fts)
-                LIMIT 400
-                ",
-                [],
+                WHERE m.rowid > ?1
+                  AND NOT EXISTS (
+                    SELECT 1 FROM messages_fts_docsize d WHERE d.id = m.rowid
+                  )
+                ORDER BY m.rowid
+                LIMIT 200
             )
-            .map_err(|e| e.to_string())?;
-        if inserted == 0 {
+            ",
+            [cursor],
+            |row| row.get::<_, Option<i64>>(0),
+        );
+        let batch_max = match batch_max {
+            Ok(value) => value,
+            Err(error) => {
+                let message = error.to_string();
+                if is_fts_schema_error(&message) && schema_retries < 3 {
+                    schema_retries += 1;
+                    drop(_maintenance);
+                    std::thread::sleep(std::time::Duration::from_millis(15));
+                    continue;
+                }
+                return Err(message);
+            }
+        };
+        let Some(batch_max) = batch_max else {
             set_messages_fts_sync_flag(&connection, true).map_err(|e| e.to_string())?;
+            log::info!(
+                "FTS backfill terminé en {:?} ({batches} lots)",
+                started.elapsed()
+            );
             break;
+        };
+        match connection.execute(FTS_BACKFILL_SQL, params![cursor, batch_max]) {
+            Ok(_) => {
+                schema_retries = 0;
+                cursor = batch_max;
+                batches += 1;
+            }
+            Err(error) => {
+                let message = error.to_string();
+                if is_fts_schema_error(&message) && schema_retries < 3 {
+                    schema_retries += 1;
+                    drop(_maintenance);
+                    std::thread::sleep(std::time::Duration::from_millis(15));
+                    continue;
+                }
+                return Err(message);
+            }
         }
+        drop(_maintenance);
+        std::thread::sleep(std::time::Duration::from_millis(15));
     }
     Ok(())
 }
@@ -1852,11 +2029,18 @@ pub fn delete_account(db_path: impl AsRef<Path>, account_id: &str) -> Result<(),
 
     forget_keyring_entry(id);
     forget_oauth_tokens(id);
-    connection
-        .execute("VACUUM", [])
-        .map_err(|e| format!("vacuum après suppression compte: {e}"))?;
-    // VACUUM renumérote les rowid : l'index FTS adressé par rowid est périmé.
-    reset_messages_fts_after_vacuum(&connection)?;
+    {
+        let _maintenance = fts_maintenance_lock();
+        match connection.execute("VACUUM", []) {
+            Ok(_) => {
+                reset_messages_fts_after_vacuum(&connection)?;
+            }
+            Err(error) => {
+                log::warn!("VACUUM après suppression compte ignoré: {error}");
+                return Ok(());
+            }
+        }
+    }
     spawn_messages_fts_backfill(db_path.as_ref());
     Ok(())
 }
@@ -3389,4 +3573,252 @@ pub fn seed_threads() -> Vec<Thread> {
             )],
         },
     ]
+}
+
+#[cfg(test)]
+mod fts_backfill_and_cache_tests {
+    use super::*;
+    use rusqlite::params;
+
+    fn scratch_db() -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("mail.sqlite3");
+        (dir, path)
+    }
+
+    fn insert_account(conn: &Connection, id: &str) {
+        conn.execute(
+            "INSERT INTO accounts (
+                id, display_name, email, imap_host, imap_port, imap_security,
+                smtp_host, smtp_port, smtp_security, auth_kind
+            ) VALUES (?1, 'n', 'a@b.c', 'imap', 993, 'tls', 'smtp', 465, 'tls', 'password')",
+            [id],
+        )
+        .expect("account");
+    }
+
+    fn insert_message(conn: &Connection, id: &str, account: &str, body: &str) {
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, subject, tags) VALUES (?1, ?2, 'INBOX', 's', '')",
+            params![id, account],
+        )
+        .expect("thread");
+        conn.execute(
+            "INSERT INTO messages (
+                id, thread_id, account_id, mailbox,
+                sender_name, sender_email, subject, received_at, body, body_plain,
+                is_read, position
+            ) VALUES (?1, ?1, ?2, 'INBOX', 'n', 'a@b.c', 's', '2026-01-01T00:00:00Z', ?3, ?3, 0, 0)",
+            params![id, account, body],
+        )
+        .expect("message");
+    }
+
+    fn wait_backfill(path: &Path) {
+        let started = std::time::Instant::now();
+        while fts_backfill_running_for_tests(path) {
+            if started.elapsed() > std::time::Duration::from_secs(20) {
+                panic!("backfill still running");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    #[test]
+    fn contact_profile_v2_ttl_is_fourteen_days() {
+        assert_eq!(ai_cache_ttl_secs_for_key("contact_profile:v2:x"), 1_209_600);
+        assert_eq!(ai_cache_ttl_secs_for_key("contact_profile:v1:x"), 1_209_600);
+    }
+
+    #[test]
+    fn contact_profile_v2_ttl_migration_is_idempotent() {
+        let (_dir, path) = scratch_db();
+        let conn = open_sqlite_migrated(&path).expect("open");
+        conn.execute(
+            "DELETE FROM app_meta WHERE key = 'contact_profile_v2_ttl_14d'",
+            [],
+        )
+        .expect("clear flag");
+        conn.execute(
+            "INSERT INTO ai_cache (cache_key, payload_json, expires_at, created_at)
+             VALUES ('contact_profile:v2:a', '{}', '2000-01-01', '2020-01-01 00:00:00')",
+            [],
+        )
+        .expect("row");
+        backfill_contact_profile_v2_ttl(&conn).expect("migrate");
+        let first: String = conn
+            .query_row(
+                "SELECT expires_at FROM ai_cache WHERE cache_key = 'contact_profile:v2:a'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("expires");
+        assert_eq!(first, "2020-01-15 00:00:00");
+        conn.execute(
+            "UPDATE ai_cache SET expires_at = '1999-01-01' WHERE cache_key = 'contact_profile:v2:a'",
+            [],
+        )
+        .expect("sentinel");
+        backfill_contact_profile_v2_ttl(&conn).expect("second");
+        let second: String = conn
+            .query_row(
+                "SELECT expires_at FROM ai_cache WHERE cache_key = 'contact_profile:v2:a'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("expires2");
+        assert_eq!(second, "1999-01-01");
+    }
+
+    #[test]
+    fn messages_fts_docsize_exists_for_both_table_kinds() {
+        for contentless in [true, false] {
+            let conn = Connection::open_in_memory().expect("mem");
+            create_messages_fts(&conn, contentless).expect("fts");
+            let n: i64 = conn
+                .query_row("SELECT COUNT(*) FROM messages_fts_docsize", [], |row| {
+                    row.get(0)
+                })
+                .expect("docsize");
+            assert_eq!(n, 0, "contentless={contentless}");
+        }
+    }
+
+    #[test]
+    fn backfill_plan_does_not_scan_the_fts_virtual_table() {
+        let (_dir, path) = scratch_db();
+        let conn = open_sqlite_migrated(&path).expect("open");
+        let mut stmt = conn
+            .prepare(
+                "EXPLAIN QUERY PLAN
+                 SELECT m.rowid FROM messages m
+                 WHERE m.rowid > 0
+                   AND NOT EXISTS (SELECT 1 FROM messages_fts_docsize d WHERE d.id = m.rowid)
+                 ORDER BY m.rowid
+                 LIMIT 200",
+            )
+            .expect("prepare");
+        let mut rows = stmt.query([]).expect("query");
+        let mut plan = String::new();
+        while let Some(row) = rows.next().expect("row") {
+            let detail: String = row.get(3).unwrap_or_default();
+            plan.push_str(&detail);
+            plan.push('\n');
+        }
+        for line in plan.lines() {
+            let lower = line.to_ascii_lowercase();
+            let scans_virtual = lower.contains("scan messages_fts")
+                && !lower.contains("docsize")
+                && !lower.contains("messages_fts_data")
+                && !lower.contains("messages_fts_idx")
+                && !lower.contains("messages_fts_config")
+                && !lower.contains("messages_fts_content");
+            assert!(!scans_virtual, "{line}\n{plan}");
+        }
+    }
+
+    #[test]
+    fn backfill_cursor_is_idempotent() {
+        let (_dir, path) = scratch_db();
+        let conn = open_sqlite_migrated(&path).expect("open");
+        insert_account(&conn, "a");
+        insert_message(&conn, "m1", "a", "corps zebre-unique");
+        reset_messages_fts_after_vacuum(&conn).expect("reset");
+        drop(conn);
+        backfill_messages_fts(&path).expect("first");
+        backfill_messages_fts(&path).expect("second");
+        let conn = open_sqlite_migrated(&path).expect("reopen");
+        let messages: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages", [], |row| row.get(0))
+            .expect("messages");
+        let docs: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages_fts_docsize", [], |row| {
+                row.get(0)
+            })
+            .expect("docs");
+        assert_eq!(messages, docs);
+        assert!(messages_fts_index_ready(&conn));
+    }
+
+    #[test]
+    fn insert_during_backfill_does_not_raise_a_constraint() {
+        let (_dir, path) = scratch_db();
+        let conn = open_sqlite_migrated(&path).expect("open");
+        insert_account(&conn, "a");
+        insert_message(&conn, "m1", "a", "avant");
+        reset_messages_fts_after_vacuum(&conn).expect("reset");
+        drop(conn);
+        set_fts_backfill_hold_for_tests(&path, true);
+        spawn_messages_fts_backfill(&path);
+        let conn = open_sqlite_migrated(&path).expect("insert");
+        insert_message(&conn, "m2", "a", "pendant zebre-live");
+        drop(conn);
+        set_fts_backfill_hold_for_tests(&path, false);
+        wait_backfill(&path);
+        let conn = open_sqlite_migrated(&path).expect("check");
+        let messages: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages", [], |row| row.get(0))
+            .expect("messages");
+        let docs: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages_fts_docsize", [], |row| {
+                row.get(0)
+            })
+            .expect("docs");
+        assert_eq!(docs, messages);
+        assert!(messages_fts_index_ready(&conn));
+    }
+
+    #[test]
+    fn spawn_during_backfill_reruns() {
+        let (_dir, path) = scratch_db();
+        let conn = open_sqlite_migrated(&path).expect("open");
+        insert_account(&conn, "a");
+        insert_message(&conn, "m1", "a", "lot");
+        reset_messages_fts_after_vacuum(&conn).expect("reset");
+        drop(conn);
+        set_fts_backfill_hold_for_tests(&path, true);
+        spawn_messages_fts_backfill(&path);
+        spawn_messages_fts_backfill(&path);
+        set_fts_backfill_hold_for_tests(&path, false);
+        wait_backfill(&path);
+        let conn = open_sqlite_migrated(&path).expect("check");
+        assert!(messages_fts_index_ready(&conn));
+    }
+
+    #[test]
+    fn delete_account_during_backfill_keeps_the_remaining_index() {
+        let (_dir, path) = scratch_db();
+        let conn = open_sqlite_migrated(&path).expect("open");
+        insert_account(&conn, "keep");
+        insert_account(&conn, "drop");
+        insert_message(&conn, "keep-1", "keep", "termerestant zebre");
+        insert_message(&conn, "drop-1", "drop", "termeparti");
+        reset_messages_fts_after_vacuum(&conn).expect("reset");
+        drop(conn);
+        set_fts_backfill_hold_for_tests(&path, true);
+        spawn_messages_fts_backfill(&path);
+        delete_account(&path, "drop").expect("delete");
+        set_fts_backfill_hold_for_tests(&path, false);
+        wait_backfill(&path);
+        let conn = open_sqlite_migrated(&path).expect("check");
+        assert!(messages_fts_index_ready(&conn));
+        let messages: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages", [], |row| row.get(0))
+            .expect("messages");
+        let docs: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages_fts_docsize", [], |row| {
+                row.get(0)
+            })
+            .expect("docs");
+        assert_eq!(messages, 1);
+        assert_eq!(docs, messages);
+        let hits: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH 'termerestant'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("match");
+        assert_eq!(hits, 1);
+    }
 }

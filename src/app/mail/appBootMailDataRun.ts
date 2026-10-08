@@ -1,6 +1,4 @@
-import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { currentAccount } from "../core/accountContext";
-import { safeInvoke } from "../lib/tauriCommand";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { applyDefaultAccountFromPrefs, ensureValidSelectedMailbox } from "./accountDefaultPrefs";
@@ -10,6 +8,7 @@ import { loadBootDeferredPrefs } from "./loadBootDeferredPrefs";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
 import { loadNewsletterRules } from "./newsletterRulesLoad";
 import { refreshSavedDraftsMailboxCount } from "./savedDraftsMailboxCountRefresh";
+import { refreshMailboxes } from "./refreshMailboxesRun";
 import { refreshSavedSearches, refreshSuggestedSavedViews } from "./savedSearchViews";
 import { syncActivityRecordingPrefs } from "./settingsWireActions";
 import { notifyImapWatchFocusedMailbox } from "./syncInboxRun";
@@ -17,12 +16,7 @@ import { notifyImapWatchFocusedMailbox } from "./syncInboxRun";
 export async function bootLoadInitialMailData(): Promise<void> {
   await loadBootDeferredPrefs();
   applyDefaultAccountFromPrefs();
-  state.mailboxes = await safeInvoke<string[]>(
-    "list_imap_mailboxes",
-    { accountId: currentAccount()?.id ?? null },
-    [],
-    BOOT_INVOKE_TIMEOUT_MS,
-  );
+  await refreshMailboxes(currentAccount()?.id ?? null);
   ensureValidSelectedMailbox();
   await loadMailView();
   notifyImapWatchFocusedMailbox(state.selectedMailbox);

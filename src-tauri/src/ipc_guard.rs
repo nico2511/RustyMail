@@ -472,6 +472,36 @@ pub fn validate_message_attachment_ids(
     validate_nonempty_trimmed("attachmentId", attachment_id, MAX_TOKEN_LEN)
 }
 
+pub fn validate_send_id(send_id: Option<&str>) -> Result<(), String> {
+    let Some(id) = send_id.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(());
+    };
+    validate_nonempty_trimmed("sendId", id, 80)?;
+    if !id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+        return Err("sendId: format invalide.".into());
+    }
+    Ok(())
+}
+
+const MAX_BULK_THREAD_ITEMS: usize = 500;
+
+pub fn validate_thread_mailbox_batch(
+    account_id: Option<&str>,
+    items: &[(&str, &str)],
+) -> Result<(), String> {
+    validate_optional_account_id(account_id)?;
+    if items.len() > MAX_BULK_THREAD_ITEMS {
+        return Err(format!(
+            "items: trop d'éléments (max {MAX_BULK_THREAD_ITEMS})."
+        ));
+    }
+    for (mailbox, thread_id) in items {
+        validate_mailbox(mailbox)?;
+        validate_thread_id(thread_id)?;
+    }
+    Ok(())
+}
+
 pub fn validate_imap_thread_op(
     account_id: Option<&str>,
     mailbox: &str,

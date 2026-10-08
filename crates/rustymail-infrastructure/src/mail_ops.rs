@@ -1134,6 +1134,116 @@ pub async fn set_thread_seen(
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkThreadRef {
+    pub mailbox: String,
+    pub thread_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkSeenOutcome {
+    pub done: usize,
+    pub errors: Vec<String>,
+}
+
+/// Regroupe les fils par dossier (première occurrence), sans doublon de `thread_id`.
+pub fn group_bulk_threads_by_mailbox(items: &[BulkThreadRef]) -> Vec<(String, Vec<String>)> {
+    let mut order: Vec<String> = Vec::new();
+    let mut groups: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for item in items {
+        let trimmed = item.mailbox.trim();
+        let mailbox = if trimmed.is_empty() {
+            "INBOX".to_string()
+        } else {
+            trimmed.to_string()
+        };
+        let tid = item.thread_id.trim();
+        if tid.is_empty() {
+            continue;
+        }
+        if let Some(list) = groups.get_mut(&mailbox) {
+            if !list.iter().any(|existing| existing == tid) {
+                list.push(tid.to_string());
+            }
+        } else {
+            order.push(mailbox.clone());
+            groups.insert(mailbox, vec![tid.to_string()]);
+        }
+    }
+    order
+        .into_iter()
+        .filter_map(|mailbox| groups.remove(&mailbox).map(|ids| (mailbox, ids)))
+        .collect()
+}
+
+/// Une session IMAP et un `UID STORE` par dossier, puis une transaction SQLite.
+pub async fn set_threads_seen_bulk(
+    path: &Path,
+    account: &Account,
+    items: &[BulkThreadRef],
+    seen: bool,
+) -> Result<BulkSeenOutcome, String> {
+    let mut done = 0usize;
+    let mut errors = Vec::new();
+    for (mailbox, thread_ids) in group_bulk_threads_by_mailbox(items) {
+        match mark_mailbox_threads_seen(path, account, &mailbox, &thread_ids, seen).await {
+            Ok((n, mailbox_errors)) => {
+                done += n;
+                errors.extend(mailbox_errors);
+            }
+            Err(error) => errors.push(format!("{mailbox}: {error}")),
+        }
+    }
+    Ok(BulkSeenOutcome { done, errors })
+}
+
+async fn mark_mailbox_threads_seen(
+    path: &Path,
+    account: &Account,
+    mailbox: &str,
+    thread_ids: &[String],
+    seen: bool,
+) -> Result<(usize, Vec<String>), String> {
+    let mut message_ids: Vec<String> = Vec::new();
+    let mut uids: Vec<async_imap::types::Uid> = Vec::new();
+    let mut errors = Vec::new();
+    let mut done = 0usize;
+    for tid in thread_ids {
+        let rows = load_thread_imap_rows(path, &account.id.0, mailbox, tid)?;
+        let stubs = load_thread_local_stub_message_ids(path, &account.id.0, mailbox, tid)?;
+        if rows.is_empty() && stubs.is_empty() {
+            errors.push(format!("{tid}: aucun message dans {mailbox}"));
+            continue;
+        }
+        for row in &rows {
+            uids.push(row.imap_uid);
+            message_ids.push(row.message_id.clone());
+        }
+        message_ids.extend(stubs);
+        done += 1;
+    }
+    if done == 0 {
+        return Ok((0, errors));
+    }
+    if !uids.is_empty() {
+        let uid_set = format_uid_set(&uids);
+        let mut session = login_session_for_account(account).await?;
+        imap_session_select_mailbox(&mut session, mailbox).await?;
+        let query = if seen {
+            "+FLAGS.SILENT (\\Seen)"
+        } else {
+            "-FLAGS.SILENT (\\Seen)"
+        };
+        uid_store(&mut session, &uid_set, query).await?;
+        let _ = session.logout().await;
+    }
+    update_local_is_read(path, &message_ids, seen)?;
+    Ok((done, errors))
+}
+
 #[cfg(test)]
 mod archive_pick_tests {
     use super::pick_archive_folder;
@@ -1142,6 +1252,86 @@ mod archive_pick_tests {
     fn prefers_inbox_archive_on_dot_server() {
         let list = vec!["Archive".to_string(), "INBOX.Archive".to_string()];
         assert_eq!(pick_archive_folder(&list).as_deref(), Some("INBOX.Archive"));
+    }
+}
+
+#[cfg(test)]
+mod bulk_seen_tests {
+    use super::{group_bulk_threads_by_mailbox, update_local_is_read, BulkThreadRef};
+    use crate::open_sqlite_migrated;
+    use rusqlite::params;
+
+    #[test]
+    fn groups_by_mailbox_keeps_first_seen_order() {
+        let items = vec![
+            BulkThreadRef {
+                mailbox: "INBOX".into(),
+                thread_id: "t1".into(),
+            },
+            BulkThreadRef {
+                mailbox: "Sent".into(),
+                thread_id: "t2".into(),
+            },
+            BulkThreadRef {
+                mailbox: " INBOX ".into(),
+                thread_id: "t1".into(),
+            },
+            BulkThreadRef {
+                mailbox: "INBOX".into(),
+                thread_id: "t3".into(),
+            },
+            BulkThreadRef {
+                mailbox: "".into(),
+                thread_id: "t4".into(),
+            },
+        ];
+        let grouped = group_bulk_threads_by_mailbox(&items);
+        assert_eq!(
+            grouped,
+            vec![
+                ("INBOX".into(), vec!["t1".into(), "t3".into(), "t4".into()]),
+                ("Sent".into(), vec!["t2".into()]),
+            ]
+        );
+    }
+
+    #[test]
+    fn local_flags_update_in_one_transaction() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("flags.db");
+        let conn = open_sqlite_migrated(&path).expect("open");
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, subject, tags) VALUES ('t', 'a', 'INBOX', 's', '')",
+            [],
+        )
+        .expect("thread");
+        for i in 0..5 {
+            conn.execute(
+                "INSERT INTO messages (
+                    id, thread_id, account_id, mailbox, imap_uid,
+                    sender_name, sender_email, subject, received_at,
+                    body, is_read, position
+                ) VALUES (?1, 't', 'a', 'INBOX', ?2, 'n', 'e@x', 's', '2026-01-01T00:00:00Z', 'b', 0, ?2)",
+                params![format!("m{i}"), i],
+            )
+            .expect("message");
+        }
+        drop(conn);
+        let ids: Vec<String> = (0..5).map(|i| format!("m{i}")).collect();
+        update_local_is_read(&path, &ids, true).expect("update");
+        let conn = open_sqlite_migrated(&path).expect("reopen");
+        let unread: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages WHERE is_read = 0", [], |r| {
+                r.get(0)
+            })
+            .expect("count");
+        assert_eq!(unread, 0);
+        let read: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages WHERE is_read = 1", [], |r| {
+                r.get(0)
+            })
+            .expect("read");
+        assert_eq!(read, 5);
     }
 }
 
