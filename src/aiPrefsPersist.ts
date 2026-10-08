@@ -27,6 +27,8 @@ export function syncLlmEnginePrefsToDom(ai: AppPrefsAi): void {
   if (olUrl) olUrl.value = ai.ollamaBaseUrl;
   const olModel = document.querySelector<HTMLInputElement>("#prefs-ollama-model");
   if (olModel) olModel.value = ai.ollamaModel;
+  const olKeep = document.querySelector<HTMLInputElement>("#prefs-ollama-keep-alive");
+  if (olKeep) olKeep.value = ai.ollamaKeepAlive || "30m";
 }
 
 function captureAiFeatureTogglesInto(ai: AppPrefs["ai"]): void {
@@ -138,6 +140,9 @@ export function captureAiPrefsFieldsFromDom(target: AppPrefs): void {
     target.ai.ollamaBaseUrl = olUrl.value.trim() || dAi.ollamaBaseUrl;
     target.ai.ollamaModel =
       document.querySelector<HTMLInputElement>("#prefs-ollama-model")?.value?.trim() ?? "";
+    target.ai.ollamaKeepAlive =
+      document.querySelector<HTMLInputElement>("#prefs-ollama-keep-alive")?.value?.trim() ||
+      dAi.ollamaKeepAlive;
     target.ai.ollamaEnabled = target.ai.chatBackend === "ollama";
   }
 

@@ -715,6 +715,10 @@ function renderEnginesOllamaFields(deps: SettingsAiPanelDeps): string {
         <label class="compose-field-label" for="prefs-ollama-model">Modèle</label>
         <input class="settings-ctl" type="text" id="prefs-ollama-model" value="${escapeAttr(ai.ollamaModel)}" placeholder="llama3.2" autocomplete="off" spellcheck="false" />
       </div>
+      <div class="settings-form-row">
+        <label class="compose-field-label" for="prefs-ollama-keep-alive">Maintien en mémoire</label>
+        <input class="settings-ctl" type="text" id="prefs-ollama-keep-alive" value="${escapeAttr(ai.ollamaKeepAlive || "30m")}" placeholder="30m" autocomplete="off" spellcheck="false" />
+      </div>
     </div>`;
 }
 

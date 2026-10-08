@@ -7,7 +7,56 @@ on:
   workflow_dispatch:
 
 jobs:
+  verify:
+    name: Verify (fmt · clippy · test · tsc · vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: System deps (OpenSSL + Tauri/GTK)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: npm ci
+        run: npm ci
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets
+
+      - name: cargo test
+        run: cargo test --workspace --all-targets
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Vitest
+        run: npm test
+
   build-windows:
+    needs: verify
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -36,6 +85,16 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Require updater signing key on tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "TAURI_SIGNING_PRIVATE_KEY absent : release refusée avant la publication."
+          }
 
       - name: Build Tauri (Windows)
         env:
@@ -115,6 +174,8 @@ jobs:
         run: |
           find dist -type f \( -name '*.exe' -o -name '*.msi' \) | head -20
           test "$(find dist -type f \( -name '*.exe' -o -name '*.msi' \) | wc -l)" -gt 0
+          test -n "$(find dist -type f -name 'latest.json' | head -1)"
+          test -n "$(find dist -type f -name '*.sig' | head -1)"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

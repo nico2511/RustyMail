@@ -1111,7 +1111,18 @@ pub(crate) fn open_sqlite_migrated(path: &Path) -> Result<Connection, rusqlite::
         return Ok(connection);
     }
     let backup = sqlite_crypto::prepare_version_backup(&connection, path);
-    migrate(&connection)?;
+    let migrate_started = std::time::Instant::now();
+    let migrated = migrate(&connection);
+    log::info!(
+        "migrate {} en {:?}",
+        if migrated.is_ok() {
+            "terminé"
+        } else {
+            "échoué"
+        },
+        migrate_started.elapsed()
+    );
+    migrated?;
     match backup {
         sqlite_crypto::VersionBackupOutcome::Unchanged
         | sqlite_crypto::VersionBackupOutcome::Copied => {

@@ -516,6 +516,9 @@ pub struct AiPrefs {
     /// Nom vu par `ollama list` (ex. `llama3.2`).
     #[serde(default)]
     pub ollama_model: String,
+    /// Durée de maintien du modèle en mémoire (`30m`, `1h`, `-1`).
+    #[serde(default = "default_ollama_keep_alive")]
+    pub ollama_keep_alive: String,
 
     #[serde(default = "default_feature_thread_summary_enabled")]
     pub feature_thread_summary_enabled: bool,
@@ -672,6 +675,10 @@ fn default_ollama_base_url() -> String {
     "http://127.0.0.1:11434/v1".to_string()
 }
 
+fn default_ollama_keep_alive() -> String {
+    "30m".to_string()
+}
+
 /// `auto`, `openrouter`, `llama-server` ou `ollama`. Toute autre valeur retombe sur `auto`.
 pub fn normalized_chat_backend(raw: &str) -> &'static str {
     match raw.trim() {
@@ -785,6 +792,7 @@ impl Default for AiPrefs {
             ollama_enabled: false,
             ollama_base_url: default_ollama_base_url(),
             ollama_model: String::new(),
+            ollama_keep_alive: default_ollama_keep_alive(),
             feature_thread_summary_enabled: default_feature_thread_summary_enabled(),
             feature_thread_translate_enabled: default_feature_thread_translate_enabled(),
             feature_message_translate_enabled: default_feature_message_translate_enabled(),
@@ -879,6 +887,8 @@ fn finalize_loaded_prefs(mut prefs: AppPrefs) -> AppPrefs {
     if prefs.ai.ollama_base_url.trim().is_empty() {
         prefs.ai.ollama_base_url = default_ollama_base_url();
     }
+    prefs.ai.ollama_keep_alive =
+        rustymail_llm::normalize_ollama_keep_alive(&prefs.ai.ollama_keep_alive);
     prefs
 }
 
@@ -1025,5 +1035,18 @@ mod mailbox_lock_tests {
             .locked_mailboxes_by_account
             .is_empty());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn v044_prefs_without_keep_alive_load_as_thirty_minutes() {
+        let raw = r#"{"version":1,"general":{},"ai":{"ollamaModel":"llama3.2","ollamaKeepAlive":"nope"}}"#;
+        let prefs: AppPrefs = serde_json::from_str(raw).expect("json");
+        let prefs = finalize_loaded_prefs(prefs);
+        assert_eq!(prefs.ai.ollama_model, "llama3.2");
+        assert_eq!(prefs.ai.ollama_keep_alive, "30m");
+
+        let legacy = r#"{"version":1,"general":{},"ai":{"ollamaModel":"qwen"}}"#;
+        let prefs: AppPrefs = serde_json::from_str(legacy).expect("legacy");
+        assert_eq!(finalize_loaded_prefs(prefs).ai.ollama_keep_alive, "30m");
     }
 }

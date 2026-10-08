@@ -64,7 +64,7 @@ Optional product capabilities:
 
 ### `rustymail-llm`
 
-HTTP client for `/v1/chat/completions` (OpenRouter, llama-server, Ollama). Privacy redaction before third-party exfiltration. GBNF is llama-server only.
+HTTP client for `/v1/chat/completions` (OpenRouter, llama-server) and Ollama native `/api/chat` (`num_ctx`, `keep_alive`). Privacy redaction before third-party exfiltration. GBNF is llama-server only.
 
 ### `rustymail-semantic`
 
@@ -94,6 +94,7 @@ Under the OS app data directory (see **Settings → Storage** or `app_paths` com
 | `models/all-MiniLM-L6-v2/` | Semantic search ONNX bundle |
 | `models/local-llm/` | Cached GGUF for local chat (when enabled) |
 | `oauth_tokens/` | Large Microsoft tokens if keyring entry exceeds OS limits |
+| OS log dir / `rustymail.log` | Rotating log (5 MB × 3). Settings → Général → Ouvrir le dossier des journaux |
 
 ## Runtime fallback
 

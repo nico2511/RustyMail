@@ -100,6 +100,8 @@ export type AppPrefsAi = {
   ollamaEnabled: boolean;
   ollamaBaseUrl: string;
   ollamaModel: string;
+  /** Durée Ollama `keep_alive` (défaut `30m`). */
+  ollamaKeepAlive: string;
   aiPanelWidthPx: number;
   /** Disposition fil : seule la lecture type document est prise en charge. */
   threadLayout: "reading";
@@ -199,6 +201,7 @@ export function defaultAppPrefs(): AppPrefs {
       ollamaEnabled: false,
       ollamaBaseUrl: "http://127.0.0.1:11434/v1",
       ollamaModel: "",
+      ollamaKeepAlive: "30m",
       aiPanelWidthPx: 340,
       threadLayout: "reading",
       aiBackgroundAutoSemanticIndex: false,
@@ -224,6 +227,28 @@ export function defaultAppPrefs(): AppPrefs {
       autoThreadSummaryMinMessages: 6,
     },
   };
+}
+
+/** Même règle que `normalize_ollama_keep_alive` côté Rust. */
+export function normalizeOllamaKeepAlive(raw: string | undefined): string {
+  const t = (raw ?? "").trim();
+  if (t === "-1") return t;
+  const unitAt = t.search(/[^0-9.]/);
+  const split = unitAt === -1 ? t.length : unitAt;
+  const num = t.slice(0, split);
+  const unit = t.slice(split);
+  if (
+    !num ||
+    num.startsWith(".") ||
+    num.endsWith(".") ||
+    (num.match(/\./g) ?? []).length > 1
+  ) {
+    return "30m";
+  }
+  if (unit === "" || unit === "ns" || unit === "us" || unit === "ms" || unit === "s" || unit === "m" || unit === "h") {
+    return `${num}${unit}`;
+  }
+  return "30m";
 }
 
 export function normalizeAiPrefsMerged(ai: AppPrefsAi): AppPrefsAi {
@@ -321,6 +346,7 @@ export function normalizeAiPrefsMerged(ai: AppPrefsAi): AppPrefsAi {
   }
   merged.ollamaBaseUrl = (merged.ollamaBaseUrl ?? d.ollamaBaseUrl).trim() || d.ollamaBaseUrl;
   merged.ollamaModel = (merged.ollamaModel ?? d.ollamaModel).trim();
+  merged.ollamaKeepAlive = normalizeOllamaKeepAlive(merged.ollamaKeepAlive ?? d.ollamaKeepAlive);
   for (const key of [
     "featureThreadSummaryEnabled",
     "featureThreadTranslateEnabled",

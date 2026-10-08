@@ -244,6 +244,14 @@ fn app_status() -> AppStatus {
 }
 
 #[tauri::command]
+async fn open_app_log_dir(app: tauri::AppHandle) -> Result<(), String> {
+    ipc_guard::validate_open_app_log_dir()?;
+    let dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    rustymail_infrastructure::open_path_in_os(dir.to_string_lossy().as_ref())
+}
+
+#[tauri::command]
 fn app_paths(paths: State<'_, AppPaths>) -> AppPathsView {
     let db_path = paths.db_path.display().to_string();
     AppPathsView {
@@ -991,15 +999,15 @@ async fn send_draft_once(
         .first()
         .map(|r| ipc_guard::audit_email_shadow(&r.email))
         .unwrap_or_default();
-    eprintln!(
-        "[RustyMail] send_draft: subject_len={} to[0]={} recipients={} pj={}",
+    log::info!(
+        "send_draft: subject_len={} to[0]={} recipients={} pj={}",
         draft.subject.trim().chars().count(),
         to_preview,
         draft.to.len(),
         draft.attachment_paths.len(),
     );
     if draft.attachment_paths.is_empty() {
-        eprintln!("[RustyMail] send_draft: attachment_paths liste vide.");
+        log::info!("send_draft: attachment_paths liste vide.");
     }
     {
         let core = core.lock().map_err(|_| "core lock poisoned".to_string())?;
@@ -1007,8 +1015,8 @@ async fn send_draft_once(
             .map_err(|error| error.to_string())?;
     }
     let account = resolve_account_from_paths(&paths, account_id)?;
-    eprintln!(
-        "[RustyMail] smtp {}:{} → sending…",
+    log::info!(
+        "smtp {}:{} → sending…",
         account.smtp.host.trim(),
         account.smtp.port
     );
@@ -1017,11 +1025,11 @@ async fn send_draft_once(
     {
         Ok(m) => m,
         Err(e) => {
-            eprintln!("[RustyMail] smtp failed: {e}");
+            log::warn!("smtp failed: {e}");
             return Err(e);
         }
     };
-    eprintln!("[RustyMail] smtp send ok");
+    log::info!("smtp send ok");
     let imap_copy = rustymail_infrastructure::imap_append_sent_copy(
         &account,
         &sent.rfc822,
@@ -1029,10 +1037,10 @@ async fn send_draft_once(
     )
     .await;
     if let Some(ref e) = imap_copy.append_failed {
-        eprintln!("[RustyMail] avertissement: copie IMAP Envoyés non enregistrée (envoi OK): {e}");
+        log::warn!("copie IMAP Envoyés non enregistrée (envoi OK): {e}");
     }
     if let Some(ref e) = imap_copy.dedupe_failed {
-        eprintln!("[RustyMail] avertissement: dédoublonnage Envoyés ignoré (envoi OK): {e}");
+        log::warn!("dédoublonnage Envoyés ignoré (envoi OK): {e}");
     }
     let imap_notice = send_draft_imap_notice(&imap_copy);
     let mid = sent.message_id;
@@ -1052,10 +1060,8 @@ async fn send_draft_once(
             account.email.trim(),
             &inline_images,
         ) {
-            Ok(()) => eprintln!("[RustyMail] local sent message recorded for thread {tid}"),
-            Err(e) => eprintln!(
-                "[RustyMail] warn: message envoyé mais copie locale SQL échouée (fil {tid}): {e}"
-            ),
+            Ok(()) => log::info!("local sent message recorded for thread {tid}"),
+            Err(e) => log::warn!("message envoyé mais copie locale SQL échouée (fil {tid}): {e}"),
         }
     } else if matches!(draft.kind, rustymail_domain::DraftKind::New) {
         match rustymail_infrastructure::sqlite_record_sent_starting_thread(
@@ -1067,10 +1073,8 @@ async fn send_draft_once(
             account.email.trim(),
             &inline_images,
         ) {
-            Ok(_tid) => eprintln!("[RustyMail] local new thread + sent message recorded"),
-            Err(e) => eprintln!(
-                "[RustyMail] warn: message envoyé mais fil local (nouveau) non enregistré: {e}"
-            ),
+            Ok(_tid) => log::info!("local new thread + sent message recorded"),
+            Err(e) => log::warn!("message envoyé mais fil local (nouveau) non enregistré: {e}"),
         }
     }
     Ok(SendDraftOutcome { imap_notice })
@@ -1332,9 +1336,7 @@ async fn transcribe_dictation(
                 "Dictée locale : {fail_detail}. Repli cloud impossible : clé API absente."
             ));
         }
-        eprintln!(
-            "[RustyMail] Repli cloud : dictée Whisper en échec, envoi WebM vers l’API dictée."
-        );
+        log::info!("Repli cloud : dictée Whisper en échec, envoi WebM vers l’API dictée.");
         let audio = decode_audio_base64(&args.audio_base64)?;
         return transcribe_and_maybe_translate(&prefs.ai, "cloud", audio, &name, &mime).await;
     }
@@ -2293,18 +2295,38 @@ fn load_oauth_and_developer_env() {
     oauth_embed::inject_embedded_oauth_env();
 }
 
+fn app_log_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    let mut targets = vec![tauri_plugin_log::Target::new(
+        tauri_plugin_log::TargetKind::LogDir {
+            file_name: Some("rustymail".into()),
+        },
+    )];
+    if cfg!(debug_assertions) {
+        targets.push(tauri_plugin_log::Target::new(
+            tauri_plugin_log::TargetKind::Stdout,
+        ));
+    }
+    tauri_plugin_log::Builder::new()
+        .targets(targets)
+        .max_file_size(5 * 1024 * 1024)
+        .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
+        .level(log::LevelFilter::Warn)
+        .level_for("rustymail_lib", log::LevelFilter::Info)
+        .level_for("rustymail_infrastructure", log::LevelFilter::Info)
+        .level_for("rustymail::audit", log::LevelFilter::Info)
+        .level_for("html5ever", log::LevelFilter::Error)
+        .build()
+}
+
 pub fn run() {
     load_oauth_and_developer_env();
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(
-        "warn,rustymail::audit=info,rustymail_infrastructure=info,html5ever=error",
-    ))
-    .try_init();
     tauri::Builder::default()
         // WebView2 tue le process si getUserMedia retombe sur l'état DEFAULT.
         .on_permission_request(|_webview, kind| match kind {
             PermissionKind::Microphone => PermissionResponse::Allow,
             _ => PermissionResponse::Default,
         })
+        .plugin(app_log_plugin())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -2325,12 +2347,12 @@ pub fn run() {
             rustymail_infrastructure::init_semantic_model_dir(models_dir.clone());
             rustymail_infrastructure::init_oauth_tokens_dir(data_dir.join("oauth_tokens"));
             if let Err(e) = rustymail_infrastructure::sqlite_ai_cache_purge_expired(&db_path) {
-                eprintln!("[RustyMail] ai_cache purge: {e}");
+                log::warn!("ai_cache purge: {e}");
             }
             if let Err(e) =
                 rustymail_infrastructure::sqlite_ai_cache_backfill_null_expires(&db_path)
             {
-                eprintln!("[RustyMail] ai_cache backfill expires_at: {e}");
+                log::warn!("ai_cache backfill expires_at: {e}");
             }
             // Index FTS : table et déclencheurs déjà créés par la migration.
             // Le remplissage des corps existants ne bloque pas l'affichage.
@@ -2384,6 +2406,7 @@ pub fn run() {
             pick_llama_server_binary_path,
             app_status,
             app_paths,
+            open_app_log_dir,
             semantic_model_available,
             semantic_embedding_counts,
             reindex_semantic_account_cmd,

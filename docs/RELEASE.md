@@ -13,14 +13,16 @@ File: [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 
 **Jobs:**
 
-1. **build-windows** (`windows-latest`)
+1. **verify** (`ubuntu-latest`) — `cargo fmt`, `cargo clippy`, `cargo test --workspace --all-targets`, `tsc`, Vitest. Required by the Windows build.
+2. **build-windows** (`windows-latest`)
    - Node 22, Rust stable, `npm ci`
+   - On a tag push, fails immediately if `TAURI_SIGNING_PRIVATE_KEY` is absent
    - `npm run tauri:build`
-   - Upload artifacts: NSIS `.exe`, MSI `.msi`, `rustymail.exe`
-
-2. **publish** (`ubuntu-latest`)
+   - Upload artifacts: NSIS `.exe`, `rustymail.exe`, and updater files when signed
+3. **publish** (`ubuntu-latest`)
    - Download artifacts
-   - Create GitHub Release with `softprops/action-gh-release@v2`
+   - Requires `latest.json` and a `.sig` before creating the release
+   - Create GitHub Release with `softprops/action-gh-release@v2` (`make_latest: true`)
    - Attach built files; auto-generate release notes
 
 ### PR quality gates
@@ -29,7 +31,7 @@ File: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
 
 Runs on push/PR to `main` / `master`:
 
-- Rust: `cargo fmt --check`, `cargo clippy`, `cargo test --workspace --lib --bins`
+- Rust: `cargo fmt --check`, `cargo clippy`, `cargo test --workspace --all-targets`
 - Frontend: `tsc --noEmit`, `npm test` (Vitest)
 
 Local equivalent: `npm run verify:ci`.

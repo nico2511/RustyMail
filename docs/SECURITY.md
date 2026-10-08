@@ -40,7 +40,7 @@ Before publishing an installable bundle (MSI/NSIS):
 
 ### Log hygiene
 
-14. Sample `rustymail::audit` lines: no full secrets, no systematic full home paths.
+14. Sample `rustymail::audit` lines: no full secrets, no systematic full home paths. Release logs go to `rustymail.log` (not stderr). Send logs use `audit_email_shadow` for the first recipient.
 
 ---
 

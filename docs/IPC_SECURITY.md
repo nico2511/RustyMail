@@ -79,6 +79,7 @@ Front-end reads via **`invokeAiCacheGet`** (`ipc_bridge.ts`) with dedup and time
 | Drafts | R/W | Follow-up: body/HTML bounds on all draft commands |
 | Send | SMTP, FS | `validate_draft_for_ipc`; send ack backend ; `send_draft` accepte `sendId` (UUID, registre mémoire 1 h) ; `send_draft_status` lit ce registre |
 | `threads_mark_read_bulk` | Net, W | `validate_thread_mailbox_batch` (≤ 500) ; une session IMAP par dossier ; un rechargement du cœur |
+| `open_app_log_dir` | Sys | Aucun argument (`validate_open_app_log_dir`). Ouvre le dossier de journaux OS (`rustymail.log`). |
 | Attachments | FS, OS | Sanitized names; CID image-only limits |
 | Prefs/secrets | W prefs, keyring | URL validation; secrets in keyring |
 | Dictation/models | audio, Net/CPU | Bounded audio payload |

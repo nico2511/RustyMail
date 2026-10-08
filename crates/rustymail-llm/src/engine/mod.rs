@@ -1,4 +1,28 @@
-//! Moteur d’inférence : client HTTP chat/completions (OpenRouter, llama-server, Ollama) ou stub sans `reqwest`.
+//! Moteur d’inférence : client HTTP (OpenRouter, llama-server, Ollama `/api/chat`) ou stub sans `reqwest`.
+
+/// Durée Ollama `keep_alive`. Vide, illisible → `30m`. `-1` conserve le modèle.
+pub fn normalize_ollama_keep_alive(raw: &str) -> String {
+    let t = raw.trim();
+    if t == "-1" {
+        return t.to_string();
+    }
+    let unit_at = t
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(t.len());
+    let (num, unit) = t.split_at(unit_at);
+    if num.is_empty()
+        || num.starts_with('.')
+        || num.ends_with('.')
+        || num.matches('.').count() > 1
+        || !num.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+    {
+        return "30m".into();
+    }
+    match unit {
+        "" | "ns" | "us" | "ms" | "s" | "m" | "h" => format!("{num}{unit}"),
+        _ => "30m".into(),
+    }
+}
 
 #[cfg(feature = "http")]
 mod http_chat;
@@ -37,11 +61,11 @@ impl LlmEngine {
         )?))
     }
 
-    /// Ollama (`/v1/chat/completions`). Pas de clé, pas de grammaire GBNF.
+    /// Ollama (`/api/chat`). Pas de clé, pas de grammaire GBNF.
     #[cfg(feature = "http")]
-    pub fn ollama(base_url: String, model: String) -> Result<Self, LlmError> {
+    pub fn ollama(base_url: String, model: String, keep_alive: String) -> Result<Self, LlmError> {
         Ok(LlmEngine::Http(http_chat::HttpChatEngine::new_ollama(
-            base_url, model,
+            base_url, model, keep_alive,
         )?))
     }
 
@@ -76,7 +100,11 @@ impl LlmEngine {
     }
 
     #[cfg(not(feature = "http"))]
-    pub fn ollama(_base_url: String, _model: String) -> Result<Self, LlmError> {
+    pub fn ollama(
+        _base_url: String,
+        _model: String,
+        _keep_alive: String,
+    ) -> Result<Self, LlmError> {
         Err(LlmError::NotAvailable)
     }
 
@@ -170,5 +198,20 @@ impl LlmEngine {
     pub fn set_n_ctx_probe(&mut self, n_ctx: u32) {
         let LlmEngine::Http(e) = self;
         e.set_n_ctx_probe(n_ctx);
+    }
+}
+
+#[cfg(test)]
+mod keep_alive_tests {
+    use super::normalize_ollama_keep_alive;
+
+    #[test]
+    fn keep_alive_defaults_and_keeps_valid_durations() {
+        assert_eq!(normalize_ollama_keep_alive(""), "30m");
+        assert_eq!(normalize_ollama_keep_alive("  "), "30m");
+        assert_eq!(normalize_ollama_keep_alive("nope"), "30m");
+        assert_eq!(normalize_ollama_keep_alive("45m"), "45m");
+        assert_eq!(normalize_ollama_keep_alive("-1"), "-1");
+        assert_eq!(normalize_ollama_keep_alive("120"), "120");
     }
 }
