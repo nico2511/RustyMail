@@ -17,17 +17,35 @@ import {
   composeSendDraftRunDeps,
   finishComposeAfterSuccessfulSend,
 } from "./composeSendDraftFinishRun";
+import { currentComposeSendId } from "./composeSendId";
 
 function isInvokeTimeout(message: string): boolean {
   const lower = message.toLowerCase();
   return message === "Tauri command timeout" || lower.includes("timeout") || lower.includes("délai");
 }
 
-function currentSendId(): string {
-  if (state.composeSendId.trim()) return state.composeSendId.trim();
-  const id = globalThis.crypto.randomUUID();
-  state.composeSendId = id;
-  return id;
+/** Plafond de sondage. Au-delà, l'indicateur local est levé mais l'id du brouillon reste. */
+export const sendDraftPoll = {
+  maxAttempts: 24,
+  delayMs: (attempt: number) => Math.min(Math.round(1500 * 1.5 ** attempt), 8_000),
+};
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+export async function pollSendDraftUntilTerminal(sendId: string): Promise<SendDraftStatus | null> {
+  for (let attempt = 0; attempt < sendDraftPoll.maxAttempts; attempt++) {
+    let status: SendDraftStatus;
+    try {
+      status = await withTimeout(invoke<SendDraftStatus>("send_draft_status", { sendId }), 10_000);
+    } catch {
+      return { state: "unknown" };
+    }
+    if (status.state !== "inFlight") return status;
+    await sleep(sendDraftPoll.delayMs(attempt));
+  }
+  return null;
 }
 
 async function finishSuccessfulSend(sendOutcome: SendDraftOutcome, keepThreadId: string | undefined, toEmails: string[]) {
@@ -53,46 +71,32 @@ async function finishSuccessfulSend(sendOutcome: SendDraftOutcome, keepThreadId:
 }
 
 async function pollSendDraftStatus(sendId: string, keepThreadId: string | undefined, toEmails: string[]) {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    let status: SendDraftStatus;
-    try {
-      status = await withTimeout(
-        invoke<SendDraftStatus>("send_draft_status", { sendId }),
-        10_000,
-      );
-    } catch {
-      state.sendDraftInFlight = false;
-      state.composeMessage = "Statut d'envoi inconnu : vérification…";
-      render();
-      return;
-    }
-    if (status.state === "inFlight") {
-      state.sendDraftInFlight = true;
-      state.composeMessage = "Statut d'envoi inconnu : vérification…";
-      render();
-      await new Promise((resolve) => window.setTimeout(resolve, 1500));
-      continue;
-    }
-    if (status.state === "done") {
-      await finishSuccessfulSend({ imapNotice: status.imapNotice ?? null }, keepThreadId, toEmails);
-      return;
-    }
-    if (status.state === "failed") {
-      state.sendDraftInFlight = false;
-      state.composeMessage = `Envoi échoué: ${status.error}`;
-      toast(state.composeMessage);
-      render();
-      return;
-    }
+  const status = await pollSendDraftUntilTerminal(sendId);
+  if (!status) {
     state.sendDraftInFlight = false;
-    state.composeMessage = "Statut d'envoi inconnu : vérification…";
+    state.composeMessage =
+      "Vérification interrompue : le même brouillon garde son identifiant d'envoi.";
     render();
     return;
   }
+  if (status.state === "done") {
+    await finishSuccessfulSend({ imapNotice: status.imapNotice ?? null }, keepThreadId, toEmails);
+    return;
+  }
+  if (status.state === "failed") {
+    state.sendDraftInFlight = false;
+    state.composeMessage = `Envoi échoué: ${status.error}`;
+    toast(state.composeMessage);
+    render();
+    return;
+  }
+  state.sendDraftInFlight = false;
+  state.composeMessage = "Statut d'envoi inconnu : vérification…";
+  render();
 }
 
 export async function invokeSendDraft(accountId: string | null, draftOutbound: Draft): Promise<void> {
-  const sendId = currentSendId();
+  const sendId = currentComposeSendId();
   const keepThreadId = state.selectedThreadId;
   const toEmails = draftOutbound.to.map((x) => x.email?.trim()).filter(Boolean);
   state.sendDraftInFlight = true;
