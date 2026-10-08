@@ -278,6 +278,11 @@ export function applyValidatedPickToZone(
   if (check.status === "bad") return check;
   const proposal = digestCut.proposal;
   if (!proposal) return check;
+  const nextRoot = pick.structureRoot?.trim() ?? "";
+  const prevRoot = (proposal.zones[zone].structureRoot ?? "").trim();
+  if (nextRoot && prevRoot && nextRoot !== prevRoot) {
+    proposal.zones[zone].anchors = [];
+  }
   const anchor = paintPickToAnchor(pick);
   const anchors = proposal.zones[zone].anchors;
   const key = `${anchor.selector ?? ""}|${anchor.index ?? ""}|${anchor.classContains ?? ""}`;

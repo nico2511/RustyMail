@@ -653,6 +653,16 @@ export async function handleDigestCutAction(action: string, element?: HTMLElemen
       digestCut.zoneStudioOpen = Boolean(digestCut.proposal) && !digestCut.zoneStudioOpen;
       render();
       return true;
+    case "digest-cut-anchor-remove": {
+      const zone = element?.dataset.zone as DigestCutZoneName | undefined;
+      const index = Number(element?.dataset.anchorIndex);
+      const anchors = zone ? digestCut.proposal?.zones[zone].anchors : undefined;
+      if (anchors && Number.isInteger(index) && index >= 0 && index < anchors.length) {
+        anchors.splice(index, 1);
+        render();
+      }
+      return true;
+    }
     case "digest-cut-zone": {
       const zone = element?.dataset.zone as DigestCutZoneName | undefined;
       const zoneAction = element?.dataset.zoneAction as DigestCutZoneAction | undefined;

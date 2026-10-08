@@ -539,10 +539,64 @@ fn unique_selector(doc: &Html, el: ElementRef<'_>) -> Option<String> {
             }
         }
     }
-    if selector_hits_first(doc, tag, el) {
-        return Some(tag.to_string());
+    disambiguated_path(doc, el)
+}
+
+/// Chemin `:nth-of-type` jusqu'à une correspondance unique. Un `div` / `td` nu
+/// vise toujours le premier élément et n'est pas une racine fiable.
+fn disambiguated_path(doc: &Html, el: ElementRef<'_>) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+    let mut current = el;
+    for _ in 0..12 {
+        let tag = current.value().name();
+        if tag.is_empty() || matches!(tag, "html" | "head" | "body" | "[document]") {
+            break;
+        }
+        parts.push(format!("{tag}:nth-of-type({})", nth_of_type(current)));
+        let selector = parts.iter().rev().cloned().collect::<Vec<_>>().join(" > ");
+        if selector_matches_only(doc, &selector, el) {
+            return Some(selector);
+        }
+        match parent_element(current) {
+            Some(parent) => current = parent,
+            None => break,
+        }
     }
-    None
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.into_iter().rev().collect::<Vec<_>>().join(" > "))
+    }
+}
+
+fn parent_element(el: ElementRef<'_>) -> Option<ElementRef<'_>> {
+    el.parent().and_then(ElementRef::wrap)
+}
+
+fn nth_of_type(el: ElementRef<'_>) -> usize {
+    let name = el.value().name();
+    let mut n = 1usize;
+    let mut sib = el.prev_sibling();
+    while let Some(node) = sib {
+        if let Some(elem) = ElementRef::wrap(node) {
+            if elem.value().name() == name {
+                n += 1;
+            }
+        }
+        sib = node.prev_sibling();
+    }
+    n
+}
+
+fn selector_matches_only(doc: &Html, selector: &str, el: ElementRef<'_>) -> bool {
+    let Ok(parsed) = Selector::parse(selector) else {
+        return false;
+    };
+    let mut hits = doc.select(&parsed);
+    match (hits.next(), hits.next()) {
+        (Some(hit), None) => hit.id() == el.id(),
+        _ => false,
+    }
 }
 
 fn selector_hits_first(doc: &Html, selector: &str, el: ElementRef<'_>) -> bool {
@@ -1004,11 +1058,10 @@ fn render_zone_yaml(out: &mut String, name: &str, zone: &DigestCutZone) {
 
 fn unstable_class_token(token: &str) -> bool {
     let t = token.trim();
-    t.is_empty()
-        || t.starts_with("digest-cut__")
-        || t.starts_with("rm-")
-        || t.starts_with("x_")
-        || t.to_ascii_lowercase().starts_with("mso")
+    // Seules les classes de l'éditeur. `rm-mail-*` / `rm-digest*` / `rm-conversation-*`
+    // sont les ancres stables conservées par le nettoyage HTML ; `x_` et `mso` n'y
+    // sont déjà plus.
+    t.is_empty() || t.starts_with("digest-cut__")
 }
 
 fn clean_class_token(token: &str) -> String {
@@ -1021,32 +1074,32 @@ fn clean_class_token(token: &str) -> String {
 
 fn clean_selector(selector: &str) -> String {
     let mut out = String::new();
-    let bytes = selector.as_bytes();
+    let chars: Vec<char> = selector.chars().collect();
     let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'.' {
+    while i < chars.len() {
+        if chars[i] == '.' {
             let start = i + 1;
             let mut end = start;
-            while end < bytes.len()
-                && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'_' || bytes[end] == b'-')
+            while end < chars.len()
+                && (chars[end].is_alphanumeric() || chars[end] == '_' || chars[end] == '-')
             {
                 end += 1;
             }
-            let token = &selector[start..end];
-            if !unstable_class_token(token) && !token.is_empty() {
+            let token: String = chars[start..end].iter().collect();
+            if !unstable_class_token(&token) && !token.is_empty() {
                 out.push('.');
-                out.push_str(token);
+                out.push_str(&token);
             }
             i = end;
         } else {
-            out.push(bytes[i] as char);
+            out.push(chars[i]);
             i += 1;
         }
     }
     out.split_whitespace()
         .filter(|part| !part.is_empty() && *part != ".")
         .collect::<Vec<_>>()
-        .join("")
+        .join(" ")
 }
 
 fn yaml_scalar(value: &str) -> String {
@@ -1413,7 +1466,37 @@ zones:
         );
         assert!(yaml.contains("div.letter"));
         assert!(yaml.contains("class_contains: body"));
-        assert!(yaml.contains("class_contains: foot"));
+        assert!(
+            yaml.contains("x_footer foot"),
+            "x_ n'est plus retiré du sélecteur :\n{yaml}"
+        );
         assert!(yaml.contains("section.foot"));
+        assert!(
+            yaml.contains("div.rm-keep"),
+            "les classes rm- stables doivent rester :\n{yaml}"
+        );
+    }
+
+    #[test]
+    fn clean_selector_keeps_spaces_utf8_and_rm_classes() {
+        assert_eq!(super::clean_selector("div.letter p"), "div.letter p");
+        assert_eq!(super::clean_selector("p.résumé"), "p.résumé");
+        assert_eq!(
+            super::clean_selector("div.rm-mail-body.digest-cut__hover"),
+            "div.rm-mail-body"
+        );
+        assert!(!super::clean_selector("div.letter p").contains("div.letterp"));
+    }
+
+    #[test]
+    fn bare_div_root_uses_nth_of_type_instead_of_first_match() {
+        use scraper::{Html, Selector};
+        let html = r#"<div><p>un</p><p>deux</p></div><div><p>trois</p><p>quatre</p></div>"#;
+        let doc = Html::parse_fragment(html);
+        let divs: Vec<_> = doc.select(&Selector::parse("div").unwrap()).collect();
+        assert!(divs.len() >= 2);
+        let sel = super::unique_selector(&doc, divs[1]).expect("selector");
+        assert!(sel.contains("nth-of-type"), "racine nue refusée : {sel}");
+        assert_ne!(sel, "div");
     }
 }

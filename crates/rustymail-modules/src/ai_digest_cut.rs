@@ -82,8 +82,7 @@ pub fn propose_digest_cut_zones(
     let fallback = current
         .cloned()
         .unwrap_or_else(|| analyze_html_structure_heuristic(html, sender_email));
-    let mut fallback_reason: Option<String> = None;
-    if let Some(engine) = engine {
+    let fallback_reason = if let Some(engine) = engine {
         match propose_with_llm(
             engine,
             html,
@@ -106,25 +105,23 @@ pub fn propose_digest_cut_zones(
                         fallback_reason: None,
                     };
                 }
-                fallback_reason = Some(
-                    "Le modèle a répondu, mais la proposition JSON/YAML a été refusée.".into(),
-                );
+                Some(
+                    "Le modèle a répondu, mais la proposition JSON/YAML a été refusée.".to_string(),
+                )
             }
-            Err(e) => {
-                fallback_reason = Some(match &e {
-                    LlmError::InputTooLarge { tokens, n_ctx } => format!(
-                        "contexte trop court pour ce mail ({tokens} jetons utilisés / n_ctx={n_ctx}). Augmentez n_ctx dans Paramètres → IA, ou chargez un mail plus court."
-                    ),
-                    other => format!("Le modèle n’a pas produit de découpe : {other}"),
-                });
-            }
+            Err(e) => Some(match &e {
+                LlmError::InputTooLarge { tokens, n_ctx } => format!(
+                    "contexte trop court pour ce mail ({tokens} jetons utilisés / n_ctx={n_ctx}). Augmentez n_ctx dans Paramètres → IA, ou chargez un mail plus court."
+                ),
+                other => format!("Le modèle n’a pas produit de découpe : {other}"),
+            }),
         }
     } else {
-        fallback_reason = Some(
+        Some(
             "Aucun moteur IA joignable pour la découpe (Paramètres → IA : mode + Tester la connexion)."
-                .into(),
-        );
-    }
+                .to_string(),
+        )
+    };
     let mut proposal = fallback;
     align_sender_hint(&mut proposal, sender_email);
     if proposal.explanation_fr.trim().is_empty() {
@@ -288,11 +285,30 @@ pub(crate) fn merge_refined_proposal(
     mut next: DigestCutProposal,
     locked_zones: &[String],
 ) -> DigestCutProposal {
+    let match_root = current.match_.structure_root.trim();
     for name in locked_zones {
+        let mut zone = match name.trim() {
+            "header" => current.zones.header.clone(),
+            "body" => current.zones.body.clone(),
+            "footer" => current.zones.footer.clone(),
+            _ => continue,
+        };
+        // Une zone verrouillée sans racine propre suivait `match.structure_root`.
+        // On fige cette racine : un modèle qui change le match ne casse pas les ancres.
+        if zone
+            .structure_root
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or("")
+            .is_empty()
+            && !match_root.is_empty()
+        {
+            zone.structure_root = Some(match_root.to_string());
+        }
         match name.trim() {
-            "header" => next.zones.header = current.zones.header.clone(),
-            "body" => next.zones.body = current.zones.body.clone(),
-            "footer" => next.zones.footer = current.zones.footer.clone(),
+            "header" => next.zones.header = zone,
+            "body" => next.zones.body = zone,
+            "footer" => next.zones.footer = zone,
             _ => {}
         }
     }

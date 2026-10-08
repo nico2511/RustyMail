@@ -87,29 +87,33 @@ export function wireEventsDomDigestCut(signal: AbortSignal): void {
   );
 
   const mail = document.querySelector<HTMLElement>("[data-digest-cut-mail]");
-  const frame = mail?.closest<HTMLElement>(".digest-cut__mail-frame");
-  const overlay = frame?.querySelector<HTMLElement>("[data-digest-cut-overlay]");
+  const overlay = mail?.querySelector<HTMLElement>("[data-digest-cut-overlay]");
 
   const placeOverlay = (elements: Element[], label: string) => {
-    if (!overlay || !frame || !elements.length) {
+    if (!overlay || !mail || !elements.length) {
       if (overlay) overlay.hidden = true;
       return;
     }
-    const host = frame.getBoundingClientRect();
+    const host = mail.getBoundingClientRect();
     let left = Infinity;
     let top = Infinity;
     let right = -Infinity;
     let bottom = -Infinity;
     for (const el of elements) {
+      if (el === overlay) continue;
       const box = el.getBoundingClientRect();
       left = Math.min(left, box.left);
       top = Math.min(top, box.top);
       right = Math.max(right, box.right);
       bottom = Math.max(bottom, box.bottom);
     }
+    if (!Number.isFinite(left) || !Number.isFinite(top)) {
+      overlay.hidden = true;
+      return;
+    }
     overlay.hidden = false;
-    overlay.style.left = `${left - host.left + frame.scrollLeft}px`;
-    overlay.style.top = `${top - host.top + frame.scrollTop}px`;
+    overlay.style.left = `${left - host.left - mail.clientLeft + mail.scrollLeft}px`;
+    overlay.style.top = `${top - host.top - mail.clientTop + mail.scrollTop}px`;
     overlay.style.width = `${Math.max(0, right - left)}px`;
     overlay.style.height = `${Math.max(0, bottom - top)}px`;
     overlay.textContent = label;
@@ -183,5 +187,14 @@ export function wireEventsDomDigestCut(signal: AbortSignal): void {
   mail?.addEventListener("pointerleave", () => {
     if (!dragStart) restoreSelection();
   }, { signal });
+  const syncOverlay = () => {
+    if (!dragStart) restoreSelection();
+  };
+  mail?.addEventListener("scroll", syncOverlay, { signal, passive: true });
+  document.querySelector<HTMLElement>(".digest-bench__pane")?.addEventListener("scroll", syncOverlay, {
+    signal,
+    passive: true,
+  });
   restoreSelection();
+  window.requestAnimationFrame(syncOverlay);
 }

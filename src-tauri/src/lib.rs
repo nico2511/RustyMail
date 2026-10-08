@@ -2230,6 +2230,9 @@ pub fn run() {
             {
                 eprintln!("[RustyMail] ai_cache backfill expires_at: {e}");
             }
+            // Index FTS : table et déclencheurs déjà créés par la migration.
+            // Le remplissage des corps existants ne bloque pas l'affichage.
+            rustymail_infrastructure::spawn_messages_fts_backfill(&db_path);
             // Ne pas charger tout SQLite en RAM au démarrage (grosse base = IPC bloqué, comptes invisibles).
             // `list_threads` / sync rechargent le cache à la demande via `sqlite_app_core*`.
             let prefs_boot = prefs_path.clone();

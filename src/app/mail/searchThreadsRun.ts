@@ -4,8 +4,10 @@ import { hasCommittedSearchCriteria } from "../../searchQueryState";
 import { isSavedDraftsVirtualMailbox } from "../../mailboxKinds";
 import type { ThreadListItem } from "../types";
 import { render } from "../dispatch";
-import { safeInvoke } from "../lib/tauriCommand";
+import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
+import { invoke } from "@tauri-apps/api/core";
+import { DEFAULT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { loadMailView } from "./mailListView";
 import {
   buildSearchQueryFromCurrentState,
@@ -22,7 +24,10 @@ import {
 
 export { getSearchThreadsGeneration } from "./searchThreadsFocusRun";
 
-export async function searchThreads(): Promise<void> {
+const SEARCH_PAGE = 200;
+
+export async function searchThreads(opts?: { append?: boolean }): Promise<void> {
+  const append = opts?.append === true;
   const gen = bumpSearchThreadsGeneration();
   const { searchHadFocus, selStart, selEnd } = captureSearchInputFocusState();
 
@@ -44,16 +49,39 @@ export async function searchThreads(): Promise<void> {
     restoreSearchInputSelection(selStart, selEnd, gen);
     return;
   }
-  const query = buildSearchQueryFromCurrentState();
-  state.threads = filterRecentlyRemovedThreads(
-    await safeInvoke<ThreadListItem[]>(
-      "search_threads",
-      {
-        query,
-      },
-      [],
-    ),
-  );
+  if (!append) state.searchResultOffset = 0;
+  const query = {
+    ...buildSearchQueryFromCurrentState(),
+    offset: append ? state.searchResultOffset : 0,
+    limit: SEARCH_PAGE,
+  };
+  let rows: ThreadListItem[] = [];
+  if (!isTauriRuntime()) {
+    state.mailListError = "";
+    state.searchHasMore = false;
+    if (!append) state.threads = [];
+  } else {
+    try {
+      rows = await withTimeout(
+        invoke<ThreadListItem[]>("search_threads", { query }),
+        DEFAULT_INVOKE_TIMEOUT_MS,
+      );
+      state.mailListError = "";
+    } catch (error) {
+      state.mailListError = tauriErrorMessage(error);
+      state.searchHasMore = false;
+      if (!append) state.threads = [];
+      if (gen !== getSearchThreadsGeneration()) return;
+      render();
+      if (!searchHadFocus) return;
+      restoreSearchInputSelection(selStart, selEnd, gen);
+      return;
+    }
+  }
+  const visible = filterRecentlyRemovedThreads(rows);
+  state.threads = append ? [...state.threads, ...visible] : visible;
+  state.searchHasMore = rows.length >= SEARCH_PAGE;
+  state.searchResultOffset = (append ? state.searchResultOffset : 0) + rows.length;
 
   if (gen !== getSearchThreadsGeneration()) {
     return;

@@ -97,8 +97,7 @@ pub fn reformat_digest_cut_reading(
 ) -> DigestCutReformatOutcome {
     let excerpts = zone_excerpts(html, sender_email, subject, current);
     let candidates = extract_useful_link_candidates(html, 8);
-    let mut fallback_reason = None;
-    if let Some(engine) = engine {
+    let fallback_reason = if let Some(engine) = engine {
         match reformat_with_llm(
             engine,
             sender_email,
@@ -118,19 +117,16 @@ pub fn reformat_digest_cut_reading(
                     fallback_reason: None,
                 };
             }
-            Err(e) => {
-                fallback_reason = Some(match &e {
-                    LlmError::InputTooLarge { tokens, n_ctx } => format!(
-                        "contexte trop court pour reformater ({tokens} jetons / n_ctx={n_ctx})."
-                    ),
-                    other => format!("Le modèle n’a pas reformatté le texte : {other}"),
-                });
-            }
+            Err(e) => Some(match &e {
+                LlmError::InputTooLarge { tokens, n_ctx } => format!(
+                    "contexte trop court pour reformater ({tokens} jetons / n_ctx={n_ctx})."
+                ),
+                other => format!("Le modèle n’a pas reformatté le texte : {other}"),
+            }),
         }
     } else {
-        fallback_reason =
-            Some("Aucun moteur IA joignable pour le reformatage (Paramètres → IA).".into());
-    }
+        Some("Aucun moteur IA joignable pour le reformatage (Paramètres → IA).".to_string())
+    };
     let (proposal, reading_html) =
         heuristic_reformat(current, subject, html, &excerpts, &candidates);
     DigestCutReformatOutcome {

@@ -95,11 +95,20 @@ pub fn cut_resolution_notes(fixture: &DigestFixture, html: &str) -> Vec<String> 
     let doc = Html::parse_fragment(html);
     let global = root_children(&doc, fixture);
     let mut notes = Vec::new();
+    note_ambiguous_root(
+        &mut notes,
+        "match",
+        fixture.match_.structure.root.as_str(),
+        &doc,
+    );
     for (name, zone) in [
         ("header", &fixture.zones.header),
         ("body", &fixture.zones.body),
         ("footer", &fixture.zones.footer),
     ] {
+        if let Some(root) = zone.structure_root.as_deref() {
+            note_ambiguous_root(&mut notes, name, root, &doc);
+        }
         let Some(children) = zone_children(zone, &doc, global.as_deref()) else {
             notes.push(format!("{name}: racine introuvable"));
             continue;
@@ -115,6 +124,22 @@ pub fn cut_resolution_notes(fixture: &DigestFixture, html: &str) -> Vec<String> 
         }
     }
     notes
+}
+
+fn note_ambiguous_root(notes: &mut Vec<String>, label: &str, selector: &str, doc: &Html) {
+    let sel = selector.trim();
+    if sel.is_empty() || !sel.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return;
+    }
+    let Ok(parsed) = Selector::parse(sel) else {
+        return;
+    };
+    let n = doc.select(&parsed).count();
+    if n > 1 {
+        notes.push(format!(
+            "{label}: racine « {sel} » ambiguë ({n} correspondances) — préférez un chemin :nth-of-type"
+        ));
+    }
 }
 
 pub(super) fn apply_ignoring_sender(fixture: &DigestFixture, html: &str) -> Option<String> {
@@ -503,5 +528,42 @@ zones:
         assert!(html_a.contains("Corps utile"));
         assert!(!html_a.contains("Désabonnement"));
         assert_eq!(html_a, html_b);
+    }
+
+    #[test]
+    fn bare_tag_root_is_diagnosed_when_ambiguous() {
+        let yaml = r#"
+id: demo
+rule_set_version: "1"
+match:
+  sender:
+    domains:
+      - exact: example.com
+  structure:
+    root: div
+    min_children: 1
+zones:
+  header:
+    action: show
+    anchors:
+      - selector: h1
+  body:
+    action: show
+    anchors:
+      - selector: p
+  footer:
+    action: hide
+    anchors:
+      - selector: p
+"#;
+        let fixture = parse_fixture(yaml).expect("yaml");
+        let html = r#"<div><h1>A</h1><p>un</p></div><div><h1>B</h1><p>deux</p></div>"#;
+        let notes = super::cut_resolution_notes(&fixture, html);
+        assert!(
+            notes
+                .iter()
+                .any(|n| n.contains("ambiguë") && n.contains("nth-of-type")),
+            "{notes:?}"
+        );
     }
 }

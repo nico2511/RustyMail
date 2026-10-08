@@ -6,8 +6,10 @@ import { senderHueSlot } from "../app/mail/historyFold";
 const root = resolve(import.meta.dirname, "../..");
 
 const RAIL = ["#1d4f8a", "#1b6b45", "#8a4b12", "#7a2f68", "#1a5c72", "#8a3030"] as const;
+const DARK_SURFACE_RAIL = ["#9ec0ff", "#8ed4ae", "#f0c08a", "#f0b0dc", "#8ed4e4", "#f0b0b0"] as const;
 const LIGHT_PAPER = "#ffffff";
 const DARK_PAPER = "#ebe6dc";
+const DARK_SURFACE = "#22262e";
 const LIGHT_TEXT = "#16191e";
 const DARK_MESSAGE_TEXT = "#1a1d22";
 
@@ -60,6 +62,10 @@ describe("historique cité", () => {
     for (const hue of RAIL) {
       expect(contrast(hue, LIGHT_PAPER)).toBeGreaterThanOrEqual(3);
       expect(contrast(hue, DARK_PAPER)).toBeGreaterThanOrEqual(3);
+    }
+    for (const hue of DARK_SURFACE_RAIL) {
+      expect(contrast(hue, DARK_SURFACE)).toBeGreaterThanOrEqual(3);
+      expect(css).toContain(hue);
     }
   });
 

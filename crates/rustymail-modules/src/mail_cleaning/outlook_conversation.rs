@@ -292,7 +292,11 @@ fn render_turn_html(turn: &Turn, n: usize, cited: bool, depth: usize) -> String 
         .unwrap_or("");
     let hue = sender_hue_slot(email);
     let depth_attr = if cited && depth > 0 {
-        let parity = if depth.is_multiple_of(2) { "even" } else { "odd" };
+        let parity = if depth.is_multiple_of(2) {
+            "even"
+        } else {
+            "odd"
+        };
         let over = if depth > 4 {
             " data-depth-over=\"1\""
         } else {

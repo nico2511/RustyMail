@@ -544,6 +544,9 @@ impl HttpChatEngine {
 
     fn ollama_options(&self, p: &LlmGenParams) -> Option<OllamaGenOptions> {
         match self.kind {
+            // `options.num_ctx` est ignoré par Ollama sur /v1/chat/completions.
+            // On le laisse pour un éventuel passage à /api/chat ; il ne fixe pas
+            // la fenêtre de contexte de cette requête.
             HttpChatBackendKind::Ollama => Some(OllamaGenOptions {
                 num_predict: p.max_tokens.max(1),
                 num_ctx: Some(self.n_ctx()),
@@ -707,6 +710,7 @@ impl HttpChatEngine {
                     "options".into(),
                     json!({
                         "num_predict": p.max_tokens.max(1),
+                        // Ignoré par Ollama sur /v1/chat/completions (voir ollama_options).
                         "num_ctx": self.n_ctx(),
                     }),
                 );

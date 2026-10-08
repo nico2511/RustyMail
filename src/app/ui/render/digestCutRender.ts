@@ -78,6 +78,20 @@ function zoneCheckBadge(name: DigestCutZoneName): string {
   return `<span class="digest-cut__check digest-cut__check--${check.status}" title="${escapeAttr(check.message)}">${escapeHtml(label)}</span>`;
 }
 
+function anchorRemoveList(name: DigestCutZoneName): string {
+  const anchors = digestCut.proposal?.zones[name].anchors ?? [];
+  if (!anchors.length) return "";
+  return `<ul class="digest-cut__anchor-list">${anchors
+    .map((anchor, index) => {
+      const label =
+        [anchor.selector, anchor.classContains, anchor.index != null ? `#${anchor.index}` : ""]
+          .filter((part) => part != null && String(part).trim() !== "")
+          .join(" · ") || "repère";
+      return `<li><span>${escapeHtml(label)}</span><button type="button" class="ghost-button" data-action="digest-cut-anchor-remove" data-zone="${name}" data-anchor-index="${index}">Retirer</button></li>`;
+    })
+    .join("")}</ul>`;
+}
+
 function zoneRow(name: DigestCutZoneName): string {
   const zone = digestCut.proposal?.zones[name];
   const action = zone?.action ?? "show";
@@ -103,6 +117,7 @@ function zoneRow(name: DigestCutZoneName): string {
         ? `<p class="digest-cut__zone-check-msg dim">${escapeHtml(check.message)}</p>`
         : `<p class="digest-cut__zone-anchors dim" title="Repères techniques dans le HTML">Repères : ${escapeHtml(anchors)}</p>`
     }
+    ${anchorRemoveList(name)}
     <div class="digest-cut__zone-actions" role="group" aria-label="${escapeAttr(`Zone ${label}`)}">
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="show" aria-pressed="${pressed("show")}">Afficher</button>
       <button type="button" class="ghost-button digest-cut__zone-btn" data-action="digest-cut-zone" data-zone="${name}" data-zone-action="hide" aria-pressed="${pressed("hide")}">Masquer</button>
@@ -326,8 +341,7 @@ function zoneStudio(rendered: string, paintClass: string): string {
       </header>
       <div class="digest-cut-studio__body">
         <div class="digest-cut__mail-frame">
-          <div class="digest-cut-studio__mail mail digest-cut__mail-doc digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}</div>
-          <div class="digest-cut__overlay" data-digest-cut-overlay="1" hidden></div>
+          <div class="digest-cut-studio__mail mail digest-cut__mail-doc digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${rendered}<div class="digest-cut__overlay" data-digest-cut-overlay="1" hidden></div></div>
         </div>
         <aside class="digest-cut-studio__side">
           <p class="digest-bench__fine">Glissez pour peindre une zone. <strong>Alt</strong> + flèches élargit vers le parent, l’enfant ou le frère.</p>
@@ -377,8 +391,7 @@ export function renderDigestCutPanel(): string {
               studio
                 ? mailPane
                 : `<div class="digest-cut__mail-frame">
-                    <div class="mail digest-cut__mail-doc digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${mailPane}</div>
-                    <div class="digest-cut__overlay" data-digest-cut-overlay="1" hidden></div>
+                    <div class="mail digest-cut__mail-doc digest-cut__mail-source${paintClass}" data-digest-cut-mail="1">${mailPane}<div class="digest-cut__overlay" data-digest-cut-overlay="1" hidden></div></div>
                   </div>`
             }
           </div>

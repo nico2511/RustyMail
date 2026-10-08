@@ -52,6 +52,8 @@ export const state: State = {
   savedSearchMarkingSeenId: null,
   searchViewBatchJob: null,
   search: "",
+  searchResultOffset: 0,
+  searchHasMore: false,
   searchDraft: "",
   searchSenders: [],
   searchMailboxPath: null,

@@ -578,7 +578,14 @@ fn lexical_thread_ids_for_like(
     rows.map_err(|e| e.to_string())
 }
 
-/// Requête FTS5 : termes (ET), préfixe `mot*`, phrase, sujet, destinataire, exclusion.
+fn fts_quote(term: &str) -> String {
+    format!("\"{}\"", term.replace('"', "\"\""))
+}
+
+/// Requête FTS5 : termes (ET), préfixe `"mot"*`, phrase, sujet, destinataire, exclusion.
+///
+/// Chaque terme utilisateur est quoté. Un préfixe `jean-pierre*` devient `"jean-pierre"*` :
+/// sans guillemets FTS5 lit le trait d'union comme un nom de colonne (`no such column: pierre`).
 fn fts_match_expr(
     needle: &str,
     subject: Option<&str>,
@@ -592,11 +599,12 @@ fn fts_match_expr(
         if folded.is_empty() {
             continue;
         }
-        positive.push(format!("\"{}\"", folded.replace('"', "\"\"")));
+        positive.push(fts_quote(&folded));
     }
     if let Some(subject) = subject.map(str::trim).filter(|s| !s.is_empty()) {
-        for term in lexical_search_terms(&fold_search_text(subject)) {
-            positive.push(format!("subject : \"{}\"", term.replace('"', "\"\"")));
+        let folded = fold_search_text(subject);
+        if !folded.is_empty() {
+            positive.push(format!("subject : {}", fts_quote(&folded)));
         }
     }
     for recipient in recipients {
@@ -604,21 +612,17 @@ fn fts_match_expr(
         if folded.is_empty() {
             continue;
         }
-        positive.push(format!("recipients : \"{}\"", folded.replace('"', "\"\"")));
+        positive.push(format!("recipients : {}", fts_quote(&folded)));
     }
     for term in lexical_search_terms(&fold_search_text(needle)) {
         if let Some(prefix) = term.strip_suffix('*') {
             let prefix = prefix.trim();
-            if prefix.chars().count() >= 2
-                && prefix
-                    .chars()
-                    .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-            {
-                positive.push(format!("{prefix}*"));
+            if prefix.chars().count() >= 2 {
+                positive.push(format!("{}*", fts_quote(prefix)));
                 continue;
             }
         }
-        positive.push(format!("\"{}\"", term.replace('"', "\"\"")));
+        positive.push(fts_quote(&term));
     }
     if positive.is_empty() {
         return None;
@@ -629,9 +633,8 @@ fn fts_match_expr(
         if folded.is_empty() {
             continue;
         }
-        query.push_str(" NOT \"");
-        query.push_str(&folded.replace('"', "\"\""));
-        query.push('"');
+        query.push_str(" NOT ");
+        query.push_str(&fts_quote(&folded));
     }
     Some(query)
 }
@@ -671,12 +674,10 @@ fn lexical_thread_ids_with_scores(
     recipients: &[String],
     exclude: &[String],
 ) -> Result<(Vec<String>, HashMap<String, f32>), String> {
-    let Some(fts_query) = fts_match_expr(needle, subject, phrases, recipients, exclude) else {
-        return Ok((Vec::new(), HashMap::new()));
-    };
-    let tokens = lexical_search_terms(&fold_search_text(needle));
+    let fts_query = fts_match_expr(needle, subject, phrases, recipients, exclude);
+    let tokens = like_tokens(needle, subject, phrases, recipients);
 
-    let fts_ok = conn
+    let fts_table = conn
         .query_row(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='messages_fts'",
             [],
@@ -684,13 +685,26 @@ fn lexical_thread_ids_with_scores(
         )
         .map(|n| n > 0)
         .unwrap_or(false);
+    let fts_ok = fts_table && crate::messages_fts_index_ready(conn);
 
     if fts_ok {
+        let Some(fts_query) = fts_query else {
+            if exclude.iter().any(|t| !fold_search_text(t).is_empty()) {
+                return exclusion_only_thread_ids(
+                    conn,
+                    account_id,
+                    scope_mailbox,
+                    mailbox_prefix,
+                    exclude,
+                );
+            }
+            return Ok((Vec::new(), HashMap::new()));
+        };
         let mut sql = String::from(
             "
             SELECT m.thread_id, bm25(messages_fts) AS score
             FROM messages_fts
-            INNER JOIN messages m ON m.id = messages_fts.message_id
+            INNER JOIN messages m ON m.rowid = messages_fts.rowid
             WHERE messages_fts MATCH ?1 AND m.account_id = ?2
             ",
         );
@@ -801,9 +815,224 @@ fn lexical_thread_ids_with_scores(
     }
 
     if tokens.is_empty() {
+        if exclude.iter().any(|t| !fold_search_text(t).is_empty()) {
+            return exclusion_only_thread_ids(
+                conn,
+                account_id,
+                scope_mailbox,
+                mailbox_prefix,
+                exclude,
+            );
+        }
         return Ok((Vec::new(), HashMap::new()));
     }
-    lexical_fallback_intersect(conn, account_id, scope_mailbox, mailbox_prefix, &tokens)
+    let (mut ids, mut scores) =
+        lexical_fallback_intersect(conn, account_id, scope_mailbox, mailbox_prefix, &tokens)?;
+    if exclude.iter().any(|t| !fold_search_text(t).is_empty()) {
+        let blocked =
+            threads_matching_exclude(conn, account_id, scope_mailbox, mailbox_prefix, exclude)?;
+        ids.retain(|id| !blocked.contains(id));
+        scores.retain(|id, _| ids.iter().any(|kept| kept == id));
+    }
+    Ok((ids, scores))
+}
+
+fn like_tokens(
+    needle: &str,
+    subject: Option<&str>,
+    phrases: &[String],
+    recipients: &[String],
+) -> Vec<String> {
+    let mut tokens = Vec::new();
+    for term in lexical_search_terms(&fold_search_text(needle)) {
+        let bare = term.trim_end_matches('*').trim();
+        if bare.chars().count() >= 2 {
+            tokens.push(bare.to_string());
+        }
+    }
+    if let Some(subject) = subject {
+        for term in lexical_search_terms(&fold_search_text(subject)) {
+            if term.chars().count() >= 2 {
+                tokens.push(term);
+            }
+        }
+    }
+    for phrase in phrases {
+        for term in lexical_search_terms(&fold_search_text(phrase)) {
+            if term.chars().count() >= 2 {
+                tokens.push(term);
+            }
+        }
+    }
+    for recipient in recipients {
+        let folded = fold_search_text(recipient);
+        if folded.chars().count() >= 2 {
+            tokens.push(folded);
+        }
+    }
+    tokens
+}
+
+fn exclusion_only_thread_ids(
+    conn: &Connection,
+    account_id: &str,
+    scope_mailbox: Option<&str>,
+    mailbox_prefix: Option<&str>,
+    exclude: &[String],
+) -> Result<(Vec<String>, HashMap<String, f32>), String> {
+    let patterns: Vec<String> = exclude
+        .iter()
+        .map(|t| fold_search_text(t))
+        .filter(|t| !t.is_empty())
+        .map(|t| sql_like_fragment(&t))
+        .collect();
+    if patterns.is_empty() {
+        return Ok((Vec::new(), HashMap::new()));
+    }
+    let mut sql = String::from(
+        "
+        SELECT t.id FROM threads t
+        WHERE t.account_id = ?1
+          AND EXISTS (
+            SELECT 1 FROM messages m
+            WHERE m.thread_id = t.id AND m.account_id = ?1
+        ",
+    );
+    append_message_scope(&mut sql, scope_mailbox, mailbox_prefix, 2);
+    sql.push_str(
+        "
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM messages m
+            WHERE m.thread_id = t.id AND m.account_id = ?1
+        ",
+    );
+    append_message_scope(&mut sql, scope_mailbox, mailbox_prefix, 2);
+    sql.push_str(" AND (");
+    for (i, _) in patterns.iter().enumerate() {
+        if i > 0 {
+            sql.push_str(" OR ");
+        }
+        let p =
+            i + 2 + usize::from(scope_mailbox.is_some()) + usize::from(mailbox_prefix.is_some());
+        sql.push_str(&format!(
+            "lower(COALESCE(m.subject, '')) LIKE ?{p} ESCAPE '\\'
+             OR lower(COALESCE(m.body_plain, m.body, '')) LIKE ?{p} ESCAPE '\\'
+             OR lower(COALESCE(m.sender_email, '')) LIKE ?{p} ESCAPE '\\'
+             OR lower(COALESCE(m.sender_name, '')) LIKE ?{p} ESCAPE '\\'"
+        ));
+    }
+    sql.push_str(")) ORDER BY t.id");
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let bind = sql_bind_owned(account_id, scope_mailbox, mailbox_prefix, &patterns);
+    let bind_refs: Vec<&dyn rusqlite::types::ToSql> = bind.iter().map(|v| v.as_ref()).collect();
+    let ids = stmt
+        .query_map(rusqlite::params_from_iter(bind_refs.iter()), |row| {
+            row.get(0)
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<String>, _>>()
+        .map_err(|e| e.to_string())?;
+    let n = ids.len().max(1) as f32;
+    let scores = ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| (id.clone(), 1.0 - (i as f32 / n)))
+        .collect();
+    Ok((ids, scores))
+}
+
+fn append_message_scope(
+    sql: &mut String,
+    scope_mailbox: Option<&str>,
+    mailbox_prefix: Option<&str>,
+    start_idx: i32,
+) {
+    let mut idx = start_idx;
+    if scope_mailbox.is_some() {
+        sql.push_str(&format!(
+            " AND lower(trim(m.mailbox)) = lower(trim(?{idx}))"
+        ));
+        idx += 1;
+    }
+    if mailbox_prefix.is_some() {
+        sql.push_str(&format!(
+            " AND (lower(trim(m.mailbox)) = lower(trim(?{idx}))
+               OR lower(m.mailbox) LIKE lower(trim(?{idx})) || '/%'
+               OR lower(m.mailbox) LIKE lower(trim(?{idx})) || '.%')"
+        ));
+    }
+}
+
+fn threads_matching_exclude(
+    conn: &Connection,
+    account_id: &str,
+    scope_mailbox: Option<&str>,
+    mailbox_prefix: Option<&str>,
+    exclude: &[String],
+) -> Result<HashSet<String>, String> {
+    let patterns: Vec<String> = exclude
+        .iter()
+        .map(|t| fold_search_text(t))
+        .filter(|t| !t.is_empty())
+        .map(|t| sql_like_fragment(&t))
+        .collect();
+    if patterns.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let mut sql = String::from(
+        "
+        SELECT DISTINCT m.thread_id FROM messages m
+        WHERE m.account_id = ?1
+        ",
+    );
+    append_message_scope(&mut sql, scope_mailbox, mailbox_prefix, 2);
+    sql.push_str(" AND (");
+    for (i, _) in patterns.iter().enumerate() {
+        if i > 0 {
+            sql.push_str(" OR ");
+        }
+        let p =
+            i + 2 + usize::from(scope_mailbox.is_some()) + usize::from(mailbox_prefix.is_some());
+        sql.push_str(&format!(
+            "lower(COALESCE(m.subject, '')) LIKE ?{p} ESCAPE '\\'
+             OR lower(COALESCE(m.body_plain, m.body, '')) LIKE ?{p} ESCAPE '\\'
+             OR lower(COALESCE(m.sender_email, '')) LIKE ?{p} ESCAPE '\\'
+             OR lower(COALESCE(m.sender_name, '')) LIKE ?{p} ESCAPE '\\'"
+        ));
+    }
+    sql.push(')');
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let bind = sql_bind_owned(account_id, scope_mailbox, mailbox_prefix, &patterns);
+    let bind_refs: Vec<&dyn rusqlite::types::ToSql> = bind.iter().map(|v| v.as_ref()).collect();
+    let ids = stmt
+        .query_map(rusqlite::params_from_iter(bind_refs.iter()), |row| {
+            row.get(0)
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<HashSet<String>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(ids)
+}
+
+fn sql_bind_owned(
+    account_id: &str,
+    scope_mailbox: Option<&str>,
+    mailbox_prefix: Option<&str>,
+    patterns: &[String],
+) -> Vec<Box<dyn rusqlite::types::ToSql>> {
+    let mut bind: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(account_id.to_string())];
+    if let Some(mbox) = scope_mailbox {
+        bind.push(Box::new(mbox.to_string()));
+    }
+    if let Some(prefix) = mailbox_prefix {
+        bind.push(Box::new(prefix.to_string()));
+    }
+    for pat in patterns {
+        bind.push(Box::new(pat.clone()));
+    }
+    bind
 }
 
 fn lexical_fallback_intersect(
@@ -1023,7 +1252,7 @@ pub fn sqlite_search_threads_unified(
     query: &SearchQuery,
 ) -> Result<Vec<ThreadListItem>, String> {
     let mut query_owned = query.clone();
-    absorb_search_operators(&mut query_owned);
+    absorb_search_operators(&mut query_owned)?;
     let query = &query_owned;
     let Some(account_id) = query
         .account_id
@@ -1646,18 +1875,23 @@ mod sender_search_tests {
         );
         let indexed: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM messages_fts WHERE message_id = 'm-new'",
+                "SELECT COUNT(*) FROM messages_fts WHERE rowid = (SELECT rowid FROM messages WHERE id = 'm-new')",
                 [],
                 |r| r.get(0),
             )
             .expect("count fts");
         assert_eq!(indexed, 1, "le mail synchronisé est dans l'index");
+        let old_rowid: i64 = conn
+            .query_row("SELECT rowid FROM messages WHERE id = 'm-old'", [], |r| {
+                r.get(0)
+            })
+            .expect("rowid");
         conn.execute("DELETE FROM messages WHERE id = 'm-old'", [])
             .expect("delete");
         let gone: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM messages_fts WHERE message_id = 'm-old'",
-                [],
+                "SELECT COUNT(*) FROM messages_fts WHERE rowid = ?1",
+                [old_rowid],
                 |r| r.get(0),
             )
             .expect("count deleted");
@@ -1768,5 +2002,189 @@ mod sender_search_tests {
             hits.iter().map(|h| &h.id.0).collect::<Vec<_>>()
         );
         assert_eq!(hits[0].id.0, "t1");
+    }
+
+    #[test]
+    fn hyphenated_prefix_is_quoted_and_matches() {
+        let expr = fts_match_expr("jean-pierre*", None, &[], &[], &[]).expect("expr");
+        assert!(
+            expr.contains("\"jean-pierre\"*"),
+            "préfixe quoté, pas une colonne : {expr}"
+        );
+        assert!(!expr.contains(" jean-pierre*") && !expr.starts_with("jean-pierre*"));
+        let mail = fts_match_expr("e-mail*", None, &[], &[], &[]).expect("mail");
+        assert!(mail.contains("\"e-mail\"*"), "{mail}");
+        let quoted = fts_match_expr("AND OR NEAR", None, &[], &[], &[]).expect("ops");
+        assert!(quoted.contains("\"and\""));
+        assert!(quoted.contains("\"or\""));
+        assert!(quoted.contains("\"near\""));
+        assert!(!quoted
+            .split(" AND ")
+            .any(|p| p == "and" || p == "or" || p == "near"));
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("hyphen.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        seed_account(&conn);
+        insert_mail(
+            &conn,
+            "m1",
+            "t1",
+            "INBOX",
+            "Note",
+            "jean-pierre a écrit un e-mail",
+        );
+        drop(conn);
+        let hits = sqlite_search_threads_unified(
+            &path,
+            &SearchQuery {
+                text: Some("jean-pierre*".into()),
+                account_id: Some("a1".into()),
+                mode: SearchMode::Lexical,
+                ..Default::default()
+            },
+        )
+        .expect("hyphen search");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].id.0, "t1");
+    }
+
+    #[test]
+    fn exclusion_only_query_returns_threads_without_the_term() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("excl.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        seed_account(&conn);
+        insert_mail(&conn, "m1", "t1", "INBOX", "Facture", "montant 12");
+        insert_mail(&conn, "m2", "t2", "INBOX", "Pub", "offre pub du mois");
+        drop(conn);
+        let hits = sqlite_search_threads_unified(
+            &path,
+            &SearchQuery {
+                text: Some("-pub".into()),
+                account_id: Some("a1".into()),
+                mode: SearchMode::Lexical,
+                ..Default::default()
+            },
+        )
+        .expect("exclude");
+        let ids: Vec<_> = hits.iter().map(|h| h.id.0.as_str()).collect();
+        assert_eq!(ids, vec!["t1"]);
+    }
+
+    #[test]
+    fn subject_phrase_matches_several_words() {
+        let expr = fts_match_expr("", Some("bon de commande"), &[], &[], &[]).expect("expr");
+        assert!(expr.contains("subject : \"bon de commande\""), "{expr}");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("subj.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        seed_account(&conn);
+        insert_mail(&conn, "m1", "t1", "INBOX", "Bon de commande 4", "détail");
+        insert_mail(
+            &conn,
+            "m2",
+            "t2",
+            "INBOX",
+            "Autre",
+            "bon de commande ailleurs",
+        );
+        drop(conn);
+        let hits = sqlite_search_threads_unified(
+            &path,
+            &SearchQuery {
+                text: Some("subject:\"bon de commande\"".into()),
+                account_id: Some("a1".into()),
+                mode: SearchMode::Lexical,
+                ..Default::default()
+            },
+        )
+        .expect("subject phrase");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].id.0, "t1");
+    }
+
+    #[test]
+    fn invalid_search_date_is_an_error() {
+        let err = sqlite_search_threads_unified(
+            std::path::Path::new("unused.db"),
+            &SearchQuery {
+                text: Some("before:pas-une-date".into()),
+                account_id: Some("a1".into()),
+                mode: SearchMode::Lexical,
+                ..Default::default()
+            },
+        )
+        .expect_err("date");
+        assert!(err.contains("date invalide"), "{err}");
+    }
+
+    #[test]
+    fn mark_read_does_not_rewrite_fts() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("read.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        seed_account(&conn);
+        let trigger: String = conn
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'messages_au_fts'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("trigger");
+        let trigger_l = trigger.to_ascii_lowercase();
+        assert!(
+            trigger_l.contains("update of"),
+            "le déclencheur doit lister les colonnes : {trigger}"
+        );
+        assert!(!trigger_l.contains("is_read"), "{trigger}");
+        assert!(trigger_l.contains("rowid = old.rowid"), "{trigger}");
+        for i in 0..240 {
+            insert_mail(
+                &conn,
+                &format!("m{i}"),
+                &format!("t{i}"),
+                "INBOX",
+                "sujet",
+                "corps unique-zebre-lecture",
+            );
+        }
+        let before: i64 = conn
+            .query_row("SELECT total_changes()", [], |r| r.get(0))
+            .expect("changes");
+        let started = std::time::Instant::now();
+        for i in 0..200 {
+            conn.execute(
+                "UPDATE messages SET is_read = 0 WHERE id = ?1",
+                [format!("m{i}")],
+            )
+            .expect("mark");
+        }
+        let elapsed = started.elapsed();
+        let after: i64 = conn
+            .query_row("SELECT total_changes()", [], |r| r.get(0))
+            .expect("changes");
+        assert_eq!(
+            after - before,
+            200,
+            "chaque is_read ne doit toucher que la ligne message, pas l'index FTS"
+        );
+        assert!(
+            elapsed.as_millis() < 1500,
+            "200 marquages lus trop lents : {elapsed:?}"
+        );
+        drop(conn);
+        let hits = sqlite_search_threads_unified(
+            &path,
+            &SearchQuery {
+                text: Some("unique-zebre-lecture".into()),
+                account_id: Some("a1".into()),
+                mode: SearchMode::Lexical,
+                limit: Some(500),
+                ..Default::default()
+            },
+        )
+        .expect("still indexed");
+        assert_eq!(hits.len(), 240);
     }
 }

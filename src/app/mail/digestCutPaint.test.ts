@@ -105,4 +105,17 @@ describe("snapDragRange", () => {
     expect(cutRangeLabel(range)).toBe("3 blocs");
     document.body.removeChild(root);
   });
+
+  it("donne une racine nth-of-type quand le parent n’a pas de classe", () => {
+    const root = document.createElement("div");
+    root.setAttribute("data-digest-cut-mail", "1");
+    root.innerHTML = `<div><div><p>un</p></div><div><p>deux</p></div></div>`;
+    document.body.appendChild(root);
+    const second = root.querySelectorAll("div")[2]!;
+    const pick = pickFromElement(second, root);
+    expect(pick?.structureRoot ?? "").toMatch(/nth-of-type/);
+    expect(pick?.structureRoot).not.toBe("div");
+    expect(pick?.structureRoot).not.toBe("td");
+    document.body.removeChild(root);
+  });
 });

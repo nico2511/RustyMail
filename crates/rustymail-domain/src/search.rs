@@ -337,11 +337,13 @@ pub struct SearchQuery {
 
 /// Extrait `from:`, `to:`, `subject:`, `before:`, `after:`, `"phrase"`, `-mot` du texte libre.
 /// Les termes restants (y compris `prefix*`) restent dans `text`.
-pub fn absorb_search_operators(query: &mut SearchQuery) {
+///
+/// Une date `before:` / `after:` illisible est une erreur (pas une borne ignorée).
+pub fn absorb_search_operators(query: &mut SearchQuery) -> Result<(), String> {
     let Some(raw) = query.text.clone() else {
-        return;
+        return Ok(());
     };
-    let parsed = parse_search_operators(&raw);
+    let parsed = parse_search_operators(&raw)?;
     if parsed.from.is_empty()
         && parsed.to.is_empty()
         && parsed.subject.is_empty()
@@ -350,7 +352,7 @@ pub fn absorb_search_operators(query: &mut SearchQuery) {
         && parsed.before.is_none()
         && parsed.after.is_none()
     {
-        return;
+        return Ok(());
     }
     for sender in parsed.from {
         if !query
@@ -403,6 +405,7 @@ pub fn absorb_search_operators(query: &mut SearchQuery) {
     } else {
         Some(rest.to_string())
     };
+    Ok(())
 }
 
 struct ParsedOperators {
@@ -416,7 +419,7 @@ struct ParsedOperators {
     after: Option<String>,
 }
 
-fn parse_search_operators(raw: &str) -> ParsedOperators {
+fn parse_search_operators(raw: &str) -> Result<ParsedOperators, String> {
     let mut out = ParsedOperators {
         rest: String::new(),
         from: Vec::new(),
@@ -437,18 +440,17 @@ fn parse_search_operators(raw: &str) -> ParsedOperators {
             continue;
         }
         if chars[i] == '"' {
-            let mut phrase = String::new();
-            i += 1;
-            while i < chars.len() && chars[i] != '"' {
-                phrase.push(chars[i]);
-                i += 1;
-            }
-            if i < chars.len() && chars[i] == '"' {
-                i += 1;
-            }
-            let phrase = phrase.trim();
+            let phrase = read_quoted(&chars, &mut i);
             if !phrase.is_empty() {
                 out.phrases.push(phrase.to_ascii_lowercase());
+            }
+            continue;
+        }
+        if chars[i] == '-' && i + 1 < chars.len() && chars[i + 1] == '"' {
+            i += 1;
+            let phrase = read_quoted(&chars, &mut i);
+            if phrase.chars().count() >= 2 {
+                out.exclude.push(phrase.to_ascii_lowercase());
             }
             continue;
         }
@@ -459,13 +461,13 @@ fn parse_search_operators(raw: &str) -> ParsedOperators {
         let token: String = chars[start..i].iter().collect();
         if let Some(rest_tok) = token.strip_prefix('-') {
             let term = rest_tok.trim().trim_matches('"');
-            if term.len() >= 2 {
+            if term.chars().count() >= 2 && !term.contains(':') {
                 out.exclude.push(term.to_ascii_lowercase());
                 continue;
             }
         }
         if let Some((key, value)) = split_operator(&token) {
-            let value = value.trim().trim_matches('"').to_string();
+            let value = read_operator_value(&chars, &mut i, value)?;
             if value.is_empty() {
                 continue;
             }
@@ -475,17 +477,15 @@ fn parse_search_operators(raw: &str) -> ParsedOperators {
                 "subject" => out.subject.push(value.to_ascii_lowercase()),
                 "before" => {
                     if out.before.is_none() {
-                        out.before = Some(normalize_search_date(&value, true));
+                        out.before = Some(normalize_search_date(&value, true)?);
                     }
                 }
                 "after" => {
                     if out.after.is_none() {
-                        out.after = Some(normalize_search_date(&value, false));
+                        out.after = Some(normalize_search_date(&value, false)?);
                     }
                 }
-                _ => {
-                    rest.extend(token.chars());
-                }
+                _ => rest.extend(token.chars()),
             }
             continue;
         }
@@ -497,7 +497,52 @@ fn parse_search_operators(raw: &str) -> ParsedOperators {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
-    out
+    Ok(out)
+}
+
+fn read_quoted(chars: &[char], i: &mut usize) -> String {
+    if *i < chars.len() && chars[*i] == '"' {
+        *i += 1;
+    }
+    let mut phrase = String::new();
+    while *i < chars.len() && chars[*i] != '"' {
+        phrase.push(chars[*i]);
+        *i += 1;
+    }
+    if *i < chars.len() && chars[*i] == '"' {
+        *i += 1;
+    }
+    phrase.trim().to_string()
+}
+
+/// Valeur d'opérateur, y compris `subject:"plusieurs mots"`.
+fn read_operator_value(chars: &[char], i: &mut usize, inline: &str) -> Result<String, String> {
+    let inline = inline.trim();
+    if let Some(rest) = inline.strip_prefix('"') {
+        let mut value = rest.to_string();
+        if inline.ends_with('"') && inline.len() > 1 {
+            value.pop();
+            return Ok(value.trim().to_string());
+        }
+        while *i < chars.len() {
+            let ch = chars[*i];
+            *i += 1;
+            if ch == '"' {
+                break;
+            }
+            value.push(ch);
+        }
+        return Ok(value.trim().to_string());
+    }
+    if inline.is_empty() {
+        while *i < chars.len() && chars[*i].is_whitespace() {
+            *i += 1;
+        }
+        if *i < chars.len() && chars[*i] == '"' {
+            return Ok(read_quoted(chars, i));
+        }
+    }
+    Ok(inline.trim_matches('"').to_string())
 }
 
 fn split_operator(token: &str) -> Option<(&str, &str)> {
@@ -520,18 +565,93 @@ fn split_operator(token: &str) -> Option<(&str, &str)> {
     }
 }
 
-/// `YYYY-MM-DD` → borne RFC3339 (début ou fin de journée UTC).
-fn normalize_search_date(value: &str, end_of_day: bool) -> String {
+/// `AAAA-MM-JJ`, `JJ/MM/AAAA` ou RFC3339 → borne. Sinon erreur explicite.
+fn normalize_search_date(value: &str, end_of_day: bool) -> Result<String, String> {
     let v = value.trim();
-    if v.len() == 10 && v.as_bytes().get(4) == Some(&b'-') && v.as_bytes().get(7) == Some(&b'-') {
-        if end_of_day {
-            format!("{v}T23:59:59Z")
-        } else {
-            format!("{v}T00:00:00Z")
+    let fail = || format!("date invalide « {v} » : utilisez AAAA-MM-JJ");
+    if let Some((date, has_time)) = split_calendar_prefix(v) {
+        if valid_iso_date(date) {
+            if has_time {
+                return Ok(v.to_string());
+            }
+            return Ok(day_bound(date, end_of_day));
         }
-    } else {
-        v.to_string()
     }
+    if let Some(date) = parse_dmy(v) {
+        return Ok(day_bound(&date, end_of_day));
+    }
+    Err(fail())
+}
+
+fn day_bound(date: &str, end_of_day: bool) -> String {
+    if end_of_day {
+        format!("{date}T23:59:59Z")
+    } else {
+        format!("{date}T00:00:00Z")
+    }
+}
+
+fn split_calendar_prefix(value: &str) -> Option<(&str, bool)> {
+    let bytes = value.as_bytes();
+    if bytes.len() >= 10 && bytes.get(4) == Some(&b'-') && bytes.get(7) == Some(&b'-') {
+        let date = &value[..10];
+        let has_time = bytes.len() > 10 && bytes.get(10) == Some(&b'T');
+        return Some((date, has_time));
+    }
+    if bytes.len() >= 10 && bytes.get(4) == Some(&b'/') && bytes.get(7) == Some(&b'/') {
+        return None;
+    }
+    None
+}
+
+fn parse_dmy(value: &str) -> Option<String> {
+    let parts: Vec<&str> = value.split(['/', '-']).collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    if parts[0].len() == 4 {
+        return None;
+    }
+    let day: u32 = parts[0].parse().ok()?;
+    let month: u32 = parts[1].parse().ok()?;
+    let year: i32 = parts[2].parse().ok()?;
+    if parts[2].len() != 4 || !valid_ymd(year, month, day) {
+        return None;
+    }
+    Some(format!("{year:04}-{month:02}-{day:02}"))
+}
+
+fn valid_iso_date(value: &str) -> bool {
+    let mut parts = value.split('-');
+    let Some(year) = parts.next().and_then(|p| p.parse::<i32>().ok()) else {
+        return false;
+    };
+    let Some(month) = parts.next().and_then(|p| p.parse::<u32>().ok()) else {
+        return false;
+    };
+    let Some(day) = parts.next().and_then(|p| p.parse::<u32>().ok()) else {
+        return false;
+    };
+    parts.next().is_none() && valid_ymd(year, month, day)
+}
+
+fn valid_ymd(year: i32, month: u32, day: u32) -> bool {
+    if !(1..=12).contains(&month) || day == 0 || year < 1 {
+        return false;
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let max = match month {
+        2 => {
+            if leap {
+                29
+            } else {
+                28
+            }
+        }
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    day <= max
 }
 
 #[cfg(test)]
@@ -584,7 +704,7 @@ mod tests {
             ),
             ..Default::default()
         };
-        absorb_search_operators(&mut q);
+        absorb_search_operators(&mut q).expect("operators");
         assert_eq!(q.text.as_deref(), Some("facture*"));
         assert_eq!(q.senders, vec!["ada@ex.fr".to_string()]);
         assert_eq!(q.recipients, vec!["bob@ex.fr".to_string()]);
@@ -593,5 +713,34 @@ mod tests {
         assert_eq!(q.exclude_terms, vec!["pub".to_string()]);
         assert_eq!(q.date_from.as_deref(), Some("2024-01-01T00:00:00Z"));
         assert_eq!(q.date_to.as_deref(), Some("2024-06-30T23:59:59Z"));
+    }
+
+    #[test]
+    fn subject_quoted_phrase_stays_one_field() {
+        let mut q = SearchQuery {
+            text: Some("subject:\"bon de commande\" facture".into()),
+            ..Default::default()
+        };
+        absorb_search_operators(&mut q).expect("ok");
+        assert_eq!(q.subject.as_deref(), Some("bon de commande"));
+        assert_eq!(q.text.as_deref(), Some("facture"));
+    }
+
+    #[test]
+    fn french_day_month_year_is_accepted_and_garbage_rejected() {
+        let mut q = SearchQuery {
+            text: Some("after:01/02/2024".into()),
+            ..Default::default()
+        };
+        absorb_search_operators(&mut q).expect("dmy");
+        assert_eq!(q.date_from.as_deref(), Some("2024-02-01T00:00:00Z"));
+
+        let mut bad = SearchQuery {
+            text: Some("before:hier".into()),
+            ..Default::default()
+        };
+        let err = absorb_search_operators(&mut bad).expect_err("reject");
+        assert!(err.contains("date invalide"), "{err}");
+        assert!(err.contains("AAAA-MM-JJ"), "{err}");
     }
 }

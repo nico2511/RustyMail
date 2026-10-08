@@ -36,7 +36,7 @@ function meaningfulClass(el: Element): string | null {
       token &&
       token.length <= 40 &&
       /^[a-zA-Z][\w-]*$/.test(token) &&
-      !/^(x_|mso|outlook|digest-cut__|rm-)/i.test(token)
+      !/^(x_|mso|outlook|digest-cut__)/i.test(token)
     ) {
       return token;
     }
@@ -44,11 +44,43 @@ function meaningfulClass(el: Element): string | null {
   return null;
 }
 
+function nthOfType(el: Element): number {
+  const tag = el.tagName;
+  let n = 1;
+  let sib = el.previousElementSibling;
+  while (sib) {
+    if (sib.tagName === tag) n += 1;
+    sib = sib.previousElementSibling;
+  }
+  return n;
+}
+
+/** Classe stable, sinon chaîne `:nth-of-type` (jamais un `div`/`td` nu). */
+function disambiguatedSelector(el: Element): string {
+  const stop = el.closest("[data-digest-cut-mail]");
+  const parts: string[] = [];
+  let cur: Element | null = el;
+  while (cur && cur !== stop) {
+    const tag = cur.tagName.toLowerCase();
+    if (tag === "html" || tag === "body" || tag === "head") break;
+    const cls = meaningfulClass(cur);
+    if (cls) {
+      parts.unshift(`${tag}.${cls}`);
+      return parts.join(" > ");
+    }
+    parts.unshift(`${tag}:nth-of-type(${nthOfType(cur)})`);
+    cur = cur.parentElement;
+    if (parts.length > 8) break;
+  }
+  return parts.join(" > ");
+}
+
 /** Même notion que `child_elements` côté Rust (table → lignes via thead/tbody/tfoot). */
 function structureChildren(root: Element): Element[] {
   const isTable = root.tagName.toLowerCase() === "table";
   const out: Element[] = [];
   for (const child of root.children) {
+    if (child.hasAttribute("data-digest-cut-overlay")) continue;
     const name = child.tagName.toLowerCase();
     if (isTable && (name === "thead" || name === "tbody" || name === "tfoot")) {
       out.push(...[...child.children]);
@@ -60,10 +92,7 @@ function structureChildren(root: Element): Element[] {
 }
 
 function uniqueSelectorFor(el: Element): string {
-  const tag = el.tagName.toLowerCase();
-  const cls = meaningfulClass(el);
-  if (cls) return `${tag}.${cls}`;
-  return tag;
+  return disambiguatedSelector(el);
 }
 
 /** Remonte vers une balise utile (table, section, div classé, fin de ligne). */

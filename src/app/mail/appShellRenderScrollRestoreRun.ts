@@ -27,7 +27,7 @@ export function snapshotAppShellScroll(): AppShellScrollSnapshot {
     hadSettingsBody: state.view === "settings" && Boolean(settingsBody),
     cutPaneTops: [
       ...document.querySelectorAll<HTMLElement>(
-        ".digest-bench__pane-body, .digest-cut-studio__mail, .digest-cut__mail-frame",
+        ".digest-bench__pane, .digest-bench__pane-body, .digest-cut-studio__mail, .digest-cut__mail-frame",
       ),
     ].map((el) => el.scrollTop),
   };
@@ -56,7 +56,7 @@ export function restoreScrollAfterRender(prev: AppShellScrollSnapshot): void {
     nextSettingsBody.scrollTop = prev.settingsBodyTop;
   }
   const cutPanes = document.querySelectorAll<HTMLElement>(
-    ".digest-bench__pane-body, .digest-cut-studio__mail, .digest-cut__mail-frame",
+    ".digest-bench__pane, .digest-bench__pane-body, .digest-cut-studio__mail, .digest-cut__mail-frame",
   );
   cutPanes.forEach((el, index) => {
     const top = prev.cutPaneTops[index] ?? 0;
@@ -64,6 +64,10 @@ export function restoreScrollAfterRender(prev: AppShellScrollSnapshot): void {
   });
   window.requestAnimationFrame(() => {
     navApplyPendingScrollRestore();
+    cutPanes.forEach((el, index) => {
+      const top = prev.cutPaneTops[index] ?? 0;
+      if (top > 0) el.scrollTop = top;
+    });
     if (nextOrgPanel && prev.orgTop > 0) {
       nextOrgPanel.scrollTop = prev.orgTop;
     }
