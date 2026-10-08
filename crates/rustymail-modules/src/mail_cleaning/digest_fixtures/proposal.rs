@@ -1313,6 +1313,7 @@ mod tests {
 
     #[test]
     fn bad_or_empty_yaml_does_not_apply_as_reading() {
+        let _reading = crate::mail_cleaning::digest_fixtures::lock_reading_fixture_for_test();
         set_installed_reading_fixture(None);
         assert!(empty_or_invalid_proposal_does_not_apply(
             "",
