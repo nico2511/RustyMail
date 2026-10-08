@@ -1,6 +1,7 @@
 //! Moteur d’inférence : client HTTP (OpenRouter, llama-server, Ollama `/api/chat`) ou stub sans `reqwest`.
 
 /// Durée Ollama `keep_alive`. Vide, illisible → `30m`. `-1` conserve le modèle.
+/// Sans unité (`-1`, `120`), le corps natif envoie un nombre JSON, pas une chaîne.
 pub fn normalize_ollama_keep_alive(raw: &str) -> String {
     let t = raw.trim();
     if t == "-1" {

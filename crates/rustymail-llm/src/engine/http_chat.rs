@@ -212,6 +212,39 @@ fn ollama_status_retryable(status: StatusCode, body: &str) -> bool {
     status == StatusCode::SERVICE_UNAVAILABLE || status == StatusCode::TOO_MANY_REQUESTS
 }
 
+fn ollama_native_error_text(body: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(body).ok()?;
+    if let Some(msg) = v.get("error").and_then(|e| e.as_str()) {
+        let msg = msg.trim();
+        if !msg.is_empty() {
+            return Some(msg.to_string());
+        }
+    }
+    v.pointer("/error/message")
+        .and_then(|m| m.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// Durée avec unité (`30m`) → chaîne JSON. Sans unité (`-1`, `120`) → nombre JSON
+/// (une chaîne `"120"` est refusée par le décodeur `time.Duration` d'Ollama).
+fn ollama_keep_alive_json(normalized: &str) -> serde_json::Value {
+    let t = normalized.trim();
+    let has_unit = t.chars().any(|c| c.is_ascii_alphabetic());
+    if !has_unit {
+        if let Ok(n) = t.parse::<i64>() {
+            return json!(n);
+        }
+        if let Ok(n) = t.parse::<f64>() {
+            if n.is_finite() {
+                return json!(n);
+            }
+        }
+    }
+    json!(t)
+}
+
 fn ollama_status_error(status: StatusCode, body: &str, model: &str) -> LlmError {
     let b = body.to_ascii_lowercase();
     if status == StatusCode::NOT_FOUND
@@ -222,6 +255,9 @@ fn ollama_status_error(status: StatusCode, body: &str, model: &str) -> LlmError 
         return LlmError::Msg(format!(
             "Ollama : modèle « {model} » introuvable. Vérifiez le nom (`ollama list`) ou téléchargez-le (`ollama pull {model}`)."
         ));
+    }
+    if let Some(msg) = ollama_native_error_text(body) {
+        return LlmError::Msg(format!("Ollama : {msg}"));
     }
     let snippet: String = body.chars().take(400).collect();
     LlmError::Msg(format!("Ollama HTTP {status} : {snippet}"))
@@ -240,6 +276,13 @@ fn message_visible_text(message: &ChatMessageOut) -> String {
 fn completion_text_from_body(body: &str) -> Result<String, LlmError> {
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
         if v.get("choices").is_none() {
+            if let Some(msg) = v
+                .get("error")
+                .and_then(|e| e.as_str())
+                .filter(|s| !s.trim().is_empty())
+            {
+                return Err(LlmError::Msg(format!("Ollama : {msg}")));
+            }
             if let Some(msg) = v
                 .pointer("/error/message")
                 .and_then(|m| m.as_str())
@@ -537,9 +580,9 @@ impl HttpChatEngine {
             ],
             "stream": stream,
             "think": false,
-            "keep_alive": self.keep_alive,
             "options": options,
         });
+        body["keep_alive"] = ollama_keep_alive_json(&self.keep_alive);
         if p.expect_json {
             body["format"] = json!("json");
         }
@@ -1014,10 +1057,13 @@ pub fn list_ollama_tags(base_url: &str) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod grammar_tests {
     use super::{
-        effective_grammar, grammar_for_kind, ollama_native_base_url, parse_ollama_tags_json,
-        probe_openai_models, HttpChatBackendKind,
+        completion_text_from_body, effective_grammar, grammar_for_kind, ollama_keep_alive_json,
+        ollama_native_base_url, ollama_status_error, parse_ollama_tags_json, probe_openai_models,
+        HttpChatBackendKind,
     };
     use crate::LlmGenParams;
+    use reqwest::StatusCode;
+    use serde_json::json;
 
     #[test]
     fn effective_grammar_prefers_params() {
@@ -1208,6 +1254,27 @@ mod grammar_tests {
             .to_string();
         let json: serde_json::Value = serde_json::from_str(body).expect("json body");
         (path, json)
+    }
+
+    #[test]
+    fn unitless_keep_alive_is_json_number_and_native_error_is_text() {
+        assert_eq!(ollama_keep_alive_json("-1"), json!(-1));
+        assert_eq!(ollama_keep_alive_json("120"), json!(120));
+        assert_eq!(ollama_keep_alive_json("45m"), json!("45m"));
+        assert_eq!(ollama_keep_alive_json("30m"), json!("30m"));
+        let err = completion_text_from_body(r#"{"error":"time: invalid duration 120"}"#)
+            .expect_err("native error");
+        let msg = err.to_string();
+        assert!(msg.contains("invalid duration"), "{msg}");
+        assert!(msg.contains("Ollama"), "{msg}");
+        let http = ollama_status_error(
+            StatusCode::BAD_REQUEST,
+            r#"{"error":"time: invalid duration"}"#,
+            "llama3.2",
+        );
+        let http_msg = http.to_string();
+        assert!(http_msg.contains("invalid duration"), "{http_msg}");
+        assert!(!http_msg.contains('{'), "{http_msg}");
     }
 
     #[test]
