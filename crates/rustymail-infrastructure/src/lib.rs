@@ -1107,9 +1107,30 @@ pub(crate) fn open_sqlite_migrated(path: &Path) -> Result<Connection, rusqlite::
     if memo.contains(&key) {
         return Ok(connection);
     }
+    let backup = sqlite_crypto::prepare_version_backup(&connection, path);
     migrate(&connection)?;
+    match backup {
+        sqlite_crypto::VersionBackupOutcome::Unchanged
+        | sqlite_crypto::VersionBackupOutcome::Copied => {
+            sqlite_crypto::write_last_app_version(&connection)?;
+        }
+        sqlite_crypto::VersionBackupOutcome::SkippedNoSpace
+        | sqlite_crypto::VersionBackupOutcome::Failed(_) => {
+            // La version n'est pas figée : un prochain lancement retentera la copie.
+        }
+    }
+    sqlite_crypto::note_sqlcipher_verified_open(&connection, path);
     memo.insert(key);
     Ok(connection)
+}
+
+#[cfg(test)]
+pub(crate) fn reset_sqlite_migrated_memo_for_tests() {
+    let mut memo = match migrated_paths_guard().lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    memo.clear();
 }
 
 /// Ouvre la base locale (WAL + SQLCipher) avec migrations appliquées.
@@ -1362,6 +1383,18 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
     activity::migrate_activity(connection)?;
     imap_tombstones::migrate_imap_tombstones(connection)?;
     migrate_messages_fts(connection)?;
+    connection.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS imap_sync_skipped (
+            account_id TEXT NOT NULL,
+            mailbox TEXT NOT NULL,
+            uid INTEGER NOT NULL,
+            error TEXT NOT NULL,
+            at TEXT NOT NULL,
+            PRIMARY KEY (account_id, mailbox, uid)
+        );
+        ",
+    )?;
 
     Ok(())
 }

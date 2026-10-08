@@ -84,8 +84,11 @@ Only **one RustyMail instance** should hold port `52789`. If connection fails:
 
 ## Token storage
 
-- Primary: OS keyring (meta + access + refresh)
-- Overflow: `oauth_tokens/` under app data if Microsoft token exceeds Windows keyring size (~2560 chars)
+- Primary: OS keyring (meta + access + refresh), service `RustyMail`
+- Microsoft tokens (and any payload over the Credential Manager limit) go to `oauth_tokens/<sha256>.json` under app data
+- That file is AES-256-GCM. Header `RMOT1`, then a 12-byte nonce, then ciphertext and tag. The file key is a random 32-byte secret `oauth-file-key-v1` in the OS keyring, created only when no entry exists
+- Writes go to `*.tmp`, are synced, then replace the destination (`MoveFileEx` with replace on Windows). The previous keyring copy is deleted only after that replace succeeds
+- A leftover plaintext JSON file is encrypted in place on the next read. After the first refresh, `refresh_token` is not readable as text on disk
 
 ## Manual test checklist
 

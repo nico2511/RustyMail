@@ -26,18 +26,85 @@ export function dropActiveContentFromHtml(html: string): string {
   return doc.body?.innerHTML ?? "";
 }
 
-export function stripUnsafeInlineStylesInEmailDoc(doc: Document): void {
+/** Décode les échappements CSS et retire les commentaires avant de chercher une fonction d'image. */
+export function decodeCssForUrlScan(input: string): string {
+  const noComments = input.replace(/\/\*[\s\S]*?\*\//g, "");
+  let out = "";
+  for (let i = 0; i < noComments.length; i++) {
+    const ch = noComments[i];
+    if (ch !== "\\") {
+      out += ch;
+      continue;
+    }
+    const rest = noComments.slice(i + 1);
+    const hex = /^[0-9a-fA-F]{1,6}/.exec(rest);
+    if (hex) {
+      const cp = Number.parseInt(hex[0], 16);
+      if (cp > 0 && cp <= 0x10ffff) out += String.fromCodePoint(cp);
+      i += hex[0].length;
+      const next = noComments[i + 1];
+      if (next === " " || next === "\t" || next === "\n" || next === "\r" || next === "\f") i += 1;
+      continue;
+    }
+    if (rest.startsWith("\r\n")) {
+      i += 2;
+      continue;
+    }
+    if (rest.startsWith("\n") || rest.startsWith("\r") || rest.startsWith("\f")) {
+      i += 1;
+      continue;
+    }
+    if (rest.length > 0) {
+      out += rest[0];
+      i += 1;
+    }
+  }
+  return out.toLowerCase();
+}
+
+const REMOTE_IMAGE_FN =
+  /(?:-webkit-image-set|image-set|cross-fade|url|image|element|src)\s*\(|@import/i;
+
+export function cssDeclaresRemoteImage(style: string): boolean {
+  return REMOTE_IMAGE_FN.test(decodeCssForUrlScan(style));
+}
+
+export function stripUnsafeInlineStylesInEmailDoc(doc: Document, allowRemoteImages = true): void {
   doc.querySelectorAll<HTMLElement>("[style]").forEach((el) => {
-    const v = (el.getAttribute("style") || "").toLowerCase();
-    if (
+    const raw = el.getAttribute("style") || "";
+    const v = raw.toLowerCase();
+    const unsafeLayout =
       /(position\s*:\s*(fixed|sticky))/.test(v) ||
       /(z-index\s*:)/.test(v) ||
       /(behavior\s*:)/.test(v) ||
-      /url\s*\(/.test(v) ||
-      /expression\s*\(/.test(v)
-    ) {
-      el.removeAttribute("style");
+      /expression\s*\(/.test(v) ||
+      /url\s*\(/.test(v);
+    const blockedImage = !allowRemoteImages && cssDeclaresRemoteImage(raw);
+    if (unsafeLayout || blockedImage) el.removeAttribute("style");
+  });
+}
+
+const REMOTE_PRESENTATION_ATTRS = ["background", "lowsrc", "dynsrc", "poster"] as const;
+
+/** En mode bloqué, déplace les URL distantes de `background` (et attributs voisins) vers `data-remote-*`. */
+export function blockRemoteResourceAttrs(doc: Document, allowRemoteImages: boolean): void {
+  if (allowRemoteImages) {
+    doc.querySelectorAll<HTMLElement>("[data-remote-background]").forEach((el) => {
+      const value = el.getAttribute("data-remote-background");
+      if (value) el.setAttribute("background", value);
+      el.removeAttribute("data-remote-background");
+    });
+    doc.querySelectorAll<HTMLElement>("[ping]").forEach((el) => el.removeAttribute("ping"));
+    return;
+  }
+  doc.querySelectorAll<HTMLElement>("*").forEach((el) => {
+    for (const attr of REMOTE_PRESENTATION_ATTRS) {
+      const value = (el.getAttribute(attr) || "").trim();
+      if (!value || !mailUrlLooksRemote(value)) continue;
+      el.setAttribute(`data-remote-${attr}`, value);
+      el.removeAttribute(attr);
     }
+    el.removeAttribute("ping");
   });
 }
 

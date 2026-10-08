@@ -37,8 +37,16 @@ export function notifySyncCompletionToasts(
   syncAllFolders: boolean,
   skippedOnServer: string[],
   syncErrors: { mailbox: string; error: string }[],
-  results: { mailbox?: string }[],
+  results: { mailbox?: string; skippedUids?: number }[],
 ): void {
+  const skipped = results.reduce((sum, r) => sum + (r.skippedUids ?? 0), 0);
+  if (skipped > 0) {
+    toast.info(
+      skipped === 1
+        ? "1 message illisible importé en version minimale."
+        : `${skipped} messages illisibles importés en version minimale.`,
+    );
+  }
   const touched = results.map((r) => r.mailbox).filter(Boolean);
   if (!options?.background) {
     const partial = skippedOnServer.length > 0 || syncErrors.length > 0;

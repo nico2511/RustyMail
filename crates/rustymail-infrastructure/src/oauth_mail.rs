@@ -241,11 +241,97 @@ fn keyring_oauth_delete(username: &str) {
     let _ = entry.delete_credential();
 }
 
-fn write_oauth_token_file(path: &Path, json: &str) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("oauth tokens mkdir: {e}"))?;
+const OAUTH_FILE_MAGIC: &[u8] = b"RMOT1";
+const OAUTH_FILE_NONCE_LEN: usize = 12;
+#[cfg(not(test))]
+const OAUTH_FILE_KEY_USER: &str = "oauth-file-key-v1";
+
+fn encrypt_oauth_blob(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, String> {
+    use aes_gcm::aead::{Aead, KeyInit};
+    use aes_gcm::{Aes256Gcm, Nonce};
+    if key.len() < 32 {
+        return Err("oauth file key: 32 octets requis".into());
     }
-    std::fs::write(path, json).map_err(|e| format!("oauth tokens file write: {e}"))?;
+    let cipher = Aes256Gcm::new_from_slice(&key[..32]).map_err(|e| format!("aes-gcm key: {e}"))?;
+    let mut nonce_bytes = [0u8; OAUTH_FILE_NONCE_LEN];
+    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let ct = cipher
+        .encrypt(nonce, plaintext)
+        .map_err(|e| format!("oauth chiffrement: {e}"))?;
+    let mut out = Vec::with_capacity(OAUTH_FILE_MAGIC.len() + OAUTH_FILE_NONCE_LEN + ct.len());
+    out.extend_from_slice(OAUTH_FILE_MAGIC);
+    out.extend_from_slice(&nonce_bytes);
+    out.extend_from_slice(&ct);
+    Ok(out)
+}
+
+fn decrypt_oauth_blob(key: &[u8], blob: &[u8]) -> Result<Vec<u8>, String> {
+    use aes_gcm::aead::{Aead, KeyInit};
+    use aes_gcm::{Aes256Gcm, Nonce};
+    let header = OAUTH_FILE_MAGIC.len() + OAUTH_FILE_NONCE_LEN;
+    if blob.len() < header + 16 || !blob.starts_with(OAUTH_FILE_MAGIC) {
+        return Err("oauth: fichier de jetons non chiffré ou incomplet".into());
+    }
+    if key.len() < 32 {
+        return Err("oauth file key: 32 octets requis".into());
+    }
+    let cipher = Aes256Gcm::new_from_slice(&key[..32]).map_err(|e| format!("aes-gcm key: {e}"))?;
+    let nonce = Nonce::from_slice(&blob[OAUTH_FILE_MAGIC.len()..header]);
+    cipher
+        .decrypt(nonce, &blob[header..])
+        .map_err(|e| format!("oauth déchiffrement: {e}"))
+}
+
+fn oauth_token_tmp_path(path: &Path) -> PathBuf {
+    let mut name = path
+        .file_name()
+        .map(|s| s.to_os_string())
+        .unwrap_or_else(|| "oauth-tokens".into());
+    name.push(".tmp");
+    path.with_file_name(name)
+}
+
+fn replace_file(from: &Path, to: &Path) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
+        const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn MoveFileExW(existing: *const u16, new: *const u16, flags: u32) -> i32;
+        }
+        fn wide(p: &Path) -> Vec<u16> {
+            p.as_os_str()
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect()
+        }
+        let src = wide(from);
+        let dst = wide(to);
+        let ok = unsafe {
+            MoveFileExW(
+                src.as_ptr(),
+                dst.as_ptr(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+        };
+        if ok == 0 {
+            return Err(format!(
+                "MoveFileEx oauth tokens: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        std::fs::rename(from, to).map_err(|e| format!("rename oauth tokens: {e}"))
+    }
+}
+
+fn restrict_oauth_file_mode(path: &Path) {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -255,7 +341,109 @@ fn write_oauth_token_file(path: &Path, json: &str) -> Result<(), String> {
             let _ = std::fs::set_permissions(path, perms);
         }
     }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+}
+
+/// Écriture atomique : `*.tmp`, `sync_all`, puis remplacement (`MoveFileEx` sous Windows).
+fn atomic_write_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("oauth tokens mkdir: {e}"))?;
+    }
+    let tmp = oauth_token_tmp_path(path);
+    {
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&tmp)
+            .map_err(|e| format!("oauth tokens tmp: {e}"))?;
+        file.write_all(bytes)
+            .map_err(|e| format!("oauth tokens tmp write: {e}"))?;
+        file.sync_all()
+            .map_err(|e| format!("oauth tokens sync: {e}"))?;
+    }
+    replace_file(&tmp, path)?;
+    restrict_oauth_file_mode(path);
     Ok(())
+}
+
+#[allow(clippy::needless_return)]
+fn load_or_create_oauth_file_key() -> Result<Vec<u8>, String> {
+    static CACHE: OnceLock<Vec<u8>> = OnceLock::new();
+    if let Some(k) = CACHE.get() {
+        return Ok(k.clone());
+    }
+    #[cfg(test)]
+    {
+        let key = vec![0x5Au8; 32];
+        let _ = CACHE.set(key.clone());
+        return Ok(key);
+    }
+    #[cfg(not(test))]
+    {
+        let entry = keyring_oauth_entry(OAUTH_FILE_KEY_USER)?;
+        let decision = match entry.get_password() {
+            Ok(raw) => crate::sqlite_crypto::decide_db_key(Ok(raw)),
+            Err(error) => crate::sqlite_crypto::decide_db_key(Err(error)),
+        };
+        let key = match decision {
+            crate::sqlite_crypto::KeyDecision::Use(bytes) if bytes.len() >= 32 => bytes,
+            crate::sqlite_crypto::KeyDecision::Use(_) => {
+                return Err(
+                    "Jetons OAuth : trousseau inaccessible, réessayer (clé fichier trop courte)"
+                        .into(),
+                );
+            }
+            crate::sqlite_crypto::KeyDecision::Fail(message) => {
+                return Err(format!(
+                    "Jetons OAuth : trousseau inaccessible, réessayer ({message})"
+                ));
+            }
+            crate::sqlite_crypto::KeyDecision::CreateNew => {
+                let mut material = [0u8; 32];
+                rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut material);
+                let stored = base64::engine::general_purpose::STANDARD.encode(material);
+                entry.set_password(&stored).map_err(|e| {
+                    format!("Jetons OAuth : trousseau inaccessible, réessayer ({e})")
+                })?;
+                material.to_vec()
+            }
+        };
+        let _ = CACHE.set(key.clone());
+        Ok(key)
+    }
+}
+
+fn write_oauth_token_file(path: &Path, json: &str) -> Result<(), String> {
+    let key = load_or_create_oauth_file_key()?;
+    let blob = encrypt_oauth_blob(&key, json.as_bytes())?;
+    atomic_write_bytes(path, &blob)
+}
+
+/// Lit un fichier de jetons. Un JSON en clair hérité est réécrit chiffré.
+fn read_oauth_token_file_with_key(path: &Path, key: &[u8]) -> Result<String, String> {
+    let bytes =
+        std::fs::read(path).map_err(|e| format!("oauth tokens file read ({path:?}): {e}"))?;
+    if bytes.starts_with(OAUTH_FILE_MAGIC) {
+        let plain = decrypt_oauth_blob(key, &bytes)?;
+        return String::from_utf8(plain).map_err(|e| format!("oauth tokens utf8: {e}"));
+    }
+    let text =
+        String::from_utf8(bytes.clone()).map_err(|e| format!("oauth tokens file JSON: {e}"))?;
+    serde_json::from_str::<serde_json::Value>(&text)
+        .map_err(|e| format!("oauth tokens file JSON: {e}"))?;
+    let blob = encrypt_oauth_blob(key, text.as_bytes())?;
+    atomic_write_bytes(path, &blob)?;
+    Ok(text)
+}
+
+fn read_oauth_token_file(path: &Path) -> Result<String, String> {
+    let key = load_or_create_oauth_file_key()?;
+    read_oauth_token_file_with_key(path, &key)
 }
 
 fn truncate_to_char_limit(s: &str, max_chars: usize) -> String {
@@ -483,8 +671,7 @@ fn load_oauth_tokens_at(id: &str) -> Result<StoredMailOAuthTokens, String> {
 
     if meta.file {
         let path = oauth_token_file_path(&id);
-        let raw = std::fs::read_to_string(&path)
-            .map_err(|e| format!("oauth tokens file read ({path:?}): {e}"))?;
+        let raw = read_oauth_token_file(&path)?;
         let mut tokens: StoredMailOAuthTokens =
             serde_json::from_str(&raw).map_err(|e| format!("oauth tokens file JSON: {e}"))?;
         if tokens.login_email.is_none() {
@@ -547,10 +734,21 @@ pub fn store_oauth_tokens(account_id: &str, tokens: &StoredMailOAuthTokens) -> R
     Ok(())
 }
 
+fn store_file_then_drop_keyring_copies(
+    id: &str,
+    tokens: &StoredMailOAuthTokens,
+    meta: OAuthTokenMetaV2,
+) -> Result<(), String> {
+    store_oauth_tokens_in_file(id, tokens, meta)?;
+    keyring_oauth_delete(&oauth_keyring_username(id));
+    keyring_oauth_delete(&oauth_keyring_username_part(id, "access"));
+    keyring_oauth_delete(&oauth_keyring_username_part(id, "refresh"));
+    Ok(())
+}
+
 fn store_oauth_tokens_at(account_id: &str, tokens: &StoredMailOAuthTokens) -> Result<(), String> {
     let id = oauth_account_id_norm(account_id);
-    purge_oauth_keyring_slots(&id);
-    delete_oauth_token_file(&id);
+    // La forme précédente (trousseau ou fichier) n'est retirée qu'après l'écriture réussie.
 
     let meta = OAuthTokenMetaV2 {
         v: 2,
@@ -561,13 +759,13 @@ fn store_oauth_tokens_at(account_id: &str, tokens: &StoredMailOAuthTokens) -> Re
     };
 
     if oauth_storage_needs_file(tokens) {
-        return store_oauth_tokens_in_file(&id, tokens, meta);
+        return store_file_then_drop_keyring_copies(&id, tokens, meta);
     }
 
     let meta_json = meta_json_for_keyring(&meta)?;
     if let Err(e) = keyring_oauth_set(&oauth_keyring_username_part(&id, "meta"), &meta_json) {
         if keyring_error_is_platform_limit(&e) {
-            return store_oauth_tokens_in_file(&id, tokens, meta);
+            return store_file_then_drop_keyring_copies(&id, tokens, meta);
         }
         return Err(e);
     }
@@ -577,18 +775,19 @@ fn store_oauth_tokens_at(account_id: &str, tokens: &StoredMailOAuthTokens) -> Re
         &tokens.access_token,
     ) {
         if keyring_error_is_platform_limit(&e) {
-            return store_oauth_tokens_in_file(&id, tokens, meta);
+            return store_file_then_drop_keyring_copies(&id, tokens, meta);
         }
         return Err(e);
     }
     if let Some(r) = &tokens.refresh_token {
         if let Err(e) = keyring_oauth_set(&oauth_keyring_username_part(&id, "refresh"), r) {
             if keyring_error_is_platform_limit(&e) {
-                return store_oauth_tokens_in_file(&id, tokens, meta);
+                return store_file_then_drop_keyring_copies(&id, tokens, meta);
             }
             return Err(e);
         }
     }
+    delete_oauth_token_file(&id);
     Ok(())
 }
 
@@ -1660,5 +1859,68 @@ mod tests {
             login_email: None,
         };
         assert!(!super::oauth_storage_needs_file(&compact));
+    }
+
+    #[test]
+    fn oauth_blob_roundtrip_hides_refresh_token() {
+        let key = [0x22u8; 32];
+        let json = r#"{"access_token":"abc","refresh_token":"secret-refresh"}"#;
+        let blob = super::encrypt_oauth_blob(&key, json.as_bytes()).expect("encrypt");
+        assert!(blob.starts_with(b"RMOT1"));
+        assert!(!String::from_utf8_lossy(&blob).contains("secret-refresh"));
+        let plain = super::decrypt_oauth_blob(&key, &blob).expect("decrypt");
+        assert_eq!(plain, json.as_bytes());
+    }
+
+    #[test]
+    fn legacy_plaintext_oauth_file_is_rewritten_encrypted() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("tokens.json");
+        let json = r#"{"access_token":"abc","refresh_token":"secret-refresh","expires_at_unix":1}"#;
+        std::fs::write(&path, json).expect("plain");
+        let key = [0x33u8; 32];
+        let back = super::read_oauth_token_file_with_key(&path, &key).expect("migrate");
+        assert_eq!(back, json);
+        let bytes = std::fs::read(&path).expect("reread");
+        assert!(bytes.starts_with(b"RMOT1"));
+        assert!(!String::from_utf8_lossy(&bytes).contains("secret-refresh"));
+        assert!(!super::oauth_token_tmp_path(&path).exists());
+        let again = super::read_oauth_token_file_with_key(&path, &key).expect("reread");
+        assert_eq!(again, json);
+    }
+
+    #[test]
+    fn oauth_tmp_file_is_never_a_valid_token_blob() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("tokens.json");
+        let legacy = r#"{"access_token":"keep","refresh_token":"still-here"}"#;
+        std::fs::write(&path, legacy).expect("legacy");
+        let tmp = super::oauth_token_tmp_path(&path);
+        std::fs::write(&tmp, b"refresh_token=secret").expect("tmp");
+        assert!(super::decrypt_oauth_blob(&[0x44u8; 32], b"refresh_token=secret").is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), legacy);
+        let key = [0x44u8; 32];
+        let blob = super::encrypt_oauth_blob(&key, legacy.as_bytes()).unwrap();
+        super::atomic_write_bytes(&path, &blob).expect("commit");
+        assert!(!tmp.exists());
+        assert!(std::fs::read(&path).unwrap().starts_with(b"RMOT1"));
+    }
+
+    #[test]
+    fn oauth_storage_needs_file_policy_unchanged() {
+        let microsoft = StoredMailOAuthTokens {
+            access_token: "a".into(),
+            refresh_token: Some("r".into()),
+            expires_at_unix: 0,
+            scope: String::new(),
+            provider: Some(MailOAuthProvider::Microsoft),
+            login_email: None,
+        };
+        assert!(super::oauth_storage_needs_file(&microsoft));
+        let google = StoredMailOAuthTokens {
+            provider: Some(MailOAuthProvider::Google),
+            ..microsoft
+        };
+        assert!(!super::oauth_storage_needs_file(&google));
     }
 }

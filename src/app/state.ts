@@ -21,6 +21,7 @@ export const state: State = {
   accountMessage: "",
   accountsLoadError: "",
   mailListError: "",
+  dbLockedMessage: "",
   syncMessage: "",
   syncInProgress: false,
   syncProgressBatch: null,

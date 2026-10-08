@@ -1,5 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { DEFAULT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
+import { state } from "../state";
+
+export const DB_LOCKED_MESSAGE = "Base verrouillée : trousseau inaccessible, réessayer";
+
+function noteDbLocked(error: unknown): void {
+  if (tauriErrorMessage(error).includes("Base verrouillée")) {
+    state.dbLockedMessage = DB_LOCKED_MESSAGE;
+  }
+}
 
 export function withTimeout<T>(
   promise: Promise<T>,
@@ -48,6 +57,7 @@ export async function safeInvoke<T>(
   try {
     return await withTimeout(invoke<T>(command, args), timeoutMs);
   } catch (error) {
+    noteDbLocked(error);
     console.error(`Tauri command failed: ${command}`, error);
     return fallback;
   }

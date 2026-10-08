@@ -11,6 +11,8 @@ export type ImapSyncResult = {
   flagsReconciled?: number;
   /** UIDs locaux absents du serveur (MOVE/delete) — retirés du cache SQLite. */
   uidsPruned?: number;
+  /** Messages dont l'analyse MIME a échoué (version minimale ou ignorés). */
+  skippedUids?: number;
 };
 
 export type SyncMailboxAlias = {

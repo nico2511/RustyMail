@@ -8,6 +8,7 @@ import {
 } from "./mailUnsubscribeLinks";
 import { stripOutlookDisplayNoiseFromDoc } from "./mailEmailHtmlOutlookStripRun";
 import {
+  blockRemoteResourceAttrs,
   dropActiveContentFromHtml,
   normalizeEmailLinksInDoc,
   restoreImgSizeAttrsFromStyle,
@@ -49,14 +50,15 @@ export function sanitizeEmailHtml(
     const clean = DOMPurify.sanitize(stripped, {
       FORBID_TAGS: FORBIDDEN_ACTIVE_TAGS,
       // DOMPurify bloque déjà tous les attributs on*. La liste reste explicite pour les relecteurs.
-      FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur"],
+      FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur", "ping"],
       ADD_ATTR: ["width", "height", "bgcolor", "border", "cellpadding", "cellspacing", "valign"],
       ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|cid|tel):|data:image\/(?:png|jpe?g|gif|webp|bmp);base64,)/i,
     });
     const doc = new DOMParser().parseFromString(String(clean), "text/html");
     flattenNestedParagraphInDocument(doc);
-    stripUnsafeInlineStylesInEmailDoc(doc);
+    stripUnsafeInlineStylesInEmailDoc(doc, allowRemoteImages);
     normalizeEmailLinksInDoc(doc);
+    blockRemoteResourceAttrs(doc, allowRemoteImages);
     sanitizeEmailImagesInDoc(doc, allowRemoteImages);
     restoreImgSizeAttrsFromStyle(doc);
     const unsubscribeLinks = collectUnsubscribeLinksFromDoc(doc);
