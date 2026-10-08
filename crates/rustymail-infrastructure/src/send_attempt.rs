@@ -8,24 +8,42 @@
 //! les pièces jointes, `in_reply_to`, les références et `send_html`.
 //! Un même `send_id` avec une autre empreinte n'est ni rejoué ni renvoyé.
 //!
-//! Risque restant : plantage après acceptation SMTP mais avant l'enregistrement `done`
-//! (ou un `inflight` de plus de 3 minutes) — un nouvel essai du même `send_id` peut renvoyer.
+//! Un `inflight` de ce lancement n'est jamais repris, même après 3 minutes.
+//! Seul un `inflight` d'un lancement précédent, et seulement après ce délai, peut être repris.
+//! `smtp_accepted` (SMTP déjà accepté, copie Envoyés pas encore finie) se rejoue sans SMTP.
+//!
+//! Risque restant : plantage après acceptation SMTP mais avant l'écriture `smtp_accepted`.
 
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rusqlite::{params, Connection};
 use sha2::{Digest, Sha256};
 
 pub const SEND_ATTEMPT_TTL: Duration = Duration::from_secs(60 * 60);
-/// Au-delà, un `inflight` vient d'un processus mort : on autorise un nouvel essai.
+/// Au-delà, un `inflight` d'un *autre* lancement peut être repris. Jamais celui du processus courant.
 pub const SEND_INFLIGHT_STALE: Duration = Duration::from_secs(3 * 60);
+
+/// Identifiant de ce processus. Stable jusqu'à l'arrêt : un `inflight` qui le porte n'est pas repris.
+pub fn current_send_launch_id() -> &'static str {
+    static ID: OnceLock<String> = OnceLock::new();
+    ID.get_or_init(|| uuid::Uuid::new_v4().to_string()).as_str()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendSlot<T> {
     InFlight {
         started: SystemTime,
         fingerprint: String,
+        launch_id: String,
+    },
+    /// SMTP accepté, copie « Envoyés » pas encore conclue. Pas un second SMTP.
+    SmtpAccepted {
+        at: SystemTime,
+        value: T,
+        fingerprint: String,
+        launch_id: String,
     },
     Done {
         at: SystemTime,
@@ -43,7 +61,11 @@ pub enum SendSlot<T> {
 pub enum SendBegin {
     Start,
     InFlight,
+    /// Même lancement, envoi encore en cours (même après le délai de 3 minutes) : pas de SMTP.
+    AlreadyInFlight,
     Replay,
+    /// SMTP déjà accepté pour cet id : pas de SMTP. La copie Envoyés peut être retentée à part.
+    Accepted,
     /// Même identifiant, autre message : ne pas rejouer l'ancien envoi.
     IdReused,
 }
@@ -56,6 +78,8 @@ pub struct StoredSendAttempt {
     pub imap_notice: Option<String>,
     pub error: Option<String>,
     pub at_unix: i64,
+    /// Lancement qui a créé l'`inflight` ou le `smtp_accepted`. Vide : lancement inconnu (reprise possible).
+    pub launch_id: String,
 }
 
 #[derive(Debug)]
@@ -79,27 +103,52 @@ impl<T: Clone> SendAttemptBook<T> {
     /// `fingerprint` vide : comparaison par identifiant seulement (tests historiques).
     /// Un autre `send_id` ne rejoue jamais un envoi déjà `Done`, même à empreinte égale.
     pub fn begin_payload(&mut self, id: &str, fingerprint: &str, now: SystemTime) -> SendBegin {
+        self.begin_owned(id, fingerprint, now, current_send_launch_id())
+    }
+
+    /// `launch_id` est le lancement qui demande l'envoi. Un `inflight` du même lancement
+    /// n'est jamais repris. Un autre lancement ne l'est qu'après [`SEND_INFLIGHT_STALE`].
+    pub fn begin_owned(
+        &mut self,
+        id: &str,
+        fingerprint: &str,
+        now: SystemTime,
+        launch_id: &str,
+    ) -> SendBegin {
         self.purge(now);
-        let stale_same = matches!(
-            self.slots.get(id),
-            Some(SendSlot::InFlight { started, fingerprint: fp, .. })
-                if fp == fingerprint && now.duration_since(*started).unwrap_or_default() > SEND_INFLIGHT_STALE
-        );
-        if stale_same {
-            self.slots.insert(
-                id.to_string(),
-                SendSlot::InFlight {
-                    started: now,
-                    fingerprint: fingerprint.to_string(),
-                },
-            );
-            return SendBegin::Start;
+        let owned = self.slots.get(id).cloned();
+        if let Some(SendSlot::InFlight {
+            started,
+            fingerprint: fp,
+            launch_id: owner,
+        }) = owned
+        {
+            if fp == fingerprint
+                && now.duration_since(started).unwrap_or_default() > SEND_INFLIGHT_STALE
+            {
+                if owner == launch_id {
+                    return SendBegin::AlreadyInFlight;
+                }
+                self.slots.insert(
+                    id.to_string(),
+                    SendSlot::InFlight {
+                        started: now,
+                        fingerprint: fingerprint.to_string(),
+                        launch_id: launch_id.to_string(),
+                    },
+                );
+                return SendBegin::Start;
+            }
         }
         match self.slots.get(id) {
             Some(SendSlot::InFlight {
                 fingerprint: fp, ..
             }) if fp == fingerprint => SendBegin::InFlight,
             Some(SendSlot::InFlight { .. }) => SendBegin::IdReused,
+            Some(SendSlot::SmtpAccepted {
+                fingerprint: fp, ..
+            }) if fp == fingerprint => SendBegin::Accepted,
+            Some(SendSlot::SmtpAccepted { .. }) => SendBegin::IdReused,
             Some(SendSlot::Done {
                 fingerprint: fp, ..
             }) if fp == fingerprint => SendBegin::Replay,
@@ -110,6 +159,7 @@ impl<T: Clone> SendAttemptBook<T> {
                     SendSlot::InFlight {
                         started: now,
                         fingerprint: fingerprint.to_string(),
+                        launch_id: launch_id.to_string(),
                     },
                 );
                 SendBegin::Start
@@ -123,9 +173,42 @@ impl<T: Clone> SendAttemptBook<T> {
 
     pub fn replay(&self, id: &str) -> Option<T> {
         match self.slots.get(id) {
-            Some(SendSlot::Done { value, .. }) => Some(value.clone()),
+            Some(SendSlot::Done { value, .. } | SendSlot::SmtpAccepted { value, .. }) => {
+                Some(value.clone())
+            }
             _ => None,
         }
+    }
+
+    pub fn launch_of(&self, id: &str) -> Option<String> {
+        match self.slots.get(id) {
+            Some(
+                SendSlot::InFlight { launch_id, .. } | SendSlot::SmtpAccepted { launch_id, .. },
+            ) => Some(launch_id.clone()),
+            _ => None,
+        }
+    }
+
+    /// SMTP vient d'accepter. Le créneau ne doit plus jamais relancer SMTP pour cet id.
+    pub fn mark_smtp_accepted(&mut self, id: &str, value: T, now: SystemTime) {
+        let (fingerprint, launch_id) = match self.slots.get(id) {
+            Some(SendSlot::InFlight {
+                fingerprint,
+                launch_id,
+                ..
+            }) => (fingerprint.clone(), launch_id.clone()),
+            Some(slot) => (slot_fingerprint(slot).to_string(), String::new()),
+            None => (String::new(), String::new()),
+        };
+        self.slots.insert(
+            id.to_string(),
+            SendSlot::SmtpAccepted {
+                at: now,
+                value,
+                fingerprint,
+                launch_id,
+            },
+        );
     }
 
     pub fn complete_ok(&mut self, id: &str, value: T, now: SystemTime) {
@@ -172,7 +255,9 @@ impl<T: Clone> SendAttemptBook<T> {
         let slot = self.slots.get(id)?.clone();
         let at = match &slot {
             SendSlot::InFlight { started, .. } => *started,
-            SendSlot::Done { at, .. } | SendSlot::Failed { at, .. } => *at,
+            SendSlot::SmtpAccepted { at, .. }
+            | SendSlot::Done { at, .. }
+            | SendSlot::Failed { at, .. } => *at,
         };
         if now.duration_since(at).unwrap_or_default() > SEND_ATTEMPT_TTL {
             return None;
@@ -184,7 +269,9 @@ impl<T: Clone> SendAttemptBook<T> {
         self.slots.retain(|_, slot| {
             let at = match slot {
                 SendSlot::InFlight { started, .. } => *started,
-                SendSlot::Done { at, .. } | SendSlot::Failed { at, .. } => *at,
+                SendSlot::SmtpAccepted { at, .. }
+                | SendSlot::Done { at, .. }
+                | SendSlot::Failed { at, .. } => *at,
             };
             now.duration_since(at).unwrap_or_default() <= SEND_ATTEMPT_TTL
         });
@@ -194,6 +281,7 @@ impl<T: Clone> SendAttemptBook<T> {
 fn slot_fingerprint<T>(slot: &SendSlot<T>) -> &str {
     match slot {
         SendSlot::InFlight { fingerprint, .. }
+        | SendSlot::SmtpAccepted { fingerprint, .. }
         | SendSlot::Done { fingerprint, .. }
         | SendSlot::Failed { fingerprint, .. } => fingerprint,
     }
@@ -276,21 +364,23 @@ fn emails_of(list: &[rustymail_domain::EmailAddress]) -> Vec<String> {
 
 pub fn upsert_stored_send(conn: &Connection, row: &StoredSendAttempt) -> Result<(), String> {
     conn.execute(
-        "INSERT INTO send_attempts (send_id, fingerprint, state, imap_notice, error, at_unix)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "INSERT INTO send_attempts (send_id, fingerprint, state, imap_notice, error, at_unix, launch_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
          ON CONFLICT(send_id) DO UPDATE SET
             fingerprint = excluded.fingerprint,
             state = excluded.state,
             imap_notice = excluded.imap_notice,
             error = excluded.error,
-            at_unix = excluded.at_unix",
+            at_unix = excluded.at_unix,
+            launch_id = excluded.launch_id",
         params![
             row.send_id,
             row.fingerprint,
             row.state,
             row.imap_notice,
             row.error,
-            row.at_unix
+            row.at_unix,
+            row.launch_id
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -314,7 +404,7 @@ pub fn load_stored_sends_since(
 ) -> Result<Vec<StoredSendAttempt>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT send_id, fingerprint, state, imap_notice, error, at_unix
+            "SELECT send_id, fingerprint, state, imap_notice, error, at_unix, launch_id
              FROM send_attempts WHERE at_unix >= ?1",
         )
         .map_err(|e| e.to_string())?;
@@ -327,6 +417,7 @@ pub fn load_stored_sends_since(
                 imap_notice: row.get(3)?,
                 error: row.get(4)?,
                 at_unix: row.get(5)?,
+                launch_id: row.get(6)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -473,6 +564,7 @@ mod tests {
                 imap_notice: None,
                 error: None,
                 at_unix: unix_secs(SystemTime::now()),
+                launch_id: String::new(),
             },
         )
         .expect("upsert");
@@ -503,6 +595,7 @@ mod tests {
                     imap_notice: Some("notice".into()),
                     error: None,
                     at_unix: unix_secs(t0),
+                    launch_id: "launch-old".into(),
                 },
             )
             .expect("store");
@@ -533,6 +626,117 @@ mod tests {
             "un nouvel id, même empreinte, part vraiment"
         );
         assert!(book.replay("id-new").is_none());
+    }
+
+    #[test]
+    fn same_launch_stale_inflight_does_not_start_smtp() {
+        let mut book = SendAttemptBook::<&'static str>::default();
+        let t0 = SystemTime::UNIX_EPOCH + Duration::from_secs(10_000);
+        assert_eq!(
+            book.begin_owned("id", "fp", t0, "launch-a"),
+            SendBegin::Start
+        );
+        let later = t0 + Duration::from_secs(262);
+        assert!(later.duration_since(t0).unwrap() > SEND_INFLIGHT_STALE);
+        assert_eq!(
+            book.begin_owned("id", "fp", later, "launch-a"),
+            SendBegin::AlreadyInFlight
+        );
+        match book.get("id", later) {
+            Some(SendSlot::InFlight { started, .. }) => assert_eq!(started, t0),
+            other => panic!("créneau inattendu: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn previous_launch_stale_inflight_may_be_taken_over() {
+        let mut book = SendAttemptBook::<&'static str>::default();
+        let t0 = SystemTime::UNIX_EPOCH + Duration::from_secs(20_000);
+        assert_eq!(
+            book.begin_owned("id", "fp", t0, "launch-a"),
+            SendBegin::Start
+        );
+        assert_eq!(
+            book.begin_owned("id", "fp", t0 + Duration::from_secs(60), "launch-b"),
+            SendBegin::InFlight,
+            "un autre lancement encore frais ne reprend pas l'envoi"
+        );
+        let later = t0 + SEND_INFLIGHT_STALE + Duration::from_secs(1);
+        assert_eq!(
+            book.begin_owned("id", "fp", later, "launch-b"),
+            SendBegin::Start
+        );
+        match book.get("id", later) {
+            Some(SendSlot::InFlight {
+                started, launch_id, ..
+            }) => {
+                assert_eq!(started, later);
+                assert_eq!(launch_id, "launch-b");
+            }
+            other => panic!("créneau inattendu: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn smtp_accepted_retry_does_not_start_smtp() {
+        let mut book = SendAttemptBook::<&'static str>::default();
+        let t0 = SystemTime::UNIX_EPOCH + Duration::from_secs(30_000);
+        assert_eq!(
+            book.begin_owned("id", "fp", t0, "launch-a"),
+            SendBegin::Start
+        );
+        book.mark_smtp_accepted("id", "accepted", t0);
+        assert_eq!(
+            book.begin_owned("id", "fp", t0 + Duration::from_secs(262), "launch-a"),
+            SendBegin::Accepted
+        );
+        assert_eq!(
+            book.begin_owned("id", "fp", t0 + Duration::from_secs(262), "launch-b"),
+            SendBegin::Accepted
+        );
+        assert_eq!(book.replay("id"), Some("accepted"));
+        assert_ne!(
+            book.begin_owned("id", "fp", t0 + Duration::from_secs(262), "launch-b"),
+            SendBegin::Start
+        );
+    }
+
+    #[test]
+    fn smtp_accepted_launch_id_roundtrips() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let conn = crate::open_sqlite_migrated(&dir.path().join("send.db")).expect("db");
+        let now = unix_secs(SystemTime::now());
+        upsert_stored_send(
+            &conn,
+            &StoredSendAttempt {
+                send_id: "id".into(),
+                fingerprint: "fp".into(),
+                state: "smtp_accepted".into(),
+                imap_notice: Some("accepted".into()),
+                error: None,
+                at_unix: now,
+                launch_id: "launch-a".into(),
+            },
+        )
+        .expect("store");
+        let rows = load_stored_sends_since(&conn, now - 10).expect("load");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].state, "smtp_accepted");
+        assert_eq!(rows[0].launch_id, "launch-a");
+        let mut book = SendAttemptBook::<String>::default();
+        book.absorb_absent(
+            &rows[0].send_id,
+            SendSlot::SmtpAccepted {
+                at: SystemTime::now(),
+                value: rows[0].imap_notice.clone().unwrap_or_default(),
+                fingerprint: rows[0].fingerprint.clone(),
+                launch_id: rows[0].launch_id.clone(),
+            },
+        );
+        assert_eq!(
+            book.begin_owned("id", "fp", SystemTime::now(), "launch-b"),
+            SendBegin::Accepted
+        );
     }
 
     fn sample_draft(

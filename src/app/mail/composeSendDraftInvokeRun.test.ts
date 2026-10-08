@@ -52,7 +52,7 @@ vi.mock("../lib/tauriCommand", async () => {
 
 import { state } from "../state";
 import { invokeSendDraft, sendDraftPoll } from "./composeSendDraftInvokeRun";
-import { resetComposeSendId } from "./composeSendId";
+import { composeSendAttemptKey, resetComposeSendId, sendIdForDraft } from "./composeSendId";
 import type { Draft } from "../types";
 
 describe("invokeSendDraft", () => {
@@ -199,5 +199,55 @@ describe("invokeSendDraft", () => {
       .map((call) => call[1].sendId as string);
     expect(ids).toHaveLength(2);
     expect(ids[1]).not.toBe(ids[0]);
+  });
+
+  it("« déjà en cours » garde l'id et sonde, sans présenter un échec", async () => {
+    sendDraftPoll.maxAttempts = 1;
+    sendDraftPoll.delayMs = () => 0;
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "send_draft_status") return Promise.resolve({ state: "inFlight" });
+      return Promise.reject(new Error("Envoi déjà en cours"));
+    });
+    const draft = { id: "draft-1", to: [], subject: "s", markdownBody: "Bonjour" } as Draft;
+    await invokeSendDraft("acc-1", draft);
+    expect(state.composeSendId).toBe("11111111-2222-4333-8444-555555555555");
+    expect(invokeMock).toHaveBeenCalledWith(
+      "send_draft_status",
+      expect.objectContaining({ sendId: "11111111-2222-4333-8444-555555555555" }),
+    );
+    expect(state.composeMessage.toLowerCase()).not.toContain("échoué");
+    expect(state.sendDraftInFlight).toBe(false);
+  });
+
+  it("une erreur SMTP libère l'id", async () => {
+    invokeMock.mockRejectedValue(new Error("smtp refused"));
+    const draft = { id: "draft-1", to: [], subject: "s", markdownBody: "Bonjour" } as Draft;
+    await invokeSendDraft("acc-1", draft);
+    expect(state.composeSendId).toBe("");
+    expect(state.composeMessage.toLowerCase()).toContain("échoué");
+    expect(invokeMock).not.toHaveBeenCalledWith("send_draft_status", expect.anything());
+  });
+
+  it("un id localStorage de plus d'une heure n'est pas réutilisé", () => {
+    resetComposeSendId();
+    const draft = {
+      id: "draft-old",
+      to: [{ email: "bob@example.com" }],
+      subject: "Hello",
+      markdownBody: "Same text",
+      attachmentPaths: ["/tmp/a.pdf"],
+    } as Draft;
+    const storageKey = `rustymail.sendAttempt.${composeSendAttemptKey(draft.id)}`;
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        sendId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        fingerprint: "ignored-once-expired",
+        at: Date.now() - 2 * 60 * 60 * 1000,
+      }),
+    );
+    const id = sendIdForDraft(draft);
+    expect(id).not.toBe("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    expect(window.localStorage.getItem(storageKey)).not.toContain("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
   });
 });

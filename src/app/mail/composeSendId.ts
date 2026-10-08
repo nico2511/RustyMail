@@ -3,6 +3,19 @@ import { state } from "../state";
 
 const SEND_ID_RE = /^[0-9a-fA-F-]{1,80}$/;
 const STORAGE_PREFIX = "rustymail.sendAttempt.";
+/** Même ordre de grandeur que le TTL `send_attempts` : un id oublié par le backend n'est pas réutilisé. */
+const SEND_ID_TTL_MS = 60 * 60 * 1000;
+
+export function isSendStillInFlightMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    message === "Tauri command timeout" ||
+    lower.includes("timeout") ||
+    lower.includes("délai") ||
+    lower.includes("déjà en cours") ||
+    lower.includes("deja en cours")
+  );
+}
 
 /** Empreinte côté UI : décide si l'on réutilise l'id de la tentative en cours. */
 let memoryFingerprint = "";
@@ -52,16 +65,20 @@ export function clientSendFingerprint(draft: Draft): string {
   ].join("\n--\n");
 }
 
-type StoredAttempt = { sendId: string; fingerprint: string };
+type StoredAttempt = { sendId: string; fingerprint: string; at: number };
 
 function readStored(key: string): StoredAttempt | null {
   try {
     const raw = window.localStorage.getItem(storageKey(key));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { sendId?: unknown; fingerprint?: unknown };
+    const parsed = JSON.parse(raw) as { sendId?: unknown; fingerprint?: unknown; at?: unknown };
     if (typeof parsed.sendId !== "string" || !SEND_ID_RE.test(parsed.sendId)) return null;
     if (typeof parsed.fingerprint !== "string") return null;
-    return { sendId: parsed.sendId, fingerprint: parsed.fingerprint };
+    if (typeof parsed.at !== "number" || Date.now() - parsed.at > SEND_ID_TTL_MS) {
+      removeStored(key);
+      return null;
+    }
+    return { sendId: parsed.sendId, fingerprint: parsed.fingerprint, at: parsed.at };
   } catch {
     return null;
   }
@@ -69,7 +86,10 @@ function readStored(key: string): StoredAttempt | null {
 
 function writeStored(key: string, sendId: string, fingerprint: string): void {
   try {
-    window.localStorage.setItem(storageKey(key), JSON.stringify({ sendId, fingerprint }));
+    window.localStorage.setItem(
+      storageKey(key),
+      JSON.stringify({ sendId, fingerprint, at: Date.now() }),
+    );
   } catch {
     /* stockage indisponible : l'id mémoire suffit pour cette session */
   }
