@@ -665,6 +665,9 @@ pub struct ImapSyncResult {
     /// UIDs présents en SQLite mais absents du serveur (MOVE/delete externe).
     #[serde(default, skip_serializing_if = "serde_skip_zero_usize")]
     pub uids_pruned: usize,
+    /// Messages dont le MIME a échoué (import minimal ou ignorés).
+    #[serde(default, skip_serializing_if = "serde_skip_zero_usize")]
+    pub skipped_uids: usize,
 }
 
 /// When LIST and the sidebar disagree on apostrophes/normalization but map to one folder.
@@ -896,6 +899,440 @@ async fn sync_mailboxes_single_session_locked(
     })
 }
 
+const UNREADABLE_MIME_BODY: &str = "Message illisible : erreur d'analyse MIME";
+
+struct ImapFetchedPart {
+    uid: Option<u32>,
+    seen: bool,
+    internal: String,
+    envelope_subject: Option<String>,
+    envelope_from_name: Option<String>,
+    envelope_from_email: Option<String>,
+    body: Option<Vec<u8>>,
+}
+
+#[allow(clippy::type_complexity)]
+struct BuiltMailboxImport {
+    threads: Vec<Thread>,
+    message_headers: HashMap<String, (Option<String>, Option<String>, Option<String>)>,
+    message_unsub_index: HashMap<String, (Option<String>, String)>,
+    attachment_blobs: HashMap<String, Vec<u8>>,
+    skipped: Vec<(u32, String)>,
+    max_treated_uid: Option<u32>,
+}
+
+fn envelope_available(part: &ImapFetchedPart) -> bool {
+    part.envelope_subject.is_some() || part.envelope_from_email.is_some()
+}
+
+#[allow(clippy::type_complexity)]
+fn minimal_unreadable_fields(
+    part: &ImapFetchedPart,
+) -> (
+    String,
+    Option<String>,
+    String,
+    Vec<rustymail_domain::EmailAddress>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    String,
+    Option<String>,
+    Vec<Attachment>,
+    Option<String>,
+    Option<String>,
+    Vec<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
+    (
+        part.envelope_subject
+            .clone()
+            .unwrap_or_else(|| "(no subject)".to_string()),
+        part.envelope_from_name.clone(),
+        part.envelope_from_email
+            .clone()
+            .unwrap_or_else(|| "unknown@invalid".to_string()),
+        Vec::new(),
+        None,
+        None,
+        None,
+        UNREADABLE_MIME_BODY.to_string(),
+        None,
+        Vec::new(),
+        None,
+        None,
+        Vec::new(),
+        None,
+        None,
+        None,
+    )
+}
+
+/// Construit les fils à partir de FETCH déjà téléchargés (sans session IMAP).
+fn build_mailbox_import(
+    db_path: &Path,
+    account: &Account,
+    mailbox: &str,
+    parts: &[ImapFetchedPart],
+) -> BuiltMailboxImport {
+    let mut by_thread: HashMap<String, (String, Option<String>, Vec<Message>, bool)> =
+        HashMap::new();
+    #[allow(clippy::type_complexity)]
+    let mut message_headers: HashMap<String, (Option<String>, Option<String>, Option<String>)> =
+        HashMap::new();
+    let mut message_unsub_index: HashMap<String, (Option<String>, String)> = HashMap::new();
+    let mut attachment_blobs: HashMap<String, Vec<u8>> = HashMap::new();
+    let mut skipped: Vec<(u32, String)> = Vec::new();
+    let mut max_treated_uid: Option<u32> = None;
+
+    for part in parts {
+        let Some(uid) = part.uid else {
+            log::warn!("IMAP: FETCH sans UID, message ignoré");
+            continue;
+        };
+        max_treated_uid = Some(max_treated_uid.map(|m| m.max(uid)).unwrap_or(uid));
+
+        let parsed = if let Some(bytes) = part.body.as_deref() {
+            match parse_mail(bytes) {
+                Ok(mail) => Ok(Some(mail)),
+                Err(error) => Err(error.to_string()),
+            }
+        } else {
+            Ok(None)
+        };
+
+        let (
+            subject,
+            from_name,
+            from_email,
+            recipients,
+            to_header,
+            cc_header,
+            reply_to_header,
+            body_plain,
+            body_html,
+            attachments,
+            message_id_header,
+            in_reply_to,
+            references,
+            authentication_results,
+            return_path,
+            list_unsubscribe,
+        ) = match parsed {
+            Err(error) => {
+                log::warn!("IMAP: UID {uid} illisible : {error}");
+                skipped.push((uid, error));
+                if !envelope_available(part) {
+                    continue;
+                }
+                minimal_unreadable_fields(part)
+            }
+            Ok(None) if !envelope_available(part) => {
+                log::warn!("IMAP: UID {uid} sans corps ni enveloppe");
+                skipped.push((uid, "corps et enveloppe absents".into()));
+                continue;
+            }
+            Ok(None) => (
+                part.envelope_subject
+                    .clone()
+                    .unwrap_or_else(|| "(no subject)".to_string()),
+                part.envelope_from_name.clone(),
+                part.envelope_from_email
+                    .clone()
+                    .unwrap_or_else(|| "unknown@invalid".to_string()),
+                Vec::new(),
+                None,
+                None,
+                None,
+                String::new(),
+                None,
+                Vec::new(),
+                None,
+                None,
+                Vec::new(),
+                None,
+                None,
+                None,
+            ),
+            Ok(Some(mail)) => {
+                let subject = header_value(&mail.headers, "Subject")
+                    .as_deref()
+                    .map(subject_from_parsed)
+                    .or_else(|| part.envelope_subject.clone())
+                    .unwrap_or_else(|| "(no subject)".to_string());
+                let (name, email) = if let Some(fh) = header_value(&mail.headers, "From") {
+                    if let Some(single) = first_address(&fh) {
+                        (single.display_name, single.addr.trim().to_ascii_lowercase())
+                    } else {
+                        (
+                            part.envelope_from_name.clone(),
+                            part.envelope_from_email
+                                .clone()
+                                .unwrap_or_else(|| "unknown@invalid".to_string()),
+                        )
+                    }
+                } else {
+                    (
+                        part.envelope_from_name.clone(),
+                        part.envelope_from_email
+                            .clone()
+                            .unwrap_or_else(|| "unknown@invalid".to_string()),
+                    )
+                };
+                let message_id_header = header_value(&mail.headers, "Message-ID")
+                    .and_then(|v| normalize_msg_id_token(&v));
+                let in_reply_to =
+                    first_msg_id_from_header(header_value(&mail.headers, "In-Reply-To"));
+                let references_header = header_value(&mail.headers, "References");
+                let to_header = header_value(&mail.headers, "To");
+                let cc_header = header_value(&mail.headers, "Cc");
+                let reply_to_header = header_value(&mail.headers, "Reply-To");
+                let authentication_results = header_value(&mail.headers, "Authentication-Results");
+                let return_path = header_value(&mail.headers, "Return-Path");
+                let parsed_headers: Vec<(String, String)> = mail
+                    .headers
+                    .iter()
+                    .map(|h| (h.get_key().to_string(), h.get_value()))
+                    .collect();
+                let list_unsubscribe = if crate::unsubscribe_detect::list_unsubscribe_header_present(
+                    &parsed_headers,
+                ) {
+                    header_value(&mail.headers, "List-Unsubscribe")
+                        .or_else(|| header_value(&mail.headers, "List-Unsubscribe-Post"))
+                } else {
+                    None
+                };
+                let references = references_header
+                    .as_deref()
+                    .map(extract_msg_ids)
+                    .unwrap_or_default();
+                let mut recipients = Vec::new();
+                if let Some(h) = to_header.as_deref() {
+                    recipients.extend(parse_address_list(h));
+                }
+                if let Some(h) = cc_header.as_deref() {
+                    for cc in parse_address_list(h) {
+                        if recipients
+                            .iter()
+                            .any(|existing: &rustymail_domain::EmailAddress| {
+                                existing.email.eq_ignore_ascii_case(&cc.email)
+                            })
+                        {
+                            continue;
+                        }
+                        recipients.push(cc);
+                    }
+                }
+                let (body_plain, body_html) = extract_bodies(&mail);
+                let mut attachments = Vec::new();
+                extract_attachments(
+                    &mail,
+                    &account.id.0,
+                    mailbox,
+                    uid,
+                    &mut attachments,
+                    &mut attachment_blobs,
+                );
+                (
+                    subject,
+                    name,
+                    email,
+                    recipients,
+                    to_header,
+                    cc_header,
+                    reply_to_header,
+                    body_plain,
+                    body_html,
+                    attachments,
+                    message_id_header,
+                    in_reply_to,
+                    references,
+                    authentication_results,
+                    return_path,
+                    list_unsubscribe,
+                )
+            }
+        };
+
+        let unsub_signal = crate::unsubscribe_detect::message_has_unsubscribe_signal(
+            list_unsubscribe.as_deref(),
+            &subject,
+            &body_plain,
+            body_html.as_deref(),
+        );
+
+        let header_root = thread_root_from_headers(
+            message_id_header.as_deref(),
+            in_reply_to.as_deref(),
+            &references,
+        );
+        let thread_root = if let Some(root) = header_root {
+            root
+        } else if let Some(normalized_subject) = normalize_subject_for_threading(&subject) {
+            let participant_fallback = participants_key(&from_email, &recipients, &account.email);
+            format!("subject:{normalized_subject}|participants:{participant_fallback}")
+        } else {
+            format!("uid:{uid}")
+        };
+        let thread_id = pick_thread_id_for_imported_message(
+            db_path,
+            &account.id.0,
+            mailbox,
+            message_id_header.as_deref(),
+            in_reply_to.as_deref(),
+            &references,
+            &thread_root,
+        );
+
+        let id = MessageId(format!(
+            "m-imap-{}-{}-{}",
+            account.id.0,
+            mailbox.to_ascii_lowercase(),
+            uid
+        ));
+
+        let preview = extract_preview_body(&body_plain, body_html.as_deref());
+
+        let reply_to = reply_to_header
+            .as_deref()
+            .map(parse_address_list)
+            .unwrap_or_default();
+
+        let plain_body = if body_plain.trim().is_empty() {
+            preview
+        } else {
+            body_plain.clone()
+        };
+        let lang_sample = format!(
+            "{}\n{}",
+            subject,
+            plain_body.chars().take(3000).collect::<String>()
+        );
+        let detected_lang = Some(crate::lang_detect::detect_language_iso639_1(&lang_sample));
+
+        let message = Message {
+            id,
+            sender: rustymail_domain::EmailAddress {
+                name: from_name,
+                email: from_email,
+            },
+            recipients: if recipients.is_empty() {
+                vec![rustymail_domain::EmailAddress {
+                    name: None,
+                    email: account.email.clone(),
+                }]
+            } else {
+                recipients
+            },
+            reply_to,
+            subject: subject.clone(),
+            received_at: part.internal.clone(),
+            plain_body,
+            html_body: body_html.clone(),
+            references: rustymail_domain::MessageReferences {
+                message_id_header: message_id_header.clone(),
+                in_reply_to: in_reply_to.clone(),
+                references: references.clone(),
+            },
+            attachments,
+            tags: Vec::new(),
+            detected_lang,
+            is_read: part.seen,
+            is_pinned: false,
+            authentication_results,
+            return_path,
+        };
+        message_headers.insert(
+            message.id.0.clone(),
+            (to_header, cc_header, reply_to_header),
+        );
+        let (list_unsub_stored, unsub_urls_json) =
+            crate::unsubscribe_detect::index_message_unsubscribe_urls(
+                list_unsubscribe.as_deref(),
+                &message.subject,
+                &message.plain_body,
+                message.html_body.as_deref(),
+                8,
+            );
+        message_unsub_index.insert(message.id.0.clone(), (list_unsub_stored, unsub_urls_json));
+
+        match by_thread.get_mut(&thread_id) {
+            Some((_subject, _root, messages, thread_unsub)) => {
+                if unsub_signal {
+                    *thread_unsub = true;
+                }
+                messages.push(message);
+            }
+            None => {
+                by_thread.insert(
+                    thread_id,
+                    (subject, Some(thread_root), vec![message], unsub_signal),
+                );
+            }
+        }
+    }
+
+    for (_subject, _root, messages, _) in by_thread.values_mut() {
+        messages.sort_by(|a, b| a.received_at.cmp(&b.received_at));
+    }
+
+    let mut threads: Vec<Thread> = by_thread
+        .into_iter()
+        .map(|(thread_id, (subject, _root, messages, has_unsub))| {
+            let has_attachments = messages.iter().any(|m| !m.attachments.is_empty());
+            Thread {
+                id: ThreadId(thread_id),
+                subject,
+                tags: tags_for_thread(mailbox, &messages, has_unsub, has_attachments),
+                entities: Vec::new(),
+                messages,
+                followed: false,
+            }
+        })
+        .collect();
+    threads.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+
+    BuiltMailboxImport {
+        threads,
+        message_headers,
+        message_unsub_index,
+        attachment_blobs,
+        skipped,
+        max_treated_uid,
+    }
+}
+
+/// Mémorise les UID dont le MIME n'a pas pu être lu. Pas de nouvel essai : `last_uid`
+/// avance au-delà. Les lignes partent avec le compte ou quand l'UIDVALIDITY change.
+fn persist_imap_sync_skipped(
+    db_path: &Path,
+    account_id: &str,
+    mailbox: &str,
+    skipped: &[(u32, String)],
+) -> Result<(), String> {
+    if skipped.is_empty() {
+        return Ok(());
+    }
+    let conn = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
+    for (uid, error) in skipped {
+        let error: String = error.chars().take(500).collect();
+        conn.execute(
+            "
+            INSERT INTO imap_sync_skipped (account_id, mailbox, uid, error, at)
+            VALUES (?1, ?2, ?3, ?4, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+            ON CONFLICT(account_id, mailbox, uid) DO UPDATE SET
+                error = excluded.error,
+                at = excluded.at
+            ",
+            params![account_id, mailbox, i64::from(*uid), error],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 async fn sync_mailbox_with_session(
     db_path: &Path,
     account: &Account,
@@ -960,6 +1397,7 @@ async fn sync_mailbox_with_session(
             uid_validity_reset,
             flags_reconciled,
             uids_pruned,
+            skipped_uids: 0,
         });
     }
 
@@ -982,333 +1420,76 @@ async fn sync_mailbox_with_session(
         fetches.extend(part);
     }
 
-    let mut by_thread: HashMap<String, (String, Option<String>, Vec<Message>, bool)> =
-        HashMap::new();
-    let mut message_headers: HashMap<String, (Option<String>, Option<String>, Option<String>)> =
-        HashMap::new();
-    let mut message_unsub_index: HashMap<String, (Option<String>, String)> = HashMap::new();
-    let mut attachment_blobs: HashMap<String, Vec<u8>> = HashMap::new();
-    for fetch in fetches {
-        let uid = fetch
-            .uid
-            .ok_or_else(|| "IMAP: fetch missing UID".to_string())?;
-        let seen = is_seen(fetch.flags());
-        let internal = fetch
-            .internal_date()
-            .map(|date| {
-                date.with_timezone(&Utc)
-                    .to_rfc3339_opts(SecondsFormat::Secs, true)
-            })
-            .unwrap_or_else(|| "—".to_string());
-
-        let body_bytes = fetch.body().or_else(|| {
-            fetch.section(&async_imap::imap_proto::types::SectionPath::Full(
-                MessageSection::Text,
-            ))
-        });
-        let (
-            subject,
-            from_name,
-            from_email,
-            recipients,
-            to_header,
-            cc_header,
-            reply_to_header,
-            body_plain,
-            body_html,
-            attachments,
-            message_id_header,
-            in_reply_to,
-            references,
-            authentication_results,
-            return_path,
-            list_unsubscribe,
-        ) = if let Some(bytes) = body_bytes {
-            let mail = parse_mail(bytes).map_err(|error| error.to_string())?;
-            let subject = header_value(&mail.headers, "Subject")
-                .as_deref()
-                .map(subject_from_parsed)
-                .or_else(|| {
-                    fetch
-                        .envelope()
-                        .map(|envelope| imap_envelope_subject(envelope))
+    let parts: Vec<ImapFetchedPart> = fetches
+        .iter()
+        .map(|fetch| {
+            let internal = fetch
+                .internal_date()
+                .map(|date| {
+                    date.with_timezone(&Utc)
+                        .to_rfc3339_opts(SecondsFormat::Secs, true)
                 })
-                .unwrap_or_else(|| "(no subject)".to_string());
-            let (name, email) = if let Some(fh) = header_value(&mail.headers, "From") {
-                if let Some(single) = first_address(&fh) {
-                    (single.display_name, single.addr.trim().to_ascii_lowercase())
-                } else {
-                    fetch
-                        .envelope()
-                        .map(|envelope| imap_envelope_from(envelope))
-                        .unwrap_or((None, "unknown@invalid".to_string()))
+                .unwrap_or_else(|| "—".to_string());
+            let (envelope_subject, envelope_from_name, envelope_from_email) = match fetch.envelope()
+            {
+                Some(env) => {
+                    let (name, email) = imap_envelope_from(env);
+                    (Some(imap_envelope_subject(env)), name, Some(email))
                 }
-            } else {
-                fetch
-                    .envelope()
-                    .map(|envelope| imap_envelope_from(envelope))
-                    .unwrap_or((None, "unknown@invalid".to_string()))
+                None => (None, None, None),
             };
-            let message_id_header =
-                header_value(&mail.headers, "Message-ID").and_then(|v| normalize_msg_id_token(&v));
-            let in_reply_to = first_msg_id_from_header(header_value(&mail.headers, "In-Reply-To"));
-            let references_header = header_value(&mail.headers, "References");
-            let to_header = header_value(&mail.headers, "To");
-            let cc_header = header_value(&mail.headers, "Cc");
-            let reply_to_header = header_value(&mail.headers, "Reply-To");
-            let authentication_results = header_value(&mail.headers, "Authentication-Results");
-            let return_path = header_value(&mail.headers, "Return-Path");
-            let parsed_headers: Vec<(String, String)> = mail
-                .headers
-                .iter()
-                .map(|h| (h.get_key().to_string(), h.get_value()))
-                .collect();
-            let list_unsubscribe =
-                if crate::unsubscribe_detect::list_unsubscribe_header_present(&parsed_headers) {
-                    header_value(&mail.headers, "List-Unsubscribe")
-                        .or_else(|| header_value(&mail.headers, "List-Unsubscribe-Post"))
-                } else {
-                    None
-                };
-            let references = references_header
-                .as_deref()
-                .map(extract_msg_ids)
-                .unwrap_or_default();
-            let mut recipients = Vec::new();
-            if let Some(h) = to_header.as_deref() {
-                recipients.extend(parse_address_list(h));
-            }
-            if let Some(h) = cc_header.as_deref() {
-                for cc in parse_address_list(h) {
-                    if recipients
-                        .iter()
-                        .any(|existing: &rustymail_domain::EmailAddress| {
-                            existing.email.eq_ignore_ascii_case(&cc.email)
-                        })
-                    {
-                        continue;
-                    }
-                    recipients.push(cc);
-                }
-            }
-            let (body_plain, body_html) = extract_bodies(&mail);
-            let mut attachments = Vec::new();
-            extract_attachments(
-                &mail,
-                &account.id.0,
-                &mailbox,
-                uid,
-                &mut attachments,
-                &mut attachment_blobs,
-            );
-            (
-                subject,
-                name,
-                email,
-                recipients,
-                to_header,
-                cc_header,
-                reply_to_header,
-                body_plain,
-                body_html,
-                attachments,
-                message_id_header,
-                in_reply_to,
-                references,
-                authentication_results,
-                return_path,
-                list_unsubscribe,
-            )
-        } else {
-            let env = fetch
-                .envelope()
-                .ok_or_else(|| format!("IMAP: missing body and envelope (uid {uid})"))?;
-            let (name, email) = imap_envelope_from(env);
-            let subj = imap_envelope_subject(env);
-            (
-                subj,
-                name,
-                email,
-                Vec::new(),
-                None,
-                None,
-                None,
-                String::new(),
-                None,
-                Vec::new(),
-                None,
-                None,
-                Vec::new(),
-                None,
-                None,
-                None,
-            )
-        };
-
-        let unsub_signal = crate::unsubscribe_detect::message_has_unsubscribe_signal(
-            list_unsubscribe.as_deref(),
-            &subject,
-            &body_plain,
-            body_html.as_deref(),
-        );
-
-        let header_root = thread_root_from_headers(
-            message_id_header.as_deref(),
-            in_reply_to.as_deref(),
-            &references,
-        );
-        let thread_root = if let Some(root) = header_root {
-            root
-        } else if let Some(normalized_subject) = normalize_subject_for_threading(&subject) {
-            let participant_fallback = participants_key(&from_email, &recipients, &account.email);
-            format!("subject:{normalized_subject}|participants:{participant_fallback}")
-        } else {
-            format!("uid:{uid}")
-        };
-        let thread_id = pick_thread_id_for_imported_message(
-            db_path,
-            &account.id.0,
-            &mailbox,
-            message_id_header.as_deref(),
-            in_reply_to.as_deref(),
-            &references,
-            &thread_root,
-        );
-
-        let id = MessageId(format!(
-            "m-imap-{}-{}-{}",
-            account.id.0,
-            mailbox.to_ascii_lowercase(),
-            uid
-        ));
-
-        let preview = extract_preview_body(&body_plain, body_html.as_deref());
-
-        let reply_to = reply_to_header
-            .as_deref()
-            .map(parse_address_list)
-            .unwrap_or_default();
-
-        let plain_body = if body_plain.trim().is_empty() {
-            preview
-        } else {
-            body_plain.clone()
-        };
-        let lang_sample = format!(
-            "{}\n{}",
-            subject,
-            plain_body.chars().take(3000).collect::<String>()
-        );
-        let detected_lang = Some(crate::lang_detect::detect_language_iso639_1(&lang_sample));
-
-        let message = Message {
-            id,
-            sender: rustymail_domain::EmailAddress {
-                name: from_name,
-                email: from_email,
-            },
-            recipients: if recipients.is_empty() {
-                vec![rustymail_domain::EmailAddress {
-                    name: None,
-                    email: account.email.clone(),
-                }]
-            } else {
-                recipients
-            },
-            reply_to,
-            subject: subject.clone(),
-            received_at: internal,
-            plain_body,
-            html_body: body_html.clone(),
-            references: rustymail_domain::MessageReferences {
-                message_id_header: message_id_header.clone(),
-                in_reply_to: in_reply_to.clone(),
-                references: references.clone(),
-            },
-            attachments,
-            tags: Vec::new(),
-            detected_lang,
-            is_read: seen,
-            is_pinned: false,
-            authentication_results,
-            return_path,
-        };
-        message_headers.insert(
-            message.id.0.clone(),
-            (to_header, cc_header, reply_to_header),
-        );
-        let (list_unsub_stored, unsub_urls_json) =
-            crate::unsubscribe_detect::index_message_unsubscribe_urls(
-                list_unsubscribe.as_deref(),
-                &message.subject,
-                &message.plain_body,
-                message.html_body.as_deref(),
-                8,
-            );
-        message_unsub_index.insert(message.id.0.clone(), (list_unsub_stored, unsub_urls_json));
-
-        match by_thread.get_mut(&thread_id) {
-            Some((_subject, _root, messages, thread_unsub)) => {
-                if unsub_signal {
-                    *thread_unsub = true;
-                }
-                messages.push(message);
-            }
-            None => {
-                by_thread.insert(
-                    thread_id,
-                    (subject, Some(thread_root), vec![message], unsub_signal),
-                );
-            }
-        }
-    }
-
-    for (_tid, (_subject, _root, messages, _)) in by_thread.iter_mut() {
-        messages.sort_by(|a, b| a.received_at.cmp(&b.received_at));
-    }
-
-    let mut threads: Vec<Thread> = by_thread
-        .into_iter()
-        .map(|(thread_id, (subject, _root, messages, has_unsub))| {
-            let has_attachments = messages.iter().any(|m| !m.attachments.is_empty());
-            Thread {
-                id: ThreadId(thread_id),
-                subject,
-                tags: tags_for_thread(&mailbox, &messages, has_unsub, has_attachments),
-                entities: Vec::new(),
-                messages,
-                followed: false,
+            let body = fetch
+                .body()
+                .or_else(|| {
+                    fetch.section(&async_imap::imap_proto::types::SectionPath::Full(
+                        MessageSection::Text,
+                    ))
+                })
+                .map(|bytes| bytes.to_vec());
+            ImapFetchedPart {
+                uid: fetch.uid,
+                seen: is_seen(fetch.flags()),
+                internal,
+                envelope_subject,
+                envelope_from_name,
+                envelope_from_email,
+                body,
             }
         })
         .collect();
-    threads.sort_by(|a, b| a.id.0.cmp(&b.id.0));
-
+    let built = build_mailbox_import(db_path, account, &mailbox, &parts);
     upsert_threads_to_db(
         db_path,
-        &threads,
-        &message_headers,
-        &message_unsub_index,
-        &attachment_blobs,
+        &built.threads,
+        &built.message_headers,
+        &built.message_unsub_index,
+        &built.attachment_blobs,
         &account.id.0,
         &mailbox,
     )?;
-
-    if let Some(max_uid) = uids.iter().copied().max() {
+    persist_imap_sync_skipped(db_path, &account.id.0, &mailbox, &built.skipped)?;
+    if let Some(max_uid) = built.max_treated_uid {
         set_imap_last_uid(db_path, &account.id.0, &mailbox, max_uid)?;
     }
+
     let high_water = get_imap_last_uid(db_path, &account.id.0, &mailbox)?;
     let flags_reconciled =
         reconcile_recent_flags(db_path, &account.id.0, &mailbox, session, high_water).await?;
 
-    let message_count: usize = threads.iter().map(|thread| thread.messages.len()).sum();
+    let message_count: usize = built
+        .threads
+        .iter()
+        .map(|thread| thread.messages.len())
+        .sum();
     Ok(ImapSyncResult {
         mailbox: mailbox.to_string(),
         message_count,
-        thread_count: threads.len(),
+        thread_count: built.threads.len(),
         fetched_uids: uids.len(),
         uid_validity_reset,
         flags_reconciled,
         uids_pruned,
+        skipped_uids: built.skipped.len(),
     })
 }
 
@@ -1889,5 +2070,114 @@ mod preview_extract_tests {
         let html = r#"<html><head><style>#outlook a { padding:0; } body { margin:0; }</style></head>
         <body><p>Hello newsletter</p></body></html>"#;
         assert_eq!(extract_preview_body("", Some(html)), "Hello newsletter");
+    }
+}
+
+#[cfg(test)]
+mod import_build_tests {
+    use super::*;
+    use rustymail_domain::{AccountId, MailAuthKind, SecurityMode, ServerSettings};
+
+    fn test_account() -> Account {
+        Account {
+            id: AccountId("acc-1".into()),
+            display_name: "Ada".into(),
+            email: "ada@example.com".into(),
+            imap: ServerSettings {
+                host: "imap.example.com".into(),
+                port: 993,
+                security: SecurityMode::Tls,
+                allow_invalid_tls: false,
+            },
+            smtp: ServerSettings {
+                host: "smtp.example.com".into(),
+                port: 465,
+                security: SecurityMode::Tls,
+                allow_invalid_tls: false,
+            },
+            auth_kind: MailAuthKind::Password,
+        }
+    }
+
+    fn rfc822(from: &str, subject: &str, body: &str) -> Vec<u8> {
+        format!(
+            "From: {from}\r\nSubject: {subject}\r\nMessage-ID: <{subject}@ex>\r\n\r\n{body}\r\n"
+        )
+        .into_bytes()
+    }
+
+    #[test]
+    fn invalid_mime_does_not_drop_the_rest_of_the_batch() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = dir.path().join("mail.sqlite3");
+        let _conn = crate::open_sqlite_migrated(&db).expect("db");
+        let account = test_account();
+        let parts = vec![
+            ImapFetchedPart {
+                uid: Some(10),
+                seen: false,
+                internal: "2026-10-08T10:00:00Z".into(),
+                envelope_subject: Some("One".into()),
+                envelope_from_name: Some("Alice".into()),
+                envelope_from_email: Some("alice@example.com".into()),
+                body: Some(rfc822("Alice <alice@example.com>", "One", "Hello one")),
+            },
+            ImapFetchedPart {
+                uid: Some(11),
+                seen: true,
+                internal: "2026-10-08T11:00:00Z".into(),
+                envelope_subject: Some("Broken".into()),
+                envelope_from_name: Some("Bob".into()),
+                envelope_from_email: Some("bob@example.com".into()),
+                body: Some(b" Subject: not a header\r\n\r\n".to_vec()),
+            },
+            ImapFetchedPart {
+                uid: None,
+                seen: false,
+                internal: "2026-10-08T11:30:00Z".into(),
+                envelope_subject: None,
+                envelope_from_name: None,
+                envelope_from_email: None,
+                body: Some(rfc822("Zoe <zoe@example.com>", "NoUid", "skip")),
+            },
+            ImapFetchedPart {
+                uid: Some(12),
+                seen: false,
+                internal: "2026-10-08T12:00:00Z".into(),
+                envelope_subject: Some("Three".into()),
+                envelope_from_name: None,
+                envelope_from_email: Some("cara@example.com".into()),
+                body: Some(rfc822("Cara <cara@example.com>", "Three", "Hello three")),
+            },
+        ];
+        let built = build_mailbox_import(&db, &account, "INBOX", &parts);
+        assert_eq!(built.skipped.len(), 1);
+        assert_eq!(built.skipped[0].0, 11);
+        assert_eq!(built.max_treated_uid, Some(12));
+        let messages: Vec<&Message> = built
+            .threads
+            .iter()
+            .flat_map(|t| t.messages.iter())
+            .collect();
+        assert_eq!(messages.len(), 3, "2 normaux + 1 minimal");
+        let minimal = messages
+            .iter()
+            .find(|m| m.plain_body.contains(UNREADABLE_MIME_BODY))
+            .expect("message minimal");
+        assert_eq!(minimal.subject, "Broken");
+        assert!(messages.iter().any(|m| m.plain_body.contains("Hello one")));
+        assert!(messages
+            .iter()
+            .any(|m| m.plain_body.contains("Hello three")));
+        persist_imap_sync_skipped(&db, &account.id.0, "INBOX", &built.skipped).expect("skip row");
+        let conn = crate::open_sqlite_migrated(&db).expect("reopen");
+        let n: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM imap_sync_skipped WHERE uid = 11",
+                [],
+                |r| r.get(0),
+            )
+            .expect("count");
+        assert_eq!(n, 1);
     }
 }

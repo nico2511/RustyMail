@@ -64,6 +64,35 @@ describe("sanitizeEmailHtml", () => {
     expect(html).toContain("data:image/png;base64,iVBORw0KGgo=");
   });
 
+  it("bloque background, image-set et les url CSS échappées", () => {
+    const cases = [
+      `<table background="https://t.example/p.gif"><tr><td>a</td></tr></table>`,
+      `<table><tr><td background="https://t.example/p.gif">a</td></tr></table>`,
+      `<body background="https://t.example/p.gif"><p>a</p></body>`,
+      `<div style="background-image:image-set('https://t.example/x' 1x)">a</div>`,
+      `<div style="background-image:-webkit-image-set(url(https://t.example/x) 1x)">a</div>`,
+      `<div style="background:u\\72 l(https://t.example/x)">a</div>`,
+      `<div style="background:\\75 rl(https://t.example/x)">a</div>`,
+      `<div style="background:ur/**/l(https://t.example/x)">a</div>`,
+    ];
+    for (const html of cases) {
+      const out = sanitizeEmailHtml(html).html;
+      expect(out, html).not.toMatch(/\sbackground="https?:/i);
+      expect(out, html).not.toMatch(/\sstyle="[^"]*https?:/i);
+      expect(out.replace(/data-remote-[a-z]+="[^"]*"/gi, ""), html).not.toContain("t.example");
+    }
+    const table = sanitizeEmailHtml(cases[0]).html;
+    expect(table).toContain('data-remote-background="https://t.example/p.gif"');
+  });
+
+  it("conserve background quand les images distantes sont autorisées", () => {
+    const { html } = sanitizeEmailHtml(`<table background="https://t.example/p.gif"><tr><td>a</td></tr></table>`, {
+      allowRemoteImages: true,
+    });
+    expect(html).toContain('background="https://t.example/p.gif"');
+    expect(html).not.toContain("data-remote-background");
+  });
+
   it("conserve la largeur d’image (attr ou style) pour le rendu", () => {
     const { html } = sanitizeEmailHtml(
       `<img src="cid:img1-abcd" width="200" style="width: 200px; height: auto; max-width: 100%;" alt="a"/>`,

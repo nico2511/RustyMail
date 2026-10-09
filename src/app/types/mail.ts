@@ -197,6 +197,8 @@ export type AppStatus = {
   walEnabled: boolean;
   vaultKeyLocation: string;
   aiRuntime: string;
+  /** Présent quand la sauvegarde de version a échoué ou a été sautée. */
+  versionBackupNotice?: string;
 };
 
 export type AppPathsView = {

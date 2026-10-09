@@ -4,6 +4,7 @@ import { applyAppearanceFromPrefs } from "../../appearance";
 import { setLocale } from "../../i18n";
 import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { safeInvoke, tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
+import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import type { AppPathsView, AppStatus } from "../types";
@@ -28,6 +29,9 @@ export async function bootInitShellAndRuntime(): Promise<void> {
   bindDraftPersistenceFlush();
 
   state.status = await safeInvoke<AppStatus>("app_status", undefined, fallbackStatus(), BOOT_INVOKE_TIMEOUT_MS);
+  const backupNotice = state.status?.versionBackupNotice?.trim();
+  if (backupNotice) toast.warning(backupNotice, { durationMs: 0 });
+  if (state.dbLockedMessage) render();
   await bindTauriNativeFileDropAsync();
   try {
     const capsRaw = await withTimeout(invoke<unknown>("capabilities", {}), BOOT_INVOKE_TIMEOUT_MS);

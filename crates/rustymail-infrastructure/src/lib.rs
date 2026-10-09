@@ -1107,9 +1107,36 @@ pub(crate) fn open_sqlite_migrated(path: &Path) -> Result<Connection, rusqlite::
     if memo.contains(&key) {
         return Ok(connection);
     }
+    let backup = sqlite_crypto::prepare_version_backup(&connection, path);
     migrate(&connection)?;
+    sqlite_crypto::apply_version_backup_outcome(&connection, &backup)?;
+    sqlite_crypto::note_sqlcipher_verified_open(&connection, path);
     memo.insert(key);
     Ok(connection)
+}
+
+#[cfg(test)]
+pub(crate) fn reset_sqlite_migrated_memo_for_tests() {
+    let mut memo = match migrated_paths_guard().lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    memo.clear();
+}
+
+/// Avis persisté quand la sauvegarde `*.pre-<version>.bak` a échoué ou a été sautée.
+/// Chaîne vide si tout va bien. Une erreur « Base verrouillée » remonte telle quelle.
+pub fn version_backup_notice(db_path: &Path) -> Result<String, String> {
+    let connection = open_sqlite_migrated(db_path).map_err(|e| e.to_string())?;
+    let value = connection
+        .query_row(
+            "SELECT value FROM app_meta WHERE key = 'version_backup_notice'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    Ok(value.unwrap_or_default())
 }
 
 /// Ouvre la base locale (WAL + SQLCipher) avec migrations appliquées.
@@ -1362,6 +1389,20 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
     activity::migrate_activity(connection)?;
     imap_tombstones::migrate_imap_tombstones(connection)?;
     migrate_messages_fts(connection)?;
+    connection.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS imap_sync_skipped (
+            account_id TEXT NOT NULL,
+            mailbox TEXT NOT NULL,
+            uid INTEGER NOT NULL,
+            error TEXT NOT NULL,
+            at TEXT NOT NULL,
+            PRIMARY KEY (account_id, mailbox, uid)
+        );
+        -- UID ignorés au FETCH : pas de nouvel essai (`last_uid` avance au-delà).
+        -- Lignes supprimées à la suppression du compte et au reset UIDVALIDITY.
+        ",
+    )?;
 
     Ok(())
 }
@@ -1804,6 +1845,8 @@ pub fn delete_account(db_path: impl AsRef<Path>, account_id: &str) -> Result<(),
         .map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM imap_state WHERE account_id = ?1", [id])
         .map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM imap_sync_skipped WHERE account_id = ?1", [id])
+        .map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM saved_drafts WHERE account_id = ?1", [id])
         .map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM draft_revisions WHERE account_id = ?1", [id])
@@ -2214,6 +2257,11 @@ pub(crate) fn invalidate_imap_mailbox_local_state(
          ON CONFLICT(account_id, mailbox) DO UPDATE SET
             last_uid = 0,
             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')",
+        params![account_id, mailbox],
+    )
+    .map_err(|error| error.to_string())?;
+    tx.execute(
+        "DELETE FROM imap_sync_skipped WHERE account_id = ?1 AND mailbox = ?2",
         params![account_id, mailbox],
     )
     .map_err(|error| error.to_string())?;
@@ -2963,6 +3011,51 @@ mod imap_uid_validity_tests {
         assert_eq!(last_uid, 0);
         let uv = get_imap_uid_validity(&path, "a1", "INBOX").expect("uv");
         assert_eq!(uv, Some(200));
+    }
+
+    #[test]
+    fn skipped_uids_cleared_on_uidvalidity_reset_and_account_delete() {
+        let (_dir, path) = test_db();
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        conn.execute(
+            "INSERT INTO imap_state (account_id, mailbox, last_uid, uidvalidity)
+             VALUES ('a1', 'INBOX', 12, 100)",
+            [],
+        )
+        .expect("state");
+        conn.execute(
+            "INSERT INTO imap_sync_skipped (account_id, mailbox, uid, error, at)
+             VALUES ('a1', 'INBOX', 11, 'mime', '2026-01-01'),
+                    ('a1', 'Sent', 3, 'mime', '2026-01-01')",
+            [],
+        )
+        .expect("skipped");
+        drop(conn);
+        ensure_imap_uid_validity(&path, "a1", "INBOX", Some(200)).expect("reset");
+        let conn = open_sqlite_migrated(&path).expect("reopen");
+        let inbox: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM imap_sync_skipped WHERE mailbox = 'INBOX'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("inbox");
+        let sent: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM imap_sync_skipped WHERE mailbox = 'Sent'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("sent");
+        assert_eq!(inbox, 0, "UIDVALIDITY reset purge le dossier");
+        assert_eq!(sent, 1, "les autres dossiers restent");
+        drop(conn);
+        delete_account(&path, "a1").expect("delete");
+        let conn = open_sqlite_migrated(&path).expect("after delete");
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM imap_sync_skipped", [], |r| r.get(0))
+            .expect("count");
+        assert_eq!(n, 0);
     }
 
     #[test]

@@ -4,7 +4,7 @@ Le mail se lit comme une **discussion**. Le nettoyage générique sert ce mode :
 
 Chaîne : HTML MIME → `clean_html_builtin` (générique, puis Amazon / GitHub si le signal expéditeur est fort, Deblock si le domaine **et** la structure de la fixture tiennent) → `CleanedMessageView.cleanedHtmlBody` → ombre DOM + `sanitizeEmailHtml` (DOMPurify et gardes).
 
-Les images distantes restent bloquées tant que la personne ne demande pas à les charger. Le cœur mail ne dépend pas d’un LLM pour ce nettoyage.
+Les images distantes restent bloquées tant que la personne ne demande pas à les charger. Le blocage est fait par `sanitizeEmailHtml` (attributs `src`, `background`, `poster`… déplacés vers `data-remote-*`, styles `url(` / `image-set(` / échappements CSS retirés). La CSP de la WebView autorise encore `img-src https:` : elle ne sert pas de filet en 0.4.5, parce que « Afficher les images » charge les URL distantes directement. Un proxy d’images est prévu pour la 0.5. Le cœur mail ne dépend pas d’un LLM pour ce nettoyage.
 
 ## Deux chemins, pas un modèle unique
 

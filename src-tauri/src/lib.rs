@@ -72,6 +72,8 @@ struct AppStatus {
     wal_enabled: bool,
     vault_key_location: &'static str,
     ai_runtime: &'static str,
+    /// Avis non vide tant qu'une sauvegarde `*.pre-<version>.bak` n'a pas réussi.
+    version_backup_notice: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -231,14 +233,24 @@ struct DownloadAttachmentInvoke {
 }
 
 #[tauri::command]
-fn app_status() -> AppStatus {
-    AppStatus {
+fn app_status(paths: State<'_, AppPaths>) -> Result<AppStatus, String> {
+    let version_backup_notice =
+        match rustymail_infrastructure::version_backup_notice(&paths.db_path) {
+            Ok(notice) => notice,
+            Err(e) if e.contains("Base verrouillée") => return Err(e),
+            Err(e) => {
+                log::warn!("avis sauvegarde de version illisible : {e}");
+                String::new()
+            }
+        };
+    Ok(AppStatus {
         app_name: "RustyMail",
         version: env!("CARGO_PKG_VERSION"),
         wal_enabled: true,
         vault_key_location: "OS Keyring",
         ai_runtime: "whisper.cpp (dictée locale)",
-    }
+        version_backup_notice,
+    })
 }
 
 #[tauri::command]

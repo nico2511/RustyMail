@@ -19,6 +19,18 @@ import {
 import { commitAppShellHtml } from "./appShellRenderCommitRun";
 
 export function renderAppShell(): void {
+  if (state.dbLockedMessage) {
+    appShell.className = "app";
+    appShell.innerHTML = `<div class="db-locked" role="alert" style="max-width:36rem;margin:12vh auto;padding:28px 24px;font-family:system-ui,sans-serif">
+      <h1 style="font-size:1.35rem;margin:0 0 12px">Base verrouillée</h1>
+      <p style="margin:0 0 18px;line-height:1.45">${state.dbLockedMessage}</p>
+      <button type="button" id="db-locked-retry">Réessayer</button>
+    </div>`;
+    appShell.querySelector<HTMLButtonElement>("#db-locked-retry")?.addEventListener("click", () => {
+      window.location.reload();
+    });
+    return;
+  }
   syncMailboxDigestPanelWithFeaturePref();
   captureAccountsFormBeforeRender();
 

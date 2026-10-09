@@ -21,7 +21,8 @@ export function buildMailShadowInnerHtml(messageId: string, raw: string, isClean
     relocateUnsubscribe: true,
     stripOutlookNoise: isCleanView,
   });
-  const blockedRemoteImages = !allowRemoteImages && sanitized.includes("data-remote-src=");
+  const blockedRemoteImages =
+    !allowRemoteImages && /data-remote-(?:src|background|poster|lowsrc|dynsrc)=/.test(sanitized);
   const remoteImageBanner = blockedRemoteImages
     ? `<div class="remote-images">
         <span>Des images distantes sont bloquées.</span>
