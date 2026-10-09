@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use async_imap::imap_proto::types::{Address, Envelope, MessageSection};
+use async_imap::imap_proto::types::{Address, Envelope};
 use async_imap::types::Flag;
 use chrono::{SecondsFormat, Utc};
 use futures::TryStreamExt;
 use mailparse::{addrparse, parse_mail, MailHeaderMap, ParsedMail, SingleInfo};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 
 use rustymail_domain::{
     canonical_source_domain, host_of_email, Account, Attachment, AttachmentId, AttachmentKind,
@@ -507,12 +507,14 @@ fn first_msg_id_from_header(value: Option<String>) -> Option<String> {
 /// Trouve un fil existant pour ce `Message-ID`, sur **tous** les dossiers du compte.
 /// Une réponse en boîte de réception doit pouvoir se rattacher au premier message enregistré
 /// seulement dans « Envoyés » (ou à une copie locale `INBOX` sans UID) — pas seulement au dossier en cours de sync.
+/// Chaîne FETCH d'une passe de synchro (un seul corps : `BODY.PEEK[]`).
+pub(crate) const IMAP_SYNC_FETCH_QUERY: &str = "(UID ENVELOPE INTERNALDATE FLAGS BODY.PEEK[])";
+
 fn lookup_thread_id_by_message_id_for_account(
-    db_path: &Path,
+    conn: &Connection,
     account_id: &str,
     message_id_header: &str,
 ) -> Option<String> {
-    let conn = crate::open_sqlite_migrated(db_path).ok()?;
     let normalized = normalize_msg_id_token(message_id_header)
         .unwrap_or_else(|| message_id_header.trim().to_string());
     let account_trim = account_id.trim();
@@ -531,7 +533,7 @@ fn lookup_thread_id_by_message_id_for_account(
 }
 
 fn pick_existing_thread_id_from_refs(
-    db_path: &Path,
+    conn: &Connection,
     account_id: &str,
     _mailbox: &str,
     in_reply_to: Option<&str>,
@@ -539,12 +541,12 @@ fn pick_existing_thread_id_from_refs(
 ) -> Option<String> {
     // Références / In-Reply-To : tout message déjà importé (n’importe quel dossier) suffit pour réutiliser le même thread_id.
     for r in references.iter().take(12) {
-        if let Some(tid) = lookup_thread_id_by_message_id_for_account(db_path, account_id, r) {
+        if let Some(tid) = lookup_thread_id_by_message_id_for_account(conn, account_id, r) {
             return Some(tid);
         }
     }
     if let Some(ir) = in_reply_to {
-        if let Some(tid) = lookup_thread_id_by_message_id_for_account(db_path, account_id, ir) {
+        if let Some(tid) = lookup_thread_id_by_message_id_for_account(conn, account_id, ir) {
             return Some(tid);
         }
     }
@@ -626,7 +628,7 @@ fn thread_id_for_root(account_id: &str, mailbox: &str, root: &str) -> String {
 }
 
 fn pick_thread_id_for_imported_message(
-    db_path: &Path,
+    conn: &Connection,
     account_id: &str,
     mailbox: &str,
     message_id_header: Option<&str>,
@@ -634,11 +636,10 @@ fn pick_thread_id_for_imported_message(
     references: &[String],
     thread_root: &str,
 ) -> String {
-    pick_existing_thread_id_from_refs(db_path, account_id, mailbox, in_reply_to, references)
+    pick_existing_thread_id_from_refs(conn, account_id, mailbox, in_reply_to, references)
         .or_else(|| {
-            message_id_header.and_then(|mid| {
-                lookup_thread_id_by_message_id_for_account(db_path, account_id, mid)
-            })
+            message_id_header
+                .and_then(|mid| lookup_thread_id_by_message_id_for_account(conn, account_id, mid))
         })
         .unwrap_or_else(|| thread_id_for_root(account_id, mailbox, thread_root))
 }
@@ -977,6 +978,7 @@ fn build_mailbox_import(
     mailbox: &str,
     parts: &[ImapFetchedPart],
 ) -> BuiltMailboxImport {
+    let thread_conn = crate::open_sqlite_migrated(db_path).ok();
     let mut by_thread: HashMap<String, (String, Option<String>, Vec<Message>, bool)> =
         HashMap::new();
     #[allow(clippy::type_complexity)]
@@ -1176,15 +1178,19 @@ fn build_mailbox_import(
         } else {
             format!("uid:{uid}")
         };
-        let thread_id = pick_thread_id_for_imported_message(
-            db_path,
-            &account.id.0,
-            mailbox,
-            message_id_header.as_deref(),
-            in_reply_to.as_deref(),
-            &references,
-            &thread_root,
-        );
+        let thread_id = if let Some(conn) = thread_conn.as_ref() {
+            pick_thread_id_for_imported_message(
+                conn,
+                &account.id.0,
+                mailbox,
+                message_id_header.as_deref(),
+                in_reply_to.as_deref(),
+                &references,
+                &thread_root,
+            )
+        } else {
+            thread_id_for_root(&account.id.0, mailbox, &thread_root)
+        };
 
         let id = MessageId(format!(
             "m-imap-{}-{}-{}",
@@ -1401,7 +1407,7 @@ async fn sync_mailbox_with_session(
         });
     }
 
-    let query = "(UID ENVELOPE INTERNALDATE FLAGS BODY.PEEK[] BODY.PEEK[TEXT])";
+    let query = IMAP_SYNC_FETCH_QUERY;
     let mut fetches: Vec<async_imap::types::Fetch> = Vec::new();
     for chunk in uids.chunks(FETCH_BATCH) {
         let mut set = String::new();
@@ -1438,14 +1444,7 @@ async fn sync_mailbox_with_session(
                 }
                 None => (None, None, None),
             };
-            let body = fetch
-                .body()
-                .or_else(|| {
-                    fetch.section(&async_imap::imap_proto::types::SectionPath::Full(
-                        MessageSection::Text,
-                    ))
-                })
-                .map(|bytes| bytes.to_vec());
+            let body = fetch.body().map(|bytes| bytes.to_vec());
             ImapFetchedPart {
                 uid: fetch.uid,
                 seen: is_seen(fetch.flags()),
@@ -1665,8 +1664,7 @@ async fn reconcile_recent_flags(
         return Ok(0);
     }
     uids.sort_unstable();
-    let connection = open_sqlite_migrated(db_path).map_err(|error| error.to_string())?;
-    let mut updated = 0usize;
+    let mut pending: Vec<(u32, bool)> = Vec::new();
     for chunk in uids.chunks(FETCH_BATCH) {
         let set = format_uid_set(chunk);
         let stream = session
@@ -1679,12 +1677,20 @@ async fn reconcile_recent_flags(
             let Some(uid) = fetch.uid else {
                 continue;
             };
-            let seen = is_seen(fetch.flags());
-            if update_message_read_by_imap_uid(&connection, account_id, mailbox, uid, seen)? {
-                updated += 1;
-            }
+            pending.push((uid, is_seen(fetch.flags())));
         }
     }
+    let mut connection = open_sqlite_migrated(db_path).map_err(|error| error.to_string())?;
+    let tx = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    let mut updated = 0usize;
+    for (uid, seen) in pending {
+        if update_message_read_by_imap_uid(&tx, account_id, mailbox, uid, seen)? {
+            updated += 1;
+        }
+    }
+    tx.commit().map_err(|error| error.to_string())?;
     Ok(updated)
 }
 
@@ -1920,8 +1926,71 @@ mod thread_pick_tests {
         .expect("message");
 
         let picked =
-            pick_thread_id_for_imported_message(&db, account, "INBOX", Some(mid), None, &[], mid);
+            pick_thread_id_for_imported_message(&conn, account, "INBOX", Some(mid), None, &[], mid);
         assert_eq!(picked, local_thread);
+    }
+
+    #[test]
+    fn reply_reuses_thread_from_references_in_another_mailbox() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = dir.path().join("refs.db");
+        let conn = open_sqlite_migrated(&db).expect("open db");
+        let account = "acc-refs";
+        let root = "<root-sent@rustymail.local>";
+        let sent_thread = "t-sent-root";
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags) VALUES (?1, ?2, 'Sent', ?3, 'Root', '')",
+            params![sent_thread, account, root],
+        )
+        .expect("thread");
+        conn.execute(
+            "
+            INSERT INTO messages (
+                id, thread_id, account_id, mailbox, imap_uid,
+                sender_name, sender_email, subject, received_at,
+                body, body_plain, message_id_header, is_read, position
+            ) VALUES ('m-sent', ?1, ?2, 'Sent', 1,
+                'Me', 'me@example.com', 'Root', '2026-01-01T00:00:00Z',
+                'body', 'body', ?3, 1, 0)
+            ",
+            params![sent_thread, account, root],
+        )
+        .expect("message");
+        let plan = explain_plan(
+            &conn,
+            "SELECT thread_id FROM messages WHERE account_id = 'acc-refs' AND message_id_header = '<root-sent@rustymail.local>' LIMIT 1",
+        );
+        assert!(
+            plan.to_ascii_lowercase()
+                .contains("idx_messages_account_msgid"),
+            "{plan}"
+        );
+        let picked = pick_thread_id_for_imported_message(
+            &conn,
+            account,
+            "INBOX",
+            Some("<reply@rustymail.local>"),
+            None,
+            &[root.to_string()],
+            root,
+        );
+        assert_eq!(picked, sent_thread);
+        assert!(!IMAP_SYNC_FETCH_QUERY.contains("BODY.PEEK[TEXT]"));
+        assert!(IMAP_SYNC_FETCH_QUERY.contains("BODY.PEEK[]"));
+    }
+
+    fn explain_plan(conn: &rusqlite::Connection, sql: &str) -> String {
+        let mut stmt = conn
+            .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+            .expect("explain");
+        let mut rows = stmt.query([]).expect("query");
+        let mut plan = String::new();
+        while let Some(row) = rows.next().expect("row") {
+            let detail: String = row.get(3).unwrap_or_default();
+            plan.push_str(&detail);
+            plan.push('\n');
+        }
+        plan
     }
 
     #[test]

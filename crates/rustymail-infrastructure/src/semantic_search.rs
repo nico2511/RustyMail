@@ -2123,7 +2123,7 @@ mod sender_search_tests {
     fn mark_read_does_not_rewrite_fts() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("read.db");
-        let conn = open_sqlite_migrated(&path).expect("migrate");
+        let mut conn = open_sqlite_migrated(&path).expect("migrate");
         seed_account(&conn);
         let trigger: String = conn
             .query_row(
@@ -2153,12 +2153,16 @@ mod sender_search_tests {
             .query_row("SELECT total_changes()", [], |r| r.get(0))
             .expect("changes");
         let started = std::time::Instant::now();
-        for i in 0..200 {
-            conn.execute(
-                "UPDATE messages SET is_read = 0 WHERE id = ?1",
-                [format!("m{i}")],
-            )
-            .expect("mark");
+        {
+            let tx = conn.transaction().expect("tx");
+            for i in 0..200 {
+                tx.execute(
+                    "UPDATE messages SET is_read = 0 WHERE id = ?1",
+                    [format!("m{i}")],
+                )
+                .expect("mark");
+            }
+            tx.commit().expect("commit");
         }
         let elapsed = started.elapsed();
         let after: i64 = conn
@@ -2169,8 +2173,7 @@ mod sender_search_tests {
             200,
             "chaque is_read ne doit toucher que la ligne message, pas l'index FTS"
         );
-        // Linux CI reste sous 1,5 s ; Windows smoke est plus lent (~5 s observés).
-        let budget_ms = if cfg!(windows) { 15_000 } else { 1_500 };
+        let budget_ms = 1_500;
         assert!(
             elapsed.as_millis() < budget_ms,
             "200 marquages lus trop lents : {elapsed:?} (budget {budget_ms} ms)"

@@ -104,12 +104,35 @@ pub struct ImapSentCopyOutcome {
     pub dedupe_failed: Option<String>,
 }
 
+/// Délai max de la copie « Envoyés ». Au-delà, l'envoi SMTP reste un succès.
+pub const SENT_COPY_TIMEOUT: Duration = Duration::from_secs(180);
+
 /// Après un envoi SMTP réussi, enregistre une copie RFC 822 dans le dossier Envoyés du serveur.
 /// Puis recherche plusieurs copies du même `Message-ID` (append client + dépôt automatique serveur),
 /// enlève les doublons en gardant **le plus petit UID**.
 ///
-/// Les erreurs sont dans [`ImapSentCopyOutcome`] : l’appelant peut les afficher à titre informatif.
+/// Les erreurs, y compris un délai dépassé, sont dans [`ImapSentCopyOutcome`] : l’appelant ne doit pas
+/// traiter ça comme un échec d’envoi.
 pub async fn imap_append_sent_copy(
+    account: &Account,
+    rfc822: &[u8],
+    message_id_header: &str,
+) -> ImapSentCopyOutcome {
+    match tokio::time::timeout(
+        SENT_COPY_TIMEOUT,
+        imap_append_sent_copy_inner(account, rfc822, message_id_header),
+    )
+    .await
+    {
+        Ok(outcome) => outcome,
+        Err(_) => ImapSentCopyOutcome {
+            append_failed: Some("délai dépassé pendant la copie IMAP vers « Envoyés »".to_string()),
+            dedupe_failed: None,
+        },
+    }
+}
+
+async fn imap_append_sent_copy_inner(
     account: &Account,
     rfc822: &[u8],
     message_id_header: &str,

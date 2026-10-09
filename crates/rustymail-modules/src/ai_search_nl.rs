@@ -1,3 +1,4 @@
+use chrono::{DateTime, Datelike, TimeZone};
 use serde::Deserialize;
 
 use crate::ai_llm_contracts::{sanitize_search_nl_senders, validate_search_nl_shape};
@@ -35,16 +36,28 @@ struct SearchLlmPartial {
     has_attachment: Option<bool>,
 }
 
+pub fn today_iso_for<Tz: TimeZone>(now: DateTime<Tz>) -> String {
+    let date = now.date_naive();
+    format!("{:04}-{:02}-{:02}", date.year(), date.month(), date.day())
+}
+
+pub fn search_nl_user_prompt(today: &str, natural: &str) -> String {
+    format!(
+        "Date du jour (AAAA-MM-JJ) : {today}\nRequête : {}",
+        natural.trim()
+    )
+}
+
 pub fn nl_to_search_query(
     engine: &mut LlmEngine,
     natural: &str,
     account_id: &str,
     output_language: &str,
+    today: &str,
 ) -> Result<SearchQuery, LlmError> {
     let trimmed = natural.trim();
     let system = crate::prompts::system_prompt_for_language("search_nl", output_language);
-    let today = today_iso_utc();
-    let user = format!("Date du jour (AAAA-MM-JJ) : {today}\nRequête : {trimmed}");
+    let user = search_nl_user_prompt(today, trimmed);
 
     let raw = engine.generate(
         system.as_str(),
@@ -128,32 +141,10 @@ fn sanitize_nl_date(raw: Option<&str>, end_of_day: bool) -> Option<String> {
     None
 }
 
-fn today_iso_utc() -> String {
-    let days = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| (d.as_secs() / 86_400) as i64)
-        .unwrap_or(0);
-    iso_from_unix_days(days)
-}
-
-fn iso_from_unix_days(unix_days: i64) -> String {
-    let z = unix_days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
-    let mut y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    if m <= 2 {
-        y += 1;
-    }
-    format!("{y:04}-{m:02}-{d:02}")
-}
-
 #[cfg(test)]
 mod tests {
+    use chrono::{DateTime, FixedOffset};
+
     use rustymail_domain::{nl_search_text_fallback, SearchQuery};
 
     #[test]
@@ -166,13 +157,11 @@ mod tests {
     }
 
     #[test]
-    fn civil_date_from_unix_days() {
-        assert_eq!(super::iso_from_unix_days(0), "1970-01-01");
-        assert_eq!(super::iso_from_unix_days(10957), "2000-01-01");
-        let today = super::today_iso_utc();
-        assert!(
-            today.len() == 10 && today.as_bytes()[4] == b'-' && today.as_bytes()[7] == b'-',
-            "{today}"
-        );
+    fn local_offset_after_utc_midnight_is_the_next_civil_day() {
+        let utc = DateTime::parse_from_rfc3339("2026-10-08T23:30:00Z").expect("rfc3339");
+        let paris = utc.with_timezone(&FixedOffset::east_opt(2 * 3600).expect("offset"));
+        assert_eq!(super::today_iso_for(paris), "2026-10-09");
+        let prompt = super::search_nl_user_prompt("2026-10-09", "hier");
+        assert!(prompt.contains("2026-10-09"), "{prompt}");
     }
 }

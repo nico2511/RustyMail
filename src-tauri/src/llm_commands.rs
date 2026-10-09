@@ -808,8 +808,14 @@ fn llm_search_nl_compute(
     llm_gate_feature(&prefs, paths, AiFeature::SearchNl)?;
     let mut engine = build_llm_engine(&prefs, paths)?;
     let lang = prefs.general.mother_language.as_str();
-    ai_search_nl::nl_to_search_query(&mut engine, phrase.trim(), account_id.trim(), lang)
-        .map_err(|e| e.to_string())
+    ai_search_nl::nl_to_search_query(
+        &mut engine,
+        phrase.trim(),
+        account_id.trim(),
+        lang,
+        &rustymail_infrastructure::local_today_iso(),
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

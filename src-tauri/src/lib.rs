@@ -14,9 +14,10 @@ use rustymail_infrastructure::{
     migrate_locked_mailboxes_after_rename, normalized_chat_backend, openrouter_api_key_clear,
     openrouter_api_key_present, openrouter_api_key_set, peek_attachment_identity,
     persist_allow_invalid_tls_from_ui_checkbox, prefs_path_from_db_dir, save_app_prefs,
-    save_app_prefs_validated, transcribe_and_maybe_translate, AppPrefs, DraftRevisionListItem,
-    ImapSyncResult, NewsletterRule, SavedDraftListItem, SavedDraftOpenResult, SemanticReindexStats,
-    SyncMailboxesOutcome, PREFIX_RISK_CONFIRM,
+    save_app_prefs_validated, transcribe_and_maybe_translate, AppPrefs, BulkSeenOutcome,
+    BulkThreadRef, DraftRevisionListItem, ImapSyncResult, NewsletterRule, SavedDraftListItem,
+    SavedDraftOpenResult, SemanticReindexStats, SendAttemptBook, SendBegin, SendSlot,
+    StoredSendAttempt, SyncMailboxesOutcome, PREFIX_RISK_CONFIRM,
 };
 mod activity_commands;
 mod address_commands;
@@ -40,7 +41,8 @@ mod webview_microphone;
 mod whisper_dictation;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
+use std::time::SystemTime;
 
 use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::Emitter;
@@ -898,11 +900,162 @@ fn send_draft_imap_notice(out: &rustymail_infrastructure::ImapSentCopyOutcome) -
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SendDraftOutcome {
     #[serde(skip_serializing_if = "Option::is_none")]
     imap_notice: Option<String>,
+}
+
+fn send_attempt_book() -> &'static Mutex<SendAttemptBook<SendDraftOutcome>> {
+    static BOOK: OnceLock<Mutex<SendAttemptBook<SendDraftOutcome>>> = OnceLock::new();
+    BOOK.get_or_init(|| Mutex::new(SendAttemptBook::default()))
+}
+
+fn lock_send_book() -> std::sync::MutexGuard<'static, SendAttemptBook<SendDraftOutcome>> {
+    match send_attempt_book().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+fn hydrate_send_book(db: &std::path::Path) {
+    let Ok(conn) = rustymail_infrastructure::open_sqlite_migrated_public(db) else {
+        return;
+    };
+    let now = rustymail_infrastructure::unix_secs(SystemTime::now());
+    let _ = rustymail_infrastructure::prune_stored_sends(&conn, now);
+    let since = now.saturating_sub(rustymail_infrastructure::SEND_ATTEMPT_TTL.as_secs() as i64);
+    let Ok(rows) = rustymail_infrastructure::load_stored_sends_since(&conn, since) else {
+        return;
+    };
+    let mut book = lock_send_book();
+    for row in rows {
+        let at = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(row.at_unix.max(0) as u64);
+        let slot = match row.state.as_str() {
+            "done" => SendSlot::Done {
+                at,
+                value: SendDraftOutcome {
+                    imap_notice: row.imap_notice,
+                },
+                fingerprint: row.fingerprint,
+            },
+            "inflight" => SendSlot::InFlight {
+                started: at,
+                fingerprint: row.fingerprint,
+                launch_id: row.launch_id,
+            },
+            "smtp_accepted" => SendSlot::SmtpAccepted {
+                at,
+                value: SendDraftOutcome {
+                    imap_notice: row.imap_notice,
+                },
+                fingerprint: row.fingerprint,
+                launch_id: row.launch_id,
+            },
+            "failed" => SendSlot::Failed {
+                at,
+                error: row.error.unwrap_or_default(),
+                fingerprint: row.fingerprint,
+            },
+            _ => continue,
+        };
+        book.absorb_absent(&row.send_id, slot);
+    }
+}
+
+fn persist_send_row(db: &std::path::Path, row: &StoredSendAttempt) {
+    let Ok(conn) = rustymail_infrastructure::open_sqlite_migrated_public(db) else {
+        return;
+    };
+    if let Err(e) = rustymail_infrastructure::upsert_stored_send(&conn, row) {
+        log::warn!("send_attempts : {e}");
+    }
+}
+
+fn send_spool_paths(
+    db: &std::path::Path,
+    send_id: &str,
+) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+    if send_id.is_empty() || !send_id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+        return None;
+    }
+    let dir = db.parent()?.join("send-spool");
+    Some((
+        dir.join(format!("{send_id}.rfc822")),
+        dir.join(format!("{send_id}.mid")),
+    ))
+}
+
+fn write_send_spool(db: &std::path::Path, send_id: &str, rfc822: &[u8], message_id: &str) {
+    let Some((body, mid)) = send_spool_paths(db, send_id) else {
+        return;
+    };
+    if let Some(dir) = body.parent() {
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            log::warn!("send spool : {e}");
+            return;
+        }
+    }
+    if let Err(e) = std::fs::write(&body, rfc822) {
+        log::warn!("send spool rfc822 : {e}");
+        return;
+    }
+    if let Err(e) = std::fs::write(&mid, message_id.as_bytes()) {
+        log::warn!("send spool message-id : {e}");
+    }
+}
+
+fn read_send_spool(db: &std::path::Path, send_id: &str) -> Option<(Vec<u8>, String)> {
+    let (body, mid) = send_spool_paths(db, send_id)?;
+    let rfc = std::fs::read(&body).ok()?;
+    let message_id = std::fs::read_to_string(&mid).unwrap_or_default();
+    if rfc.is_empty() || message_id.trim().is_empty() {
+        return None;
+    }
+    Some((rfc, message_id))
+}
+
+fn discard_send_spool(db: &std::path::Path, send_id: &str) {
+    if let Some((body, mid)) = send_spool_paths(db, send_id) {
+        let _ = std::fs::remove_file(body);
+        let _ = std::fs::remove_file(mid);
+    }
+}
+
+fn record_send_done(db: &std::path::Path, id: &str, outcome: &SendDraftOutcome) {
+    let now = SystemTime::now();
+    let mut book = lock_send_book();
+    book.complete_ok(id, outcome.clone(), now);
+    let fp = book.fingerprint_of(id).unwrap_or_default();
+    drop(book);
+    persist_send_row(
+        db,
+        &StoredSendAttempt {
+            send_id: id.to_string(),
+            fingerprint: fp,
+            state: "done".into(),
+            imap_notice: outcome.imap_notice.clone(),
+            error: None,
+            at_unix: rustymail_infrastructure::unix_secs(now),
+            launch_id: String::new(),
+        },
+    );
+    discard_send_spool(db, id);
+}
+
+#[derive(serde::Serialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+enum SendDraftStatusView {
+    Unknown,
+    InFlight,
+    Done {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        imap_notice: Option<String>,
+    },
+    Failed {
+        error: String,
+    },
 }
 
 #[tauri::command]
@@ -912,6 +1065,172 @@ async fn send_draft(
     account_id: Option<String>,
     draft: Draft,
     send_ack: Option<String>,
+    send_id: Option<String>,
+) -> Result<SendDraftOutcome, String> {
+    ipc_guard::validate_send_id(send_id.as_deref())?;
+    let db_path = paths.db_path.clone();
+    let tracked = send_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(str::to_string);
+    let fingerprint = rustymail_infrastructure::draft_send_fingerprint(
+        account_id.as_deref().unwrap_or(""),
+        &draft,
+    );
+    if let Some(id) = tracked.clone() {
+        hydrate_send_book(&db_path);
+        let decision = lock_send_book().begin_payload(&id, &fingerprint, SystemTime::now());
+        match decision {
+            SendBegin::InFlight | SendBegin::AlreadyInFlight => {
+                return Err("Envoi déjà en cours".into());
+            }
+            SendBegin::IdReused => {
+                return Err(
+                    "Identifiant d'envoi déjà utilisé pour un autre message. Rouvrez le brouillon."
+                        .into(),
+                );
+            }
+            SendBegin::Replay => {
+                return lock_send_book()
+                    .replay(&id)
+                    .ok_or_else(|| "Envoi déjà enregistré".to_string());
+            }
+            SendBegin::Accepted => {
+                return finish_smtp_accepted(paths, &db_path, account_id, &id).await;
+            }
+            SendBegin::Start => {
+                persist_send_row(
+                    &db_path,
+                    &StoredSendAttempt {
+                        send_id: id,
+                        fingerprint: fingerprint.clone(),
+                        state: "inflight".into(),
+                        imap_notice: None,
+                        error: None,
+                        at_unix: rustymail_infrastructure::unix_secs(SystemTime::now()),
+                        launch_id: rustymail_infrastructure::current_send_launch_id().to_string(),
+                    },
+                );
+            }
+        }
+    }
+    let result = send_draft_once(
+        paths,
+        core,
+        account_id,
+        draft,
+        send_ack,
+        tracked.clone(),
+        fingerprint.clone(),
+    )
+    .await;
+    if let Some(id) = tracked.as_deref() {
+        let now = SystemTime::now();
+        let already_accepted = matches!(
+            lock_send_book().get(id, now),
+            Some(SendSlot::SmtpAccepted { .. } | SendSlot::Done { .. })
+        );
+        if already_accepted && result.is_err() {
+            let outcome = lock_send_book()
+                .replay(id)
+                .unwrap_or(SendDraftOutcome { imap_notice: None });
+            record_send_done(&db_path, id, &outcome);
+            return Ok(outcome);
+        }
+        let mut book = lock_send_book();
+        match &result {
+            Ok(outcome) => book.complete_ok(id, outcome.clone(), now),
+            Err(error) => book.complete_err(id, error.clone(), now),
+        }
+        let fp = book.fingerprint_of(id).unwrap_or(fingerprint);
+        drop(book);
+        match &result {
+            Ok(outcome) => {
+                record_send_done(&db_path, id, outcome);
+            }
+            Err(error) => {
+                discard_send_spool(&db_path, id);
+                persist_send_row(
+                    &db_path,
+                    &StoredSendAttempt {
+                        send_id: id.to_string(),
+                        fingerprint: fp,
+                        state: "failed".into(),
+                        imap_notice: None,
+                        error: Some(error.clone()),
+                        at_unix: rustymail_infrastructure::unix_secs(now),
+                        launch_id: String::new(),
+                    },
+                );
+            }
+        }
+    }
+    result
+}
+
+/// SMTP déjà accepté : aucun second envoi. Un autre lancement peut retenter seulement la copie Envoyés.
+async fn finish_smtp_accepted(
+    paths: State<'_, AppPaths>,
+    db_path: &std::path::Path,
+    account_id: Option<String>,
+    id: &str,
+) -> Result<SendDraftOutcome, String> {
+    let owner = lock_send_book().launch_of(id).unwrap_or_default();
+    let foreign = owner != rustymail_infrastructure::current_send_launch_id();
+    if foreign {
+        if let Some((rfc822, message_id)) = read_send_spool(db_path, id) {
+            let account = resolve_account_from_paths(&paths, account_id)?;
+            let imap_copy = rustymail_infrastructure::imap_append_sent_copy(
+                &account,
+                &rfc822,
+                message_id.trim(),
+            )
+            .await;
+            let outcome = SendDraftOutcome {
+                imap_notice: send_draft_imap_notice(&imap_copy),
+            };
+            record_send_done(db_path, id, &outcome);
+            return Ok(outcome);
+        }
+    }
+    let outcome = lock_send_book()
+        .replay(id)
+        .unwrap_or(SendDraftOutcome { imap_notice: None });
+    if foreign {
+        record_send_done(db_path, id, &outcome);
+    }
+    Ok(outcome)
+}
+
+#[tauri::command]
+async fn send_draft_status(
+    paths: State<'_, AppPaths>,
+    send_id: String,
+) -> Result<SendDraftStatusView, String> {
+    ipc_guard::validate_send_id(Some(&send_id))?;
+    hydrate_send_book(&paths.db_path);
+    let slot = lock_send_book().get(send_id.trim(), SystemTime::now());
+    Ok(match slot {
+        None => SendDraftStatusView::Unknown,
+        Some(SendSlot::InFlight { .. }) => SendDraftStatusView::InFlight,
+        // SMTP déjà accepté : l'UI continue de sonder jusqu'au `done` (copie Envoyés comprise).
+        Some(SendSlot::SmtpAccepted { .. }) => SendDraftStatusView::InFlight,
+        Some(SendSlot::Done { value, .. }) => SendDraftStatusView::Done {
+            imap_notice: value.imap_notice.clone(),
+        },
+        Some(SendSlot::Failed { error, .. }) => SendDraftStatusView::Failed { error },
+    })
+}
+
+async fn send_draft_once(
+    paths: State<'_, AppPaths>,
+    core: State<'_, Mutex<AppCore>>,
+    account_id: Option<String>,
+    draft: Draft,
+    send_ack: Option<String>,
+    tracked_send_id: Option<String>,
+    fingerprint: String,
 ) -> Result<SendDraftOutcome, String> {
     ipc_guard::validate_send_draft_ack(send_ack.as_deref())?;
     let mut draft = draft;
@@ -955,6 +1274,29 @@ async fn send_draft(
         }
     };
     eprintln!("[RustyMail] smtp send ok");
+    if let Some(id) = tracked_send_id.as_deref() {
+        let now = SystemTime::now();
+        {
+            let mut book = lock_send_book();
+            book.mark_smtp_accepted(id, SendDraftOutcome { imap_notice: None }, now);
+            let launch = book.launch_of(id).unwrap_or_default();
+            let fp = book.fingerprint_of(id).unwrap_or(fingerprint);
+            drop(book);
+            persist_send_row(
+                &paths.db_path,
+                &StoredSendAttempt {
+                    send_id: id.to_string(),
+                    fingerprint: fp,
+                    state: "smtp_accepted".into(),
+                    imap_notice: None,
+                    error: None,
+                    at_unix: rustymail_infrastructure::unix_secs(now),
+                    launch_id: launch,
+                },
+            );
+        }
+        write_send_spool(&paths.db_path, id, &sent.rfc822, sent.message_id.trim());
+    }
     let imap_copy = rustymail_infrastructure::imap_append_sent_copy(
         &account,
         &sent.rfc822,
@@ -1990,6 +2332,30 @@ async fn thread_mark_read(
     Ok(result)
 }
 
+#[tauri::command]
+async fn threads_mark_read_bulk(
+    paths: State<'_, AppPaths>,
+    core: State<'_, Mutex<AppCore>>,
+    account_id: Option<String>,
+    items: Vec<BulkThreadRef>,
+    seen: bool,
+) -> Result<BulkSeenOutcome, String> {
+    let pairs: Vec<(&str, &str)> = items
+        .iter()
+        .map(|item| (item.mailbox.as_str(), item.thread_id.as_str()))
+        .collect();
+    ipc_guard::validate_thread_mailbox_batch(account_id.as_deref(), &pairs)?;
+    let account = resolve_account_from_paths(&paths, account_id)?;
+    let outcome =
+        rustymail_infrastructure::set_threads_seen_bulk(&paths.db_path, &account, &items, seen)
+            .await?;
+    {
+        let mut guard = core.lock().map_err(|_| "core lock poisoned".to_string())?;
+        guard.set_threads_seen_local(&outcome.updated_thread_ids, seen);
+    }
+    Ok(outcome)
+}
+
 /// Bascule (ou force) le drapeau « suivi » local d’un fil (table SQLite `threads.is_followed`).
 /// Aucun appel IMAP : flag stable face aux resyncs et indépendant des serveurs.
 #[tauri::command]
@@ -2320,6 +2686,8 @@ pub fn run() {
             saved_draft_delete,
             saved_draft_open,
             send_draft,
+            send_draft_status,
+            threads_mark_read_bulk,
             plan_split_send,
             execute_split_send_cmd,
             download_attachment,

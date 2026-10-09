@@ -90,6 +90,8 @@ export type State = {
   accountsLoadError: string;
   /** Dernière erreur de chargement liste (`list_threads`) — affichée sous la barre du dossier. */
   mailListError: string;
+  /** Échec `list_imap_mailboxes` : la liste précédente reste affichée. */
+  mailboxListError: string;
   /** Trousseau SQLCipher inaccessible : écran bloquant, aucune réécriture de clé. */
   dbLockedMessage: string;
   syncMessage: string;
@@ -103,6 +105,10 @@ export type State = {
   /** Erreur du dernier chargement des chemins (stockage). */
   settingsPathsLoadError: string;
   composeMessage: string;
+  /** UUID de la tentative d'envoi en cours (réutilisé tant que l'envoi n'est pas confirmé). */
+  composeSendId: string;
+  /** Vrai tant que le registre d'envoi est InFlight (bouton Envoyer désactivé). */
+  sendDraftInFlight: boolean;
   selectedMailbox: string;
   mailboxes: string[];
   mailboxUnread: Record<string, number>;

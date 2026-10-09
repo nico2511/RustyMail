@@ -17,6 +17,7 @@ export { registerComposeSendDraftRunDeps };
 export { confirmAndExecuteSplitSend } from "./composeSendDraftSplitRun";
 
 export async function sendDraft(): Promise<void> {
+  if (state.sendDraftInFlight) return;
   persistDraft();
   if (!state.draft) {
     toast.warning("Aucun brouillon à envoyer.");

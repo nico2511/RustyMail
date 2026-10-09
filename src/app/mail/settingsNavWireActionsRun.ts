@@ -1,14 +1,13 @@
 import type { Account } from "../../accountSetup";
 import { accountFieldTouched } from "../../accountSetup";
-import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
 import { currentAccount } from "../core/accountContext";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { toast } from "../lib/toast";
-import { safeInvoke } from "../lib/tauriCommand";
 import { clearDiscoveredServerSnap } from "../account/discoveredServerSnap";
 import { loadAccountsFromBackend } from "./accountsLoadAction";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
+import { refreshMailboxes } from "./refreshMailboxesRun";
 import { loadNewsletterRules } from "./newsletterRulesLoad";
 import { refreshAddressBookList } from "./addressBookWireActions";
 import { syncAiEngineSettingsTabFromPrefs } from "./settingsLlmRuntime";
@@ -29,15 +28,16 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
     case "account":
       openSettingsView();
       return true;
+    case "retry-mailbox-list": {
+      await refreshMailboxes(currentAccount()?.id ?? null);
+      ensureValidSelectedMailbox();
+      render();
+      return true;
+    }
     case "reload-accounts": {
       const ok = await loadAccountsFromBackend({ silent: false });
       if (ok) {
-        state.mailboxes = await safeInvoke<string[]>(
-          "list_imap_mailboxes",
-          { accountId: currentAccount()?.id ?? null },
-          [],
-          BOOT_INVOKE_TIMEOUT_MS
-        );
+        await refreshMailboxes(currentAccount()?.id ?? null);
         ensureValidSelectedMailbox();
         await loadMailView(false);
         await loadMailboxUnread();

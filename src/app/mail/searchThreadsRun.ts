@@ -50,6 +50,7 @@ export async function searchThreads(opts?: { append?: boolean }): Promise<void> 
     return;
   }
   if (!append) state.searchResultOffset = 0;
+  const criteriaSnapshot = JSON.stringify(buildSearchQueryFromCurrentState());
   const query = {
     ...buildSearchQueryFromCurrentState(),
     offset: append ? state.searchResultOffset : 0,
@@ -57,6 +58,7 @@ export async function searchThreads(opts?: { append?: boolean }): Promise<void> 
   };
   let rows: ThreadListItem[] = [];
   if (!isTauriRuntime()) {
+    if (gen !== getSearchThreadsGeneration()) return;
     state.mailListError = "";
     state.searchHasMore = false;
     if (!append) state.threads = [];
@@ -66,17 +68,19 @@ export async function searchThreads(opts?: { append?: boolean }): Promise<void> 
         invoke<ThreadListItem[]>("search_threads", { query }),
         DEFAULT_INVOKE_TIMEOUT_MS,
       );
-      state.mailListError = "";
     } catch (error) {
+      if (gen !== getSearchThreadsGeneration()) return;
       state.mailListError = tauriErrorMessage(error);
       state.searchHasMore = false;
       if (!append) state.threads = [];
-      if (gen !== getSearchThreadsGeneration()) return;
       render();
       if (!searchHadFocus) return;
       restoreSearchInputSelection(selStart, selEnd, gen);
       return;
     }
+    if (gen !== getSearchThreadsGeneration()) return;
+    if (append && JSON.stringify(buildSearchQueryFromCurrentState()) !== criteriaSnapshot) return;
+    state.mailListError = "";
   }
   const visible = filterRecentlyRemovedThreads(rows);
   state.threads = append ? [...state.threads, ...visible] : visible;

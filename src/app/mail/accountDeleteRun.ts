@@ -1,12 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import {
-  ACCOUNT_INVOKE_TIMEOUT_MS,
-  BOOT_INVOKE_TIMEOUT_MS,
-  MAIL_ACTION_TIMEOUT_MS,
-} from "../core/timeouts";
+import { ACCOUNT_INVOKE_TIMEOUT_MS, MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { currentAccount } from "../core/accountContext";
 import { isTauriRuntime } from "../lib/tauriRuntime";
-import { safeInvoke, tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
+import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { toast } from "../lib/toast";
 import { openConfirmModal } from "../modals/promptConfirm";
 import { render } from "../dispatch";
@@ -15,6 +11,7 @@ import type { Account } from "../../accountSetup";
 import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 import { normalizeAccountRow } from "./accountRowNormalize";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
+import { refreshMailboxes } from "./refreshMailboxesRun";
 
 export async function deleteSettingsAccount() {
   if (!isTauriRuntime()) {
@@ -55,12 +52,7 @@ export async function deleteSettingsAccount() {
     state.settingsSelectedAccountId = state.accounts[0]?.id ?? "new";
     state.accountMessage = "Compte supprimé.";
     if (isTauriRuntime()) {
-      state.mailboxes = await safeInvoke<string[]>(
-        "list_imap_mailboxes",
-        { accountId: currentAccount()?.id ?? null },
-        [],
-        BOOT_INVOKE_TIMEOUT_MS,
-      );
+      await refreshMailboxes(currentAccount()?.id ?? null);
       ensureValidSelectedMailbox();
       await loadMailView();
       await loadMailboxUnread();

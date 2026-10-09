@@ -10,8 +10,28 @@ import { fetchOpenThreadOrNotify } from "./fetchOpenThread";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
 import { currentThreadIdForReply } from "./composeThreadReply";
 import { toastSendDraftImapNotice } from "./sendDraftImapNotice";
+import { pollSendDraftUntilTerminal } from "./composeSendDraftInvokeRun";
+import { isSendStillInFlightMessage } from "./composeSendId";
+
+let quickReplyInFlight = false;
+const quickReplyIds = new Map<string, string>();
+
+export function quickReplySendId(threadId: string, body: string): string {
+  const key = `${threadId}\0${body}`;
+  const existing = quickReplyIds.get(key);
+  if (existing) return existing;
+  const id = globalThis.crypto.randomUUID();
+  quickReplyIds.set(key, id);
+  return id;
+}
+
+/** Done ou Failed : le prochain « Merci » est un nouvel envoi. */
+export function releaseQuickReplySendId(threadId: string, body: string): void {
+  quickReplyIds.delete(`${threadId}\0${body}`);
+}
 
 export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void> {
+  if (quickReplyInFlight) return;
   const quickInput = document.querySelector<HTMLInputElement>("[data-quick-reply]");
   const body = quickInput?.value.trim() ?? "";
   if (!body) {
@@ -36,15 +56,42 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
     return;
   }
   draft.markdownBody = `${body}\n`;
+  const replyBody = draft.markdownBody;
+  const sendId = quickReplySendId(threadId, replyBody);
+  quickReplyInFlight = true;
+  let terminal = false;
   try {
-    const sendOutcome = await withTimeout(
-      invoke<SendDraftOutcome>("send_draft", {
-        accountId: composeSendAccount()?.id ?? null,
-        draft,
-        sendAck: "send-draft",
-      }),
-      MAIL_ACTION_TIMEOUT_MS,
-    );
+    let sendOutcome: SendDraftOutcome;
+    try {
+      sendOutcome = await withTimeout(
+        invoke<SendDraftOutcome>("send_draft", {
+          accountId: composeSendAccount()?.id ?? null,
+          draft,
+          sendAck: "send-draft",
+          sendId,
+        }),
+        MAIL_ACTION_TIMEOUT_MS,
+      );
+      terminal = true;
+    } catch (error) {
+      const message = tauriErrorMessage(error);
+      if (!isSendStillInFlightMessage(message)) {
+        terminal = true;
+        throw error;
+      }
+      const status = await pollSendDraftUntilTerminal(sendId);
+      if (!status || status.state === "inFlight" || status.state === "unknown") {
+        toast.warning("Envoi toujours en cours : le même identifiant est conservé, pas de nouvel envoi.");
+        return;
+      }
+      if (status.state === "failed") {
+        terminal = true;
+        toast.error(`Envoi échoué: ${status.error}`);
+        return;
+      }
+      terminal = true;
+      sendOutcome = { imapNotice: status.imapNotice ?? null };
+    }
     toast.success(kind === "reply" ? "Réponse envoyée." : "Réponse à tous envoyée.");
     toastSendDraftImapNotice(sendOutcome);
     if (quickInput) quickInput.value = "";
@@ -59,5 +106,8 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
   } catch (error) {
     console.error("send_draft (quick reply)", error);
     toast.error(`Envoi échoué: ${tauriErrorMessage(error)}`);
+  } finally {
+    if (terminal) releaseQuickReplySendId(threadId, replyBody);
+    quickReplyInFlight = false;
   }
 }

@@ -220,6 +220,22 @@ impl AppCore {
         self.threads.iter().find(|thread| &thread.id == id)
     }
 
+    /// Met à jour `is_read` en mémoire pour les fils déjà chargés (évite un rechargement complet).
+    pub fn set_threads_seen_local(&mut self, thread_ids: &[String], seen: bool) {
+        let wanted: std::collections::HashSet<&str> =
+            thread_ids.iter().map(String::as_str).collect();
+        if wanted.is_empty() {
+            return;
+        }
+        for thread in &mut self.threads {
+            if wanted.contains(thread.id.0.as_str()) {
+                for message in &mut thread.messages {
+                    message.is_read = seen;
+                }
+            }
+        }
+    }
+
     pub fn capabilities(&self) -> AppCapabilities {
         AppCapabilities {
             mail_core: true,

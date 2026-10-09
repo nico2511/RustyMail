@@ -417,10 +417,17 @@ fn open_with_key(path: &Path, key: &[u8]) -> Result<Connection, rusqlite::Error>
     }
 }
 
+/// PRAGMA par connexion (pas dans `migrate`, qui n'est exécuté qu'une fois par processus).
+fn apply_per_connection_pragmas(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.execute_batch("PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;")
+}
+
 /// Ouvre (ou crée) la base locale avec SQLCipher. Migre automatiquement une base en clair existante.
 pub fn open_sqlite_encrypted(path: &Path) -> Result<Connection, rusqlite::Error> {
     let key = load_or_create_db_key(path).map_err(|e| rusqlite::Error::InvalidPath(e.into()))?;
-    open_with_key(path, &key)
+    let conn = open_with_key(path, &key)?;
+    apply_per_connection_pragmas(&conn)?;
+    Ok(conn)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -703,6 +710,30 @@ mod tests {
         let dir = TempDir::new().expect("tempdir");
         let path = dir.path().join("rustymail.sqlite3");
         (dir, path)
+    }
+
+    #[test]
+    fn per_connection_pragmas_survive_second_open() {
+        let (_dir, path) = temp_db_path();
+        let first = crate::open_sqlite_migrated(&path).expect("first");
+        let sync1: i64 = first
+            .query_row("PRAGMA synchronous", [], |row| row.get(0))
+            .expect("sync");
+        let busy1: i64 = first
+            .query_row("PRAGMA busy_timeout", [], |row| row.get(0))
+            .expect("busy");
+        assert_eq!(sync1, 1, "NORMAL");
+        assert_eq!(busy1, 5000);
+        drop(first);
+        let second = crate::open_sqlite_migrated(&path).expect("second");
+        let sync2: i64 = second
+            .query_row("PRAGMA synchronous", [], |row| row.get(0))
+            .expect("sync2");
+        let busy2: i64 = second
+            .query_row("PRAGMA busy_timeout", [], |row| row.get(0))
+            .expect("busy2");
+        assert_eq!(sync2, 1);
+        assert_eq!(busy2, 5000);
     }
 
     #[test]

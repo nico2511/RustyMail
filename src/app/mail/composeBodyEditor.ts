@@ -493,9 +493,11 @@ export async function applyComposeToolbarCommand(action: string): Promise<void> 
       break;
     }
     case "table": {
-      const size = promptComposeTableSize();
+      const size = await promptComposeTableSize();
       if (!size) break;
-      chain.insertTable({ rows: size.rows, cols: size.cols, withHeaderRow: true }).run();
+      const live = getComposeBodyEditor();
+      if (!live) break;
+      live.chain().focus().insertTable({ rows: size.rows, cols: size.cols, withHeaderRow: true }).run();
       break;
     }
     case "table-add-row":

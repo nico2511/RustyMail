@@ -45,7 +45,7 @@ Workflows the UI triggers: list/search/open threads, prepare drafts, preview, se
 
 Adapters and persistence:
 
-- **SQLite** (`rustymail.sqlite3`, WAL, SQLCipher at rest)
+- **SQLite** (`rustymail.sqlite3`, WAL, SQLCipher at rest). Chaque connexion pose `PRAGMA synchronous = NORMAL` (sûr en WAL hors coupure d'alimentation) et `PRAGMA busy_timeout = 5000`. Ces PRAGMA ne sont pas dans `migrate()` (exécuté une fois par processus).
 - **IMAP** session, sync, mailbox ops, **IDLE push** (`imap_push.rs` → Tauri event `imap-push`). UIDs skipped during FETCH stay in `imap_sync_skipped` (no retry); they are removed on account delete and on UIDVALIDITY reset
 - **SMTP** send via `lettre`
 - **Keyring** for passwords and API keys

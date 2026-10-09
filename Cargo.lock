@@ -5569,6 +5569,7 @@ dependencies = [
 name = "rustymail-modules"
 version = "0.4.4"
 dependencies = [
+ "chrono",
  "ego-tree",
  "regex",
  "rustymail-domain",
