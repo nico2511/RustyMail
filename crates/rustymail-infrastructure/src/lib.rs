@@ -403,7 +403,8 @@ pub fn sqlite_list_threads_page_scoped(
         },
     )? {
         let (id, subject, tags, followed) = row?;
-        let thread = build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
+        let thread =
+            build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
         let mut item = thread.list_item(resolved.clone());
         item.attachment_count = attachment_count_for_thread(&connection, &id)?;
         let aid = account_id.trim();
@@ -517,7 +518,8 @@ pub fn sqlite_list_threads_page_unified_inbox(
         ))
     })? {
         let (id, subject, tags, followed, aid, mbox) = row?;
-        let thread = build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
+        let thread =
+            build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
         let mut item = thread.list_item(mbox.trim().to_string());
         item.attachment_count = attachment_count_for_thread(&connection, &id)?;
         item.account_id = Some(aid.clone());
@@ -578,7 +580,8 @@ pub fn sqlite_list_followed_threads_page(
         },
     )? {
         let (id, subject, tags, followed, mbox) = row?;
-        let thread = build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
+        let thread =
+            build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
         let mut item = thread.list_item(mbox.trim().to_string());
         item.attachment_count = attachment_count_for_thread(&connection, &id)?;
         let aid = account_id.trim();
@@ -638,7 +641,8 @@ pub fn sqlite_list_threads_page_account(
         },
     )? {
         let (id, subject, tags, followed, mbox) = row?;
-        let thread = build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
+        let thread =
+            build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
         let mut item = thread.list_item(mbox.trim().to_string());
         item.attachment_count = attachment_count_for_thread(&connection, &id)?;
         let aid = account_id.trim();
