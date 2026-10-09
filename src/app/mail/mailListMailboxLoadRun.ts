@@ -57,20 +57,46 @@ export async function loadMailView(append: boolean = false) {
     try {
       page = await withTimeout(invoke<ThreadListItem[]>("list_threads", payload), BOOT_INVOKE_TIMEOUT_MS);
       state.mailListError = "";
-    } catch (error) {
-      const detail = tauriErrorMessage(error);
-      console.error("list_threads", error);
-      state.mailListError = `Impossible de charger les conversations : ${detail}`;
-      toast.error(state.mailListError);
-      if (append) return;
-      state.threads = [];
-      state.threadOffset = 0;
-      state.hasMoreThreads = false;
-      if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
-        state.selectedThreadId = state.threads[0]?.id;
-        state.selectedThread = undefined;
+    } catch (firstError) {
+      const firstDetail = tauriErrorMessage(firstError);
+      if (/timeout/i.test(firstDetail) && !append) {
+        try {
+          page = await withTimeout(
+            invoke<ThreadListItem[]>("list_threads", payload),
+            BOOT_INVOKE_TIMEOUT_MS,
+          );
+          state.mailListError = "";
+        } catch (retryError) {
+          const raw = tauriErrorMessage(retryError);
+          const detail = /timeout/i.test(raw)
+            ? "délai dépassé pendant la préparation locale — réessayez dans un instant"
+            : raw;
+          console.error("list_threads", firstError, retryError);
+          state.mailListError = `Impossible de charger les conversations : ${detail}`;
+          toast.error(state.mailListError);
+          state.threads = [];
+          state.threadOffset = 0;
+          state.hasMoreThreads = false;
+          if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
+            state.selectedThreadId = state.threads[0]?.id;
+            state.selectedThread = undefined;
+          }
+          return;
+        }
+      } else {
+        console.error("list_threads", firstError);
+        state.mailListError = `Impossible de charger les conversations : ${firstDetail}`;
+        toast.error(state.mailListError);
+        if (append) return;
+        state.threads = [];
+        state.threadOffset = 0;
+        state.hasMoreThreads = false;
+        if (state.selectedThreadId && !state.threads.some((t) => t.id === state.selectedThreadId)) {
+          state.selectedThreadId = state.threads[0]?.id;
+          state.selectedThread = undefined;
+        }
+        return;
       }
-      return;
     }
   }
   applyServerThreadPage(page, append);

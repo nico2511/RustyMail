@@ -403,8 +403,9 @@ pub fn sqlite_list_threads_page_scoped(
         },
     )? {
         let (id, subject, tags, followed) = row?;
-        let thread = build_thread_from_row(&connection, id, subject, tags, followed)?;
+        let thread = build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
         let mut item = thread.list_item(resolved.clone());
+        item.attachment_count = attachment_count_for_thread(&connection, &id)?;
         let aid = account_id.trim();
         if !aid.is_empty() {
             item.account_id = Some(aid.to_string());
@@ -516,8 +517,9 @@ pub fn sqlite_list_threads_page_unified_inbox(
         ))
     })? {
         let (id, subject, tags, followed, aid, mbox) = row?;
-        let thread = build_thread_from_row(&connection, id, subject, tags, followed)?;
+        let thread = build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
         let mut item = thread.list_item(mbox.trim().to_string());
+        item.attachment_count = attachment_count_for_thread(&connection, &id)?;
         item.account_id = Some(aid.clone());
         let account_emails = account_email_by_id
             .get(&aid)
@@ -576,8 +578,9 @@ pub fn sqlite_list_followed_threads_page(
         },
     )? {
         let (id, subject, tags, followed, mbox) = row?;
-        let thread = build_thread_from_row(&connection, id, subject, tags, followed)?;
+        let thread = build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
         let mut item = thread.list_item(mbox.trim().to_string());
+        item.attachment_count = attachment_count_for_thread(&connection, &id)?;
         let aid = account_id.trim();
         if !aid.is_empty() {
             item.account_id = Some(aid.to_string());
@@ -635,8 +638,9 @@ pub fn sqlite_list_threads_page_account(
         },
     )? {
         let (id, subject, tags, followed, mbox) = row?;
-        let thread = build_thread_from_row(&connection, id, subject, tags, followed)?;
+        let thread = build_thread_from_row_for_list(&connection, id.clone(), subject, tags, followed)?;
         let mut item = thread.list_item(mbox.trim().to_string());
+        item.attachment_count = attachment_count_for_thread(&connection, &id)?;
         let aid = account_id.trim();
         if !aid.is_empty() {
             item.account_id = Some(aid.to_string());
@@ -1730,13 +1734,11 @@ fn fts_maintenance_lock() -> std::sync::MutexGuard<'static, ()> {
     }
 }
 
-#[cfg(test)]
 fn fts_backfill_hold_paths() -> &'static Mutex<HashSet<String>> {
     static PATHS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
     PATHS.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
-#[cfg(test)]
 fn fts_backfill_hold(path: &Path) -> bool {
     let key = path.to_string_lossy().to_string();
     let guard = match fts_backfill_hold_paths().lock() {
@@ -1746,8 +1748,8 @@ fn fts_backfill_hold(path: &Path) -> bool {
     guard.contains(&key)
 }
 
-#[cfg(test)]
-pub(crate) fn set_fts_backfill_hold_for_tests(path: &Path, hold: bool) {
+/// Pause / reprend le backfill FTS (ex. jusqu’au premier `list_threads`).
+pub fn set_fts_backfill_hold(path: &Path, hold: bool) {
     let key = path.to_string_lossy().to_string();
     let mut guard = match fts_backfill_hold_paths().lock() {
         Ok(g) => g,
@@ -1758,6 +1760,11 @@ pub(crate) fn set_fts_backfill_hold_for_tests(path: &Path, hold: bool) {
     } else {
         guard.remove(&key);
     }
+}
+
+#[cfg(test)]
+pub(crate) fn set_fts_backfill_hold_for_tests(path: &Path, hold: bool) {
+    set_fts_backfill_hold(path, hold);
 }
 
 #[cfg(test)]
@@ -1778,6 +1785,9 @@ fn is_fts_schema_error(message: &str) -> bool {
         || lower.contains("schema")
 }
 
+/// Plafond d’attente si le premier `list_threads` ne libère jamais le hold.
+const FTS_BACKFILL_HOLD_MAX_WAIT: std::time::Duration = std::time::Duration::from_secs(45);
+
 /// Remplit `messages_fts` par lots, hors du chemin d'ouverture de la fenêtre.
 pub fn spawn_messages_fts_backfill(db_path: impl AsRef<Path>) {
     let path = db_path.as_ref().to_path_buf();
@@ -1796,10 +1806,17 @@ pub fn spawn_messages_fts_backfill(db_path: impl AsRef<Path>) {
         slot.rerun = false;
     }
     std::thread::spawn(move || {
+        let hold_deadline = std::time::Instant::now() + FTS_BACKFILL_HOLD_MAX_WAIT;
+        while fts_backfill_hold(&path) && std::time::Instant::now() < hold_deadline {
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        if fts_backfill_hold(&path) {
+            log::warn!("FTS backfill : hold expiré, démarrage forcé");
+            set_fts_backfill_hold(&path, false);
+        }
         let started = std::time::Instant::now();
         log::info!("FTS backfill démarré");
         loop {
-            #[cfg(test)]
             while fts_backfill_hold(&path) {
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
@@ -2679,6 +2696,41 @@ pub(crate) fn build_thread_from_row(
     })
 }
 
+/// Fil pour la liste paginée : pas de HTML ni pièces jointes (corps tronqué pour l’aperçu).
+fn build_thread_from_row_for_list(
+    connection: &Connection,
+    id: String,
+    subject: String,
+    tags: String,
+    followed: bool,
+) -> Result<Thread, rusqlite::Error> {
+    Ok(Thread {
+        id: ThreadId(id.clone()),
+        subject,
+        tags: parse_tags(&tags),
+        entities: Vec::new(),
+        messages: load_messages_for_list(connection, &id)?,
+        followed,
+    })
+}
+
+fn attachment_count_for_thread(
+    connection: &Connection,
+    thread_id: &str,
+) -> Result<usize, rusqlite::Error> {
+    let n: i64 = connection.query_row(
+        "
+        SELECT COUNT(*)
+        FROM message_attachments a
+        INNER JOIN messages m ON m.id = a.message_id
+        WHERE m.thread_id = ?1
+        ",
+        params![thread_id],
+        |row| row.get(0),
+    )?;
+    Ok(n.max(0) as usize)
+}
+
 /// Clé commune pour même Message-ID RFC, qu’il soit stocké avec ou sans `< >`.
 fn normalize_msg_id_for_dedup(raw: Option<&str>) -> Option<String> {
     let s = raw?.trim();
@@ -2753,6 +2805,48 @@ fn dedupe_messages_by_message_id_header(
         .enumerate()
         .filter_map(|(idx, pair)| (!drop.contains(&idx)).then_some(pair.0))
         .collect()
+}
+
+/// Chargement léger pour `list_threads` : aperçu + métadonnées, sans `body_html`.
+/// Évite le timeout Tauri au premier lancement (backfill FTS / grosse boîte).
+fn load_messages_for_list(
+    connection: &Connection,
+    thread_id: &str,
+) -> Result<Vec<rustymail_domain::Message>, rusqlite::Error> {
+    let mut statement = connection.prepare(
+        "
+        SELECT id, sender_name, sender_email, subject, received_at,
+               substr(COALESCE(body_plain, body, ''), 1, 400) as body_snip,
+               message_id_header,
+               is_read,
+               imap_uid
+        FROM messages
+        WHERE thread_id = ?1
+        ORDER BY received_at ASC, position ASC, id ASC
+        ",
+    )?;
+
+    let pairs: Vec<(rustymail_domain::Message, Option<i64>)> = statement
+        .query_map(params![thread_id], |row| {
+            let imap_uid: Option<i64> = row.get(8)?;
+            let mut msg = message(
+                &row.get::<_, String>(0)?,
+                &row.get::<_, String>(1)?,
+                &row.get::<_, String>(2)?,
+                &row.get::<_, String>(3)?,
+                &row.get::<_, String>(4)?,
+                &row.get::<_, String>(5)?,
+                row.get::<_, i64>(7)? != 0,
+            );
+            msg.recipients.clear();
+            msg.html_body = None;
+            msg.references.message_id_header = row.get::<_, Option<String>>(6)?;
+            msg.attachments.clear();
+            Ok((msg, imap_uid))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(dedupe_messages_by_message_id_header(pairs))
 }
 
 fn load_messages(
@@ -3413,6 +3507,47 @@ mod unified_inbox_tests {
         let page2 = sqlite_list_threads_page_unified_inbox(&path, 1, 1).expect("page2");
         assert_eq!(page2.len(), 1);
         assert_eq!(page2[0].id.0, "t-old");
+    }
+
+    #[test]
+    fn list_page_uses_plain_preview_without_loading_html() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("list-lite.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        insert_account(&conn, "acc", "u@example.com");
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags)
+             VALUES ('t1', 'acc', 'INBOX', 'm1', 'Sujet', '')",
+            [],
+        )
+        .expect("thread");
+        let huge_html = format!("<html>{}</html>", "x".repeat(200_000));
+        conn.execute(
+            "INSERT INTO messages (
+                id, thread_id, account_id, mailbox, imap_uid,
+                sender_name, sender_email, subject, received_at,
+                body, body_plain, body_html, is_read, position
+             ) VALUES (
+                'm1', 't1', 'acc', 'INBOX', 1,
+                'Alice', 'alice@example.com', 'Sujet', '2026-06-01T12:00:00Z',
+                'corps', 'Première ligne aperçu\nSuite', ?1, 0, 0
+             )",
+            params![huge_html],
+        )
+        .expect("msg");
+        conn.execute(
+            "INSERT INTO message_attachments (id, message_id, file_name, mime_type, size_bytes, kind)
+             VALUES ('att1', 'm1', 'doc.pdf', 'application/pdf', 10, 'regular')",
+            [],
+        )
+        .expect("att");
+        drop(conn);
+
+        let page = sqlite_list_threads_page_scoped(&path, "acc", "INBOX", 10, 0).expect("list");
+        assert_eq!(page.len(), 1);
+        assert_eq!(page[0].preview, "Première ligne aperçu");
+        assert_eq!(page[0].attachment_count, 1);
+        assert_eq!(page[0].participants, vec!["Alice".to_string()]);
     }
 }
 

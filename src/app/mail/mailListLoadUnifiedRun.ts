@@ -34,7 +34,10 @@ export async function loadUnifiedInboxThreadPage(append: boolean): Promise<boole
     );
     state.mailListError = "";
   } catch (error) {
-    const detail = tauriErrorMessage(error);
+    const raw = tauriErrorMessage(error);
+    const detail = /timeout/i.test(raw)
+      ? "délai dépassé pendant la préparation locale après mise à jour — réessayez dans un instant"
+      : raw;
     console.error("list_threads (unified)", error);
     state.mailListError = `Boîte unifiée : ${detail}`;
     if (!append) {

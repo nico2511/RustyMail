@@ -5,7 +5,7 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { loadAccountsFromBackend } from "./accountsLoadFromBackend";
-import { refreshUiAfterImapPush, syncInbox } from "./syncInboxRun";
+import { refreshUiAfterImapPush } from "./syncInboxRun";
 
 export async function bootLoadAccountsAndImapPush(): Promise<void> {
   await loadAccountsFromBackend({ silent: false });
@@ -17,9 +17,8 @@ export async function bootLoadAccountsAndImapPush(): Promise<void> {
       if (current && current !== accId) return;
       void refreshUiAfterImapPush(ev.payload.mailbox?.trim() || "INBOX");
     });
-    if (currentAccount()?.id?.trim()) {
-      void syncInbox({ background: true });
-    }
+    // La sync IMAP démarre après le premier `loadMailView` (voir `bootLoadInitialMailData`)
+    // pour ne pas saturer SQLite pendant l’affichage du cache local.
   }
   render();
 }
