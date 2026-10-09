@@ -6,10 +6,22 @@ import { currentAccount } from "../core/accountContext";
 import { MAIL_ACTION_TIMEOUT_MS } from "../core/timeouts";
 import { withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
+import { render } from "../dispatch";
 import { loadMailboxUnread } from "./mailListView";
 import { state } from "../state";
 import type { OpenThreadDeps } from "./openThreadViewDepsRun";
 
+function applyThreadReadLocal(threadId: string): void {
+  if (state.selectedThread && String(state.selectedThread.id) === String(threadId)) {
+    state.selectedThread = { ...state.selectedThread, unread: false };
+  }
+  const ti = state.threads.findIndex((t) => String(t.id) === String(threadId));
+  if (ti >= 0) {
+    state.threads[ti] = { ...state.threads[ti], unread: false };
+  }
+}
+
+/** Marque lu en local immédiatement, puis IMAP + compteurs en arrière-plan. */
 export async function markOpenedThreadReadIfUnread(
   threadId: string,
   deps: OpenThreadDeps,
@@ -21,15 +33,12 @@ export async function markOpenedThreadReadIfUnread(
   const account = currentAccount();
   const accountId = account?.id?.trim();
   if (!accountId) return;
+  applyThreadReadLocal(threadId);
   try {
     const mailbox = deps.sourceMailboxForThread(threadId);
     await withTimeout(invoke<string>("thread_mark_read", { accountId, mailbox, threadId }), MAIL_ACTION_TIMEOUT_MS);
-    if (state.selectedThread) state.selectedThread = { ...state.selectedThread, unread: false };
-    const ti = state.threads.findIndex((t) => String(t.id) === String(threadId));
-    if (ti >= 0) {
-      state.threads[ti] = { ...state.threads[ti], unread: false };
-    }
     await loadMailboxUnread();
+    render();
   } catch (e) {
     console.warn("thread_mark_read (ouverture)", e);
   }

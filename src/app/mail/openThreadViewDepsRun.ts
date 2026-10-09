@@ -9,7 +9,6 @@ export type OpenThreadDeps = {
   clearThreadAiSummaryState: () => void;
   threadIsAutoMail: (thread: DiscussionThreadView | undefined, tid: string) => boolean;
   stopAgentTelemetry: () => Promise<void>;
-  loadNewsletterRules: () => Promise<void>;
   hydrateMessageTranslationsFromCacheForThread: (messages: DiscussionThreadView["messages"]) => void;
   scheduleSecurityLlmAugment: (message: DiscussionThreadView["messages"][number]) => void;
   summarizeThread: () => Promise<void>;

@@ -1,5 +1,4 @@
 import { navPop } from "../../navigation";
-import { loadNewsletterRules } from "./newsletterRulesLoad";
 import { openSavedDraftById } from "./savedDraftOpenRun";
 import { scheduleSecurityLlmAugment } from "./mailSecurityDisplay";
 import {
@@ -24,7 +23,6 @@ export function registerAppThreadWireOpenDeps(): void {
     clearThreadAiSummaryState,
     threadIsAutoMail,
     stopAgentTelemetry,
-    loadNewsletterRules,
     hydrateMessageTranslationsFromCacheForThread,
     scheduleSecurityLlmAugment,
     summarizeThread,

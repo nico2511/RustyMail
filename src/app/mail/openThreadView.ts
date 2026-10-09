@@ -67,8 +67,9 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
   if (state.aiOutput?.trim() && threadIdsMatch(state.aiThreadScope, tid)) {
     state.aiThreadScope = String(tid);
   }
-  await markOpenedThreadReadIfUnread(tid, openThreadDeps);
-  await openThreadDeps.loadNewsletterRules();
+  // Ne pas attendre IMAP mark-read / compteurs : le premier paint doit suivre open_thread.
+  // La partie sync de markOpenedThreadReadIfUnread met à jour unread en local avant le 1er await.
+  void markOpenedThreadReadIfUnread(tid, openThreadDeps);
   state.view = "thread";
   startThreadActivityOpen(tid);
   if (isTauriRuntime()) void invoke("ai_user_activity_ping").catch(() => {});

@@ -2379,10 +2379,11 @@ async fn thread_mark_read(
         true,
     )
     .await?;
-    let refreshed =
-        rustymail_infrastructure::sqlite_app_core_scoped(&paths.db_path, &account.id.0, &mbox)
-            .map_err(|e| e.to_string())?;
-    *core.lock().map_err(|_| "core lock poisoned".to_string())? = refreshed;
+    // Comme le bulk : maj mémoire locale, pas de reload SQLite complet (body_html de toute la boîte).
+    {
+        let mut guard = core.lock().map_err(|_| "core lock poisoned".to_string())?;
+        guard.set_threads_seen_local(&[thread_id], true);
+    }
     Ok(result)
 }
 
@@ -2459,10 +2460,10 @@ async fn thread_mark_unread(
         false,
     )
     .await?;
-    let refreshed =
-        rustymail_infrastructure::sqlite_app_core_scoped(&paths.db_path, &account.id.0, &mbox)
-            .map_err(|e| e.to_string())?;
-    *core.lock().map_err(|_| "core lock poisoned".to_string())? = refreshed;
+    {
+        let mut guard = core.lock().map_err(|_| "core lock poisoned".to_string())?;
+        guard.set_threads_seen_local(&[thread_id], false);
+    }
     Ok(result)
 }
 
