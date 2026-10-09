@@ -14,7 +14,7 @@
     "verify:compile": "cargo check -p rustymail",
     "verify:fmt": "cargo fmt --all -- --check",
     "verify:clippy": "cargo clippy --workspace --all-targets",
-    "verify:rust-test": "cargo test --workspace --lib --bins",
+    "verify:rust-test": "cargo test --workspace --all-targets",
     "verify:ts": "tsc --noEmit",
     "verify:ci": "npm run verify:fmt && npm run verify:clippy && npm run verify:rust-test && npm run verify:ts && npm test",
     "test": "vitest run",

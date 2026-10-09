@@ -59,21 +59,17 @@ Copy [`.env.example`](../.env.example) → `.env` for OAuth client IDs during de
 
 ## Logging
 
-Default filter (see `lib.rs`):
+`tauri-plugin-log` writes `rustymail.log` in the OS app log directory (5 MB, 3 files). Debug builds also print to stdout. Release builds do not use stderr (`windows_subsystem = "windows"`).
 
-```text
-warn,rustymail::audit=info,rustymail_infrastructure=info,html5ever=error
-```
-
-Override with `RUST_LOG` when debugging.
+Filter: warn by default; `rustymail_lib`, `rustymail_infrastructure` and `rustymail::audit` at info; `html5ever` at error. `migrate()` and the FTS backfill log their durations (backfill also logs the batch count). Settings → Général → **Ouvrir le dossier des journaux**.
 
 ## CI
 
 | Workflow | Trigger | Action |
 | -------- | ------- | ------ |
-| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | push/PR to main | `fmt` · `clippy` · `cargo test` · `tsc` · Vitest |
+| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | push/PR to main | `fmt` · `clippy` · `cargo test --all-targets` · `tsc` · Vitest |
 | [`.github/workflows/cargo-audit.yml`](../.github/workflows/cargo-audit.yml) | push/PR to main | `cargo audit` |
-| [`.github/workflows/release.yml`](../.github/workflows/release.yml) | tag `v*` or manual | Windows Tauri build + GitHub Release |
+| [`.github/workflows/release.yml`](../.github/workflows/release.yml) | tag `v*` or manual | verify, then Windows Tauri build + GitHub Release |
 
 See [RELEASE.md](RELEASE.md).
 

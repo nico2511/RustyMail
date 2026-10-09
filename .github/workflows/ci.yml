@@ -46,7 +46,7 @@ jobs:
         run: cargo clippy -p rustymail-domain --all-targets -- -D warnings
 
       - name: cargo test
-        run: cargo test --workspace --lib --bins
+        run: cargo test --workspace --all-targets
 
   rust-windows:
     name: Rust smoke (Windows)
@@ -61,8 +61,8 @@ jobs:
         with:
           workspaces: ". -> target"
 
-      - name: cargo test (lib/bins)
-        run: cargo test --workspace --lib --bins
+      - name: cargo test
+        run: cargo test --workspace --all-targets
 
   frontend:
     name: Frontend (tsc · vitest)

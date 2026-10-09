@@ -1,5 +1,6 @@
-//! Client HTTP `POST …/chat/completions` (API [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat)) —
-//! utilisé pour OpenRouter, **llama-server** et **Ollama** (`/v1`, souvent `http://127.0.0.1:11434/v1`).
+//! Client HTTP chat : OpenRouter et llama-server via `POST …/chat/completions`
+//! (API [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat)).
+//! Ollama utilise l’API native `POST {racine}/api/chat` (`num_ctx`, `keep_alive`).
 
 use crate::{LlmError, LlmGenParams};
 use serde::de::DeserializeOwned;
@@ -28,34 +29,9 @@ struct ChatCompletionRequest<'a> {
     temperature: f32,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_p: Option<f32>,
-    /// Grammaire GBNF (llama-server / llama.cpp) — ignorée par OpenRouter et Ollama.
+    /// Grammaire GBNF (llama-server / llama.cpp) — ignorée par OpenRouter.
     #[serde(skip_serializing_if = "Option::is_none")]
     grammar: Option<&'a str>,
-    /// Ollama : forcer une réponse unique. Absent pour OpenRouter / llama-server.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    stream: Option<bool>,
-    /// Ollama : désactive la chaîne de raisonnement qui peut ne jamais produire de `content`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    think: Option<bool>,
-    /// Ollama : `num_predict` borne la génération même si `max_tokens` est ignoré.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    options: Option<OllamaGenOptions>,
-    /// Ollama : sortie JSON structurée quand l’appelant attend un objet.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    response_format: Option<JsonObjectFormat>,
-}
-
-#[derive(Debug, Serialize)]
-struct JsonObjectFormat {
-    #[serde(rename = "type")]
-    kind: &'static str,
-}
-
-#[derive(Debug, Serialize)]
-struct OllamaGenOptions {
-    num_predict: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    num_ctx: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -135,7 +111,7 @@ pub enum HttpChatBackendKind {
     OpenRouter,
     /// llama-server, vLLM, etc. : clé optionnelle, pas d’en-têtes fournisseur. GBNF envoyée.
     OpenAiCompatible,
-    /// Ollama (`/v1/chat/completions`). Pas de grammaire GBNF : le JSON est validé ensuite en Rust.
+    /// Ollama (`/api/chat`). Pas de grammaire GBNF : le JSON est validé ensuite en Rust.
     Ollama,
 }
 
@@ -159,6 +135,8 @@ pub struct HttpChatEngine {
     kind: HttpChatBackendKind,
     /// Contexte serveur (sonde `/props` ou cache boot).
     n_ctx_probe: Option<u32>,
+    /// Ollama `keep_alive` (ex. `30m`). Ignoré par les autres backends.
+    keep_alive: String,
 }
 
 fn map_reqwest_send_err(ctx: &str, e: reqwest::Error) -> LlmError {
@@ -234,6 +212,39 @@ fn ollama_status_retryable(status: StatusCode, body: &str) -> bool {
     status == StatusCode::SERVICE_UNAVAILABLE || status == StatusCode::TOO_MANY_REQUESTS
 }
 
+fn ollama_native_error_text(body: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(body).ok()?;
+    if let Some(msg) = v.get("error").and_then(|e| e.as_str()) {
+        let msg = msg.trim();
+        if !msg.is_empty() {
+            return Some(msg.to_string());
+        }
+    }
+    v.pointer("/error/message")
+        .and_then(|m| m.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// Durée avec unité (`30m`) → chaîne JSON. Sans unité (`-1`, `120`) → nombre JSON
+/// (une chaîne `"120"` est refusée par le décodeur `time.Duration` d'Ollama).
+fn ollama_keep_alive_json(normalized: &str) -> serde_json::Value {
+    let t = normalized.trim();
+    let has_unit = t.chars().any(|c| c.is_ascii_alphabetic());
+    if !has_unit {
+        if let Ok(n) = t.parse::<i64>() {
+            return json!(n);
+        }
+        if let Ok(n) = t.parse::<f64>() {
+            if n.is_finite() {
+                return json!(n);
+            }
+        }
+    }
+    json!(t)
+}
+
 fn ollama_status_error(status: StatusCode, body: &str, model: &str) -> LlmError {
     let b = body.to_ascii_lowercase();
     if status == StatusCode::NOT_FOUND
@@ -244,6 +255,9 @@ fn ollama_status_error(status: StatusCode, body: &str, model: &str) -> LlmError 
         return LlmError::Msg(format!(
             "Ollama : modèle « {model} » introuvable. Vérifiez le nom (`ollama list`) ou téléchargez-le (`ollama pull {model}`)."
         ));
+    }
+    if let Some(msg) = ollama_native_error_text(body) {
+        return LlmError::Msg(format!("Ollama : {msg}"));
     }
     let snippet: String = body.chars().take(400).collect();
     LlmError::Msg(format!("Ollama HTTP {status} : {snippet}"))
@@ -262,6 +276,13 @@ fn message_visible_text(message: &ChatMessageOut) -> String {
 fn completion_text_from_body(body: &str) -> Result<String, LlmError> {
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
         if v.get("choices").is_none() {
+            if let Some(msg) = v
+                .get("error")
+                .and_then(|e| e.as_str())
+                .filter(|s| !s.trim().is_empty())
+            {
+                return Err(LlmError::Msg(format!("Ollama : {msg}")));
+            }
             if let Some(msg) = v
                 .pointer("/error/message")
                 .and_then(|m| m.as_str())
@@ -461,6 +482,7 @@ impl HttpChatEngine {
             model,
             kind: HttpChatBackendKind::OpenRouter,
             n_ctx_probe: None,
+            keep_alive: String::new(),
         })
     }
 
@@ -486,11 +508,16 @@ impl HttpChatEngine {
             model,
             kind: HttpChatBackendKind::OpenAiCompatible,
             n_ctx_probe: None,
+            keep_alive: String::new(),
         })
     }
 
-    /// Ollama : même chemin HTTP qu’un serveur compatible OpenAI, sans Bearer ni GBNF.
-    pub fn new_ollama(base_url: String, model: String) -> Result<Self, LlmError> {
+    /// Ollama : API native `/api/chat`, sans Bearer ni GBNF.
+    pub fn new_ollama(
+        base_url: String,
+        model: String,
+        keep_alive: String,
+    ) -> Result<Self, LlmError> {
         let model = model.trim().to_string();
         if model.is_empty() {
             return Err(LlmError::Msg(
@@ -509,6 +536,7 @@ impl HttpChatEngine {
             model,
             kind: HttpChatBackendKind::Ollama,
             n_ctx_probe: None,
+            keep_alive: super::normalize_ollama_keep_alive(&keep_alive),
         })
     }
 
@@ -519,7 +547,46 @@ impl HttpChatEngine {
     }
 
     fn url(&self) -> String {
-        format!("{}/chat/completions", self.base_url)
+        match self.kind {
+            HttpChatBackendKind::Ollama => {
+                format!("{}/api/chat", ollama_native_base_url(&self.base_url))
+            }
+            HttpChatBackendKind::OpenRouter | HttpChatBackendKind::OpenAiCompatible => {
+                format!("{}/chat/completions", self.base_url)
+            }
+        }
+    }
+
+    fn ollama_native_body(
+        &self,
+        system: &str,
+        user: &str,
+        p: &LlmGenParams,
+        stream: bool,
+    ) -> serde_json::Value {
+        let mut options = json!({
+            "num_ctx": self.n_ctx(),
+            "num_predict": p.max_tokens.max(1),
+            "temperature": p.temperature.max(1e-6),
+        });
+        if p.top_p > 1e-6 && p.top_p <= 1.0 {
+            options["top_p"] = json!(p.top_p);
+        }
+        let mut body = json!({
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "stream": stream,
+            "think": false,
+            "options": options,
+        });
+        body["keep_alive"] = ollama_keep_alive_json(&self.keep_alive);
+        if p.expect_json {
+            body["format"] = json!("json");
+        }
+        body
     }
 
     fn apply_auth(
@@ -542,29 +609,6 @@ impl HttpChatEngine {
         }
     }
 
-    fn ollama_options(&self, p: &LlmGenParams) -> Option<OllamaGenOptions> {
-        match self.kind {
-            // `options.num_ctx` est ignoré par Ollama sur /v1/chat/completions.
-            // On le laisse pour un éventuel passage à /api/chat ; il ne fixe pas
-            // la fenêtre de contexte de cette requête.
-            HttpChatBackendKind::Ollama => Some(OllamaGenOptions {
-                num_predict: p.max_tokens.max(1),
-                num_ctx: Some(self.n_ctx()),
-            }),
-            _ => None,
-        }
-    }
-
-    fn ollama_json_format(&self, p: &LlmGenParams) -> Option<JsonObjectFormat> {
-        if self.kind == HttpChatBackendKind::Ollama && p.expect_json {
-            Some(JsonObjectFormat {
-                kind: "json_object",
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn generate(
         &mut self,
         system: &str,
@@ -573,36 +617,31 @@ impl HttpChatEngine {
         schema_gbnf: &str,
     ) -> Result<String, LlmError> {
         let grammar = grammar_for_kind(self.kind, p, schema_gbnf);
-        let body = ChatCompletionRequest {
-            model: self.model.as_str(),
-            messages: vec![
-                ChatMessage {
-                    role: "system",
-                    content: system,
+        let body = if self.kind == HttpChatBackendKind::Ollama {
+            self.ollama_native_body(system, user, p, false)
+        } else {
+            serde_json::to_value(&ChatCompletionRequest {
+                model: self.model.as_str(),
+                messages: vec![
+                    ChatMessage {
+                        role: "system",
+                        content: system,
+                    },
+                    ChatMessage {
+                        role: "user",
+                        content: user,
+                    },
+                ],
+                max_tokens: p.max_tokens.max(1),
+                temperature: p.temperature.max(1e-6),
+                top_p: if p.top_p > 1e-6 && p.top_p <= 1.0 {
+                    Some(p.top_p)
+                } else {
+                    None
                 },
-                ChatMessage {
-                    role: "user",
-                    content: user,
-                },
-            ],
-            max_tokens: p.max_tokens.max(1),
-            temperature: p.temperature.max(1e-6),
-            top_p: if p.top_p > 1e-6 && p.top_p <= 1.0 {
-                Some(p.top_p)
-            } else {
-                None
-            },
-            grammar,
-            stream: match self.kind {
-                HttpChatBackendKind::Ollama => Some(false),
-                _ => None,
-            },
-            think: match self.kind {
-                HttpChatBackendKind::Ollama => Some(false),
-                _ => None,
-            },
-            options: self.ollama_options(p),
-            response_format: self.ollama_json_format(p),
+                grammar,
+            })
+            .map_err(|e| LlmError::Msg(e.to_string()))?
         };
 
         let attempts = self.max_http_attempts();
@@ -683,42 +722,31 @@ impl HttpChatEngine {
         mut on_chunk: impl FnMut(&str) -> ControlFlow<Result<(), E>>,
     ) -> Result<String, LlmError> {
         let grammar = grammar_for_kind(self.kind, p, schema_gbnf);
-        let mut body = json!({
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "max_tokens": p.max_tokens.max(1),
-            "temperature": p.temperature.max(1e-6),
-            "stream": true,
-        });
-        if let Some(g) = grammar {
-            if let Some(obj) = body.as_object_mut() {
-                obj.insert("grammar".into(), json!(g));
-            }
-        }
-        if let Some(tp) = (p.top_p > 1e-6 && p.top_p <= 1.0).then_some(p.top_p) {
-            if let Some(obj) = body.as_object_mut() {
-                obj.insert("top_p".into(), json!(tp));
-            }
-        }
-        if self.kind == HttpChatBackendKind::Ollama {
-            if let Some(obj) = body.as_object_mut() {
-                obj.insert("think".into(), json!(false));
-                obj.insert(
-                    "options".into(),
-                    json!({
-                        "num_predict": p.max_tokens.max(1),
-                        // Ignoré par Ollama sur /v1/chat/completions (voir ollama_options).
-                        "num_ctx": self.n_ctx(),
-                    }),
-                );
-                if p.expect_json {
-                    obj.insert("response_format".into(), json!({ "type": "json_object" }));
+        let body = if self.kind == HttpChatBackendKind::Ollama {
+            self.ollama_native_body(system, user, p, true)
+        } else {
+            let mut body = json!({
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                "max_tokens": p.max_tokens.max(1),
+                "temperature": p.temperature.max(1e-6),
+                "stream": true,
+            });
+            if let Some(g) = grammar {
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert("grammar".into(), json!(g));
                 }
             }
-        }
+            if let Some(tp) = (p.top_p > 1e-6 && p.top_p <= 1.0).then_some(p.top_p) {
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert("top_p".into(), json!(tp));
+                }
+            }
+            body
+        };
 
         let attempts = self.max_http_attempts();
         let mut last_loading_hint: Option<String> = None;
@@ -727,11 +755,10 @@ impl HttpChatEngine {
             if attempt > 0 {
                 thread::sleep(Duration::from_millis(MODEL_LOAD_POLL_MS));
             }
-            let req = self
-                .client
-                .post(self.url())
-                .header("Accept", "text/event-stream")
-                .json(&body);
+            let mut req = self.client.post(self.url()).json(&body);
+            if self.kind != HttpChatBackendKind::Ollama {
+                req = req.header("Accept", "text/event-stream");
+            }
             let resp = self
                 .apply_auth(req)
                 .send()
@@ -1030,10 +1057,13 @@ pub fn list_ollama_tags(base_url: &str) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod grammar_tests {
     use super::{
-        effective_grammar, grammar_for_kind, ollama_native_base_url, parse_ollama_tags_json,
-        probe_openai_models, HttpChatBackendKind,
+        completion_text_from_body, effective_grammar, grammar_for_kind, ollama_keep_alive_json,
+        ollama_native_base_url, ollama_status_error, parse_ollama_tags_json, probe_openai_models,
+        HttpChatBackendKind,
     };
     use crate::LlmGenParams;
+    use reqwest::StatusCode;
+    use serde_json::json;
 
     #[test]
     fn effective_grammar_prefers_params() {
@@ -1160,5 +1190,176 @@ mod grammar_tests {
             names,
             vec!["llama3.2".to_string(), "qwen2.5:7b".to_string()]
         );
+    }
+
+    fn spawn_one_shot(response_body: &str) -> (u16, std::sync::Arc<std::sync::Mutex<String>>) {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::{Arc, Mutex};
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let captured = Arc::new(Mutex::new(String::new()));
+        let slot = captured.clone();
+        let response_body = response_body.to_string();
+        std::thread::spawn(move || {
+            let (mut sock, _) = listener.accept().expect("accept");
+            let _ = sock.set_read_timeout(Some(std::time::Duration::from_secs(5)));
+            let mut buf = Vec::new();
+            let mut tmp = [0u8; 4096];
+            loop {
+                match sock.read(&mut tmp) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        buf.extend_from_slice(&tmp[..n]);
+                        if let Some(header_end) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                            let headers = String::from_utf8_lossy(&buf[..header_end]);
+                            let len = headers
+                                .lines()
+                                .find_map(|line| {
+                                    let rest = line
+                                        .strip_prefix("Content-Length:")
+                                        .or_else(|| line.strip_prefix("content-length:"))?;
+                                    rest.trim().parse::<usize>().ok()
+                                })
+                                .unwrap_or(0);
+                            if buf.len() >= header_end + 4 + len {
+                                break;
+                            }
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            *slot.lock().expect("capture") = String::from_utf8_lossy(&buf).into_owned();
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response_body.len(),
+                response_body
+            );
+            let _ = sock.write_all(resp.as_bytes());
+        });
+        (port, captured)
+    }
+
+    fn captured_request(slot: &std::sync::Mutex<String>) -> (String, serde_json::Value) {
+        let raw = slot.lock().expect("capture").clone();
+        let (head, body) = raw.split_once("\r\n\r\n").expect("headers");
+        let path = head
+            .lines()
+            .next()
+            .expect("request line")
+            .split_whitespace()
+            .nth(1)
+            .expect("path")
+            .to_string();
+        let json: serde_json::Value = serde_json::from_str(body).expect("json body");
+        (path, json)
+    }
+
+    #[test]
+    fn unitless_keep_alive_is_json_number_and_native_error_is_text() {
+        assert_eq!(ollama_keep_alive_json("-1"), json!(-1));
+        assert_eq!(ollama_keep_alive_json("120"), json!(120));
+        assert_eq!(ollama_keep_alive_json("45m"), json!("45m"));
+        assert_eq!(ollama_keep_alive_json("30m"), json!("30m"));
+        let err = completion_text_from_body(r#"{"error":"time: invalid duration 120"}"#)
+            .expect_err("native error");
+        let msg = err.to_string();
+        assert!(msg.contains("invalid duration"), "{msg}");
+        assert!(msg.contains("Ollama"), "{msg}");
+        let http = ollama_status_error(
+            StatusCode::BAD_REQUEST,
+            r#"{"error":"time: invalid duration"}"#,
+            "llama3.2",
+        );
+        let http_msg = http.to_string();
+        assert!(http_msg.contains("invalid duration"), "{http_msg}");
+        assert!(!http_msg.contains('{'), "{http_msg}");
+    }
+
+    #[test]
+    fn ollama_native_chat_sends_num_ctx_keep_alive_and_parses_message() {
+        let (port, slot) = spawn_one_shot(
+            r#"{"model":"llama3.2","message":{"role":"assistant","content":"{\"ok\":true}"},"done":true}"#,
+        );
+        let mut engine = super::HttpChatEngine::new_ollama(
+            format!("http://127.0.0.1:{port}/v1"),
+            "llama3.2".into(),
+            "45m".into(),
+        )
+        .expect("engine");
+        engine.set_n_ctx_probe(4096);
+        let params = LlmGenParams {
+            expect_json: true,
+            max_tokens: 128,
+            ..LlmGenParams::default()
+        };
+        let text = engine
+            .generate("sys", "user", &params, "")
+            .expect("generate");
+        assert!(text.contains("\"ok\""), "{text}");
+        let (path, body) = captured_request(&slot);
+        assert_eq!(path, "/api/chat");
+        assert_eq!(body["keep_alive"], "45m");
+        assert_eq!(body["think"], false);
+        assert_eq!(body["stream"], false);
+        assert_eq!(body["format"], "json");
+        assert_eq!(body["options"]["num_ctx"], 4096);
+        assert_eq!(body["options"]["num_predict"], 128);
+        assert!(body.get("max_tokens").is_none());
+        assert!(body.get("response_format").is_none());
+    }
+
+    #[test]
+    fn ollama_native_chat_parses_ndjson_stream() {
+        let (port, slot) = spawn_one_shot(
+            "{\"message\":{\"content\":\"hel\"},\"done\":false}\n{\"message\":{\"content\":\"lo\"},\"done\":false}\n{\"message\":{\"content\":\"\"},\"done\":true}\n",
+        );
+        let mut engine = super::HttpChatEngine::new_ollama(
+            format!("http://127.0.0.1:{port}/v1"),
+            "llama3.2".into(),
+            "30m".into(),
+        )
+        .expect("engine");
+        engine.set_n_ctx_probe(2048);
+        let params = LlmGenParams {
+            max_tokens: 32,
+            ..LlmGenParams::default()
+        };
+        let mut pieces = Vec::new();
+        let text = engine
+            .generate_streaming("sys", "user", &params, "", |chunk| {
+                pieces.push(chunk.to_string());
+                std::ops::ControlFlow::<Result<(), String>>::Continue(())
+            })
+            .expect("stream");
+        assert_eq!(text, "hello");
+        assert_eq!(pieces, vec!["hel".to_string(), "lo".to_string()]);
+        let (path, body) = captured_request(&slot);
+        assert_eq!(path, "/api/chat");
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["keep_alive"], "30m");
+        assert_eq!(body["options"]["num_ctx"], 2048);
+        assert!(body.get("format").is_none());
+    }
+
+    #[test]
+    fn llama_server_stays_on_chat_completions() {
+        let (port, slot) = spawn_one_shot(r#"{"choices":[{"message":{"content":"ok"}}]}"#);
+        let mut engine = super::HttpChatEngine::new_open_ai_compatible(
+            format!("http://127.0.0.1:{port}/v1"),
+            "local".into(),
+            String::new(),
+        )
+        .expect("engine");
+        let text = engine
+            .generate("sys", "user", &LlmGenParams::default(), "")
+            .expect("generate");
+        assert_eq!(text, "ok");
+        let (path, body) = captured_request(&slot);
+        assert_eq!(path, "/v1/chat/completions");
+        assert!(body.get("keep_alive").is_none());
+        assert!(body.get("options").is_none());
+        assert!(body.get("max_tokens").is_some());
     }
 }

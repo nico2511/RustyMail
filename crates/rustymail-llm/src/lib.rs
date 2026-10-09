@@ -1,4 +1,4 @@
-//! Inférence LLM via **HTTP** (`/v1/chat/completions`) : OpenRouter, llama-server, Ollama.
+//! Inférence LLM via **HTTP** : OpenRouter et llama-server (`/v1/chat/completions`), Ollama (`/api/chat`).
 //! Recommandations de poids GGUF selon la RAM : [`hardware`].
 
 mod engine;
@@ -6,7 +6,7 @@ mod error;
 pub mod hardware;
 mod privacy;
 
-pub use engine::LlmEngine;
+pub use engine::{normalize_ollama_keep_alive, LlmEngine};
 
 #[cfg(feature = "http")]
 pub use engine::{

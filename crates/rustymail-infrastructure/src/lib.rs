@@ -209,9 +209,9 @@ pub use semantic_search::{
     SemanticEmbeddingCountsSnapshot, SemanticReindexStats,
 };
 pub use send_attempt::{
-    current_send_launch_id, draft_send_fingerprint, load_stored_sends_since, prune_stored_sends,
-    unix_secs, upsert_stored_send, SendAttemptBook, SendBegin, SendSlot, StoredSendAttempt,
-    SEND_ATTEMPT_TTL, SEND_INFLIGHT_STALE,
+    cleanup_send_spool, current_send_launch_id, draft_send_fingerprint, load_stored_sends_since,
+    prune_stored_sends, unix_secs, upsert_stored_send, SendAttemptBook, SendBegin, SendSlot,
+    StoredSendAttempt, SEND_ATTEMPT_TTL, SEND_INFLIGHT_STALE,
 };
 
 pub use demo_playground::{
@@ -1115,7 +1115,18 @@ pub(crate) fn open_sqlite_migrated(path: &Path) -> Result<Connection, rusqlite::
         return Ok(connection);
     }
     let backup = sqlite_crypto::prepare_version_backup(&connection, path);
-    migrate(&connection)?;
+    let migrate_started = std::time::Instant::now();
+    let migrated = migrate(&connection);
+    log::info!(
+        "migrate {} en {:?}",
+        if migrated.is_ok() {
+            "terminé"
+        } else {
+            "échoué"
+        },
+        migrate_started.elapsed()
+    );
+    migrated?;
     sqlite_crypto::apply_version_backup_outcome(&connection, &backup)?;
     sqlite_crypto::note_sqlcipher_verified_open(&connection, path);
     memo.insert(key);

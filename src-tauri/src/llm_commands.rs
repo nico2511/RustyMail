@@ -142,8 +142,12 @@ pub fn build_llm_engine(prefs: &AppPrefs, paths: &crate::AppPaths) -> Result<Llm
             return Err("Ollama : nom de modèle vide (voir `ollama list`).".into());
         }
         probe_openai_models(base)?;
-        let mut engine =
-            LlmEngine::ollama(base.to_string(), model.to_string()).map_err(|e| e.to_string())?;
+        let mut engine = LlmEngine::ollama(
+            base.to_string(),
+            model.to_string(),
+            prefs.ai.ollama_keep_alive.clone(),
+        )
+        .map_err(|e| e.to_string())?;
         if prefs.ai.local_llm_context_size >= 1024 {
             engine.set_n_ctx_probe(prefs.ai.local_llm_context_size);
         }

@@ -1,4 +1,6 @@
+import { invoke } from "@tauri-apps/api/core";
 import type { Account } from "../../accountSetup";
+import { isTauriRuntime } from "../lib/tauriRuntime";
 import { accountFieldTouched } from "../../accountSetup";
 import { currentAccount } from "../core/accountContext";
 import { render } from "../dispatch";
@@ -96,6 +98,19 @@ export async function tryHandleSettingsNavWire(action: string, element?: HTMLEle
     case "open-settings-default-account":
       openSettingsView({ settingsTab: "general" });
       return true;
+    case "open-app-log-dir": {
+      if (!isTauriRuntime()) {
+        toast.info("Les journaux sont disponibles dans l’application bureau.");
+        return true;
+      }
+      try {
+        await invoke("open_app_log_dir");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        toast.error(message || "Impossible d’ouvrir le dossier des journaux.");
+      }
+      return true;
+    }
     default:
       return false;
   }

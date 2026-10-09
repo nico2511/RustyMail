@@ -59,9 +59,10 @@ GBNF grammars are sent **only** to llama-server. OpenRouter and Ollama ignore th
 1. Run Ollama (`ollama serve`) and pull a model (`ollama pull llama3.2`)
 2. Settings → IA → Moteurs → **Ollama**
 3. Base URL default `http://127.0.0.1:11434/v1`, model name as in `ollama list`
-4. Status probes `GET {base}/models` (about 2s). If nothing answers, the line says **injoignable** and Organiser shows that message instead of inventing an orientation
+4. Chat calls the native API `POST {host}/api/chat` (the `/v1` suffix is stripped). The body sends `options.num_ctx` (preference `localLlmContextSize`, else 8192), `options.num_predict`, `think: false`, and `keep_alive` (preference `ollamaKeepAlive`, default `30m`). JSON features set `format: "json"`. Streaming is NDJSON (`message.content`, `done: true`).
+5. Status probes `GET {base}/models` (about 2s). If nothing answers, the line says **injoignable** and Organiser shows that message instead of inventing an orientation
 
-No API key. Loopback Ollama is not treated as third-party exfiltration. A remote Ollama URL is redacted like any other non-loopback OpenAI-compatible host. RustyMail does not install or start the Ollama binary.
+No API key. Loopback Ollama is not treated as third-party exfiltration. A remote Ollama URL is redacted like any other non-loopback host. RustyMail does not install or start the Ollama binary. OpenRouter and llama-server stay on `/v1/chat/completions`.
 
 ## OpenRouter
 

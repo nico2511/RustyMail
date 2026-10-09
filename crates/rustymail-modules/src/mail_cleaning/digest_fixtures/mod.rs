@@ -144,6 +144,16 @@ pub fn preview_candidate_fixture(yaml: &str, raw_html: &str, sender_email: &str)
 /// Accepter une fixture sur le banc n'appelle pas cette fonction.
 static READING_FIXTURE: Mutex<Option<DigestFixture>> = Mutex::new(None);
 
+/// Les tests partagent `READING_FIXTURE`. Ce verrou les sérialise.
+#[cfg(test)]
+pub(crate) fn lock_reading_fixture_for_test() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: Mutex<()> = Mutex::new(());
+    match LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
 pub fn set_installed_reading_fixture(fixture: Option<DigestFixture>) {
     if let Ok(mut slot) = READING_FIXTURE.lock() {
         *slot = fixture;
@@ -423,6 +433,7 @@ zones:
 
     #[test]
     fn explicit_reading_fixture_applies_only_while_installed() {
+        let _reading = super::lock_reading_fixture_for_test();
         let _clear = ClearReading;
         set_installed_reading_fixture(None);
         let yaml = r#"
@@ -481,6 +492,7 @@ zones:
 
     #[test]
     fn preview_reuses_a_template_from_another_sender() {
+        let _reading = super::lock_reading_fixture_for_test();
         let yaml = r#"
 id: facture-gabarit
 rule_set_version: "1"

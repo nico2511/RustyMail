@@ -485,6 +485,11 @@ pub fn validate_send_id(send_id: Option<&str>) -> Result<(), String> {
 
 const MAX_BULK_THREAD_ITEMS: usize = 500;
 
+/// `open_app_log_dir` n'accepte aucun argument utilisateur.
+pub fn validate_open_app_log_dir() -> Result<(), String> {
+    Ok(())
+}
+
 pub fn validate_thread_mailbox_batch(
     account_id: Option<&str>,
     items: &[(&str, &str)],

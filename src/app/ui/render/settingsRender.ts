@@ -148,6 +148,16 @@ function renderSettingsGeneralPanel(): string {
 
       <hr class="settings-section-divider" />
 
+      <section class="settings-general-section" aria-labelledby="settings-general-logs-heading">
+        <h3 id="settings-general-logs-heading" class="thread-kicker settings-form-kicker">Journaux</h3>
+        ${settingsExplainHtml("Fichier tournant rustymail.log (5 Mo × 3) dans le dossier de journaux de l’application.")}
+        <div class="settings-card__actions">
+          <button type="button" class="ghost-button" data-action="open-app-log-dir">Ouvrir le dossier des journaux</button>
+        </div>
+      </section>
+
+      <hr class="settings-section-divider" />
+
       <section class="settings-general-section" aria-labelledby="settings-general-update-heading">
         <h3 id="settings-general-update-heading" class="thread-kicker settings-form-kicker">Mises à jour</h3>
         ${settingsExplainHtml(

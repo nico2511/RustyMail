@@ -499,6 +499,7 @@ mod tests {
 
     #[test]
     fn invalid_llm_shape_is_rejected_before_yaml() {
+        let _reading = crate::mail_cleaning::digest_fixtures::lock_reading_fixture_for_test();
         let dto = super::DigestCutDto {
             fixture_id: "bad id".into(),
             rule_set_version: "1".into(),
@@ -545,6 +546,7 @@ mod tests {
 
     #[test]
     fn proposal_yaml_roundtrip_does_not_touch_reading_registry() {
+        let _reading = crate::mail_cleaning::digest_fixtures::lock_reading_fixture_for_test();
         set_installed_reading_fixture(None);
         let proposal = crate::mail_cleaning::digest_fixtures::analyze_html_structure_heuristic(
             include_str!("../tests/fixtures/deblock/receive_200eur.html"),

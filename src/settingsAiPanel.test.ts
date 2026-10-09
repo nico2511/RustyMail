@@ -77,6 +77,7 @@ describe("écran IA", () => {
     const ollama = modeFields(renderSettingsAiHub(deps({ chatBackend: "ollama", ollamaEnabled: true })));
     expect(ollama).toContain("prefs-ollama-base-url");
     expect(ollama).toContain("prefs-ollama-model");
+    expect(ollama).toContain("prefs-ollama-keep-alive");
     expect(ollama).toContain("Tester la connexion");
     expect(ollama).not.toContain("prefs-openrouter-model");
     expect(ollama).not.toContain("prefs-llama-server-base-url");
