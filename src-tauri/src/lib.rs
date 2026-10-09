@@ -348,8 +348,11 @@ fn capabilities(core: State<'_, Mutex<AppCore>>) -> Result<AppCapabilities, Stri
 
 /// Refresh in-memory `AppCore` from SQLite, optionally scoped to one IMAP account and mailbox.
 /// Without `accountId` + `mailbox`, loads the full local store (démo / navigateur).
+///
+/// `async` + `spawn_blocking` : ne bloque pas le runtime Tokio pendant les lectures SQLite
+/// (critique au premier lancement après mise à jour, avec backfill FTS en parallèle).
 #[tauri::command]
-fn list_threads(
+async fn list_threads(
     core: State<'_, Mutex<AppCore>>,
     paths: State<'_, AppPaths>,
     account_id: Option<String>,
@@ -365,39 +368,86 @@ fn list_threads(
     ipc_guard::validate_optional_mailbox(mailbox.as_deref())?;
     let normalized_page_size = ipc_guard::normalize_page_size(page_size, 50)?;
     let normalized_page_offset = ipc_guard::normalize_page_offset(page_offset)?;
+    let db = paths.db_path.clone();
+    let db_release = paths.db_path.clone();
+
+    let result = list_threads_inner(
+        &core,
+        db,
+        account_id,
+        mailbox,
+        page_size,
+        page_offset,
+        normalized_page_size,
+        normalized_page_offset,
+        followed_only,
+        account_wide,
+        unified,
+    )
+    .await;
+    // Libère le backfill FTS dès que la première page a été tentée.
+    rustymail_infrastructure::set_fts_backfill_hold(&db_release, false);
+    result
+}
+
+async fn list_threads_inner(
+    core: &State<'_, Mutex<AppCore>>,
+    db: std::path::PathBuf,
+    account_id: Option<String>,
+    mailbox: Option<String>,
+    page_size: Option<usize>,
+    page_offset: Option<usize>,
+    normalized_page_size: usize,
+    normalized_page_offset: usize,
+    followed_only: Option<bool>,
+    account_wide: Option<bool>,
+    unified: Option<bool>,
+) -> Result<Vec<ThreadListItem>, String> {
     if unified == Some(true) {
-        return rustymail_infrastructure::sqlite_list_threads_page_unified_inbox(
-            &paths.db_path,
-            normalized_page_size,
-            normalized_page_offset,
-        )
-        .map_err(|e| e.to_string());
+        return tauri::async_runtime::spawn_blocking(move || {
+            rustymail_infrastructure::sqlite_list_threads_page_unified_inbox(
+                &db,
+                normalized_page_size,
+                normalized_page_offset,
+            )
+            .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| format!("list_threads join: {e}"))?;
     }
     if followed_only == Some(true) {
         if let Some(a) = account_id.as_deref() {
-            let a = a.trim();
+            let a = a.trim().to_string();
             if !a.is_empty() {
-                return rustymail_infrastructure::sqlite_list_followed_threads_page(
-                    &paths.db_path,
-                    a,
-                    normalized_page_size,
-                    normalized_page_offset,
-                )
-                .map_err(|e| e.to_string());
+                return tauri::async_runtime::spawn_blocking(move || {
+                    rustymail_infrastructure::sqlite_list_followed_threads_page(
+                        &db,
+                        &a,
+                        normalized_page_size,
+                        normalized_page_offset,
+                    )
+                    .map_err(|e| e.to_string())
+                })
+                .await
+                .map_err(|e| format!("list_threads join: {e}"))?;
             }
         }
     }
     if account_wide == Some(true) {
         if let Some(a) = account_id.as_deref() {
-            let a = a.trim();
+            let a = a.trim().to_string();
             if !a.is_empty() {
-                return rustymail_infrastructure::sqlite_list_threads_page_account(
-                    &paths.db_path,
-                    a,
-                    normalized_page_size,
-                    normalized_page_offset,
-                )
-                .map_err(|e| e.to_string());
+                return tauri::async_runtime::spawn_blocking(move || {
+                    rustymail_infrastructure::sqlite_list_threads_page_account(
+                        &db,
+                        &a,
+                        normalized_page_size,
+                        normalized_page_offset,
+                    )
+                    .map_err(|e| e.to_string())
+                })
+                .await
+                .map_err(|e| format!("list_threads join: {e}"))?;
             }
         }
     }
@@ -407,24 +457,38 @@ fn list_threads(
         page_size,
         page_offset,
     ) {
-        if !a.trim().is_empty() && !m.trim().is_empty() {
-            return rustymail_infrastructure::sqlite_list_threads_page_scoped(
-                &paths.db_path,
-                a.trim(),
-                m,
-                normalized_page_size,
-                normalized_page_offset,
-            )
-            .map_err(|e| e.to_string());
+        let a = a.trim().to_string();
+        let m = m.to_string();
+        if !a.is_empty() && !m.trim().is_empty() {
+            return tauri::async_runtime::spawn_blocking(move || {
+                rustymail_infrastructure::sqlite_list_threads_page_scoped(
+                    &db,
+                    &a,
+                    &m,
+                    normalized_page_size,
+                    normalized_page_offset,
+                )
+                .map_err(|e| e.to_string())
+            })
+            .await
+            .map_err(|e| format!("list_threads join: {e}"))?;
         }
     }
-    let reloaded = match (account_id.as_deref(), mailbox.as_deref()) {
-        (Some(a), Some(m)) if !a.trim().is_empty() && !m.trim().is_empty() => {
-            rustymail_infrastructure::sqlite_app_core_scoped(&paths.db_path, a.trim(), m)
+
+    let account_id_owned = account_id.clone();
+    let mailbox_owned = mailbox.clone();
+    let reloaded = tauri::async_runtime::spawn_blocking(move || {
+        match (account_id_owned.as_deref(), mailbox_owned.as_deref()) {
+            (Some(a), Some(m)) if !a.trim().is_empty() && !m.trim().is_empty() => {
+                rustymail_infrastructure::sqlite_app_core_scoped(&db, a.trim(), m)
+            }
+            _ => rustymail_infrastructure::sqlite_app_core(&db),
         }
-        _ => rustymail_infrastructure::sqlite_app_core(&paths.db_path),
-    }
-    .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("list_threads join: {e}"))??;
+
     {
         let mut c = core.lock().map_err(|_| "core lock poisoned".to_string())?;
         *c = reloaded;
@@ -2076,7 +2140,7 @@ fn mailbox_inbox_filter_counts(
 #[tauri::command]
 async fn sync_inbox(
     paths: State<'_, AppPaths>,
-    core: State<'_, Mutex<AppCore>>,
+    _core: State<'_, Mutex<AppCore>>,
     account_id: Option<String>,
     mailbox: Option<String>,
     limit: Option<usize>,
@@ -2104,28 +2168,22 @@ async fn sync_inbox(
     let mailbox = mailbox
         .filter(|name| !name.trim().is_empty())
         .unwrap_or_else(|| "INBOX".to_string());
-    let result =
-        rustymail_infrastructure::sync_inbox(&paths.db_path, &account, &mailbox, limit).await?;
-    let refreshed =
-        rustymail_infrastructure::sqlite_app_core_scoped(&paths.db_path, &account.id.0, &mailbox)
-            .map_err(|error| error.to_string())?;
-    {
-        let mut core = core.lock().map_err(|_| "core lock poisoned".to_string())?;
-        *core = refreshed;
-    }
-    Ok(result)
+    // Pas de `sqlite_app_core_scoped` post-sync : recharger toute la boîte en RAM
+    // (corps HTML) bloquait la sync et faisait timeout `list_threads`.
+    rustymail_infrastructure::sync_inbox(&paths.db_path, &account, &mailbox, limit).await
 }
 
 #[tauri::command]
 async fn sync_mailboxes(
     paths: State<'_, AppPaths>,
-    core: State<'_, Mutex<AppCore>>,
+    _core: State<'_, Mutex<AppCore>>,
     account_id: Option<String>,
     mailboxes: Vec<String>,
     focus_mailbox: Option<String>,
     limit_per_mailbox: Option<usize>,
 ) -> Result<SyncMailboxesOutcome, String> {
     ipc_guard::validate_sync_mailboxes(&mailboxes)?;
+    // Conservé pour l’API IPC (focus UI) ; plus d’hydratation AppCore.
     ipc_guard::validate_optional_mailbox(focus_mailbox.as_deref())?;
     let limit_per_mailbox = ipc_guard::normalize_imap_sync_limit(limit_per_mailbox)?;
     let account = resolve_account_from_paths(&paths, account_id)?;
@@ -2133,20 +2191,14 @@ async fn sync_mailboxes(
         format!("imap_sync_mailboxes:{}", account.id.0.trim()),
         std::time::Duration::from_secs(2),
     )?;
-    let outcome = rustymail_infrastructure::sync_mailboxes_single_session(
+    // Même raison que `sync_inbox` : pas de rechargement AppCore post-sync.
+    rustymail_infrastructure::sync_mailboxes_single_session(
         &paths.db_path,
         &account,
         &mailboxes,
         limit_per_mailbox,
     )
-    .await?;
-    if let Some(focus) = focus_mailbox.as_deref().filter(|m| !m.trim().is_empty()) {
-        let refreshed =
-            rustymail_infrastructure::sqlite_app_core_scoped(&paths.db_path, &account.id.0, focus)
-                .map_err(|error| error.to_string())?;
-        *core.lock().map_err(|_| "core lock poisoned".to_string())? = refreshed;
-    }
-    Ok(outcome)
+    .await
 }
 
 fn resolve_account_from_paths(
@@ -2637,10 +2689,11 @@ pub fn run() {
                 log::warn!("ai_cache backfill expires_at: {e}");
             }
             // Index FTS : table et déclencheurs déjà créés par la migration.
-            // Le remplissage des corps existants ne bloque pas l'affichage.
+            // Hold jusqu’au premier `list_threads` pour laisser l’inbox gagner le disque.
+            rustymail_infrastructure::set_fts_backfill_hold(&db_path, true);
             rustymail_infrastructure::spawn_messages_fts_backfill(&db_path);
-            // Ne pas charger tout SQLite en RAM au démarrage (grosse base = IPC bloqué, comptes invisibles).
-            // `list_threads` / sync rechargent le cache à la demande via `sqlite_app_core*`.
+            // Ne pas charger tout SQLite en RAM au démarrage (grosse base = IPC bloqué).
+            // La liste UI page via `list_threads` ; la sync n’hydrate plus AppCore.
             let prefs_boot = prefs_path.clone();
             let minilm_boot = models_dir.clone();
 

@@ -2,7 +2,8 @@
 
 export const DEFAULT_INVOKE_TIMEOUT_MS = 2500;
 
-export const BOOT_INVOKE_TIMEOUT_MS = 15_000;
+/** Liste / boot : marge après mise à jour (migration SQLite, index, I/O disque). */
+export const BOOT_INVOKE_TIMEOUT_MS = 45_000;
 
 export const ACCOUNTS_BOOT_TIMEOUT_MS = 45_000;
 
