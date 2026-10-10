@@ -11,13 +11,13 @@ export function navSnapshotLabelsForView(view: View): { backLabel: string; bread
     case "thread": {
       const subj = state.selectedThread?.subject?.trim();
       const fil = subj ? (subj.length > 36 ? `${subj.slice(0, 33)}…` : subj) : "Fil";
-      return { backLabel: navMailboxSegment(), breadcrumb: [navMailboxSegment(), fil] };
+      return { backLabel: fil, breadcrumb: [navMailboxSegment(), fil] };
     }
     case "contacts":
       return { backLabel: "Carnet", breadcrumb: ["Carnet"] };
     case "contact": {
       const name = getContactDetail()?.displayName?.trim() || state.selectedContactEmail || "Contact";
-      return { backLabel: "Contact", breadcrumb: ["Carnet", name] };
+      return { backLabel: name, breadcrumb: ["Carnet", name] };
     }
     case "settings":
       return { backLabel: "Paramètres", breadcrumb: ["Paramètres"] };
@@ -35,7 +35,7 @@ export function navSnapshotLabelsForView(view: View): { backLabel: string; bread
     }
     case "compose":
       return {
-        backLabel: state.selectedThread ? "Fil" : navMailboxSegment(),
+        backLabel: "Composer",
         breadcrumb: state.selectedThread ? ["Fil", "Composer"] : [navMailboxSegment(), "Composer"],
       };
     default:

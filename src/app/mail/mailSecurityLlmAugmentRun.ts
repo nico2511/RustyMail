@@ -12,6 +12,11 @@ const securityLlmAugmentCache: Record<string, MailSecuritySignals> = {};
 const securityLlmAugmentFailed: Record<string, boolean> = {};
 let securityAugmentRenderQueued = false;
 
+/** File d’attente sérialisée — évite N appels LLM + N re-render en parallèle à l’ouverture. */
+const securityLlmQueue: CleanedMessageView[] = [];
+let securityLlmQueueRunning = false;
+let securityLlmEpoch = 0;
+
 function scheduleSecurityAugmentRender(): void {
   if (securityAugmentRenderQueued) return;
   securityAugmentRenderQueued = true;
@@ -59,6 +64,57 @@ export function securityLlmAugmentStateForMessage(messageId: string | undefined)
   };
 }
 
+/** Invalide la file LLM si on quitte / change de fil (les invokes déjà partis restent, sans re-render). */
+export function cancelPendingSecurityLlmAugments(): void {
+  securityLlmEpoch += 1;
+  securityLlmQueue.length = 0;
+  for (const mid of Object.keys(securityLlmAugmentBusy)) {
+    delete securityLlmAugmentBusy[mid];
+  }
+}
+
+async function runSecurityLlmQueue(epoch: number): Promise<void> {
+  if (securityLlmQueueRunning) return;
+  securityLlmQueueRunning = true;
+  try {
+    while (securityLlmQueue.length && epoch === securityLlmEpoch) {
+      const message = securityLlmQueue.shift()!;
+      const mid = message.messageId?.trim();
+      if (!mid) continue;
+      if (securityLlmAugmentCache[mid] || securityLlmAugmentFailed[mid]) {
+        delete securityLlmAugmentBusy[mid];
+        continue;
+      }
+      const base = message.mailSecurity ?? defaultMailSecuritySignals();
+      try {
+        const context = buildMailSecurityLlmContext(message, state.selectedThread?.subject);
+        const augmented = await invoke<MailSecuritySignals>("llm_security_signals_augment", {
+          payload: { signals: base, context },
+        });
+        if (epoch !== securityLlmEpoch) return;
+        securityLlmAugmentCache[mid] = augmented;
+      } catch {
+        if (epoch !== securityLlmEpoch) return;
+        securityLlmAugmentFailed[mid] = true;
+      } finally {
+        delete securityLlmAugmentBusy[mid];
+      }
+      if (
+        epoch === securityLlmEpoch &&
+        state.view === "thread" &&
+        state.selectedThread?.messages?.some((m) => m.messageId === mid)
+      ) {
+        scheduleSecurityAugmentRender();
+      }
+    }
+  } finally {
+    securityLlmQueueRunning = false;
+    if (securityLlmQueue.length && epoch === securityLlmEpoch) {
+      void runSecurityLlmQueue(epoch);
+    }
+  }
+}
+
 export function scheduleSecurityLlmAugment(message: CleanedMessageView): void {
   const mid = message.messageId?.trim();
   if (!mid || !isTauriRuntime()) return;
@@ -68,20 +124,6 @@ export function scheduleSecurityLlmAugment(message: CleanedMessageView): void {
   if (securityLlmAugmentCache[mid] || securityLlmAugmentBusy[mid]) return;
   delete securityLlmAugmentFailed[mid];
   securityLlmAugmentBusy[mid] = true;
-  void (async () => {
-    try {
-      const context = buildMailSecurityLlmContext(message, state.selectedThread?.subject);
-      const augmented = await invoke<MailSecuritySignals>("llm_security_signals_augment", {
-        payload: { signals: base, context },
-      });
-      securityLlmAugmentCache[mid] = augmented;
-    } catch {
-      securityLlmAugmentFailed[mid] = true;
-    } finally {
-      delete securityLlmAugmentBusy[mid];
-      if (state.view === "thread" && state.selectedThread?.messages?.some((m) => m.messageId === mid)) {
-        scheduleSecurityAugmentRender();
-      }
-    }
-  })();
+  securityLlmQueue.push(message);
+  void runSecurityLlmQueue(securityLlmEpoch);
 }

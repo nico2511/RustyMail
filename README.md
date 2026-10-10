@@ -2,7 +2,7 @@
 
 RustyMail is a **local-first desktop email client** built with **Tauri v2**, **Rust**, and **TypeScript**. It syncs mail over **IMAP**, sends over **SMTP**, caches state in **SQLite**, and keeps credentials in the **OS keyring**. Optional AI (summaries, rewrite, translation, grammar, dictation, semantic search) runs on-device or over HTTP to OpenRouter / llama-server — never required for core mail.
 
-Version courante : **0.4.7**.
+Version courante : **0.4.8**.
 
 **0.4.0** follows 0.3.9: éditeur de découpe digest (zones visuelles, validation, reformatage IA du texte), recherche multi-compte, détection désinscription renforcée.
 

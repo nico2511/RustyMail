@@ -8,9 +8,11 @@ import { render } from "../dispatch";
 import { state } from "../state";
 import { applyNavSnapshot } from "./appNavigationApplyRun";
 import { captureCurrentNav } from "./appNavigationSnapshotRun";
+import { cancelPendingSecurityLlmAugments } from "./mailSecurityDisplay";
 import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 
 export async function goBack(): Promise<void> {
+  if (state.view === "thread") cancelPendingSecurityLlmAugments();
   const snap = navPop();
   if (!snap) {
     if (state.view === "folderManager" && state.folderManager.selectedMailbox) {

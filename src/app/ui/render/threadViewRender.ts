@@ -354,8 +354,6 @@ export function renderThread() {
               : renderThreadLoopChangeNote(recipientEventsById.get(message.messageId), iconSvg("thread"));
             const offerMsgTranslate = renderDeps().shouldOfferPerMessageTranslate(message, translationTargetLang, thread.tags);
             const inlineTr = renderMessageInlineTranslation(message, translationTargetLang, offerMsgTranslate);
-            const htmlForDisplay = showsHtmlBubble ? renderDeps().messageHtmlForDisplay(message, eff) : null;
-            const unsubLinks = htmlForDisplay ? renderDeps().extractUnsubscribeLinksFromHtml(htmlForDisplay) : [];
             const headActionsHtml = renderThreadMsgHeadActions(message, nlRuleRow, thread.tags);
             const headMainHtml =
               showMeta ?
@@ -373,6 +371,36 @@ export function renderThread() {
             const unreadMark = Boolean(threadUnreadNav) && i === 0;
             const foldPreview = threadMessageFoldPreview(message.cleanedText || message.sourceText || "");
             const foldLabel = msgOpen ? "Replier ce message" : "Développer ce message";
+            // Corps HTML seulement si ouvert : sanitize/base64/hydrate des messages pliés
+            // provoquait freeze à l’ouverture (et au re-render analyse sécurité).
+            const openBodyHtml = msgOpen
+              ? (() => {
+                  const htmlForDisplay = showsHtmlBubble
+                    ? renderDeps().messageHtmlForDisplay(message, eff)
+                    : null;
+                  const unsubLinks = htmlForDisplay
+                    ? renderDeps().extractUnsubscribeLinksFromHtml(htmlForDisplay)
+                    : [];
+                  return `
+                  <div class="thread-msg-card mail-security-tier ${renderDeps().mailSecurityTierClass(renderDeps().normalizedMailSecurity(message))}">
+                    ${headActionsHtml}
+                    ${renderMessageBody(message, eff, unsubLinks)}
+                    ${inlineTr}
+                    ${
+                      message.attachments.length > 1
+                        ? `<div class="thread-attach-bulk-row">
+                        <button type="button" class="ghost-button thread-attach-bulk-btn" data-action="download-all-attachments" data-msg-id="${escapeAttr(message.messageId)}" title="Enregistrer toutes les pièces jointes de ce message dans Téléchargements">
+                          ${iconSvg("download")}<span>Tout télécharger (${message.attachments.length})</span>
+                        </button>
+                      </div>`
+                        : ""
+                    }
+                    ${renderThreadMessageAttachmentSection(message)}
+                  </div>`;
+                })()
+              : `<div class="thread-msg-card thread-msg-card--folded mail-security-tier ${renderDeps().mailSecurityTierClass(renderDeps().normalizedMailSecurity(message))}">
+                    ${headActionsHtml}
+                  </div>`;
             return `
               ${daySeparator}
               ${loopChangeHtml}
@@ -391,22 +419,7 @@ export function renderThread() {
                       ? ""
                       : `<button type="button" class="thread-msg-fold-preview" data-action="thread-accordion-toggle" data-msg-id="${escapeAttr(message.messageId)}">${escapeHtml(foldPreview)}</button>`
                   }
-                  <div class="thread-msg-card mail-security-tier ${renderDeps().mailSecurityTierClass(renderDeps().normalizedMailSecurity(message))}">
-                    ${headActionsHtml}
-                    ${renderMessageBody(message, eff, unsubLinks)}
-                    ${inlineTr}
-                    ${
-                      message.attachments.length > 1
-                        ? `<div class="thread-attach-bulk-row">
-                        <button type="button" class="ghost-button thread-attach-bulk-btn" data-action="download-all-attachments" data-msg-id="${escapeAttr(message.messageId)}" title="Enregistrer toutes les pièces jointes de ce message dans Téléchargements">
-                          ${iconSvg("download")}<span>Tout télécharger (${message.attachments.length})</span>
-                        </button>
-                      </div>`
-                        : ""
-                    }
-                    ${renderThreadMessageAttachmentSection(message)}
-                    ${""}
-                  </div>
+                  ${openBodyHtml}
                 </div>
               </article>
             `;

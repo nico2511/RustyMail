@@ -138,12 +138,15 @@ const SECONDARY_VIEWS: AppView[] = [
   "folderManager",
 ];
 
+/** Libellé du bouton Retour — omis du fil d’Ariane (évite Réception ×2). */
 function navParentLeafLabel(): string | null {
   const prev = navPeek();
   if (!prev) return null;
+  const bl = prev.backLabel?.replace(/^←\s*/, "").trim();
+  if (bl) return bl;
   const trail = prev.breadcrumb.filter(Boolean);
   if (trail.length) return trail[trail.length - 1]!;
-  return prev.backLabel?.replace(/^←\s*/, "").trim() || null;
+  return null;
 }
 
 function navInboxCrumbLabel(): string {

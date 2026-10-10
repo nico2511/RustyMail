@@ -2,8 +2,12 @@ import { escapeAttr } from "../../ui/sanitize";
 
 export function utf8StringToBase64(s: string): string {
   const bytes = new TextEncoder().encode(s);
+  const chunk = 0x2000;
   let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
+  for (let i = 0; i < bytes.length; i += chunk) {
+    const end = Math.min(i + chunk, bytes.length);
+    bin += String.fromCharCode(...bytes.subarray(i, end));
+  }
   return btoa(bin);
 }
 

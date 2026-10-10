@@ -5,6 +5,7 @@ export {
 } from "./mailSecurityDisplaySignalsRun";
 export {
   activeSecurityLlmAugmentCount,
+  cancelPendingSecurityLlmAugments,
   isSecurityLlmAugmentPending,
   normalizedMailSecurity,
   scheduleSecurityLlmAugment,

@@ -7,6 +7,8 @@ use rustymail_domain::{
 };
 
 const MANY_URL_THRESHOLD: usize = 10;
+/// Plafond de scan HTML pour densité de liens / punycode (évite freeze sur newsletters énormes).
+const MAX_HTML_SECURITY_SCAN_BYTES: usize = 256 * 1024;
 
 /// Heuristiques déterministes à partir du modèle `Message` déjà chargé.
 pub fn analyze_mail_security(message: &Message) -> MailSecuritySignals {
@@ -282,8 +284,21 @@ fn count_urls_in_text(s: &str) -> usize {
     s.match_indices("http://").count() + s.match_indices("https://").count()
 }
 
+fn html_security_scan_slice(html: &str) -> &str {
+    if html.len() <= MAX_HTML_SECURITY_SCAN_BYTES {
+        return html;
+    }
+    // Coupe sur une frontière UTF-8 sûre.
+    let mut end = MAX_HTML_SECURITY_SCAN_BYTES;
+    while end > 0 && !html.is_char_boundary(end) {
+        end -= 1;
+    }
+    &html[..end]
+}
+
 fn strip_tags_for_url_scan(html: &str) -> String {
-    let mut out = String::with_capacity(html.len());
+    let html = html_security_scan_slice(html);
+    let mut out = String::with_capacity(html.len().min(64 * 1024));
     let mut in_tag = false;
     for ch in html.chars() {
         match ch {
@@ -299,10 +314,12 @@ fn strip_tags_for_url_scan(html: &str) -> String {
 fn check_link_density(message: &Message, out: &mut Vec<MailSecurityFinding>) {
     let mut n = count_urls_in_text(&message.plain_body);
     if let Some(html) = message.html_body.as_deref() {
-        n += count_urls_in_text(&strip_tags_for_url_scan(html));
-        // href= counts (often duplicates visible URLs — still indicative of noisy HTML mail)
-        n += html.to_ascii_lowercase().matches("href=\"http").count();
-        n += html.to_ascii_lowercase().matches("href='http").count();
+        let slice = html_security_scan_slice(html);
+        n += count_urls_in_text(&strip_tags_for_url_scan(slice));
+        // Une seule passe lowercase (évite 2× allocation sur gros HTML).
+        let lower = slice.to_ascii_lowercase();
+        n += lower.matches("href=\"http").count();
+        n += lower.matches("href='http").count();
     }
     if n >= MANY_URL_THRESHOLD {
         out.push(MailSecurityFinding {
@@ -451,7 +468,13 @@ fn blob_has_suspicious_url_domain(blob: &str) -> bool {
 }
 
 fn check_punycode_or_homoglyph_urls(message: &Message, out: &mut Vec<MailSecurityFinding>) {
-    let mut blob = message.plain_body.clone();
+    let plain = if message.plain_body.len() > MAX_HTML_SECURITY_SCAN_BYTES {
+        html_security_scan_slice(&message.plain_body)
+    } else {
+        message.plain_body.as_str()
+    };
+    let mut blob = String::with_capacity(plain.len().saturating_add(1024));
+    blob.push_str(plain);
     if let Some(html) = message.html_body.as_deref() {
         blob.push(' ');
         blob.push_str(&strip_tags_for_url_scan(html));

@@ -50,11 +50,40 @@ describe("navBuildBreadcrumbItems", () => {
     navPushBackEntry({ view: "settings", backLabel: "Paramètres", breadcrumb: ["Paramètres"] });
     navPushBackEntry({
       view: "thread",
-      backLabel: "Boîte de réception",
+      backLabel: "Sujet du fil",
       breadcrumb: ["Boîte de réception", "Sujet du fil"],
       selectedThreadId: "t1",
     });
     const items = navBuildBreadcrumbItems("Paramètres");
     expect(items.map((i) => i.label)).toEqual(["Boîte de réception", "Paramètres"]);
+  });
+
+  it("n’affiche pas Réception en double quand Retour pointe déjà vers la boîte (fil → Paramètres)", () => {
+    navPushBackEntry(listSnap("Réception"));
+    navPushBackEntry({
+      view: "thread",
+      // Ancien bug : backLabel = boîte alors que le Retour mène au fil.
+      backLabel: "Réception",
+      breadcrumb: ["Réception", "Fil"],
+      selectedThreadId: "t1",
+    });
+    expect(navBuildBreadcrumbItems("Paramètres").map((i) => i.label)).toEqual([
+      "Fil",
+      "Paramètres",
+    ]);
+  });
+
+  it("omet le sujet du fil déjà porté par Retour (backLabel corrigé)", () => {
+    navPushBackEntry(listSnap("Réception"));
+    navPushBackEntry({
+      view: "thread",
+      backLabel: "Fil",
+      breadcrumb: ["Réception", "Fil"],
+      selectedThreadId: "t1",
+    });
+    expect(navBuildBreadcrumbItems("Paramètres").map((i) => i.label)).toEqual([
+      "Réception",
+      "Paramètres",
+    ]);
   });
 });

@@ -38,7 +38,10 @@ export async function markOpenedThreadReadIfUnread(
     const mailbox = deps.sourceMailboxForThread(threadId);
     await withTimeout(invoke<string>("thread_mark_read", { accountId, mailbox, threadId }), MAIL_ACTION_TIMEOUT_MS);
     await loadMailboxUnread();
-    render();
+    // Évite un 2ᵉ paint lourd du fil (ou un paint orphelin après Retour).
+    if (state.view === "list" || String(state.selectedThreadId) === String(threadId)) {
+      render();
+    }
   } catch (e) {
     console.warn("thread_mark_read (ouverture)", e);
   }

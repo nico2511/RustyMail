@@ -582,23 +582,40 @@ fn assert_reply_allowed_for_thread(
     Ok(())
 }
 
+/// `async` + `spawn_blocking` : SQLite + clean HTML + analyse sécurité ne bloquent pas Tokio.
 #[tauri::command]
-fn open_thread(
+async fn open_thread(
     core: State<'_, Mutex<AppCore>>,
     paths: State<'_, AppPaths>,
     thread_id: String,
 ) -> Result<DiscussionThreadView, String> {
     ipc_guard::validate_thread_id(&thread_id)?;
-    let mut view = if let Some(thread) =
-        rustymail_infrastructure::sqlite_open_thread_by_id(&paths.db_path, &thread_id)
-            .map_err(|e| e.to_string())?
-    {
+    let app_paths = paths.inner().clone();
+    let tid = thread_id.clone();
+    let sqlite_view = tauri::async_runtime::spawn_blocking(move || {
+        let Some(thread) =
+            rustymail_infrastructure::sqlite_open_thread_by_id(&app_paths.db_path, &tid)
+                .map_err(|e| e.to_string())?
+        else {
+            return Ok::<Option<DiscussionThreadView>, String>(None);
+        };
         let temp = AppCore::new(vec![thread]);
-        temp.open_thread(&ThreadId(thread_id.clone()))
-            .map_err(|error| error.to_string())?
-    } else {
+        let mut view = temp
+            .open_thread(&ThreadId(tid))
+            .map_err(|error| error.to_string())?;
+        enrich_thread_newsletter(&app_paths, &mut view)?;
+        Ok(Some(view))
+    })
+    .await
+    .map_err(|e| format!("open_thread join: {e}"))??;
+
+    if let Some(view) = sqlite_view {
+        return Ok(view);
+    }
+
+    let mut view = {
         let core = core.lock().map_err(|_| "core lock poisoned".to_string())?;
-        core.open_thread(&ThreadId(thread_id.clone()))
+        core.open_thread(&ThreadId(thread_id))
             .map_err(|error| error.to_string())?
     };
     enrich_thread_newsletter(&paths, &mut view)?;

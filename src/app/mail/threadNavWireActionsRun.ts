@@ -2,10 +2,21 @@ import { render } from "../dispatch";
 import { state } from "../state";
 import { goBack, navigateToInbox, navigateToBreadcrumbIndex } from "./appNavActions";
 import { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";
-import { nextAccordionAfterToggle } from "./threadAccordion";
+import { scheduleSecurityLlmAugment } from "./mailSecurityDisplay";
+import { messageAccordionOpen, nextAccordionAfterToggle } from "./threadAccordion";
 import { sortMessagesByReceivedDescending } from "./threadMessageSort";
 import { pickImapMailboxFallback } from "./mailboxImapFallback";
 import { switchMailbox } from "./switchMailboxAction";
+
+function scheduleSecurityForOpenMessages(): void {
+  const msgs = sortMessagesByReceivedDescending(state.selectedThread?.messages ?? []);
+  const ids = msgs.map((m) => m.messageId);
+  for (const m of msgs) {
+    if (messageAccordionOpen(state.threadAccordion, m.messageId, ids)) {
+      scheduleSecurityLlmAugment(m);
+    }
+  }
+}
 
 export async function tryHandleThreadNavWire(action: string, element?: HTMLElement): Promise<boolean> {
   switch (action) {
@@ -33,11 +44,13 @@ export async function tryHandleThreadNavWire(action: string, element?: HTMLEleme
       const id = element?.dataset.msgId?.trim() ?? "";
       const ids = sortMessagesByReceivedDescending(state.selectedThread?.messages ?? []).map((m) => m.messageId);
       state.threadAccordion = nextAccordionAfterToggle(state.threadAccordion, id, ids);
+      scheduleSecurityForOpenMessages();
       render();
       return true;
     }
     case "thread-accordion-expand-all":
       state.threadAccordion = "all";
+      scheduleSecurityForOpenMessages();
       render();
       return true;
     case "thread-accordion-collapse-all":

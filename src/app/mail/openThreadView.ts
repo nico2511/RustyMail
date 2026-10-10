@@ -9,10 +9,12 @@ import { beginNavigation } from "./appNavigationStack";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { requireOpenThreadDeps, type OpenThreadOptions } from "./openThreadViewDepsRun";
+import { cancelPendingSecurityLlmAugments } from "./mailSecurityDisplay";
 import {
   markOpenedThreadReadIfUnread,
   maybeAutoSummarizeThreadOnOpen,
 } from "./openThreadViewEffectsRun";
+import { messageAccordionOpen } from "./threadAccordion";
 
 export type { OpenThreadOptions, OpenThreadDeps } from "./openThreadViewDepsRun";
 export { registerOpenThreadDeps } from "./openThreadViewDepsRun";
@@ -38,6 +40,7 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
   const keepAi =
     opts?.preserveAi && openThreadDeps.threadAiSummaryScoped() && threadIdsMatch(state.aiThreadScope, tid);
   if (String(prev) !== String(tid)) {
+    cancelPendingSecurityLlmAugments();
     state.threadAccordion = "latest";
     state.threadQuickReplyOpen = false;
     state.threadTagsModalOpen = false;
@@ -75,7 +78,13 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
   if (isTauriRuntime()) void invoke("ai_user_activity_ping").catch(() => {});
   const hyd = state.selectedThread?.messages ?? [];
   if (isTauriRuntime() && hyd.length) void openThreadDeps.hydrateMessageTranslationsFromCacheForThread(hyd);
-  for (const m of hyd) openThreadDeps.scheduleSecurityLlmAugment(m);
+  // LLM sécurité seulement pour les messages ouverts (évite N invokes + re-renders à l’ouverture).
+  const openIds = hyd.map((m) => m.messageId);
+  for (const m of hyd) {
+    if (messageAccordionOpen(state.threadAccordion, m.messageId, openIds)) {
+      openThreadDeps.scheduleSecurityLlmAugment(m);
+    }
+  }
   void maybeAutoSummarizeThreadOnOpen(tid, opened, openThreadDeps);
   render();
 }
