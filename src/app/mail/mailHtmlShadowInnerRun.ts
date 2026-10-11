@@ -1,8 +1,13 @@
-import { base64ToUtf8String } from "../lib/htmlMessage";
+import { base64ToUtf8String, peekMailHtmlPayload } from "../lib/htmlMessage";
 import { state } from "../state";
 import { sanitizeEmailHtml } from "./mailEmailHtmlSanitize";
 
 function readMailHtmlRawFromHost(host: HTMLDivElement): string {
+  const messageId = (host.dataset.messageId ?? "").trim();
+  if (messageId) {
+    const cached = peekMailHtmlPayload(messageId);
+    if (cached != null) return cached;
+  }
   const b64 = host.dataset.emailHtmlB64?.trim();
   if (b64) {
     try {

@@ -57,7 +57,7 @@ export function remountMailHtmlShadow(host: HTMLDivElement): void {
 
 export function hydrateEmailHtml() {
   const nodes = document.querySelectorAll<HTMLDivElement>(
-    ".message-html[data-email-html-b64], .message-html[data-email-html]",
+    ".message-html[data-email-html-fp], .message-html[data-email-html-b64], .message-html[data-email-html]",
   );
   nodes.forEach((host) => {
     if ((host as unknown as { __hydrated?: boolean }).__hydrated) return;

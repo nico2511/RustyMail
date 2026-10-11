@@ -44,6 +44,7 @@ function assignSlots(elements: HTMLElement[]): Map<HTMLElement, string> {
 
 function sameMailHost(previous: HTMLElement, incoming: HTMLElement): boolean {
   if ((previous.dataset.messageId ?? "") !== (incoming.dataset.messageId ?? "")) return false;
+  if ((previous.dataset.emailHtmlFp ?? "") !== (incoming.dataset.emailHtmlFp ?? "")) return false;
   if ((previous.dataset.emailHtmlB64 ?? "") !== (incoming.dataset.emailHtmlB64 ?? "")) return false;
   if ((previous.dataset.emailHtml ?? "") !== (incoming.dataset.emailHtml ?? "")) return false;
   const prevClean = previous.classList.contains("message-html--clean");

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { sanitizeEmailHtml } from "./mailEmailHtmlSanitize";
+import { extractUnsubscribeLinksFromHtml, sanitizeEmailHtml } from "./mailEmailHtmlSanitize";
 
 describe("sanitizeEmailHtml", () => {
   it("retire style, video et svg sans laisser l’URL de tracking", () => {
@@ -83,6 +83,15 @@ describe("sanitizeEmailHtml", () => {
     }
     const table = sanitizeEmailHtml(cases[0]).html;
     expect(table).toContain('data-remote-background="https://t.example/p.gif"');
+  });
+
+  it("extrait les liens de désabo sans sanitize DOMPurify", () => {
+    const links = extractUnsubscribeLinksFromHtml(
+      `<p>News</p><a href="https://news.example/unsubscribe?u=1">Se désabonner</a>`,
+    );
+    expect(links).toHaveLength(1);
+    expect(links[0]?.href).toContain("unsubscribe");
+    expect(links[0]?.label.toLowerCase()).toContain("désabonn");
   });
 
   it("conserve background quand les images distantes sont autorisées", () => {
