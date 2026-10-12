@@ -3,18 +3,14 @@ import { state } from "../state";
 import { goBack, navigateToInbox, navigateToBreadcrumbIndex } from "./appNavActions";
 import { writeSidebarCollapsedPreference } from "../lib/sidebarUiPref";
 import { scheduleSecurityLlmAugment } from "./mailSecurityDisplay";
-import { messageAccordionOpen, nextAccordionAfterToggle } from "./threadAccordion";
+import { nextAccordionAfterToggle, openMessagesForAccordion } from "./threadAccordion";
 import { sortMessagesByReceivedDescending } from "./threadMessageSort";
 import { pickImapMailboxFallback } from "./mailboxImapFallback";
 import { switchMailbox } from "./switchMailboxAction";
 
 function scheduleSecurityForOpenMessages(): void {
-  const msgs = sortMessagesByReceivedDescending(state.selectedThread?.messages ?? []);
-  const ids = msgs.map((m) => m.messageId);
-  for (const m of msgs) {
-    if (messageAccordionOpen(state.threadAccordion, m.messageId, ids)) {
-      scheduleSecurityLlmAugment(m);
-    }
+  for (const m of openMessagesForAccordion(state.threadAccordion, state.selectedThread?.messages ?? [])) {
+    scheduleSecurityLlmAugment(m);
   }
 }
 

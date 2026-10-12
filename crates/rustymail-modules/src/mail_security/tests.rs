@@ -181,3 +181,60 @@ fn merge_preserves_hard_auth_when_llm_omits() {
     assert!(merged.iter().any(|f| f.code == "dmarc_fail"));
     assert!(merged.iter().any(|f| f.code == "context_hint"));
 }
+
+#[test]
+fn punycode_link_after_large_padding_is_still_flagged() {
+    // Régression 0.4.8 : un remplissage > 256 Ko (ici un commentaire invisible) masquait le lien.
+    let mut m = base_msg();
+    m.plain_body = String::new();
+    m.html_body = Some(format!(
+        "<!--{}--><p><a href=\"https://www.xn--pple-43d.com/login\">Connexion</a></p>",
+        "a".repeat(300 * 1024)
+    ));
+    let s = analyze_mail_security(&m);
+    assert!(
+        s.findings
+            .iter()
+            .any(|f| f.code == "punycode_or_homoglyph_url"),
+        "{:?}",
+        s.findings.iter().map(|f| &f.code).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        s.severity,
+        rustymail_domain::MailSecuritySeverity::Suspicion
+    );
+}
+
+#[test]
+fn punycode_only_in_href_attribute_is_flagged() {
+    let mut m = base_msg();
+    m.html_body = Some(r#"<a href="https://xn--pypal-4ve.com/x">https://paypal.com</a>"#.into());
+    let s = analyze_mail_security(&m);
+    assert!(s
+        .findings
+        .iter()
+        .any(|f| f.code == "punycode_or_homoglyph_url"));
+}
+
+#[test]
+fn oversized_mail_is_never_reported_ok() {
+    let mut m = base_msg();
+    m.html_body = Some(format!("<p>{}</p>", "Bonjour. ".repeat(40 * 1024)));
+    let s = analyze_mail_security(&m);
+    assert!(s
+        .findings
+        .iter()
+        .any(|f| f.code == "security_scan_truncated"));
+    assert_ne!(s.severity, rustymail_domain::MailSecuritySeverity::Ok);
+}
+
+#[test]
+fn plain_ascii_links_with_trailing_accented_text_are_not_flagged() {
+    let mut m = base_msg();
+    m.plain_body = "Voir https://example.com voilà, et https://exemple.fr/été".into();
+    let s = analyze_mail_security(&m);
+    assert!(!s
+        .findings
+        .iter()
+        .any(|f| f.code == "punycode_or_homoglyph_url"));
+}

@@ -164,11 +164,11 @@ pub use mail_classify::{
     sender_is_transactional, subject_looks_transactional,
 };
 pub use mail_ops::{
-    empty_trash_mailbox, group_bulk_threads_by_mailbox, is_sent_like_mailbox,
-    is_trash_like_mailbox, move_thread_to_archive, move_thread_to_mailbox, move_thread_to_trash,
-    move_thread_unarchive, pick_archive_folder, pick_trash_folder, set_thread_seen,
-    set_threads_seen_bulk, ArchiveDestination, ArchiveMoveResult, BulkSeenOutcome, BulkThreadRef,
-    ThreadMailboxMoveResult,
+    empty_trash_mailbox, flush_pending_seen_flags, group_bulk_threads_by_mailbox,
+    is_sent_like_mailbox, is_trash_like_mailbox, move_thread_to_archive, move_thread_to_mailbox,
+    move_thread_to_trash, move_thread_unarchive, pick_archive_folder, pick_trash_folder,
+    set_thread_seen, set_threads_seen_bulk, ArchiveDestination, ArchiveMoveResult, BulkSeenOutcome,
+    BulkThreadRef, ThreadMailboxMoveResult,
 };
 pub use mailbox_local_cache::{
     purge_mailbox_local_cache, register_mailbox_local_cache, rename_mailbox_local_cache,
@@ -1447,6 +1447,19 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
         );
         CREATE INDEX IF NOT EXISTS idx_send_attempts_fp
             ON send_attempts(fingerprint, at_unix);
+        -- Drapeaux \\Seen déjà appliqués en local, à pousser vers IMAP (échec / hors ligne).
+        -- Tant qu’une ligne existe, la sync ne réécrit pas `messages.is_read`.
+        CREATE TABLE IF NOT EXISTS pending_seen_flags (
+            message_id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            mailbox TEXT NOT NULL,
+            imap_uid INTEGER NOT NULL,
+            seen INTEGER NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pending_seen_flags_account
+            ON pending_seen_flags(account_id);
         ",
     )?;
     // Bases déjà créées avant `launch_id` : la colonne manque, l'ALTER l'ajoute.
@@ -2477,6 +2490,14 @@ pub(crate) fn invalidate_imap_mailbox_local_state(
         params![account_id, mailbox],
     )
     .map_err(|error| error.to_string())?;
+    // UID invalides après changement d’UIDVALIDITY : les drapeaux en attente ne sont plus adressables.
+    tx.execute(
+        "DELETE FROM pending_seen_flags WHERE message_id IN (
+            SELECT id FROM messages WHERE account_id = ?1 AND mailbox = ?2 AND imap_uid IS NOT NULL
+        )",
+        params![account_id, mailbox],
+    )
+    .map_err(|error| error.to_string())?;
     tx.execute(
         "DELETE FROM messages WHERE account_id = ?1 AND mailbox = ?2 AND imap_uid IS NOT NULL",
         params![account_id, mailbox],
@@ -2540,7 +2561,10 @@ pub(crate) fn update_message_read_by_imap_uid(
     let n = connection
         .execute(
             "UPDATE messages SET is_read = ?1
-             WHERE account_id = ?2 AND mailbox = ?3 AND imap_uid = ?4",
+             WHERE account_id = ?2 AND mailbox = ?3 AND imap_uid = ?4
+               AND NOT EXISTS (
+                 SELECT 1 FROM pending_seen_flags p WHERE p.message_id = messages.id
+               )",
             params![i64::from(is_read), account_id, mailbox, imap_uid as i64],
         )
         .map_err(|error| error.to_string())?;

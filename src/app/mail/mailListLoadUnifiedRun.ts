@@ -11,6 +11,7 @@ import {
   applyServerThreadPage,
   syncSelectionAfterThreadPage,
 } from "./mailListViewContext";
+import { beginMailListLoad, isMailListLoadCurrent } from "./mailListLoadGeneration";
 
 export async function loadUnifiedInboxThreadPage(append: boolean): Promise<boolean> {
   if (!isTauriRuntime() || state.accounts.length === 0) {
@@ -21,6 +22,7 @@ export async function loadUnifiedInboxThreadPage(append: boolean): Promise<boole
     }
     return false;
   }
+  const token = beginMailListLoad(append);
   let page: ThreadListItem[];
   try {
     page = await withTimeout(
@@ -32,8 +34,10 @@ export async function loadUnifiedInboxThreadPage(append: boolean): Promise<boole
       }),
       BOOT_INVOKE_TIMEOUT_MS,
     );
+    if (!isMailListLoadCurrent(token)) return false;
     state.mailListError = "";
   } catch (error) {
+    if (!isMailListLoadCurrent(token)) return false;
     const raw = tauriErrorMessage(error);
     const detail = /timeout/i.test(raw)
       ? "délai dépassé pendant la préparation locale après mise à jour — réessayez dans un instant"

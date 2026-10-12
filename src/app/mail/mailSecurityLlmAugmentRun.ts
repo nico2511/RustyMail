@@ -73,16 +73,22 @@ export function cancelPendingSecurityLlmAugments(): void {
   }
 }
 
-async function runSecurityLlmQueue(epoch: number): Promise<void> {
+async function runSecurityLlmQueue(): Promise<void> {
   if (securityLlmQueueRunning) return;
   securityLlmQueueRunning = true;
   try {
-    while (securityLlmQueue.length && epoch === securityLlmEpoch) {
+    while (securityLlmQueue.length) {
+      // Epoch lue à chaque tour : une annulation (changement de fil) ne bloque pas les entrées
+      // mises en file ensuite pour le nouveau fil.
+      const epoch = securityLlmEpoch;
       const message = securityLlmQueue.shift()!;
       const mid = message.messageId?.trim();
       if (!mid) continue;
       if (securityLlmAugmentCache[mid] || securityLlmAugmentFailed[mid]) {
         delete securityLlmAugmentBusy[mid];
+        if (state.view === "thread" && state.selectedThread?.messages?.some((m) => m.messageId === mid)) {
+          scheduleSecurityAugmentRender();
+        }
         continue;
       }
       const base = message.mailSecurity ?? defaultMailSecuritySignals();
@@ -91,13 +97,14 @@ async function runSecurityLlmQueue(epoch: number): Promise<void> {
         const augmented = await invoke<MailSecuritySignals>("llm_security_signals_augment", {
           payload: { signals: base, context },
         });
-        if (epoch !== securityLlmEpoch) return;
+        // Résultat valable même après annulation : il ne dépend que du message.
         securityLlmAugmentCache[mid] = augmented;
       } catch {
-        if (epoch !== securityLlmEpoch) return;
-        securityLlmAugmentFailed[mid] = true;
+        if (epoch === securityLlmEpoch) securityLlmAugmentFailed[mid] = true;
       } finally {
-        delete securityLlmAugmentBusy[mid];
+        // Ne libère que l’entrée de cette epoch : après annulation, le même message peut
+        // avoir été remis en file (busy reposé) par le nouveau fil.
+        if (epoch === securityLlmEpoch) delete securityLlmAugmentBusy[mid];
       }
       if (
         epoch === securityLlmEpoch &&
@@ -109,9 +116,7 @@ async function runSecurityLlmQueue(epoch: number): Promise<void> {
     }
   } finally {
     securityLlmQueueRunning = false;
-    if (securityLlmQueue.length && epoch === securityLlmEpoch) {
-      void runSecurityLlmQueue(epoch);
-    }
+    if (securityLlmQueue.length) void runSecurityLlmQueue();
   }
 }
 
@@ -125,5 +130,5 @@ export function scheduleSecurityLlmAugment(message: CleanedMessageView): void {
   delete securityLlmAugmentFailed[mid];
   securityLlmAugmentBusy[mid] = true;
   securityLlmQueue.push(message);
-  void runSecurityLlmQueue(securityLlmEpoch);
+  void runSecurityLlmQueue();
 }

@@ -1084,6 +1084,112 @@ fn update_local_is_read(path: &Path, message_ids: &[String], is_read: bool) -> R
     Ok(())
 }
 
+/// Au-delà, une ligne en attente est abandonnée (message disparu du serveur, compte cassé…).
+const PENDING_SEEN_MAX_ATTEMPTS: i64 = 50;
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// Écrit `is_read` en local **avant** IMAP et met en file le drapeau à pousser (même transaction).
+fn persist_seen_local_and_queue(
+    path: &Path,
+    account_id: &str,
+    mailbox: &str,
+    rows: &[ThreadImapRow],
+    stubs: &[String],
+    seen: bool,
+) -> Result<(), String> {
+    let mut conn = crate::open_sqlite_migrated(path).map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let now = unix_now();
+    for id in rows.iter().map(|r| &r.message_id).chain(stubs.iter()) {
+        tx.execute(
+            "UPDATE messages SET is_read = ?2 WHERE id = ?1",
+            params![id, i64::from(seen)],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    for r in rows {
+        tx.execute(
+            "INSERT INTO pending_seen_flags
+                (message_id, account_id, mailbox, imap_uid, seen, attempts, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)
+             ON CONFLICT(message_id) DO UPDATE SET
+                account_id = excluded.account_id,
+                mailbox = excluded.mailbox,
+                imap_uid = excluded.imap_uid,
+                seen = excluded.seen,
+                attempts = 0,
+                updated_at = excluded.updated_at",
+            params![
+                r.message_id,
+                account_id,
+                mailbox,
+                i64::from(r.imap_uid),
+                i64::from(seen),
+                now
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+
+/// Retire les lignes poussées avec succès — seulement si la valeur voulue n’a pas changé entre-temps.
+fn clear_pending_seen(path: &Path, message_ids: &[String], seen: bool) -> Result<(), String> {
+    if message_ids.is_empty() {
+        return Ok(());
+    }
+    let mut conn = crate::open_sqlite_migrated(path).map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    for id in message_ids {
+        tx.execute(
+            "DELETE FROM pending_seen_flags WHERE message_id = ?1 AND seen = ?2",
+            params![id, i64::from(seen)],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+
+fn bump_pending_seen_attempts(path: &Path, message_ids: &[String]) -> Result<(), String> {
+    if message_ids.is_empty() {
+        return Ok(());
+    }
+    let mut conn = crate::open_sqlite_migrated(path).map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let now = unix_now();
+    for id in message_ids {
+        tx.execute(
+            "UPDATE pending_seen_flags SET attempts = attempts + 1, updated_at = ?2
+             WHERE message_id = ?1",
+            params![id, now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+
+async fn push_seen_flags_to_imap(
+    session: &mut ImapSession,
+    mailbox: &str,
+    uids: &[async_imap::types::Uid],
+    seen: bool,
+) -> Result<(), String> {
+    imap_session_select_mailbox(session, mailbox).await?;
+    // RFC 3501 UID STORE: mark read/unread. `.SILENT` évite les grosses réponses.
+    let query = if seen {
+        "+FLAGS.SILENT (\\Seen)"
+    } else {
+        "-FLAGS.SILENT (\\Seen)"
+    };
+    uid_store(session, &format_uid_set(uids), query).await
+}
+
 pub async fn set_thread_seen(
     path: &Path,
     account: &Account,
@@ -1101,37 +1207,101 @@ pub async fn set_thread_seen(
         );
     }
 
-    if !rows.is_empty() {
-        let uids: Vec<async_imap::types::Uid> = rows.iter().map(|r| r.imap_uid).collect();
-        let uid_set = format_uid_set(&uids);
-
-        let mut session = login_session_for_account(account).await?;
-        imap_session_select_mailbox(&mut session, source_mailbox).await?;
-
-        // RFC 3501 UID STORE: mark read/unread.
-        // Use .SILENT to avoid large responses on some servers.
-        let query = if seen {
-            "+FLAGS.SILENT (\\Seen)"
-        } else {
-            "-FLAGS.SILENT (\\Seen)"
-        };
-        uid_store(&mut session, &uid_set, query).await?;
-        let _ = session.logout().await;
-
-        let ids: Vec<String> = rows.iter().map(|r| r.message_id.clone()).collect();
-        update_local_is_read(path, &ids, seen)?;
-    }
-
-    if !stubs.is_empty() {
-        update_local_is_read(path, &stubs, seen)?;
-    }
+    // SQLite d’abord : l’état lu/non lu survit à un échec IMAP ou à une fermeture rapide.
+    persist_seen_local_and_queue(path, &account.id.0, source_mailbox, &rows, &stubs, seen)?;
 
     let n = rows.len() + stubs.len();
-    if seen {
-        Ok(format!("Marqué comme lu ({})", n))
-    } else {
-        Ok(format!("Marqué comme non lu ({})", n))
+    let label = if seen { "lu" } else { "non lu" };
+    if !rows.is_empty() {
+        let uids: Vec<async_imap::types::Uid> = rows.iter().map(|r| r.imap_uid).collect();
+        let ids: Vec<String> = rows.iter().map(|r| r.message_id.clone()).collect();
+        let pushed = match login_session_for_account(account).await {
+            Ok(mut session) => {
+                let r = push_seen_flags_to_imap(&mut session, source_mailbox, &uids, seen).await;
+                let _ = session.logout().await;
+                r
+            }
+            Err(e) => Err(e),
+        };
+        match pushed {
+            Ok(()) => clear_pending_seen(path, &ids, seen)?,
+            Err(e) => {
+                log::warn!("drapeau \\Seen en attente ({} message(s)) : {e}", ids.len());
+                bump_pending_seen_attempts(path, &ids)?;
+                return Ok(format!(
+                    "Marqué comme {label} ({n}) — synchronisation IMAP en attente"
+                ));
+            }
+        }
     }
+
+    Ok(format!("Marqué comme {label} ({n})"))
+}
+
+/// Pousse vers IMAP les drapeaux \Seen restés en attente pour ce compte (appelé avant une sync).
+/// Retourne le nombre de messages confirmés côté serveur.
+pub async fn flush_pending_seen_flags(path: &Path, account: &Account) -> Result<usize, String> {
+    let pending: Vec<(String, String, u32, bool)> = {
+        let conn = crate::open_sqlite_migrated(path).map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM pending_seen_flags WHERE account_id = ?1 AND attempts >= ?2",
+            params![account.id.0, PENDING_SEEN_MAX_ATTEMPTS],
+        )
+        .map_err(|e| e.to_string())?;
+        let mut s = conn
+            .prepare(
+                "SELECT message_id, mailbox, imap_uid, seen FROM pending_seen_flags
+                 WHERE account_id = ?1 ORDER BY mailbox, imap_uid",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = s
+            .query_map(params![account.id.0], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?.max(0) as u32,
+                    row.get::<_, i64>(3)? != 0,
+                ))
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<_, _>>().map_err(|e| e.to_string())?
+    };
+    if pending.is_empty() {
+        return Ok(0);
+    }
+    let mut groups: std::collections::BTreeMap<(String, bool), Vec<(String, u32)>> =
+        std::collections::BTreeMap::new();
+    for (id, mailbox, uid, seen) in pending {
+        groups.entry((mailbox, seen)).or_default().push((id, uid));
+    }
+    let mut session = match login_session_for_account(account).await {
+        Ok(s) => s,
+        Err(e) => {
+            let ids: Vec<String> = groups
+                .values()
+                .flat_map(|v| v.iter().map(|(id, _)| id.clone()))
+                .collect();
+            bump_pending_seen_attempts(path, &ids)?;
+            return Err(e);
+        }
+    };
+    let mut done = 0usize;
+    for ((mailbox, seen), items) in groups {
+        let ids: Vec<String> = items.iter().map(|(id, _)| id.clone()).collect();
+        let uids: Vec<async_imap::types::Uid> = items.iter().map(|(_, uid)| *uid).collect();
+        match push_seen_flags_to_imap(&mut session, &mailbox, &uids, seen).await {
+            Ok(()) => {
+                clear_pending_seen(path, &ids, seen)?;
+                done += ids.len();
+            }
+            Err(e) => {
+                log::warn!("drapeaux \\Seen en attente ({mailbox}) : {e}");
+                bump_pending_seen_attempts(path, &ids)?;
+            }
+        }
+    }
+    let _ = session.logout().await;
+    Ok(done)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -1271,7 +1441,10 @@ mod archive_pick_tests {
 
 #[cfg(test)]
 mod bulk_seen_tests {
-    use super::{group_bulk_threads_by_mailbox, update_local_is_read, BulkThreadRef};
+    use super::{
+        clear_pending_seen, group_bulk_threads_by_mailbox, persist_seen_local_and_queue,
+        update_local_is_read, BulkThreadRef, ThreadImapRow,
+    };
     use crate::open_sqlite_migrated;
     use rusqlite::params;
 
@@ -1346,6 +1519,72 @@ mod bulk_seen_tests {
             })
             .expect("read");
         assert_eq!(read, 5);
+    }
+
+    #[test]
+    fn mark_read_is_persisted_locally_and_queued_before_imap() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("pending.db");
+        let conn = open_sqlite_migrated(&path).expect("migrate");
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, thread_root_message_id, subject, tags)
+             VALUES ('t1', 'acc', 'INBOX', '<r@x>', 'S', '')",
+            [],
+        )
+        .expect("thread");
+        for (id, uid) in [("m1", Some(11i64)), ("stub", None)] {
+            conn.execute(
+                "INSERT INTO messages (id, thread_id, account_id, mailbox, imap_uid, sender_name, sender_email, subject, received_at, body, is_read, position)
+                 VALUES (?1, 't1', 'acc', 'INBOX', ?2, 'A', 'a@x', 'S', '2026-01-01', 'b', 0, 0)",
+                params![id, uid],
+            )
+            .expect("msg");
+        }
+        let rows = vec![ThreadImapRow {
+            message_id: "m1".into(),
+            imap_uid: 11,
+        }];
+        persist_seen_local_and_queue(&path, "acc", "INBOX", &rows, &["stub".to_string()], true)
+            .expect("persist");
+
+        let unread: i64 = conn
+            .query_row("SELECT COUNT(*) FROM messages WHERE is_read = 0", [], |r| {
+                r.get(0)
+            })
+            .expect("count");
+        assert_eq!(unread, 0, "SQLite est à jour avant toute tentative IMAP");
+        let (uid, seen): (i64, i64) = conn
+            .query_row(
+                "SELECT imap_uid, seen FROM pending_seen_flags WHERE message_id = 'm1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .expect("pending row");
+        assert_eq!((uid, seen), (11, 1));
+        let stub_pending: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pending_seen_flags WHERE message_id = 'stub'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("count");
+        assert_eq!(
+            stub_pending, 0,
+            "un brouillon local n’a pas d’UID à pousser"
+        );
+
+        // Une confirmation pour l’ancienne valeur ne doit pas effacer une demande plus récente.
+        persist_seen_local_and_queue(&path, "acc", "INBOX", &rows, &[], false).expect("unread");
+        clear_pending_seen(&path, &["m1".to_string()], true).expect("clear stale");
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM pending_seen_flags", [], |r| r.get(0))
+            .expect("count");
+        assert_eq!(left, 1);
+        clear_pending_seen(&path, &["m1".to_string()], false).expect("clear");
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM pending_seen_flags", [], |r| r.get(0))
+            .expect("count");
+        assert_eq!(left, 0);
     }
 }
 

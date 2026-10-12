@@ -29,23 +29,30 @@ export async function restoreThreadSelectionAfterReload(options: {
   mode: "push" | "sync";
 }): Promise<void> {
   const { keepThreadId, mode } = options;
-  if (mode === "sync") {
-    if (keepThreadId && state.threads.some((t) => t.id === keepThreadId)) {
-      state.selectedThreadId = keepThreadId;
-    } else {
-      state.selectedThreadId = state.threads[0]?.id;
-    }
-  } else if (keepThreadId && state.threads.some((t) => t.id === keepThreadId)) {
-    state.selectedThreadId = keepThreadId;
+  const inList = (id: string | undefined): id is string => !!id && state.threads.some((t) => t.id === id);
+  // La sélection courante (fin de sync) prime sur celle capturée au début : l’utilisateur
+  // a pu ouvrir un autre fil pendant la synchronisation.
+  const current = state.selectedThreadId ?? keepThreadId;
+  if (inList(current)) {
+    state.selectedThreadId = current;
+  } else if (state.view === "thread" && current) {
+    // Fil ouvert absent de la page rechargée (pagination, filtre…) : ne jamais le remplacer
+    // par un autre fil ; on le laisse affiché tel quel.
+    return;
+  } else if (mode === "sync") {
+    state.selectedThreadId = state.threads[0]?.id;
   }
 
   if (state.view === "thread" && state.selectedThreadId) {
+    const threadId = state.selectedThreadId;
     try {
-      state.selectedThread = await withTimeout(
-        invoke<DiscussionThreadView>("open_thread", { threadId: state.selectedThreadId }),
+      const refreshed = await withTimeout(
+        invoke<DiscussionThreadView>("open_thread", { threadId }),
         BOOT_INVOKE_TIMEOUT_MS,
       );
+      if (state.selectedThreadId === threadId) state.selectedThread = refreshed;
     } catch (error) {
+      if (state.selectedThreadId !== threadId) return;
       if (mode === "sync") {
         console.error("open_thread after sync", error);
         toast.error(`Impossible d’ouvrir le fil : ${tauriErrorMessage(error)}`);

@@ -14,7 +14,7 @@ import {
   markOpenedThreadReadIfUnread,
   maybeAutoSummarizeThreadOnOpen,
 } from "./openThreadViewEffectsRun";
-import { messageAccordionOpen } from "./threadAccordion";
+import { openMessagesForAccordion } from "./threadAccordion";
 
 export type { OpenThreadOptions, OpenThreadDeps } from "./openThreadViewDepsRun";
 export { registerOpenThreadDeps } from "./openThreadViewDepsRun";
@@ -79,11 +79,9 @@ export async function openThread(threadId: string, opts?: OpenThreadOptions): Pr
   const hyd = state.selectedThread?.messages ?? [];
   if (isTauriRuntime() && hyd.length) void openThreadDeps.hydrateMessageTranslationsFromCacheForThread(hyd);
   // LLM sécurité seulement pour les messages ouverts (évite N invokes + re-renders à l’ouverture).
-  const openIds = hyd.map((m) => m.messageId);
-  for (const m of hyd) {
-    if (messageAccordionOpen(state.threadAccordion, m.messageId, openIds)) {
-      openThreadDeps.scheduleSecurityLlmAugment(m);
-    }
+  // `open_thread` renvoie l’ordre chronologique ; l’accordéon raisonne du plus récent au plus ancien.
+  for (const m of openMessagesForAccordion(state.threadAccordion, hyd)) {
+    openThreadDeps.scheduleSecurityLlmAugment(m);
   }
   void maybeAutoSummarizeThreadOnOpen(tid, opened, openThreadDeps);
   render();

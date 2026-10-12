@@ -7,7 +7,8 @@ use rustymail_domain::{
 };
 
 const MANY_URL_THRESHOLD: usize = 10;
-/// Plafond de scan HTML pour densité de liens / punycode (évite freeze sur newsletters énormes).
+/// Plafond de scan HTML pour la densité de liens (évite freeze sur newsletters énormes).
+/// Le scan punycode/homoglyphe n’est pas plafonné (passe linéaire sans allocation).
 const MAX_HTML_SECURITY_SCAN_BYTES: usize = 256 * 1024;
 
 /// Heuristiques déterministes à partir du modèle `Message` déjà chargé.
@@ -23,6 +24,7 @@ pub fn analyze_mail_security(message: &Message) -> MailSecuritySignals {
     check_return_path_alignment(message, &mut findings);
     check_message_id(message, &mut findings);
     check_punycode_or_homoglyph_urls(message, &mut findings);
+    check_security_scan_truncated(message, &mut findings);
     check_composite_phishing_score(&mut findings);
 
     aggregate(findings)
@@ -425,19 +427,11 @@ fn check_return_path_alignment(message: &Message, out: &mut Vec<MailSecurityFind
     }
 }
 
-fn host_from_url_prefix(lower: &str, scheme_len: usize) -> Option<&str> {
-    let rest = lower.get(scheme_len..)?;
-    let host = rest.split(&['/', '?', '#', ':'][..]).next()?;
-    let host = host.trim_matches(|c| c == '<' || c == '>' || c == '"' || c == '\'');
-    (!host.is_empty()).then_some(host)
-}
-
 fn host_looks_suspicious(host: &str) -> bool {
     if host.contains("xn--") {
         return true;
     }
-    let labels: Vec<&str> = host.split('.').collect();
-    for label in labels {
+    for label in host.split('.') {
         if label.is_empty() {
             continue;
         }
@@ -450,36 +444,73 @@ fn host_looks_suspicious(host: &str) -> bool {
     false
 }
 
-fn blob_has_suspicious_url_domain(blob: &str) -> bool {
-    let lower = blob.to_ascii_lowercase();
-    for (scheme, len) in [("https://", 8usize), ("http://", 7usize)] {
-        let mut start = 0;
-        while let Some(pos) = lower[start..].find(scheme) {
-            let idx = start + pos;
-            if let Some(host) = host_from_url_prefix(&lower, idx + len) {
-                if host_looks_suspicious(host) {
-                    return true;
-                }
-            }
-            start = idx + len;
+/// Fin d’hôte dans une URL (texte brut ou attribut HTML). Tous ASCII : découpe UTF-8 sûre.
+fn is_url_host_delimiter(b: u8) -> bool {
+    b.is_ascii_whitespace()
+        || matches!(
+            b,
+            b'/' | b'?'
+                | b'#'
+                | b':'
+                | b'<'
+                | b'>'
+                | b'"'
+                | b'\''
+                | b'\\'
+                | b'('
+                | b')'
+                | b'['
+                | b']'
+                | b','
+                | b';'
+                | b'|'
+                | b'{'
+                | b'}'
+                | b'&'
+        )
+}
+
+/// Parcourt **tout** le texte (corps, attributs `href`, commentaires…) en une passe, sans allocation
+/// proportionnelle à la taille : pas de plafond, donc un remplissage en tête ne masque pas le lien.
+fn text_has_suspicious_url_domain(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    let n = bytes.len();
+    let mut i = 0usize;
+    while i + 7 <= n {
+        if !bytes[i].eq_ignore_ascii_case(&b'h') || !bytes[i..i + 4].eq_ignore_ascii_case(b"http") {
+            i += 1;
+            continue;
         }
+        let mut j = i + 4;
+        if j < n && bytes[j].eq_ignore_ascii_case(&b's') {
+            j += 1;
+        }
+        if j + 3 > n || &bytes[j..j + 3] != b"://" {
+            i += 1;
+            continue;
+        }
+        let start = j + 3;
+        let mut end = start;
+        while end < n && !is_url_host_delimiter(bytes[end]) {
+            end += 1;
+        }
+        if end > start {
+            let host = s[start..end].to_lowercase();
+            if host_looks_suspicious(&host) {
+                return true;
+            }
+        }
+        i = end.max(i + 1);
     }
     false
 }
 
 fn check_punycode_or_homoglyph_urls(message: &Message, out: &mut Vec<MailSecurityFinding>) {
-    let plain = if message.plain_body.len() > MAX_HTML_SECURITY_SCAN_BYTES {
-        html_security_scan_slice(&message.plain_body)
-    } else {
-        message.plain_body.as_str()
-    };
-    let mut blob = String::with_capacity(plain.len().saturating_add(1024));
-    blob.push_str(plain);
-    if let Some(html) = message.html_body.as_deref() {
-        blob.push(' ');
-        blob.push_str(&strip_tags_for_url_scan(html));
-    }
-    if !blob_has_suspicious_url_domain(&blob) {
+    let html_hit = message
+        .html_body
+        .as_deref()
+        .is_some_and(text_has_suspicious_url_domain);
+    if !html_hit && !text_has_suspicious_url_domain(&message.plain_body) {
         return;
     }
     out.push(MailSecurityFinding {
@@ -487,6 +518,24 @@ fn check_punycode_or_homoglyph_urls(message: &Message, out: &mut Vec<MailSecurit
         code: "punycode_or_homoglyph_url".to_string(),
         severity: MailSecurityFindingSeverity::Suspicion,
         message_fr: "Au moins un lien pointe vers un domaine en punycode (xn--) ou avec des caractères non latins dans l’hôte : technique courante pour imiter une marque connue. Vérifiez l’URL affichée au survol.".to_string(),
+    });
+}
+
+/// Contenu au-delà du plafond de scan (densité de liens) : jamais « ok » par défaut,
+/// pour que la vérification complémentaire (LLM) soit demandée.
+fn check_security_scan_truncated(message: &Message, out: &mut Vec<MailSecurityFinding>) {
+    let html_big = message
+        .html_body
+        .as_deref()
+        .is_some_and(|h| h.len() > MAX_HTML_SECURITY_SCAN_BYTES);
+    if !html_big && message.plain_body.len() <= MAX_HTML_SECURITY_SCAN_BYTES {
+        return;
+    }
+    out.push(MailSecurityFinding {
+        kind: MailSecurityFindingKind::Heuristic,
+        code: "security_scan_truncated".to_string(),
+        severity: MailSecurityFindingSeverity::Attention,
+        message_fr: "Message très volumineux : une partie des vérifications automatiques (densité de liens) n’a porté que sur le début du contenu. Restez prudent avant de cliquer.".to_string(),
     });
 }
 

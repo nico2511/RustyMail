@@ -19,6 +19,7 @@ import {
   loadSavedDraftsAsThreadList,
 } from "./mailListLoadSavedDraftsRun";
 import { loadUnifiedInboxThreadPage, shouldLoadUnifiedInbox } from "./mailListLoadUnifiedRun";
+import { beginMailListLoad, isMailListLoadCurrent } from "./mailListLoadGeneration";
 
 export async function loadMailView(append: boolean = false) {
   if (!append) invalidateIdleAiCachePrefetch();
@@ -47,6 +48,7 @@ export async function loadMailView(append: boolean = false) {
     pageOffset: append ? state.threadOffset : 0,
     followedOnly: state.listFilter === "starred",
   };
+  const token = beginMailListLoad(append);
   let page: ThreadListItem[];
   if (!isTauriRuntime()) {
     state.mailListError =
@@ -56,8 +58,11 @@ export async function loadMailView(append: boolean = false) {
   } else {
     try {
       page = await withTimeout(invoke<ThreadListItem[]>("list_threads", payload), BOOT_INVOKE_TIMEOUT_MS);
+      if (!isMailListLoadCurrent(token)) return;
       state.mailListError = "";
     } catch (firstError) {
+      // Réponse d’un dossier quitté entre-temps : ni erreur ni liste vidée.
+      if (!isMailListLoadCurrent(token)) return;
       const firstDetail = tauriErrorMessage(firstError);
       if (/timeout/i.test(firstDetail) && !append) {
         try {
@@ -65,8 +70,10 @@ export async function loadMailView(append: boolean = false) {
             invoke<ThreadListItem[]>("list_threads", payload),
             BOOT_INVOKE_TIMEOUT_MS,
           );
+          if (!isMailListLoadCurrent(token)) return;
           state.mailListError = "";
         } catch (retryError) {
+          if (!isMailListLoadCurrent(token)) return;
           const raw = tauriErrorMessage(retryError);
           const detail = /timeout/i.test(raw)
             ? "délai dépassé pendant la préparation locale — réessayez dans un instant"

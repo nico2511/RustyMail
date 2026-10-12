@@ -1800,7 +1800,12 @@ fn upsert_threads_to_db(
                         detected_lang = excluded.detected_lang,
                         list_unsubscribe = excluded.list_unsubscribe,
                         unsubscribe_urls = excluded.unsubscribe_urls,
-                        is_read = excluded.is_read,
+                        is_read = CASE
+                            WHEN EXISTS (
+                                SELECT 1 FROM pending_seen_flags p WHERE p.message_id = excluded.id
+                            ) THEN messages.is_read
+                            ELSE excluded.is_read
+                        END,
                         position = excluded.position
                     ",
                     params![
@@ -2112,6 +2117,100 @@ mod thread_pick_tests {
         assert_eq!(t2, 0, "empty thread after prune must be removed");
         let uids = list_local_imap_uids(&db, "acc", "INBOX").expect("list");
         assert_eq!(uids, vec![10, 30]);
+    }
+
+    fn seen_test_thread(is_read: bool) -> Thread {
+        Thread {
+            id: ThreadId("t-seen".into()),
+            subject: "Seen".into(),
+            tags: vec![],
+            entities: vec![],
+            followed: false,
+            messages: vec![Message {
+                id: MessageId("m-imap-acc-inbox-7".into()),
+                sender: rustymail_domain::EmailAddress {
+                    name: Some("A".into()),
+                    email: "a@example.com".into(),
+                },
+                recipients: vec![],
+                reply_to: vec![],
+                subject: "Seen".into(),
+                received_at: "2026-01-01T00:00:00Z".into(),
+                plain_body: "x".into(),
+                html_body: None,
+                attachments: vec![],
+                tags: vec![],
+                is_read,
+                is_pinned: false,
+                references: rustymail_domain::MessageReferences {
+                    message_id_header: Some("<seen@x>".into()),
+                    in_reply_to: None,
+                    references: vec![],
+                },
+                authentication_results: None,
+                return_path: None,
+                detected_lang: None,
+            }],
+        }
+    }
+
+    fn upsert_seen(db: &std::path::Path, is_read: bool) {
+        upsert_threads_to_db(
+            db,
+            &[seen_test_thread(is_read)],
+            &HashMap::new(),
+            &HashMap::new(),
+            &HashMap::new(),
+            "acc",
+            "INBOX",
+        )
+        .expect("upsert");
+    }
+
+    fn local_is_read(db: &std::path::Path) -> i64 {
+        open_sqlite_migrated(db)
+            .expect("reopen")
+            .query_row(
+                "SELECT is_read FROM messages WHERE id = 'm-imap-acc-inbox-7'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("is_read")
+    }
+
+    #[test]
+    fn pending_seen_flag_is_not_overwritten_by_sync() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = dir.path().join("pending-seen.db");
+        let _ = open_sqlite_migrated(&db).expect("migrate");
+        upsert_seen(&db, false);
+        assert_eq!(local_is_read(&db), 0);
+
+        // Mark-read local dont le STORE IMAP n’a pas encore abouti.
+        let conn = open_sqlite_migrated(&db).expect("reopen");
+        conn.execute(
+            "UPDATE messages SET is_read = 1 WHERE id = 'm-imap-acc-inbox-7'",
+            [],
+        )
+        .expect("local read");
+        conn.execute(
+            "INSERT INTO pending_seen_flags (message_id, account_id, mailbox, imap_uid, seen, attempts, updated_at)
+             VALUES ('m-imap-acc-inbox-7', 'acc', 'INBOX', 7, 1, 0, 0)",
+            [],
+        )
+        .expect("pending");
+
+        // Le serveur renvoie encore « non lu » : la sync ne doit pas annuler le choix local.
+        upsert_seen(&db, false);
+        assert_eq!(local_is_read(&db), 1);
+        assert!(!update_message_read_by_imap_uid(&conn, "acc", "INBOX", 7, false).expect("flags"));
+        assert_eq!(local_is_read(&db), 1);
+
+        // Une fois le drapeau poussé, l’état serveur redevient la référence.
+        conn.execute("DELETE FROM pending_seen_flags", [])
+            .expect("clear");
+        upsert_seen(&db, false);
+        assert_eq!(local_is_read(&db), 0);
     }
 }
 

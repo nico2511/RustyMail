@@ -1,3 +1,6 @@
+import type { CleanedMessageView } from "../types";
+import { sortMessagesByReceivedDescending } from "./threadMessageSort";
+
 /** Sentinelles : `latest` (défaut), `all`, `none`. Toute autre valeur est un messageId ouvert. */
 export type ThreadAccordionMode = "latest" | "all" | "none" | (string & {});
 
@@ -30,4 +33,14 @@ export function threadMessageFoldPreview(text: string, max = 96): string {
   if (!flat) return "Message vide";
   if (flat.length <= max) return flat;
   return `${flat.slice(0, Math.max(1, max - 1))}…`;
+}
+
+/**
+ * Messages dépliés selon l’accordéon, dans l’ordre d’affichage (plus récent d’abord).
+ * Même tri que le rendu (`threadViewRender`) : `latest` = message le plus récent.
+ */
+export function openMessagesForAccordion(mode: string, messages: CleanedMessageView[]): CleanedMessageView[] {
+  const sorted = sortMessagesByReceivedDescending(messages);
+  const ids = sorted.map((m) => m.messageId);
+  return sorted.filter((m) => messageAccordionOpen(mode, m.messageId, ids));
 }

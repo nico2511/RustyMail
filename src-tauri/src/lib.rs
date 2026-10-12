@@ -2154,6 +2154,16 @@ fn mailbox_inbox_filter_counts(
     )
 }
 
+/// Rejoue les drapeaux lu/non lu restés en attente (échec IMAP, hors ligne, fermeture rapide)
+/// avant de relire le serveur. Non bloquant pour la sync : un échec reste en file.
+async fn flush_pending_seen_before_sync(db_path: &std::path::Path, account: &Account) {
+    match rustymail_infrastructure::flush_pending_seen_flags(db_path, account).await {
+        Ok(0) => {}
+        Ok(n) => log::info!("drapeaux \\Seen en attente poussés : {n}"),
+        Err(e) => log::warn!("drapeaux \\Seen en attente non poussés : {e}"),
+    }
+}
+
 #[tauri::command]
 async fn sync_inbox(
     paths: State<'_, AppPaths>,
@@ -2187,6 +2197,7 @@ async fn sync_inbox(
         .unwrap_or_else(|| "INBOX".to_string());
     // Pas de `sqlite_app_core_scoped` post-sync : recharger toute la boîte en RAM
     // (corps HTML) bloquait la sync et faisait timeout `list_threads`.
+    flush_pending_seen_before_sync(&paths.db_path, &account).await;
     rustymail_infrastructure::sync_inbox(&paths.db_path, &account, &mailbox, limit).await
 }
 
@@ -2208,6 +2219,7 @@ async fn sync_mailboxes(
         format!("imap_sync_mailboxes:{}", account.id.0.trim()),
         std::time::Duration::from_secs(2),
     )?;
+    flush_pending_seen_before_sync(&paths.db_path, &account).await;
     // Même raison que `sync_inbox` : pas de rechargement AppCore post-sync.
     rustymail_infrastructure::sync_mailboxes_single_session(
         &paths.db_path,
