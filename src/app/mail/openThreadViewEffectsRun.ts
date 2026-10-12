@@ -106,7 +106,8 @@ export async function markOpenedThreadReadIfUnread(
       toast.warning(`Impossible de marquer le fil comme lu : ${tauriErrorMessage(e)}`);
     }
     await loadMailboxUnread().catch(() => {});
-    render();
+    // Seulement si le fil est encore affiché : pas de repaint BAL complet après « Retour ».
+    if (state.view === "thread") render();
     return;
   }
   // Met à jour state seulement — pas de render() : le fil a déjà le unread local,

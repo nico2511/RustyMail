@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_imap::extensions::idle::IdleResponse;
+use async_imap::imap_proto::{MailboxDatum, Response, Status};
 use rustymail_domain::Account;
 use tokio::sync::{mpsc, Mutex};
 use tokio::time::sleep;
@@ -425,9 +426,10 @@ async fn watch_account_loop(
                     e,
                     backoff_secs
                 );
+                // Erreur passagère (réseau, BYE, TLS) : on retente IDLE avec backoff au lieu de
+                // basculer définitivement en polling (sync toutes les 90 s).
                 sleep(Duration::from_secs(backoff_secs)).await;
                 backoff_secs = (backoff_secs * 2).min(BACKOFF_CAP_SECS);
-                use_polling = true;
             }
         }
     }
@@ -445,20 +447,81 @@ async fn idle_mailbox_once(account: &Account, mailbox: &str) -> Result<IdleOutco
 
     let mut handle = session.idle();
     handle.init().await.map_err(map_imap_error)?;
-    let (wait, _stop) = handle.wait_with_timeout(IDLE_MAX_WAIT);
-    let outcome = match wait.await.map_err(map_imap_error)? {
-        IdleResponse::NewData(_) => IdleOutcome::NewMail,
-        IdleResponse::Timeout => IdleOutcome::Timeout,
-        IdleResponse::ManualInterrupt => IdleOutcome::Interrupted,
+    let started = std::time::Instant::now();
+    let outcome = loop {
+        let remaining = IDLE_MAX_WAIT.saturating_sub(started.elapsed());
+        if remaining.is_zero() {
+            break IdleOutcome::Timeout;
+        }
+        let response = {
+            let (wait, _stop) = handle.wait_with_timeout(remaining);
+            wait.await.map_err(map_imap_error)?
+        };
+        match response {
+            IdleResponse::NewData(data) => {
+                if idle_response_wakes(data.parsed()) {
+                    break IdleOutcome::NewMail;
+                }
+                // FETCH (drapeaux, y compris nos propres \Seen) : pas de reconnexion ni de sync.
+            }
+            IdleResponse::Timeout => break IdleOutcome::Timeout,
+            IdleResponse::ManualInterrupt => break IdleOutcome::Interrupted,
+        }
     };
     let mut session = handle.done().await.map_err(map_imap_error)?;
     let _ = session.logout().await;
     Ok(outcome)
 }
 
+/// Réponses non sollicitées qui justifient une sync : nouveau message, suppression, fin de session.
+/// Les `FETCH` (changement de drapeaux) et autres données sont ignorés.
+fn idle_response_wakes(response: &Response<'_>) -> bool {
+    matches!(
+        response,
+        Response::MailboxData(MailboxDatum::Exists(_) | MailboxDatum::Recent(_))
+            | Response::Expunge(_)
+            | Response::Vanished { .. }
+            | Response::Data {
+                status: Status::Bye,
+                ..
+            }
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn idle_classifier_wakes_on_new_mail_and_expunge_only() {
+        assert!(idle_response_wakes(&Response::MailboxData(
+            MailboxDatum::Exists(12)
+        )));
+        assert!(idle_response_wakes(&Response::MailboxData(
+            MailboxDatum::Recent(1)
+        )));
+        assert!(idle_response_wakes(&Response::Expunge(3)));
+        assert!(idle_response_wakes(&Response::Vanished {
+            earlier: false,
+            uids: vec![4..=4, 9..=12],
+        }));
+        assert!(!idle_response_wakes(&Response::Fetch(5, Vec::new())));
+        assert!(!idle_response_wakes(&Response::MailboxData(
+            MailboxDatum::Flags(Vec::new())
+        )));
+    }
+
+    #[test]
+    fn idle_classifier_parses_raw_server_lines() {
+        let wakes = |raw: &[u8]| {
+            let (_, resp) = Response::from_bytes(raw).expect("parse");
+            idle_response_wakes(&resp)
+        };
+        assert!(wakes(b"* 23 EXISTS\r\n"));
+        assert!(wakes(b"* 7 EXPUNGE\r\n"));
+        assert!(!wakes(b"* 4 FETCH (FLAGS (\\Seen))\r\n"));
+        assert!(!wakes(b"* 4 FETCH (UID 99 FLAGS (\\Seen \\Flagged))\r\n"));
+    }
 
     #[test]
     fn inbox_detection_is_case_insensitive() {

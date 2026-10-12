@@ -120,12 +120,20 @@ async function runSecurityLlmQueue(): Promise<void> {
   }
 }
 
+/** Constat « contenu tronqué » seul : verdict non ok, mais pas d’analyse LLM (gros mails / newsletters). */
+export function securityNeedsLlm(signals: MailSecuritySignals): boolean {
+  if (signals.severity === "ok") return false;
+  const findings = signals.findings ?? [];
+  if (findings.length > 0 && findings.every((f) => f.code === "security_scan_truncated")) return false;
+  return true;
+}
+
 export function scheduleSecurityLlmAugment(message: CleanedMessageView): void {
   const mid = message.messageId?.trim();
   if (!mid || !isTauriRuntime()) return;
   if (!isAiFeatureEnabled(state.appPrefs.ai, "featureSecurityLlmEnabled")) return;
   const base = message.mailSecurity ?? defaultMailSecuritySignals();
-  if (base.severity === "ok") return;
+  if (!securityNeedsLlm(base)) return;
   if (securityLlmAugmentCache[mid] || securityLlmAugmentBusy[mid]) return;
   delete securityLlmAugmentFailed[mid];
   securityLlmAugmentBusy[mid] = true;

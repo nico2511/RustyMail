@@ -2107,51 +2107,65 @@ async fn list_imap_mailboxes(
     rustymail_infrastructure::list_mailboxes(&account).await
 }
 
+/// `async` + `spawn_blocking` : les COUNT SQLite ne bloquent plus le thread principal (retour BAL).
 #[tauri::command]
-fn mailbox_unread_counts(
+async fn mailbox_unread_counts(
     paths: State<'_, AppPaths>,
     account_id: Option<String>,
     mailboxes: Option<Vec<String>>,
 ) -> Result<Vec<MailboxUnreadCount>, String> {
-    let account = resolve_account_from_paths(&paths, account_id)?;
-    let rows = if let Some(list) = mailboxes {
-        ipc_guard::validate_sync_mailboxes(&list)?;
-        rustymail_infrastructure::sqlite_mailbox_sidebar_counts(
-            &paths.db_path,
-            &account.id.0,
-            &list,
-        )
-        .map_err(|e| e.to_string())?
-    } else {
-        rustymail_infrastructure::sqlite_mailbox_folder_stats(&paths.db_path, &account.id.0)
+    if let Some(list) = mailboxes.as_ref() {
+        ipc_guard::validate_sync_mailboxes(list)?;
+    }
+    let app_paths = paths.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let account = resolve_account_from_paths(&app_paths, account_id)?;
+        let rows = if let Some(list) = mailboxes {
+            rustymail_infrastructure::sqlite_mailbox_sidebar_counts(
+                &app_paths.db_path,
+                &account.id.0,
+                &list,
+            )
             .map_err(|e| e.to_string())?
-    };
-    Ok(rows
-        .into_iter()
-        .map(
-            |(mailbox, unread_count, total_threads)| MailboxUnreadCount {
-                mailbox,
-                unread_count,
-                total_threads,
-            },
-        )
-        .collect())
+        } else {
+            rustymail_infrastructure::sqlite_mailbox_folder_stats(&app_paths.db_path, &account.id.0)
+                .map_err(|e| e.to_string())?
+        };
+        Ok(rows
+            .into_iter()
+            .map(
+                |(mailbox, unread_count, total_threads)| MailboxUnreadCount {
+                    mailbox,
+                    unread_count,
+                    total_threads,
+                },
+            )
+            .collect())
+    })
+    .await
+    .map_err(|e| format!("mailbox_unread_counts join: {e}"))?
 }
 
+/// `async` + `spawn_blocking` : voir `mailbox_unread_counts`.
 #[tauri::command]
-fn mailbox_inbox_filter_counts(
+async fn mailbox_inbox_filter_counts(
     paths: State<'_, AppPaths>,
     account_id: Option<String>,
     mailbox: String,
 ) -> Result<rustymail_infrastructure::MailboxInboxFilterCounts, String> {
     ipc_guard::validate_optional_account_id(account_id.as_deref())?;
     ipc_guard::validate_mailbox(&mailbox)?;
-    let account = resolve_account_from_paths(&paths, account_id)?;
-    rustymail_infrastructure::sqlite_mailbox_inbox_filter_counts(
-        &paths.db_path,
-        &account.id.0,
-        &mailbox,
-    )
+    let app_paths = paths.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let account = resolve_account_from_paths(&app_paths, account_id)?;
+        rustymail_infrastructure::sqlite_mailbox_inbox_filter_counts(
+            &app_paths.db_path,
+            &account.id.0,
+            &mailbox,
+        )
+    })
+    .await
+    .map_err(|e| format!("mailbox_inbox_filter_counts join: {e}"))?
 }
 
 /// Rejoue les drapeaux lu/non lu restés en attente (échec IMAP, hors ligne, fermeture rapide)

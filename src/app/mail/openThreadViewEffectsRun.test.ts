@@ -5,7 +5,8 @@ const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invokeMock(...args) }));
 const loadMailboxUnreadMock = vi.fn(async () => {});
 vi.mock("./mailListView", () => ({ loadMailboxUnread: () => loadMailboxUnreadMock() }));
-vi.mock("../dispatch", () => ({ render: vi.fn() }));
+const renderMock = vi.fn();
+vi.mock("../dispatch", () => ({ render: () => renderMock() }));
 const toastWarning = vi.fn();
 vi.mock("../lib/toast", () => ({ toast: { warning: (...a: unknown[]) => toastWarning(...a), error: vi.fn() } }));
 
@@ -32,6 +33,24 @@ describe("mark-read à l’ouverture", () => {
     invokeMock.mockReset();
     loadMailboxUnreadMock.mockClear();
     toastWarning.mockClear();
+    renderMock.mockClear();
+  });
+
+  it("échec après « Retour » : pas de render complet de la BAL", async () => {
+    seed();
+    let rejectInvoke: (e: unknown) => void = () => {};
+    invokeMock.mockReturnValue(new Promise((_, rej) => (rejectInvoke = rej)));
+    const pending = markOpenedThreadReadIfUnread("t1", deps);
+    state.view = "list";
+    rejectInvoke(new Error("database is locked"));
+    await pending;
+    expect(renderMock).not.toHaveBeenCalled();
+
+    seed();
+    state.view = "thread";
+    invokeMock.mockRejectedValue(new Error("database is locked"));
+    await markOpenedThreadReadIfUnread("t1", deps);
+    expect(renderMock).toHaveBeenCalledTimes(1);
   });
 
   it("succès : fil lu, compteurs relus depuis SQLite", async () => {

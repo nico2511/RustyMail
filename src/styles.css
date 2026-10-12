@@ -1280,13 +1280,13 @@ textarea {
   padding: 0 6px;
 }
 
+/* Point statique : une animation box-shadow infinie forçait un repaint à chaque image (CPU WebView2). */
 .ai-pulse,
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 999px;
   background: var(--success);
-  animation: pulse 2s ease-in-out infinite;
 }
 
 @keyframes pulse {
@@ -1833,7 +1833,6 @@ textarea {
 
 .status-dot--ok {
   background: var(--success);
-  animation: pulse 2s ease-in-out infinite;
 }
 
 .status-dot--idle {
@@ -2072,6 +2071,14 @@ textarea {
 .status-bar-progress-track--indeterminate .status-bar-progress-fill {
   width: 38% !important;
   animation: status-bar-progress-indeterminate 1.1s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-bar-progress-track--indeterminate .status-bar-progress-fill {
+    animation: none;
+    transform: none;
+  }
 }
 
 .status-bar-progress-fill {

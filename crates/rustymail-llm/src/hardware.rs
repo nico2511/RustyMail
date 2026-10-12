@@ -101,7 +101,7 @@ pub fn llama_server_gpu_gate_ok(profile: &HardwareModelProfile, allow_cpu_overri
 /// Profil pour les réglages `auto`.
 /// RAM hôte pour l’UI (gibioctets arrondis, basé sur `sysinfo`).
 pub fn host_memory_gib() -> (f64, f64) {
-    let mut sys = sysinfo::System::new_all();
+    let mut sys = sysinfo::System::new();
     sys.refresh_memory();
     let total_kib = sys.total_memory() as f64;
     let avail_kib = sys.available_memory() as f64;
@@ -109,8 +109,35 @@ pub fn host_memory_gib() -> (f64, f64) {
     (gib(total_kib), gib(avail_kib))
 }
 
+/// Durée de validité du profil matériel en cache (appelé à chaque requête LLM).
+const PROFILE_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(60);
+
+fn profile_cache() -> &'static std::sync::Mutex<Option<(std::time::Instant, HardwareModelProfile)>>
+{
+    static CACHE: std::sync::OnceLock<
+        std::sync::Mutex<Option<(std::time::Instant, HardwareModelProfile)>>,
+    > = std::sync::OnceLock::new();
+    CACHE.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+/// Profil matériel, mis en cache ~60 s : seule la mémoire est lue (pas de scan processus/disques).
 pub fn detect_profile() -> HardwareModelProfile {
-    let mut sys = sysinfo::System::new_all();
+    let mut guard = match profile_cache().lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    if let Some((at, profile)) = guard.as_ref() {
+        if at.elapsed() < PROFILE_CACHE_TTL {
+            return profile.clone();
+        }
+    }
+    let profile = detect_profile_uncached();
+    *guard = Some((std::time::Instant::now(), profile.clone()));
+    profile
+}
+
+fn detect_profile_uncached() -> HardwareModelProfile {
+    let mut sys = sysinfo::System::new();
     sys.refresh_memory();
     let total_ram = sys.total_memory() * 1024; // sysinfo KiB → bytes
     let avail_ram = sys.available_memory() * 1024;
@@ -142,6 +169,19 @@ pub fn detect_profile() -> HardwareModelProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detect_profile_is_cached() {
+        let a = detect_profile();
+        let started = std::time::Instant::now();
+        let b = detect_profile();
+        assert!(started.elapsed() < std::time::Duration::from_millis(5));
+        assert_eq!(a.tier, b.tier);
+        let cached = profile_cache().lock().unwrap();
+        assert!(cached
+            .as_ref()
+            .is_some_and(|(at, _)| at.elapsed() < PROFILE_CACHE_TTL));
+    }
 
     #[test]
     fn tier_repo_matches_gguf_basename() {

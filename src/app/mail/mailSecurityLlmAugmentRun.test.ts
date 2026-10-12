@@ -50,4 +50,30 @@ describe("file LLM sécurité", () => {
     expect(mod.securityLlmAugmentStateForMessage("q-B").cached).toBe(true);
     expect(mod.activeSecurityLlmAugmentCount()).toBe(0);
   });
+
+  it("ne planifie pas le LLM quand security_scan_truncated est le seul constat", async () => {
+    const { state } = await import("../state");
+    (state.appPrefs.ai as unknown as Record<string, unknown>).featureSecurityLlmEnabled = true;
+    const mod = await import("./mailSecurityLlmAugmentRun");
+    const finding = (code: string) => ({ code, kind: "heuristic", severity: "attention", messageFr: "" });
+    mod.scheduleSecurityLlmAugment({
+      messageId: "big-1",
+      mailSecurity: { severity: "attention", summaryFr: "", findings: [finding("security_scan_truncated")] },
+    } as never);
+    await flush();
+    expect(invokedIds).toHaveLength(0);
+    expect(mod.isSecurityLlmAugmentPending("big-1")).toBe(false);
+
+    mod.scheduleSecurityLlmAugment({
+      messageId: "big-2",
+      mailSecurity: {
+        severity: "attention",
+        summaryFr: "",
+        findings: [finding("security_scan_truncated"), finding("punycode_or_homoglyph_url")],
+      },
+    } as never);
+    await flush();
+    expect(invokedIds).toHaveLength(1);
+    expect(mod.isSecurityLlmAugmentPending("big-2")).toBe(true);
+  });
 });
