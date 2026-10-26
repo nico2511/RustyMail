@@ -7,4 +7,9 @@
 ignore = [
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
+    # zip 4.x via tauri-plugin-updater ^2.13 (`zip = "^4"`). Patched releases need zip >= 9;
+    # no stable tauri-plugin-updater on 2.x with zip 9 yet — track upstream plugin releases.
+    "RUSTSEC-2026-0367",
+    "RUSTSEC-2026-0368",
+    "RUSTSEC-2026-0369",
 ]

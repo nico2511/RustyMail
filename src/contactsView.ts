@@ -4,6 +4,18 @@ import { localeTag } from "./i18n";
 import { navRenderTrailHtml } from "./navigation";
 import { escapeAttr, escapeHtml } from "./ui/sanitize";
 
+const CONTACT_SUGGESTED_TONE_FR: Record<string, string> = {
+  neutral: "Neutre",
+  formal: "Formel",
+  warm: "Chaleureux",
+  direct: "Direct",
+};
+
+export function formatContactSuggestedToneFr(tone: string): string {
+  const key = tone.trim().toLowerCase();
+  return CONTACT_SUGGESTED_TONE_FR[key] ?? tone;
+}
+
 export type AddressContactRow = {
   accountId: string;
   email: string;
@@ -446,7 +458,7 @@ export function renderContactDetailPage(): string {
               ? `<p class="dim">Sujets : ${contactsProfile.topics.map((t) => escapeHtml(t)).join(" · ")}</p>`
               : ""
           }
-          <p class="dim">Ton suggéré : ${escapeHtml(contactsProfile.suggestedTone)}${
+          <p class="dim">Ton suggéré : ${escapeHtml(formatContactSuggestedToneFr(contactsProfile.suggestedTone))}${
             contactsProfile.isAutoLikely ? " · expéditeur probablement automatique" : ""
           }</p>`
       : "";

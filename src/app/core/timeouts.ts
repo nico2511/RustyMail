@@ -22,7 +22,7 @@ export const LLM_INVOKE_TIMEOUT_MS = 200_000;
 /** Réécriture post-dictée : budget court — le texte brut est déjà dans le compositeur. */
 export const DICTATION_REWRITE_TIMEOUT_MS = 25_000;
 
-export const AI_CACHE_PROMPT_REVISION = 10;
+export const AI_CACHE_PROMPT_REVISION = 11;
 
 export const MAILBOX_DIGEST_DEBOUNCE_MS = 2400;
 

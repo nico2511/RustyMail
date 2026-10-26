@@ -6,6 +6,7 @@ use crate::ai_agent_prepare_reply::AgentIntentResult;
 use crate::ai_llm_contracts::ensure_mail_body_output;
 use crate::ai_llm_util::{
     gen_params_text_echo_for_prompt, generate_fil_json, parse_model_json, truncate_chars,
+    untrusted_mail_for_engine,
 };
 use rustymail_domain::{AssistRecommendation, AssistUserPrefs, MailSecuritySeverity};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -44,6 +45,7 @@ pub fn extract_action_items_with_llm(
         engine,
         system.as_str(),
         thread_context,
+        "assist-actions-thread",
         "Fil :\n",
         &hint,
         20_000,
@@ -107,7 +109,8 @@ pub fn adapt_draft_tone_with_llm(
     let draft_clip = truncate_chars(draft, 8000);
     let mut system = crate::prompts::system_prompt_for_language("assist_tone", lang);
     system = system.replace("{tone}", tone);
-    let user = format!("Brouillon à adapter :{hint}\n\n{draft_clip}");
+    let draft_block = untrusted_mail_for_engine(engine, "assist-tone-draft", &draft_clip);
+    let user = format!("Brouillon à adapter :{hint}\n\n{draft_block}");
     let raw = engine.generate(
         system.as_str(),
         &user,

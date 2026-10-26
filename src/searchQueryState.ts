@@ -127,11 +127,27 @@ export function extractNlSearchFallbackText(phrase: string): string {
   return terms.join(" ");
 }
 
+/** Résout un chemin de boîte NL vers un chemin connu, ou null si inventé. */
+export function resolveNlSearchMailboxPath(
+  raw: string,
+  mailboxes: string[]
+): string | null {
+  const path = raw.trim();
+  if (!path) return null;
+  if (mailboxes.includes(path)) return path;
+  if (path.toLowerCase() === "inbox") {
+    const inbox = mailboxes.find((m) => m.toUpperCase() === "INBOX");
+    return inbox ?? null;
+  }
+  return null;
+}
+
 export function applyNlSearchQueryToState(
   s: SearchStructuralState,
   sq: NlSearchQueryInput,
   normalizeSender: (raw: string) => string | null,
-  accountExists: (id: string) => boolean
+  accountExists: (id: string) => boolean,
+  resolveMailboxPath: (raw: string) => string | null = () => null
 ): void {
   resetSearchStructuralState(s);
   s.search = (sq.text ?? "").trim();
@@ -154,9 +170,13 @@ export function applyNlSearchQueryToState(
     modeRaw === "lexical" || modeRaw === "semantic" || modeRaw === "hybrid" ? modeRaw : null;
   const lang = sq.language?.trim().toLowerCase();
   s.searchLanguageFilter = lang && lang.length > 0 ? lang : null;
-  if (sq.mailbox?.trim()) {
-    s.searchMailboxPath = sq.mailbox.trim();
-    s.searchScope = "mailbox";
+  const mailboxRaw = sq.mailbox?.trim();
+  if (mailboxRaw) {
+    const resolved = resolveMailboxPath(mailboxRaw);
+    if (resolved) {
+      s.searchMailboxPath = resolved;
+      s.searchScope = "mailbox";
+    }
   }
   const aid = sq.accountId?.trim();
   if (aid && accountExists(aid)) {

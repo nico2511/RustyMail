@@ -103,13 +103,6 @@ const CATALOG: &[PromptCatalogEntry] = &[
         &[]
     ),
     prompt_entry!(
-        "inbox_digest",
-        "Inbox digest",
-        "../../prompts/inbox_digest.system.txt",
-        &["output_language"],
-        &[]
-    ),
-    prompt_entry!(
         "action_brief",
         "Action brief",
         "../../prompts/action_brief.system.txt",
@@ -169,7 +162,7 @@ const CATALOG: &[PromptCatalogEntry] = &[
         "agent_draft",
         "Agent — draft",
         "../../prompts/agent_draft.system.txt",
-        &["output_language", "draft_language"],
+        &["output_language"],
         &["draftReply"]
     ),
     prompt_entry!(
@@ -209,6 +202,31 @@ const CATALOG: &[PromptCatalogEntry] = &[
     ),
 ];
 
+/// Identifiants du catalogue embarqué (tests + garde anti typo).
+pub const PROMPT_IDS: &[&str] = &[
+    "summary",
+    "translation",
+    "grammar",
+    "writing",
+    "quick_reply",
+    "qa",
+    "search_nl",
+    "action_brief",
+    "contact_profile",
+    "org_proposals",
+    "flux_affiner",
+    "security_llm",
+    "digest_cut",
+    "digest_cut_reformat",
+    "agent_intent",
+    "agent_draft",
+    "agent_slots",
+    "assist_actions",
+    "assist_tone",
+    "assist_facts",
+    "assist_consistency",
+];
+
 pub fn system_prompt(id: &str, ctx: &PromptCtx) -> Option<String> {
     CATALOG
         .iter()
@@ -218,7 +236,15 @@ pub fn system_prompt(id: &str, ctx: &PromptCtx) -> Option<String> {
 
 pub fn system_prompt_for_language(id: &str, language: &str) -> String {
     let ctx = PromptCtx::from_language(language);
-    system_prompt(id, &ctx).unwrap_or_else(|| format!("[missing prompt: {id}]"))
+    match system_prompt(id, &ctx) {
+        Some(s) => s,
+        None => {
+            debug_assert!(false, "unknown prompt id: {id}");
+            #[cfg(not(debug_assertions))]
+            eprintln!("unknown prompt id: {id}");
+            format!("[missing prompt: {id}]")
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -242,4 +268,67 @@ pub fn list_catalog_for_ui() -> Vec<PromptCatalogItemView> {
             linked_skills: e.linked_skills.iter().map(|s| (*s).to_string()).collect(),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Identifiants utilisés dans le crate — toute typo doit faire échouer ce test.
+    const USED_PROMPT_IDS: &[&str] = &[
+        "summary",
+        "translation",
+        "grammar",
+        "writing",
+        "quick_reply",
+        "qa",
+        "search_nl",
+        "action_brief",
+        "contact_profile",
+        "org_proposals",
+        "flux_affiner",
+        "security_llm",
+        "digest_cut",
+        "digest_cut_reformat",
+        "agent_intent",
+        "agent_draft",
+        "agent_slots",
+        "assist_actions",
+        "assist_tone",
+        "assist_facts",
+        "assist_consistency",
+    ];
+
+    #[test]
+    fn used_prompt_ids_exist_in_catalog() {
+        for id in USED_PROMPT_IDS {
+            assert!(
+                PROMPT_IDS.contains(id),
+                "missing catalog entry for prompt id {id}"
+            );
+            let rendered = system_prompt_for_language(id, "fr");
+            assert!(
+                !rendered.contains("[missing prompt:"),
+                "catalog miss for {id}"
+            );
+            assert!(!rendered.trim().is_empty());
+            let item = list_catalog_for_ui()
+                .into_iter()
+                .find(|e| e.id == *id)
+                .expect("catalog item");
+            if item.variables.iter().any(|v| *v == "output_language") {
+                assert!(
+                    !rendered.contains("{output_language}"),
+                    "unsubstituted output_language in prompt {id}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn agent_draft_prompt_has_no_draft_language_placeholder() {
+        let rendered = system_prompt_for_language("agent_draft", "fr");
+        assert!(!rendered.contains("{draft_language}"));
+        assert!(rendered.contains("Do not state dates, times, amounts"));
+    }
 }

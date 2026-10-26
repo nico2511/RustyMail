@@ -175,7 +175,7 @@ fn summary_system(lang: &str) -> String {
 
 /// Message d’état quand la sortie du modèle ne contient pas une synthèse lisible.
 const SUMMARY_UNREADABLE_FR: &str =
-    "Résumé indisponible : la réponse du modèle n’a pas pu être lue.";
+    "Résumé indisponible : la réponse du modèle était illisible. Réessayez, ou réduisez la taille du fil / augmentez n_ctx dans Paramètres → IA.";
 
 fn is_conversation_index_marker(text: &str) -> bool {
     let t = text.trim();

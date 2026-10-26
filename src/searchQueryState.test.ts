@@ -5,6 +5,7 @@ import {
   hasCommittedSearchCriteria,
   hasSavableSearchCriteria,
   resetSearchStructuralState,
+  resolveNlSearchMailboxPath,
   searchCriteriaSnapshotsEqual,
   snapshotFromStructuralState,
   type SearchStructuralState,
@@ -131,6 +132,7 @@ describe("hasCommittedSearchCriteria", () => {
 describe("applyNlSearchQueryToState", () => {
   it("n’hérite pas mailbox/compte d’une requête NL précédente", () => {
     const s = emptyStructural();
+    const mailboxes = ["INBOX", "INBOX.Factures"];
     applyNlSearchQueryToState(
       s,
       {
@@ -142,7 +144,8 @@ describe("applyNlSearchQueryToState", () => {
         language: "fr",
       },
       (raw) => raw.trim().toLowerCase(),
-      (id) => id === "acc-1"
+      (id) => id === "acc-1",
+      (raw) => resolveNlSearchMailboxPath(raw, mailboxes)
     );
     expect(s.searchMailboxPath).toBe("INBOX.Factures");
     expect(s.searchAccountOverrideId).toBe("acc-1");
@@ -151,7 +154,8 @@ describe("applyNlSearchQueryToState", () => {
       s,
       { text: "autre sujet", senders: ["c@d.com"] },
       (raw) => raw.trim().toLowerCase(),
-      () => false
+      () => false,
+      (raw) => resolveNlSearchMailboxPath(raw, mailboxes)
     );
     expect(s.search).toBe("autre sujet");
     expect(s.searchSenders).toEqual(["c@d.com"]);
@@ -159,5 +163,47 @@ describe("applyNlSearchQueryToState", () => {
     expect(s.searchAccountOverrideId).toBeNull();
     expect(s.searchNlMode).toBeNull();
     expect(s.searchLanguageFilter).toBeNull();
+  });
+
+  it("applique une boîte connue", () => {
+    const s = emptyStructural();
+    const mailboxes = ["INBOX", "INBOX.Archives"];
+    applyNlSearchQueryToState(
+      s,
+      { text: "x", mailbox: "INBOX.Archives" },
+      (raw) => raw.trim().toLowerCase(),
+      () => false,
+      (raw) => resolveNlSearchMailboxPath(raw, mailboxes)
+    );
+    expect(s.searchMailboxPath).toBe("INBOX.Archives");
+    expect(s.searchScope).toBe("mailbox");
+  });
+
+  it("ignore une boîte inventée (reste sur le compte)", () => {
+    const s = emptyStructural();
+    const mailboxes = ["INBOX"];
+    applyNlSearchQueryToState(
+      s,
+      { text: "x", mailbox: "INBOX.Fantome" },
+      (raw) => raw.trim().toLowerCase(),
+      () => false,
+      (raw) => resolveNlSearchMailboxPath(raw, mailboxes)
+    );
+    expect(s.searchMailboxPath).toBeNull();
+    expect(s.searchScope).toBe("account");
+  });
+
+  it("accepte inbox en minuscules", () => {
+    const s = emptyStructural();
+    const mailboxes = ["INBOX", "Sent"];
+    applyNlSearchQueryToState(
+      s,
+      { text: "x", mailbox: "inbox" },
+      (raw) => raw.trim().toLowerCase(),
+      () => false,
+      (raw) => resolveNlSearchMailboxPath(raw, mailboxes)
+    );
+    expect(s.searchMailboxPath).toBe("INBOX");
+    expect(s.searchScope).toBe("mailbox");
   });
 });

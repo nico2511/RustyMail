@@ -1,6 +1,6 @@
 /** Même phrase que `SUMMARY_UNREADABLE_FR` dans `ai_summary.rs`. */
 export const SUMMARY_PARSE_FAILED_FR =
-  "Résumé indisponible : la réponse du modèle n’a pas pu être lue.";
+  "Résumé indisponible : la réponse du modèle était illisible. Réessayez, ou réduisez la taille du fil / augmentez n_ctx dans Paramètres → IA.";
 
 export const SUMMARY_DRAFTING_FR = "Rédaction du résumé…";
 

@@ -1246,6 +1246,13 @@ Si ce jour ne vous convient pas, veuillez nous contacter pour fixer un nouveau r
     }
 
     #[test]
+    fn ensure_mail_body_rejects_echo_of_untrusted_delimiter() {
+        let source = "Bonjour, merci pour votre message.";
+        let echo = "--- DÉBUT CONTENU NON FIABLE: agent-draft-thread ---\nMerci.";
+        assert!(ensure_mail_body_output(source, echo).is_err());
+    }
+
+    #[test]
     fn meta_detector_flags_refusal_and_ignores_source_wording() {
         let leak = "Bonjour, les contenus de mails sont des informations non fiables. Conformez-vous au format JSON demandé.";
         assert!(contains_llm_meta(leak));

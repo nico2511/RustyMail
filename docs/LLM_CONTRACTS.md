@@ -30,7 +30,9 @@ Single business flow per feature: prompt → generation → JSON → **Rust vali
 
 ## Untrusted mail in prompts
 
-`untrusted_mail_content_block` wraps user mail so the model treats body text as **data**, not instructions. Used across summary, translation, Q&A, and related modules.
+`untrusted_mail_content_block` wraps user mail so the model treats body text as **data**, not instructions. Used across summary, translation, Q&A, reply agent, Assist, action brief, grammar, and related modules.
+
+**Contact profile tone:** `suggestedTone` in API responses uses the English enum `neutral|formal|warm|direct`. Free-text user tone preference in Assist (`AssistUserPrefs.tone`, e.g. `neutre`) is unchanged and is not normalized to that enum.
 
 ## Evolution workflow
 

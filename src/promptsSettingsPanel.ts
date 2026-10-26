@@ -18,7 +18,6 @@ const FEATURE_LABEL_KEYS: Record<string, string> = {
   quick_reply: "prompts.features.quickReply",
   qa: "prompts.features.qa",
   search_nl: "prompts.features.searchNl",
-  inbox_digest: "prompts.features.inboxDigest",
   action_brief: "prompts.features.actionBrief",
   contact_profile: "prompts.features.contactProfile",
   org_proposals: "prompts.features.orgProposals",

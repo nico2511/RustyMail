@@ -5,6 +5,7 @@ use crate::ai_llm_util::{
     gen_params_json_for_prompt, output_room_after_prompt, parse_model_json, truncate_chars,
     untrusted_mail_for_engine, user_text_for_engine,
 };
+use crate::ai_quick_reply::normalize_quick_reply_tone;
 use rustymail_llm::{LlmEngine, LlmError};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -62,11 +63,19 @@ pub fn contact_profile_with_llm(
             .filter(|t: &String| !t.is_empty())
             .take(5)
             .collect(),
-        suggested_tone: if dto.suggested_tone.trim().is_empty() {
-            "neutre".into()
-        } else {
-            dto.suggested_tone.trim().chars().take(40).collect()
-        },
+        suggested_tone: normalize_quick_reply_tone(&dto.suggested_tone),
         is_auto_likely: dto.is_auto_likely,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ai_quick_reply::normalize_quick_reply_tone;
+
+    #[test]
+    fn suggested_tone_normalized_to_english_enum() {
+        assert_eq!(normalize_quick_reply_tone("Formel"), "formal");
+        assert_eq!(normalize_quick_reply_tone(""), "neutral");
+        assert_eq!(normalize_quick_reply_tone("NEUTRALFORMAL"), "neutral");
+    }
 }
