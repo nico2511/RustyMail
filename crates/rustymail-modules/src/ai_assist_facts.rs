@@ -5,6 +5,7 @@ use serde::Deserialize;
 use crate::ai_agent_prepare_reply::AgentIntentResult;
 use crate::ai_llm_util::{
     fit_fil_context_user, generate_fil_json, parse_model_json, truncate_chars,
+    untrusted_mail_for_engine,
 };
 use rustymail_domain::{AssistFact, AssistFactsSnapshot, AssistUserPrefs};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -130,6 +131,7 @@ pub fn extract_facts_with_llm(
         engine,
         system.as_str(),
         thread_context,
+        "assist-facts-thread",
         "Fil :\n",
         &intent_hint,
         24_000,
@@ -367,11 +369,13 @@ pub fn consistency_check_with_llm(
             )
         })
         .unwrap_or_default();
-    let suffix = format!("\n\nFAITS :\n{facts_json}{intent_line}\n\nBROUILLON :\n{draft_clip}");
+    let draft_block = untrusted_mail_for_engine(engine, "assist-consistency-draft", &draft_clip);
+    let suffix = format!("\n\nFAITS :\n{facts_json}{intent_line}\n\nBROUILLON :\n{draft_block}");
     let (user, params) = fit_fil_context_user(
         engine,
         system.as_str(),
         thread_context,
+        "assist-consistency-thread",
         "FIL :\n",
         &suffix,
         12_000,
@@ -404,7 +408,7 @@ pub fn consistency_check_with_llm(
         &mut safety_flags,
     );
     Ok(ConsistencyOutput {
-        aligned: dto.aligned && issues.is_empty() && !role_inversion,
+        aligned: dto.aligned && issues.is_empty() && safety_flags.is_empty() && !role_inversion,
         issues,
         safety_flags,
         role_inversion,
@@ -578,5 +582,16 @@ Pouvez-vous préciser l'heure d'arrivée ?\n\nCordialement";
     fn facts_block_shows_actor_and_role() {
         let block = facts_block_for_draft(&sender_proposal_facts());
         assert!(block.contains("[proposal (sender/proposer)]"));
+    }
+
+    #[test]
+    fn safety_flags_force_not_aligned() {
+        let dto_aligned = true;
+        let issues: Vec<String> = vec![];
+        let safety_flags = vec!["amount_mismatch".to_string()];
+        let role_inversion = false;
+        let aligned =
+            dto_aligned && issues.is_empty() && safety_flags.is_empty() && !role_inversion;
+        assert!(!aligned);
     }
 }

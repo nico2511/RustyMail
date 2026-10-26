@@ -6,8 +6,8 @@ use serde::Deserialize;
 
 use crate::ai_llm_contracts::contains_llm_meta;
 use crate::ai_llm_util::{
-    budget_report, gen_params_json_for_prompt, output_room_after_prompt, parse_model_json,
-    parse_model_json_ex, truncate_chars, user_text_for_engine,
+    budget_report, gen_params_json_for_prompt, output_room_after_prompt, parse_model_json_ex,
+    truncate_chars, untrusted_mail_for_engine, user_text_for_engine,
 };
 use rustymail_domain::{
     ActionBriefAmbiguity, ActionBriefChange, ActionBriefDecision, ActionBriefEvidenceLink,
@@ -614,7 +614,11 @@ fn fit_brief_user(
     let original_chars = snapshot.chars().count();
     let mut snap = snapshot.to_string();
     for _ in 0..12 {
-        let user = user_text_for_engine(engine, &user_prompt(mode, account_id, mailbox, &snap));
+        let snap_for_prompt = wrap_brief_snapshot_untrusted(engine, &snap);
+        let user = user_text_for_engine(
+            engine,
+            &user_prompt(mode, account_id, mailbox, &snap_for_prompt),
+        );
         let room = output_room_after_prompt(engine, system, &user, 64);
         let clipped = snap.chars().count() < original_chars;
         if room >= target {
@@ -646,6 +650,51 @@ fn dto_has_signal(dto: &LlmBriefDto) -> bool {
 
 fn system_prompt(_mode: ActionBriefMode, output_language: &str) -> String {
     crate::prompts::system_prompt_for_language("action_brief", output_language)
+}
+
+/// Garde fil_id lisibles ; sujet et aperçu dans un bloc non fiable.
+fn wrap_brief_snapshot_untrusted(engine: &LlmEngine, snapshot: &str) -> String {
+    let mut out = String::new();
+    let lines: Vec<&str> = snapshot.lines().collect();
+    let mut i = 0usize;
+    while i < lines.len() {
+        let line = lines[i];
+        if !line.starts_with("fil_id=") {
+            i += 1;
+            continue;
+        }
+        let parts: Vec<&str> = line.split(" | ").collect();
+        if parts.len() < 9 {
+            out.push_str(line);
+            out.push('\n');
+            i += 1;
+            continue;
+        }
+        let header = parts[..8].join(" | ");
+        let subject = parts[8..].join(" | ");
+        let preview = if i + 1 < lines.len() && !lines[i + 1].starts_with("fil_id=") {
+            let p = lines[i + 1].trim();
+            i += 1;
+            p
+        } else {
+            ""
+        };
+        out.push_str(&header);
+        out.push('\n');
+        let body = if preview.is_empty() {
+            subject.to_string()
+        } else {
+            format!("{subject}\n{preview}")
+        };
+        out.push_str(&untrusted_mail_for_engine(
+            engine,
+            "brief-thread-preview",
+            &body,
+        ));
+        out.push_str("\n\n");
+        i += 1;
+    }
+    out
 }
 
 fn user_prompt(mode: ActionBriefMode, account_id: &str, mailbox: &str, snapshot: &str) -> String {

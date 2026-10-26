@@ -176,6 +176,7 @@ pub(crate) fn fit_fil_context_user(
     engine: &LlmEngine,
     system: &str,
     thread_context: &str,
+    untrusted_label: &str,
     prefix: &str,
     suffix: &str,
     initial_max_chars: usize,
@@ -189,7 +190,8 @@ pub(crate) fn fit_fil_context_user(
         .max(400);
     for _ in 0..28 {
         let ctx = truncate_chars(thread_context, max_chars);
-        let user = format!("{prefix}{ctx}{suffix}");
+        let ctx_block = untrusted_mail_for_engine(engine, untrusted_label, &ctx);
+        let user = format!("{prefix}{ctx_block}{suffix}");
         let room = output_room_after_prompt(engine, system, &user, 64);
         let max_tokens =
             resolve_max_output_tokens(engine, system, &user, min_output, max_output, 64);
@@ -235,6 +237,7 @@ pub(crate) fn generate_fil_json<T: DeserializeOwned>(
     engine: &mut LlmEngine,
     system: &str,
     thread_context: &str,
+    untrusted_label: &str,
     prefix: &str,
     suffix: &str,
     initial_max_chars: usize,
@@ -245,6 +248,7 @@ pub(crate) fn generate_fil_json<T: DeserializeOwned>(
         engine,
         system,
         thread_context,
+        untrusted_label,
         prefix,
         suffix,
         initial_max_chars,
@@ -265,6 +269,7 @@ pub(crate) fn generate_fil_json<T: DeserializeOwned>(
                 engine,
                 system,
                 thread_context,
+                untrusted_label,
                 prefix,
                 suffix,
                 compact_chars,
@@ -857,9 +862,18 @@ mod tests {
         engine.set_n_ctx_probe(4096);
         let system = "Tu analyses un fil et réponds en JSON.";
         let huge = "x".repeat(80_000);
-        let (user, params) =
-            fit_fil_context_user(&engine, system, &huge, "Fil :\n", "", 24_000, 256, 768)
-                .expect("fit");
+        let (user, params) = fit_fil_context_user(
+            &engine,
+            system,
+            &huge,
+            "test-thread",
+            "Fil :\n",
+            "",
+            24_000,
+            256,
+            768,
+        )
+        .expect("fit");
         let room = output_room_after_prompt(&engine, system, &user, 64);
         assert!(
             room >= MIN_ASSIST_JSON_OUTPUT_ROOM,

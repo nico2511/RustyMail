@@ -13,7 +13,6 @@ pub mod ai_digest_cut_reformat;
 pub mod ai_extraction;
 pub mod ai_flux_affiner;
 pub mod ai_grammar;
-pub mod ai_inbox_digest;
 pub mod ai_org_proposals;
 pub mod ai_qa;
 pub mod ai_quick_reply;

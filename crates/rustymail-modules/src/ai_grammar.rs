@@ -3,7 +3,7 @@ use serde::Deserialize;
 use crate::ai_llm_contracts::contains_llm_meta;
 use crate::ai_llm_util::{
     budget_report, extract_json_candidate, gen_params_json_for_prompt, normalize_json_loose,
-    truncate_chars,
+    truncate_chars, untrusted_mail_for_engine,
 };
 use rustymail_domain::{GrammarResult, GrammarSuggestion};
 use rustymail_llm::{LlmEngine, LlmError};
@@ -473,9 +473,10 @@ pub fn grammar_check_with_llm(
     output_language: &str,
 ) -> Result<GrammarResult, LlmError> {
     let system = crate::prompts::system_prompt_for_language("grammar", output_language);
-    let user = truncate_chars(text, 32_768);
+    let clipped = truncate_chars(text, 32_768);
+    let mail_block = untrusted_mail_for_engine(engine, "grammar-draft", &clipped);
     let user_block = format!(
-        "Correct only the draft below. Each original must be a short exact excerpt of this draft (at most a short sentence), not a whole paragraph. Do not delete words or sentence-ending punctuation.\nText:\n{user}"
+        "Correct only the draft below. Each original must be a short exact excerpt of this draft (at most a short sentence), not a whole paragraph. Do not delete words or sentence-ending punctuation.\n{mail_block}"
     );
 
     let (suggestions, raw) = match grammar_once(engine, system.as_str(), &user_block, text) {

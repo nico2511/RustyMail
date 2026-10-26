@@ -1,5 +1,6 @@
 import {
   applyNlSearchQueryToState,
+  resolveNlSearchMailboxPath,
   type SearchStructuralState,
 } from "../../searchQueryState";
 import type { Tag } from "../types";
@@ -38,6 +39,7 @@ export function applySearchQueryFromNl(sq: {
     sq,
     (raw) => canonicalEmailForNlMatch(raw) ?? (raw.trim().toLowerCase() || null),
     (id) => state.accounts.some((a) => a.id === id),
+    (raw) => resolveNlSearchMailboxPath(raw, state.mailboxes),
   );
   state.search = applied.search;
   state.searchDraft = applied.search;
