@@ -845,6 +845,7 @@ pub fn action_brief_offline_stub(
 #[cfg(test)]
 mod brief_context_tests {
     use super::*;
+    use crate::ai_llm_util::parse_model_json;
 
     #[test]
     fn mode_scales_with_n_ctx() {
