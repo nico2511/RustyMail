@@ -4136,3 +4136,119 @@ mod fts_backfill_and_cache_tests {
         assert_eq!(hits, 1);
     }
 }
+
+#[cfg(test)]
+mod inbox_filter_counts_parity_tests {
+    use super::*;
+    use rusqlite::params;
+
+    fn scratch_db() -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("mail.sqlite3");
+        (dir, path)
+    }
+
+    fn insert_account(conn: &Connection, id: &str, email: &str) {
+        conn.execute(
+            "INSERT INTO accounts (
+                id, display_name, email, imap_host, imap_port, imap_security,
+                smtp_host, smtp_port, smtp_security, auth_kind
+            ) VALUES (?1, 'n', ?2, 'imap', 993, 'tls', 'smtp', 465, 'tls', 'password')",
+            params![id, email],
+        )
+        .expect("account");
+    }
+
+    #[test]
+    fn seed_if_empty_only_when_no_threads() {
+        let (_dir, path) = scratch_db();
+        let conn = open_sqlite_migrated(&path).expect("open");
+        seed_if_empty(&conn).expect("seed");
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM threads", [], |r| r.get(0))
+            .expect("count");
+        assert!(n > 0);
+        let before = n;
+        seed_if_empty(&conn).expect("again");
+        let after: i64 = conn
+            .query_row("SELECT COUNT(*) FROM threads", [], |r| r.get(0))
+            .expect("count");
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn focused_auto_matches_legacy_loader() {
+        let (_dir, path) = scratch_db();
+        let conn = open_sqlite_migrated(&path).expect("open");
+        insert_account(&conn, "acc1", "owner@example.com");
+        conn.execute(
+            "INSERT INTO threads (id, account_id, mailbox, subject, tags) VALUES ('t1', 'acc1', 'INBOX', 's', '')",
+            [],
+        )
+        .expect("thread");
+        conn.execute(
+            "INSERT INTO messages (
+                id, thread_id, account_id, mailbox, sender_name, sender_email,
+                subject, received_at, body, body_plain, message_id_header, is_read, position
+            ) VALUES ('m1', 't1', 'acc1', 'INBOX', 'n', 'news@example.com', 's', '2026-01-02T00:00:00Z', 'b', 'b', '<a@b>', 0, 0)",
+            [],
+        )
+        .expect("msg");
+        conn.execute(
+            "INSERT INTO messages (
+                id, thread_id, account_id, mailbox, sender_name, sender_email,
+                subject, received_at, body, body_plain, message_id_header, imap_uid, is_read, position
+            ) VALUES ('m1-dup', 't1', 'acc1', 'INBOX', 'n', 'news@example.com', 's', '2026-01-03T00:00:00Z', 'html', 'html', '<a@b>', 42, 0, 1)",
+            [],
+        )
+        .expect("dup");
+        let rules = newsletter::list_newsletter_rules_connection(&conn).expect("rules");
+        let account_emails = vec!["owner@example.com".to_string()];
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, subject, tags, COALESCE(is_followed, 0) FROM threads WHERE account_id = 'acc1'",
+            )
+            .expect("stmt");
+        let rows: Vec<(String, String, String, bool)> = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get::<_, i64>(3)? != 0,
+                ))
+            })
+            .expect("q")
+            .filter_map(|r| r.ok())
+            .collect();
+        let mut legacy_focused = 0usize;
+        let mut legacy_auto = 0usize;
+        let mut lite_focused = 0usize;
+        let mut lite_auto = 0usize;
+        for (id, subject, tags, followed) in rows {
+            let legacy = build_thread_from_row(&conn, id.clone(), subject.clone(), tags.clone(), followed)
+                .expect("legacy");
+            let lite = build_thread_from_row_for_filter_counts(
+                &conn,
+                id,
+                subject,
+                tags,
+                followed,
+            )
+            .expect("lite");
+            if newsletter::thread_blocks_reply(&legacy, &account_emails, &rules) {
+                legacy_auto += 1;
+            } else {
+                legacy_focused += 1;
+            }
+            if newsletter::thread_blocks_reply(&lite, &account_emails, &rules) {
+                lite_auto += 1;
+            } else {
+                lite_focused += 1;
+            }
+        }
+        assert_eq!(legacy_focused, lite_focused);
+        assert_eq!(legacy_auto, lite_auto);
+        assert_eq!(legacy_focused + legacy_auto, 1);
+    }
+}
