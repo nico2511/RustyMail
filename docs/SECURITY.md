@@ -63,7 +63,7 @@ Before publishing an installable bundle (MSI/NSIS):
 ### Keyring
 
 - Account passwords, OpenRouter key, dictation API key, SQLCipher key
-- Linux: `keyring::use_native_store(false)` may use keyutils vs Secret Service
+- Linux: keyutils via `keyring_store::use_native_store()` (unchanged since 0.4.11)
 - Windows/macOS: native OS store
 
 ---

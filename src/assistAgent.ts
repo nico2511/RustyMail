@@ -51,6 +51,7 @@ export type AssistFactsSnapshot = {
   facts: AssistFact[];
   ambiguities: string[];
   confidence: number;
+  outputPartial?: boolean;
 };
 
 export type AssistRecommendation = {

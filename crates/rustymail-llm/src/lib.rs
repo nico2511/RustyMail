@@ -65,6 +65,9 @@ pub struct LlmGenParams {
     /// Ollama : `response_format: json_object` quand l’appelant attend du JSON.
     #[serde(default)]
     pub expect_json: bool,
+    /// Ollama : schéma JSON (`format`) ; prioritaire sur `expect_json`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub json_schema: Option<serde_json::Value>,
 }
 
 impl Default for LlmGenParams {
@@ -76,6 +79,7 @@ impl Default for LlmGenParams {
             stop: Vec::new(),
             grammar_gbnf: None,
             expect_json: false,
+            json_schema: None,
         }
     }
 }

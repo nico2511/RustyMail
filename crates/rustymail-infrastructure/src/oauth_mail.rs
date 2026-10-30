@@ -203,7 +203,8 @@ struct OAuthTokenMetaV2 {
 }
 
 fn keyring_oauth_entry(username: &str) -> Result<keyring_core::Entry, String> {
-    keyring::use_native_store(false).map_err(|e| format!("keyring native store failed: {e}"))?;
+    crate::keyring_store::use_native_store()
+        .map_err(|e| format!("keyring native store failed: {e}"))?;
     keyring_core::Entry::new(KEYRING_SERVICE, username)
         .map_err(|e| format!("keyring oauth entry failed: {e}"))
 }

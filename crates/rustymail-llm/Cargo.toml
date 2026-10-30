@@ -18,3 +18,4 @@ serde_json.workspace = true
 thiserror.workspace = true
 sysinfo = "0.37"
 regex = "1"
+log = "0.4"

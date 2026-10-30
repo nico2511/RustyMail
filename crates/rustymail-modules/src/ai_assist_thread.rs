@@ -480,6 +480,7 @@ pub fn run_assist_phase(
                         facts: Vec::new(),
                         ambiguities: Vec::new(),
                         confidence: 0.25,
+                        output_partial: false,
                     });
                     result.confidence = Some(0.25);
                     result.run_steps.push(run_step.clone());
@@ -567,6 +568,7 @@ pub fn run_assist_phase(
                 facts: Vec::new(),
                 ambiguities: Vec::new(),
                 confidence: 1.0,
+                output_partial: false,
             });
             match consistency_check_with_llm(
                 engine,
@@ -782,6 +784,7 @@ mod tests {
             facts: vec![AssistFact::new("request", "Devis")],
             ambiguities: vec![],
             confidence: 0.4,
+            output_partial: false,
         };
         assert!(needs_clarification_before_draft(&r, Some(&facts)));
     }
@@ -814,6 +817,7 @@ mod tests {
             )],
             ambiguities: vec![],
             confidence: 0.9,
+            output_partial: false,
         };
         assert!(!should_run_slot_skill(&r, Some(&intent), "", Some(&facts)));
         let owner_proposes = AssistIntentSnapshot {
@@ -837,6 +841,7 @@ mod tests {
             facts: vec![sender_fact],
             ambiguities: vec![],
             confidence: 0.9,
+            output_partial: false,
         };
         assert!(!should_run_slot_skill(
             &r,
@@ -862,6 +867,7 @@ mod tests {
             ],
             ambiguities: vec![],
             confidence: 0.9,
+            output_partial: false,
         };
         assert!(!should_run_slot_skill(&r, Some(&intent), "", Some(&facts)));
     }
@@ -917,6 +923,7 @@ mod tests {
             facts: Vec::new(),
             ambiguities: vec!["Date limite inconnue".into()],
             confidence: 0.5,
+            output_partial: false,
         };
         let plan = assist_routing_plan(&r, None, "", Some(&facts));
         assert!(plan.needs_clarification);

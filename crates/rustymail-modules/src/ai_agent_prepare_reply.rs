@@ -405,6 +405,7 @@ mod tests {
             facts: vec![fact],
             ambiguities: vec![],
             confidence: 0.9,
+            output_partial: false,
         };
         let i = intent("sender_proposes_meeting");
         let mut engine = LlmEngine::open_ai_compatible(

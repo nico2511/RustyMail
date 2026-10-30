@@ -287,6 +287,91 @@ pub(crate) fn generate_fil_json<T: DeserializeOwned>(
     }
 }
 
+/// Comme [`generate_fil_json`], avec drapeau « JSON réparé » et schéma Ollama optionnel.
+pub(crate) fn generate_fil_json_ex<T: DeserializeOwned>(
+    engine: &mut LlmEngine,
+    system: &str,
+    thread_context: &str,
+    untrusted_label: &str,
+    prefix: &str,
+    suffix: &str,
+    initial_max_chars: usize,
+    min_output: u32,
+    max_output: u32,
+    json_schema: Option<serde_json::Value>,
+) -> Result<(T, bool), LlmError> {
+    fn run_once<T: DeserializeOwned>(
+        engine: &mut LlmEngine,
+        system: &str,
+        thread_context: &str,
+        untrusted_label: &str,
+        prefix: &str,
+        suffix: &str,
+        max_chars: usize,
+        min_output: u32,
+        max_output: u32,
+        json_schema: Option<serde_json::Value>,
+    ) -> Result<(T, bool), LlmError> {
+        let (user, mut params) = fit_fil_context_user(
+            engine,
+            system,
+            thread_context,
+            untrusted_label,
+            prefix,
+            suffix,
+            max_chars,
+            min_output,
+            max_output,
+        )?;
+        if let Some(schema) = json_schema {
+            params.json_schema = Some(schema);
+        }
+        let raw = engine.generate(system, &user, &params)?;
+        let parsed = parse_model_json_ex::<T>(&raw)?;
+        Ok((parsed.value, parsed.repaired))
+    }
+
+    match run_once(
+        engine,
+        system,
+        thread_context,
+        untrusted_label,
+        prefix,
+        suffix,
+        initial_max_chars,
+        min_output,
+        max_output,
+        json_schema.clone(),
+    ) {
+        Ok(v) => Ok(v),
+        Err(first) if json_truncation_retryable(&first) => {
+            let first_chars = thread_context
+                .chars()
+                .count()
+                .min(initial_max_chars.max(400));
+            let compact_chars = ((first_chars * 2) / 5).clamp(800, 2_400);
+            run_once(
+                engine,
+                system,
+                thread_context,
+                untrusted_label,
+                prefix,
+                suffix,
+                compact_chars,
+                min_output,
+                max_output,
+                json_schema,
+            )
+            .map_err(|e2| {
+                LlmError::InvalidJson(format!(
+                    "Réponse JSON incomplète ou tronquée ({first}). Nouvel essai: {e2}"
+                ))
+            })
+        }
+        Err(e) => Err(e),
+    }
+}
+
 pub(crate) fn gen_params_json_with_grammar(
     max_tokens: u32,
     grammar_gbnf: Option<&str>,
@@ -298,6 +383,7 @@ pub(crate) fn gen_params_json_with_grammar(
         stop: Vec::new(),
         grammar_gbnf: grammar_gbnf.map(str::to_string),
         expect_json: true,
+        json_schema: None,
     }
 }
 
@@ -309,6 +395,7 @@ pub(crate) fn gen_params_text(max_tokens: u32) -> LlmGenParams {
         stop: Vec::new(),
         grammar_gbnf: None,
         expect_json: false,
+        json_schema: None,
     }
 }
 

@@ -8,7 +8,7 @@ use serde::Deserialize;
 pub const DICTATION_KEYRING_USERNAME: &str = "__rustymail_dictation_openai__";
 
 pub fn dictation_api_key_get() -> Result<Option<String>, String> {
-    keyring::use_native_store(false).map_err(|e| format!("keyring: {e}"))?;
+    crate::keyring_store::use_native_store().map_err(|e| format!("keyring: {e}"))?;
     let entry = keyring_core::Entry::new(crate::KEYRING_SERVICE, DICTATION_KEYRING_USERNAME)
         .map_err(|e| format!("keyring entry: {e}"))?;
     match entry.get_password() {
@@ -20,7 +20,7 @@ pub fn dictation_api_key_get() -> Result<Option<String>, String> {
 }
 
 pub fn dictation_api_key_set(secret: &str) -> Result<(), String> {
-    keyring::use_native_store(false).map_err(|e| format!("keyring: {e}"))?;
+    crate::keyring_store::use_native_store().map_err(|e| format!("keyring: {e}"))?;
     let entry = keyring_core::Entry::new(crate::KEYRING_SERVICE, DICTATION_KEYRING_USERNAME)
         .map_err(|e| format!("keyring entry: {e}"))?;
     entry
@@ -29,7 +29,7 @@ pub fn dictation_api_key_set(secret: &str) -> Result<(), String> {
 }
 
 pub fn dictation_api_key_clear() {
-    let Ok(_) = keyring::use_native_store(false) else {
+    let Ok(_) = crate::keyring_store::use_native_store() else {
         return;
     };
     let Ok(entry) = keyring_core::Entry::new(crate::KEYRING_SERVICE, DICTATION_KEYRING_USERNAME)

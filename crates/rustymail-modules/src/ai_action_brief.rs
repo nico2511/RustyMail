@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use serde::Deserialize;
 
 use crate::ai_llm_contracts::contains_llm_meta;
+use crate::ai_llm_contracts::{action_brief_json_schema, action_brief_schema_limits};
 use crate::ai_llm_util::{
     budget_report, gen_params_json_for_prompt, output_room_after_prompt, parse_model_json_ex,
     truncate_chars, untrusted_mail_for_engine, user_text_for_engine,
@@ -698,10 +699,20 @@ fn wrap_brief_snapshot_untrusted(engine: &LlmEngine, snapshot: &str) -> String {
 }
 
 fn user_prompt(mode: ActionBriefMode, account_id: &str, mailbox: &str, snapshot: &str) -> String {
+    let lim = action_brief_schema_limits(mode);
     let mode_hint = match mode {
-        ActionBriefMode::Quick => "Mode Quick : au plus 2 changements, 1 décision, 3 actions, 1 risque, 1 ambiguïté si nécessaire.",
-        ActionBriefMode::Decision => "Mode Decision : jusqu'à 4 changements, top 3 décisions, top 5 actions, risques pertinents, ambiguïtés ciblées.",
-        ActionBriefMode::Deep => "Mode Deep : jusqu'à 6 changements, top 3 décisions, top 7 actions, risques détaillés, plus d'ambiguïtés si le contexte est flou.",
+        ActionBriefMode::Quick => format!(
+            "Mode Quick : au plus {} changements, {} décision, {} actions, {} risque, {} ambiguïté si nécessaire.",
+            lim.changes, lim.decisions, lim.actions, lim.risks, lim.ambiguities
+        ),
+        ActionBriefMode::Decision => format!(
+            "Mode Decision : jusqu'à {} changements, top {} décisions, top {} actions, risques pertinents (max {}), ambiguïtés ciblées (max {}).",
+            lim.changes, lim.decisions, lim.actions, lim.risks, lim.ambiguities
+        ),
+        ActionBriefMode::Deep => format!(
+            "Mode Deep : jusqu'à {} changements, top {} décisions, top {} actions, risques détaillés (max {}), ambiguïtés si le contexte est flou (max {}).",
+            lim.changes, lim.decisions, lim.actions, lim.risks, lim.ambiguities
+        ),
     };
     format!(
         "{mode_hint}\n\ncompte_hint={account_id}\nmailbox_hint={mailbox}\n\nLISTE FILS (une entrée par fil, ne pas ignorer fil_id) :\n\n{snapshot}"
@@ -714,11 +725,10 @@ fn generate_brief_dto(
     user: &str,
     mode: ActionBriefMode,
 ) -> Result<(LlmBriefDto, String, bool), LlmError> {
-    let raw = engine.generate(
-        system,
-        user,
-        &gen_params_json_for_prompt(engine, system, user, 384, max_tokens_for_mode(mode)),
-    )?;
+    let mut params =
+        gen_params_json_for_prompt(engine, system, user, 384, max_tokens_for_mode(mode));
+    params.json_schema = Some(action_brief_json_schema(mode));
+    let raw = engine.generate(system, user, &params)?;
     let parsed = parse_model_json_ex::<LlmBriefDto>(&raw)?;
     if !dto_has_signal(&parsed.value) {
         return Err(LlmError::InvalidJson("brief vide".into()));

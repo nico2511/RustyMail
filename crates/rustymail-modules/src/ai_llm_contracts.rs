@@ -1040,9 +1040,103 @@ pub fn validate_org_orientation_shape(
     Ok(())
 }
 
+use rustymail_domain::ActionBriefMode;
+use serde_json::{json, Value};
+
+/// Bornes listes brief : une seule source pour le hint prompt et le schéma Ollama.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActionBriefSchemaLimits {
+    pub changes: usize,
+    pub decisions: usize,
+    pub actions: usize,
+    pub risks: usize,
+    pub ambiguities: usize,
+}
+
+pub fn action_brief_schema_limits(mode: ActionBriefMode) -> ActionBriefSchemaLimits {
+    match mode {
+        ActionBriefMode::Quick => ActionBriefSchemaLimits {
+            changes: 2,
+            decisions: 1,
+            actions: 3,
+            risks: 1,
+            ambiguities: 1,
+        },
+        ActionBriefMode::Decision => ActionBriefSchemaLimits {
+            changes: 4,
+            decisions: 3,
+            actions: 5,
+            risks: 4,
+            ambiguities: 4,
+        },
+        ActionBriefMode::Deep => ActionBriefSchemaLimits {
+            changes: 6,
+            decisions: 3,
+            actions: 7,
+            risks: 5,
+            ambiguities: 5,
+        },
+    }
+}
+
+pub fn action_brief_json_schema(mode: ActionBriefMode) -> Value {
+    let lim = action_brief_schema_limits(mode);
+    json!({
+        "type": "object",
+        "properties": {
+            "changes": { "type": "array", "maxItems": lim.changes, "items": { "type": "object" } },
+            "decisions": { "type": "array", "maxItems": lim.decisions, "items": { "type": "object" } },
+            "recommendedActions": { "type": "array", "maxItems": lim.actions, "items": { "type": "object" } },
+            "risks": { "type": "array", "maxItems": lim.risks, "items": { "type": "object" } },
+            "ambiguities": { "type": "array", "maxItems": lim.ambiguities, "items": { "type": "object" } },
+            "evidenceLinks": { "type": "array", "items": { "type": "object" } },
+            "confidence": { "type": "number" },
+            "priorityBucket": { "type": "string" },
+            "verificationRecommended": { "type": "boolean" }
+        },
+        "required": [
+            "changes",
+            "decisions",
+            "recommendedActions",
+            "risks",
+            "ambiguities",
+            "evidenceLinks",
+            "confidence",
+            "verificationRecommended"
+        ],
+        "additionalProperties": false
+    })
+}
+
+pub fn rewrite_json_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "text": { "type": "string", "minLength": 1 }
+        },
+        "required": ["text"],
+        "additionalProperties": false
+    })
+}
+
+pub fn assist_facts_json_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "facts": { "type": "array", "maxItems": 24, "items": { "type": "object" } },
+            "ambiguities": { "type": "array", "items": { "type": "string" } },
+            "clarificationQuestions": { "type": "array", "items": { "type": "string" } },
+            "confidence": { "type": "number" }
+        },
+        "required": ["facts", "ambiguities", "clarificationQuestions", "confidence"],
+        "additionalProperties": false
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn summary_rejects_too_many_bullets() {
@@ -1054,6 +1148,42 @@ mod tests {
     fn translation_rejects_oversized_text() {
         let s = "x".repeat(MAX_TRANSLATION_TEXT_CHARS + 1);
         assert!(validate_translation_llm_shape(&s, &[], None).is_err());
+    }
+
+    #[test]
+    fn action_brief_schema_max_items_match_limits() {
+        use rustymail_domain::ActionBriefMode;
+        for mode in [
+            ActionBriefMode::Quick,
+            ActionBriefMode::Decision,
+            ActionBriefMode::Deep,
+        ] {
+            let lim = action_brief_schema_limits(mode);
+            let schema = action_brief_json_schema(mode);
+            let props = schema
+                .get("properties")
+                .and_then(|p| p.as_object())
+                .unwrap();
+            assert_eq!(
+                props["changes"]["maxItems"].as_u64().unwrap() as usize,
+                lim.changes
+            );
+            assert_eq!(
+                props["recommendedActions"]["maxItems"].as_u64().unwrap() as usize,
+                lim.actions
+            );
+        }
+    }
+
+    #[test]
+    fn rewrite_schema_requires_text() {
+        let s = rewrite_json_schema();
+        assert_eq!(s["required"], json!(["text"]));
+    }
+
+    #[test]
+    fn assist_facts_schema_is_object() {
+        assert_eq!(assist_facts_json_schema()["type"], "object");
     }
 
     #[test]

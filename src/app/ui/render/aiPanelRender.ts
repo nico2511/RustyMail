@@ -117,7 +117,7 @@ function renderAgentTelemetryHtml(session: NonNullable<typeof state.agentSession
   return `<details class="agent-panel__telemetry" open><summary>Exécution</summary><ul>${rows}</ul></details>`;
 }
 
-function renderAgentPrepareReplyPanelHtml(): string {
+export function renderAgentPrepareReplyPanelHtml(): string {
   const s = state.agentSession;
   if (!s || !renderDeps().threadIdsMatch(s.threadId, state.selectedThreadId)) return "";
   const stepLabel = renderDeps().agentStepProgressLabel(s);
@@ -135,7 +135,7 @@ function renderAgentPrepareReplyPanelHtml(): string {
     : "";
   const factsBlock =
     s.facts?.facts?.length ?
-      `<ul class="agent-panel__facts">${s.facts.facts
+      `${s.facts.outputPartial ? `<p class="agent-warn dim">Extraction partielle</p>` : ""}<ul class="agent-panel__facts">${s.facts.facts
         .slice(0, 8)
         .map((f) => `<li><span class="dim">${escapeHtml(f.kind)}</span> ${escapeHtml(f.text)}</li>`)
         .join("")}</ul>`

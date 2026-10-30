@@ -7,7 +7,6 @@ import {
   listMailboxForPanel,
 } from "./mailboxPanelContext";
 import { loadMailView } from "./mailListMailboxLoadRun";
-import { loadInboxFilterCounts } from "./mailListSidebarRun";
 import { loadThreadsForSearchContext } from "./mailListSearchContextRun";
 import { requireMailListDeps } from "./mailListViewContext";
 
@@ -30,6 +29,7 @@ export async function reloadCurrentThreadList(append = false): Promise<void> {
 
 export async function applyListFilter(next: typeof state.listFilter): Promise<void> {
   const deps = requireMailListDeps();
+  const prevFilter = state.listFilter;
   state.listFilter = next;
   state.searchNewsletterRule = null;
   if (state.view !== "folderManager") {
@@ -40,13 +40,13 @@ export async function applyListFilter(next: typeof state.listFilter): Promise<vo
     render();
     return;
   }
+  render();
   if (!isSavedDraftsVirtualMailbox(mb) && isTauriRuntime()) {
+    const starredChanged = (prevFilter === "starred") !== (next === "starred");
     if (deps.isSearchActive()) {
       await deps.searchThreads();
-    } else {
+    } else if (starredChanged) {
       await loadMailView(false);
     }
-    void loadInboxFilterCounts();
   }
-  render();
 }
