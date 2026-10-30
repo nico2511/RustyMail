@@ -4226,16 +4226,11 @@ mod inbox_filter_counts_parity_tests {
         let mut lite_focused = 0usize;
         let mut lite_auto = 0usize;
         for (id, subject, tags, followed) in rows {
-            let legacy = build_thread_from_row(&conn, id.clone(), subject.clone(), tags.clone(), followed)
-                .expect("legacy");
-            let lite = build_thread_from_row_for_filter_counts(
-                &conn,
-                id,
-                subject,
-                tags,
-                followed,
-            )
-            .expect("lite");
+            let legacy =
+                build_thread_from_row(&conn, id.clone(), subject.clone(), tags.clone(), followed)
+                    .expect("legacy");
+            let lite = build_thread_from_row_for_filter_counts(&conn, id, subject, tags, followed)
+                .expect("lite");
             if newsletter::thread_blocks_reply(&legacy, &account_emails, &rules) {
                 legacy_auto += 1;
             } else {
