@@ -96,7 +96,8 @@ fn version_backup_sibling_exists(path: &Path) -> bool {
 
 #[cfg(not(test))]
 fn db_keyring_entry() -> Result<keyring_core::Entry, String> {
-    keyring::use_native_store(false).map_err(|e| format!("keyring native store failed: {e}"))?;
+    crate::keyring_store::use_native_store()
+        .map_err(|e| format!("keyring native store failed: {e}"))?;
     keyring_core::Entry::new(KEYRING_SERVICE, DB_KEYRING_USER)
         .map_err(|e| format!("keyring db key entry failed: {e}"))
 }

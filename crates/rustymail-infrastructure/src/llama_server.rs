@@ -3,7 +3,7 @@
 pub const LLAMA_SERVER_KEYRING_USERNAME: &str = "__rustymail_llama_server__";
 
 pub fn llama_server_api_key_get() -> Result<Option<String>, String> {
-    keyring::use_native_store(false).map_err(|e| format!("keyring: {e}"))?;
+    crate::keyring_store::use_native_store().map_err(|e| format!("keyring: {e}"))?;
     let entry = keyring_core::Entry::new(crate::KEYRING_SERVICE, LLAMA_SERVER_KEYRING_USERNAME)
         .map_err(|e| format!("keyring entry: {e}"))?;
     match entry.get_password() {
@@ -15,7 +15,7 @@ pub fn llama_server_api_key_get() -> Result<Option<String>, String> {
 }
 
 pub fn llama_server_api_key_set(secret: &str) -> Result<(), String> {
-    keyring::use_native_store(false).map_err(|e| format!("keyring: {e}"))?;
+    crate::keyring_store::use_native_store().map_err(|e| format!("keyring: {e}"))?;
     let entry = keyring_core::Entry::new(crate::KEYRING_SERVICE, LLAMA_SERVER_KEYRING_USERNAME)
         .map_err(|e| format!("keyring entry: {e}"))?;
     entry
@@ -24,7 +24,7 @@ pub fn llama_server_api_key_set(secret: &str) -> Result<(), String> {
 }
 
 pub fn llama_server_api_key_clear() {
-    let Ok(_) = keyring::use_native_store(false) else {
+    let Ok(_) = crate::keyring_store::use_native_store() else {
         return;
     };
     let Ok(entry) = keyring_core::Entry::new(crate::KEYRING_SERVICE, LLAMA_SERVER_KEYRING_USERNAME)

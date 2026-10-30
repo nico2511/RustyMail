@@ -22,6 +22,7 @@ mod eml_preview;
 mod folder_ops;
 mod imap;
 mod imap_tombstones;
+mod keyring_store;
 mod inline_compose_images;
 mod lang_detect;
 mod mail_autoconfig;
@@ -251,7 +252,7 @@ pub use oauth_mail::{
 };
 
 pub fn get_account_password(account_id: &str) -> Result<String, String> {
-    keyring::use_native_store(false)
+    crate::keyring_store::use_native_store()
         .map_err(|error| format!("keyring native store failed: {error}"))?;
     let entry = keyring_core::Entry::new(KEYRING_SERVICE, account_id)
         .map_err(|error| format!("keyring entry failed: {error}"))?;
@@ -1999,7 +2000,7 @@ pub(crate) fn upsert_account_row(
 }
 
 pub(crate) fn set_keyring_password(account_id: &str, password: &str) -> Result<(), String> {
-    keyring::use_native_store(false)
+    crate::keyring_store::use_native_store()
         .map_err(|error| format!("keyring native store failed: {error}"))?;
     let entry = keyring_core::Entry::new(KEYRING_SERVICE, account_id)
         .map_err(|error| format!("keyring entry failed: {error}"))?;
@@ -2010,7 +2011,7 @@ pub(crate) fn set_keyring_password(account_id: &str, password: &str) -> Result<(
 
 /// Supprime une entrée keyring si elle existe ; les erreurs « absent » sont ignorées.
 fn forget_keyring_entry(account_id: &str) {
-    let Ok(_) = keyring::use_native_store(false) else {
+    let Ok(_) = crate::keyring_store::use_native_store() else {
         return;
     };
     let Ok(entry) = keyring_core::Entry::new(KEYRING_SERVICE, account_id) else {
