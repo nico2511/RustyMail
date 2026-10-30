@@ -13,9 +13,9 @@ pub(crate) fn use_native_store() -> keyring_core::Result<()> {
         apple_native_keyring_store::keychain::Store::new_with_configuration(&config)?,
     );
     #[cfg(target_os = "linux")]
-    keyring_core::set_default_store(
-        linux_keyutils_keyring_store::Store::new_with_configuration(&config)?,
-    );
+    keyring_core::set_default_store(linux_keyutils_keyring_store::Store::new_with_configuration(
+        &config,
+    )?);
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         let _ = &config;

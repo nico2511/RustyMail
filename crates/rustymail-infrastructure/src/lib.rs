@@ -22,8 +22,8 @@ mod eml_preview;
 mod folder_ops;
 mod imap;
 mod imap_tombstones;
-mod keyring_store;
 mod inline_compose_images;
+mod keyring_store;
 mod lang_detect;
 mod mail_autoconfig;
 mod mail_classify;
@@ -1086,16 +1086,22 @@ pub fn sqlite_mailbox_inbox_filter_counts(
         .map_err(|e| e.to_string())?;
     let mut focused = 0usize;
     let mut auto = 0usize;
+    let t_focused = std::time::Instant::now();
     for row in rows {
         let (id, subject, tags, followed) = row.map_err(|e| e.to_string())?;
-        let thread = build_thread_from_row(&connection, id, subject, tags, followed)
-            .map_err(|e| e.to_string())?;
+        let thread =
+            build_thread_from_row_for_filter_counts(&connection, id, subject, tags, followed)
+                .map_err(|e| e.to_string())?;
         if newsletter::thread_blocks_reply(&thread, &account_emails, &rules) {
             auto += 1;
         } else {
             focused += 1;
         }
     }
+    log::debug!(
+        "mailbox_inbox_filter_counts focused_auto_ms={}",
+        t_focused.elapsed().as_millis()
+    );
 
     Ok(MailboxInboxFilterCounts {
         all,
@@ -2587,8 +2593,9 @@ fn security_from_str(value: &str) -> SecurityMode {
 }
 
 fn seed_if_empty(connection: &Connection) -> Result<(), rusqlite::Error> {
-    let count: i64 = connection.query_row("SELECT COUNT(*) FROM threads", [], |row| row.get(0))?;
-    if count > 0 {
+    let count: i64 =
+        connection.query_row("SELECT EXISTS(SELECT 1 FROM threads)", [], |row| row.get(0))?;
+    if count != 0 {
         return Ok(());
     }
 
@@ -2741,6 +2748,57 @@ fn build_thread_from_row_for_list(
         messages: load_messages_for_list(connection, &id)?,
         followed,
     })
+}
+
+fn build_thread_from_row_for_filter_counts(
+    connection: &Connection,
+    id: String,
+    subject: String,
+    tags: String,
+    followed: bool,
+) -> Result<Thread, rusqlite::Error> {
+    Ok(Thread {
+        id: ThreadId(id.clone()),
+        subject,
+        tags: parse_tags(&tags),
+        entities: Vec::new(),
+        messages: load_messages_for_inbox_filter_counts(connection, &id)?,
+        followed,
+    })
+}
+
+fn load_messages_for_inbox_filter_counts(
+    connection: &Connection,
+    thread_id: &str,
+) -> Result<Vec<rustymail_domain::Message>, rusqlite::Error> {
+    let mut statement = connection.prepare(
+        "
+        SELECT id, sender_email, received_at, message_id_header, imap_uid
+        FROM messages
+        WHERE thread_id = ?1
+        ORDER BY received_at ASC, position ASC, id ASC
+        ",
+    )?;
+    let pairs: Vec<(rustymail_domain::Message, Option<i64>)> = statement
+        .query_map(params![thread_id], |row| {
+            let imap_uid: Option<i64> = row.get(4)?;
+            let mut msg = message(
+                &row.get::<_, String>(0)?,
+                "",
+                &row.get::<_, String>(1)?,
+                "",
+                &row.get::<_, String>(2)?,
+                "",
+                true,
+            );
+            msg.references.message_id_header = row.get(3)?;
+            msg.recipients.clear();
+            msg.html_body = None;
+            msg.attachments.clear();
+            Ok((msg, imap_uid))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(dedupe_messages_by_message_id_header(pairs))
 }
 
 fn attachment_count_for_thread(
