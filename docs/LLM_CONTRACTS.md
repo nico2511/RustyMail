@@ -1,6 +1,14 @@
 # LLM JSON contracts
 
-Single business flow per feature: prompt → generation → JSON → **Rust validation** → domain. **GBNF** is an accelerator on llama-server only; OpenRouter and Ollama have no grammar constraint.
+Single business flow per feature: prompt → generation → JSON → **Rust validation** → domain. **GBNF** is an accelerator on llama-server only. **Ollama** accepts an optional JSON Schema in `format` when the caller sets `LlmGenParams.json_schema`, with a single fallback to `"json"` if the server rejects the schema. OpenRouter has no grammar constraint.
+
+## Schémas Ollama (`format` JSON Schema)
+
+| Feature | Schéma | Repli si erreur `format` / schéma |
+| ------- | ------ | ----------------------------------- |
+| Brief d’action (Quick / Decision / Deep) | `ai_llm_contracts::action_brief_json_schema(mode)` | `"json"` puis parse + validation Rust |
+| Réécriture | `ai_llm_contracts::rewrite_json_schema()` | `"json"` |
+| Assist — faits fil | `ai_llm_contracts::assist_facts_json_schema()` | `"json"` ; JSON réparé → `outputPartial`, confiance ≤ 0,45 |
 
 ## Layers
 

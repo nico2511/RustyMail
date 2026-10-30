@@ -3,8 +3,9 @@
 use serde::Deserialize;
 
 use crate::ai_agent_prepare_reply::AgentIntentResult;
+use crate::ai_llm_contracts::assist_facts_json_schema;
 use crate::ai_llm_util::{
-    fit_fil_context_user, generate_fil_json, parse_model_json, truncate_chars,
+    fit_fil_context_user, generate_fil_json_ex, parse_model_json, truncate_chars,
     untrusted_mail_for_engine,
 };
 use rustymail_domain::{AssistFact, AssistFactsSnapshot, AssistUserPrefs};
@@ -127,7 +128,7 @@ pub fn extract_facts_with_llm(
         })
         .unwrap_or_default();
     let system = crate::prompts::system_prompt_for_language("assist_facts", lang);
-    let dto: FactsDto = generate_fil_json(
+    let (dto, json_repaired): (FactsDto, bool) = generate_fil_json_ex(
         engine,
         system.as_str(),
         thread_context,
@@ -137,6 +138,7 @@ pub fn extract_facts_with_llm(
         24_000,
         768,
         4096,
+        Some(assist_facts_json_schema()),
     )?;
     let ctx = truncate_chars(thread_context, 24_000);
     let facts = sanitize_facts(dto.facts, &ctx);
@@ -149,11 +151,16 @@ pub fn extract_facts_with_llm(
             .take(3)
             .collect();
     }
-    let confidence = dto.confidence.clamp(0.0, 1.0);
+    let mut confidence = dto.confidence.clamp(0.0, 1.0);
+    let output_partial = json_repaired;
+    if output_partial {
+        confidence = confidence.min(0.45);
+    }
     let snapshot = AssistFactsSnapshot {
         facts,
         ambiguities,
         confidence,
+        output_partial,
     };
     Ok(ExtractFactsOutput {
         snapshot,
@@ -506,6 +513,7 @@ mod tests {
             facts: vec![f],
             ambiguities: vec![],
             confidence: 0.9,
+            output_partial: false,
         }
     }
 

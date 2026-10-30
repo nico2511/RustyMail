@@ -1,6 +1,8 @@
 use serde::Deserialize;
 
-use crate::ai_llm_contracts::{introduces_llm_meta, validate_rewrite_llm_shape};
+use crate::ai_llm_contracts::{
+    introduces_llm_meta, rewrite_json_schema, validate_rewrite_llm_shape,
+};
 use crate::ai_llm_util::{
     budget_report, gen_params_json_echo_for_prompt, parse_model_json, truncate_chars,
     untrusted_mail_for_engine,
@@ -24,11 +26,9 @@ fn rewrite_once(
     source: &str,
     clipped: &str,
 ) -> Result<String, LlmError> {
-    let raw = engine.generate(
-        system,
-        user,
-        &gen_params_json_echo_for_prompt(engine, system, user, clipped, 512, 8192),
-    )?;
+    let mut params = gen_params_json_echo_for_prompt(engine, system, user, clipped, 512, 8192);
+    params.json_schema = Some(rewrite_json_schema());
+    let raw = engine.generate(system, user, &params)?;
     let dto: RewriteDto = parse_model_json(&raw)?;
     let text = dto.text.trim().to_string();
     validate_rewrite_llm_shape(&text)?;

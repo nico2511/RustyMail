@@ -4641,6 +4641,7 @@ dependencies = [
 name = "rustymail-llm"
 version = "0.4.11"
 dependencies = [
+ "log",
  "regex",
  "reqwest 0.12.28",
  "serde",

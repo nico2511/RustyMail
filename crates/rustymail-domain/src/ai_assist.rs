@@ -100,13 +100,17 @@ impl AssistFact {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AssistFactsSnapshot {
+    #[serde(default)]
     pub facts: Vec<AssistFact>,
     #[serde(default)]
     pub ambiguities: Vec<String>,
+    #[serde(default)]
     pub confidence: f32,
+    #[serde(default)]
+    pub output_partial: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]

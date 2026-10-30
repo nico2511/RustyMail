@@ -126,7 +126,31 @@ fn grammar_for_kind<'a>(
     }
 }
 
-#[derive(Debug)]
+fn ollama_format_for_params(p: &LlmGenParams) -> Option<serde_json::Value> {
+    if let Some(schema) = &p.json_schema {
+        return Some(schema.clone());
+    }
+    if p.expect_json {
+        return Some(json!("json"));
+    }
+    None
+}
+
+fn ollama_format_error_retryable(status: StatusCode, body: &str) -> bool {
+    if status != StatusCode::BAD_REQUEST && !status.is_server_error() {
+        return false;
+    }
+    let b = body.to_ascii_lowercase();
+    b.contains("format") || b.contains("schema")
+}
+
+fn ollama_json_only_params(p: &LlmGenParams) -> LlmGenParams {
+    let mut fallback = p.clone();
+    fallback.json_schema = None;
+    fallback.expect_json = true;
+    fallback
+}
+
 pub struct HttpChatEngine {
     client: reqwest::blocking::Client,
     api_key: String,
@@ -583,8 +607,8 @@ impl HttpChatEngine {
             "options": options,
         });
         body["keep_alive"] = ollama_keep_alive_json(&self.keep_alive);
-        if p.expect_json {
-            body["format"] = json!("json");
+        if let Some(fmt) = ollama_format_for_params(p) {
+            body["format"] = fmt;
         }
         body
     }
@@ -687,6 +711,28 @@ impl HttpChatEngine {
                     continue;
                 }
                 return Err(self.loading_exhausted_err(last_loading_hint.as_deref()));
+            }
+            if self.kind == HttpChatBackendKind::Ollama
+                && p.json_schema.is_some()
+                && ollama_format_error_retryable(status, &txt)
+            {
+                log::warn!("Ollama : repli format \"json\" après erreur de schéma");
+                let fallback_body =
+                    self.ollama_native_body(system, user, &ollama_json_only_params(p), false);
+                let req = self.client.post(self.url()).json(&fallback_body);
+                let resp = self
+                    .apply_auth(req)
+                    .send()
+                    .map_err(|e| self.map_transport_err("LLM HTTP", e))?;
+                let status2 = resp.status();
+                if status2.is_success() {
+                    let raw_body = resp
+                        .text()
+                        .map_err(|e| self.map_transport_err("LLM HTTP", e))?;
+                    return completion_text_from_body(&raw_body);
+                }
+                let txt2 = resp.text().unwrap_or_default();
+                return Err(self.http_status_err(status2, &txt2));
             }
             return Err(self.http_status_err(status, &txt));
         }
@@ -1361,5 +1407,51 @@ mod grammar_tests {
         assert!(body.get("keep_alive").is_none());
         assert!(body.get("options").is_none());
         assert!(body.get("max_tokens").is_some());
+    }
+
+    #[test]
+    fn ollama_format_for_params_schema_overrides_expect_json() {
+        let schema = json!({"type":"object"});
+        let p = LlmGenParams {
+            expect_json: true,
+            json_schema: Some(schema.clone()),
+            ..Default::default()
+        };
+        assert_eq!(super::ollama_format_for_params(&p), Some(schema));
+        let p2 = LlmGenParams {
+            expect_json: true,
+            ..Default::default()
+        };
+        assert_eq!(super::ollama_format_for_params(&p2), Some(json!("json")));
+        assert!(super::ollama_format_for_params(&LlmGenParams::default()).is_none());
+    }
+
+    #[test]
+    fn ollama_format_error_retryable_detects_schema_errors() {
+        use reqwest::StatusCode;
+        assert!(super::ollama_format_error_retryable(
+            StatusCode::BAD_REQUEST,
+            "invalid format schema"
+        ));
+        assert!(!super::ollama_format_error_retryable(
+            StatusCode::BAD_REQUEST,
+            "context length exceeded"
+        ));
+    }
+
+    #[test]
+    fn llm_gen_params_without_schema_serializes_like_before() {
+        let p = LlmGenParams {
+            max_tokens: 100,
+            temperature: 0.2,
+            top_p: 0.9,
+            stop: vec!["x".into()],
+            grammar_gbnf: None,
+            expect_json: true,
+            json_schema: None,
+        };
+        let v = serde_json::to_value(&p).expect("json");
+        assert!(v.get("json_schema").is_none());
+        assert_eq!(v["expect_json"], true);
     }
 }
