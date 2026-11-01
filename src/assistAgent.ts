@@ -1,4 +1,5 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { userTimeZone } from "./app/lib/timeZone";
 import { t } from "./i18n";
 
 export type AssistMode = "quick" | "deep" | "strictSafe";
@@ -54,10 +55,17 @@ export type AssistFactsSnapshot = {
   outputPartial?: boolean;
 };
 
+export type AssistSlot = {
+  start: string;
+  end: string;
+  timezone: string;
+};
+
 export type AssistRecommendation = {
   kind: string;
   label: string;
   detail?: string;
+  messageIds?: string[];
 };
 
 export type AssistResult = {
@@ -71,6 +79,7 @@ export type AssistResult = {
   executedSkills?: string[];
   intent?: AssistIntentSnapshot;
   slots?: string[];
+  slotRanges?: AssistSlot[];
   facts?: AssistFactsSnapshot;
   consistencyIssues?: string[];
   /** Consigne de réécriture (ex. inversion de rôle détectée). */
@@ -86,6 +95,7 @@ export type AssistThreadPayload = {
   accountId: string;
   assistMode: AssistMode;
   enabledSkills: string[];
+  userPrefs?: { timezone?: string; tone?: string };
 };
 
 const SKILL_TO_API: Record<AssistSkillId, string> = {
@@ -143,6 +153,7 @@ export function buildAssistPayload(
     accountId,
     assistMode,
     enabledSkills,
+    userPrefs: { timezone: userTimeZone() },
   };
 }
 

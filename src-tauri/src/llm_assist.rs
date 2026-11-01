@@ -43,18 +43,8 @@ fn assist_request_from_payload(
 ) -> AssistRequest {
     let lang = prefs.ai.draft_language.trim();
     let lang = if lang.is_empty() { "fr" } else { lang };
-    let tone = payload
-        .user_prefs
-        .as_ref()
-        .map(|p| p.tone.trim())
-        .filter(|t| !t.is_empty())
-        .unwrap_or("neutre");
-    let timezone = payload
-        .user_prefs
-        .as_ref()
-        .map(|p| p.timezone.trim())
-        .filter(|t| !t.is_empty())
-        .unwrap_or("Europe/Paris");
+    let (tone, timezone) =
+        crate::ipc_guard::normalize_assist_user_prefs(payload.user_prefs.as_ref());
     AssistRequest {
         schema_version: payload.schema_version,
         thread_id: payload.thread_id.clone(),
@@ -334,4 +324,52 @@ pub fn assist_thread_context_with_engine(
     let view = open_thread_domain(&paths.db_path, thread_id.trim())?;
     let owner = transcript_owner_for_account(&paths.db_path, account_id);
     Ok(assist_thread_context(&view, engine, &owner))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustymail_infrastructure::AppPrefs;
+
+    fn sample_prefs() -> AppPrefs {
+        serde_json::from_str(r#"{"ai":{"draftLanguage":"fr"}}"#).unwrap_or_default()
+    }
+
+    #[test]
+    fn assist_request_normalizes_user_prefs() {
+        let payload = LlmAssistThreadPayload {
+            schema_version: 3,
+            thread_id: "t1".into(),
+            account_id: "user@example.com".into(),
+            assist_mode: AssistMode::Deep,
+            enabled_skills: vec![],
+            user_prefs: None,
+        };
+        let req = assist_request_from_payload(&payload, &sample_prefs());
+        assert_eq!(req.user_prefs.timezone, "Europe/Paris");
+        assert_eq!(req.user_prefs.tone, "neutre");
+
+        let payload = LlmAssistThreadPayload {
+            user_prefs: Some(AssistUserPrefs {
+                lang: "en".into(),
+                tone: " chaleureux ".into(),
+                timezone: "America/Toronto".into(),
+            }),
+            ..payload
+        };
+        let req = assist_request_from_payload(&payload, &sample_prefs());
+        assert_eq!(req.user_prefs.timezone, "America/Toronto");
+        assert_eq!(req.user_prefs.tone, "chaleureux");
+
+        let payload = LlmAssistThreadPayload {
+            user_prefs: Some(AssistUserPrefs {
+                lang: "fr".into(),
+                tone: "ok".into(),
+                timezone: "evil\nInject".into(),
+            }),
+            ..payload
+        };
+        let req = assist_request_from_payload(&payload, &sample_prefs());
+        assert_eq!(req.user_prefs.timezone, "Europe/Paris");
+    }
 }

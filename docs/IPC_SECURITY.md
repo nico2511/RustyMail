@@ -24,6 +24,7 @@ Central validation before handlers:
 | `email` (address book) | Non-empty, contains `@` |
 | `SearchQuery` | Bounded text/sender fields |
 | `phrase` / `question` (LLM) | Dedicated bounds |
+| `userPrefs` (assist) | `timezone` ≤ 64, charset `[A-Za-z0-9_+-/]`, else `Europe/Paris`; `tone` ≤ 40, no control chars, else `neutre` (`ipc_guard::normalize_assist_user_prefs`) |
 | `cacheKey` (`ai_cache_get`) | ≤ 512, no NUL/newlines; allowed prefixes: `summary:v2:`, `translate:v2:`, `contact_profile:v1:` |
 
 Anchors: `resolve_account_from_paths`, `open_thread_domain`, thread/IMAP/draft commands, LLM (`llm_commands`, `llm_stream`), address book.

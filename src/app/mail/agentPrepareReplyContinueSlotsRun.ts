@@ -8,6 +8,7 @@ import { state } from "../state";
 import { agentAssistPhasePayload } from "./agentAssistSessionHelpers";
 import { agentRefreshPlanFromDraft } from "./agentPrepareReplyPipelineRun";
 import { withLlmQueue } from "./llmJobQueue";
+import { formatAssistSlotLabel } from "./agentSchedulingDraftFormat";
 import { agentOfferSlotsStep } from "./threadAiStreamDom";
 
 export async function agentPrepareReplyContinueFromDraftReply(): Promise<boolean> {
@@ -35,7 +36,15 @@ export async function agentPrepareReplyContinueFromDraftReply(): Promise<boolean
         }),
       );
       if (signal.aborted || !state.agentSession) return;
-      state.agentSession.slots = res.slots ?? res.recommendations?.map((r) => r.label) ?? [];
+      const locale = state.appPrefs.ai.draftLanguage?.trim() || "fr";
+      const fromRanges =
+        res.slotRanges?.length ?
+          res.slotRanges.map((sl) => formatAssistSlotLabel(sl, locale)).filter(Boolean)
+        : [];
+      state.agentSession.slots =
+        fromRanges.length ?
+          (fromRanges as string[])
+        : (res.slots ?? res.recommendations?.map((r) => r.label) ?? []);
       state.agentSession.plan = res.plan ?? state.agentSession.plan;
       state.agentSession.busy = false;
     } catch (e) {
