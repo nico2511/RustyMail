@@ -9,6 +9,8 @@ Single business flow per feature: prompt → generation → JSON → **Rust vali
 | Brief d’action (Quick / Decision / Deep) | `ai_llm_contracts::action_brief_json_schema(mode)` | `"json"` puis parse + validation Rust |
 | Réécriture | `ai_llm_contracts::rewrite_json_schema()` | `"json"` |
 | Assist — faits fil | `ai_llm_contracts::assist_facts_json_schema()` | `"json"` ; JSON réparé → `outputPartial`, confiance ≤ 0,45 |
+| Agent — créneaux | `ai_llm_contracts::agent_slots_json_schema()` | `"json"` ; parse tolérant (ancien tableau de chaînes). Contrat canonique : `start`/`end` en heure locale (`YYYY-MM-DDTHH:MM`) + `timezone` IANA côté domaine |
+| Assist — actions | `ai_llm_contracts::assist_actions_json_schema()` | `"json"`. `messageIds` filtrés par égalité exacte sur les en-têtes `[message_id=…]` du transcript ; sur moteur cloud les ids sont masqués par la redaction, les actions sont alors non ancrées (« à vérifier ») |
 
 ## Layers
 
@@ -33,7 +35,7 @@ Single business flow per feature: prompt → generation → JSON → **Rust vali
 | `SUMMARY_THREAD_JSON_GBNF` | `{ title, bullets[], sourceMessageIds[] }` |
 | `TRANSLATION_PLAIN_JSON_GBNF` | `{ translatedText, preservedEntityIds[], detectedSourceLang }` |
 | `QA_THREAD_JSON_GBNF` | `{ answer, evidenceMessageIds[] }` |
-| `SECURITY_FINDINGS_GBNF` (`mail_security`) | `{ findings[{ code, severity, messageFr }] }` — max 3 findings enforced post-parse |
+| `SECURITY_FINDINGS_GBNF` (`mail_security`) | `{ findings[{ code, severity, message }] }` — max 3 findings enforced post-parse ; alias `messageFr` accepté au parse ; sortie dans `output_language` ; contrat IPC `MailSecurityFinding.messageFr` inchangé |
 | `ORG_ORIENTATION_JSON_GBNF` | `{ diagnosis, recommendations[], actions[{ title, rationale, threadIds[], searchKeywords[], suggestedAction, targetMailbox }] }` — `suggestedAction` ∈ `archive` \| `move` \| `trash` \| `markRead` \| `deleteMailbox` ; alias normalisés, action inconnue ignorée (`validate_org_orientation_shape`) |
 
 ## Untrusted mail in prompts
