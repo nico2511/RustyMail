@@ -3,28 +3,55 @@
 use serde::Deserialize;
 
 use crate::ai_agent_prepare_reply::AgentIntentResult;
-use crate::ai_llm_contracts::ensure_mail_body_output;
+use crate::ai_assist_thread::transcript_message_ids;
+use crate::ai_llm_contracts::{assist_actions_json_schema, ensure_mail_body_output};
 use crate::ai_llm_util::{
-    gen_params_text_echo_for_prompt, generate_fil_json, parse_model_json, truncate_chars,
+    gen_params_text_echo_for_prompt, generate_fil_json_ex, parse_model_json, truncate_chars,
     untrusted_mail_for_engine,
 };
 use rustymail_domain::{AssistRecommendation, AssistUserPrefs, MailSecuritySeverity};
 use rustymail_llm::{LlmEngine, LlmError};
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ActionItemsDto {
     #[serde(default)]
     actions: Vec<ActionIn>,
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ActionIn {
     #[serde(default)]
     text: String,
     #[serde(default)]
     owner: String,
-    #[serde(default)]
+    #[serde(default, alias = "due_hint")]
     due_hint: String,
+    #[serde(default)]
+    message_ids: Option<Vec<String>>,
+}
+
+fn filter_message_ids(raw: Option<Vec<String>>, transcript: &str) -> Vec<String> {
+    let allowed = transcript_message_ids(transcript);
+    let mut out = Vec::new();
+    for id in raw.into_iter().flatten() {
+        let t = id.trim();
+        if t.is_empty() || t == "[REDACTED_ID]" {
+            continue;
+        }
+        if !allowed.contains(t) {
+            continue;
+        }
+        if out.iter().any(|x: &String| x == t) {
+            continue;
+        }
+        out.push(t.to_string());
+        if out.len() >= 3 {
+            break;
+        }
+    }
+    out
 }
 
 /// Extrait actions / tâches du fil.
@@ -41,7 +68,7 @@ pub fn extract_action_items_with_llm(
         .unwrap_or_default();
     let system = crate::prompts::system_prompt_for_language("assist_actions", lang);
     // Light tier ≈ 512–4096 ; calage pour éviter max_tokens=1 sur fils longs.
-    let dto: ActionItemsDto = generate_fil_json(
+    let dto: ActionItemsDto = generate_fil_json_ex(
         engine,
         system.as_str(),
         thread_context,
@@ -51,7 +78,9 @@ pub fn extract_action_items_with_llm(
         20_000,
         512,
         4096,
-    )?;
+        Some(assist_actions_json_schema()),
+    )?
+    .0;
     let mut out = Vec::new();
     for a in dto.actions.into_iter().take(6) {
         let text = a.text.trim();
@@ -68,6 +97,7 @@ pub fn extract_action_items_with_llm(
             kind: "action".into(),
             label: text.to_string(),
             detail,
+            message_ids: filter_message_ids(a.message_ids, thread_context),
         });
     }
     Ok(out)
@@ -157,5 +187,30 @@ mod tests {
         );
         assert!(flags.iter().any(|f| f.contains("phishing_hint")));
         assert!(flags.iter().any(|f| f.contains("thread_security")));
+    }
+
+    #[test]
+    fn action_dto_reads_due_hint_camel_and_snake() {
+        let a: ActionIn =
+            serde_json::from_str(r#"{"text":"T","owner":"me","dueHint":"demain"}"#).unwrap();
+        assert_eq!(a.due_hint, "demain");
+        let b: ActionIn = serde_json::from_str(r#"{"text":"T","due_hint":"lundi"}"#).unwrap();
+        assert_eq!(b.due_hint, "lundi");
+    }
+
+    #[test]
+    fn filter_message_ids_exact_match_only() {
+        let tx = "[message_id=m1] x\n[message_id=m10] y\n[message_id=ok] z";
+        assert!(filter_message_ids(Some(vec!["ok".into()]), tx).contains(&"ok".into()));
+        assert!(filter_message_ids(Some(vec!["m10".into()]), tx).contains(&"m10".into()));
+        assert!(filter_message_ids(Some(vec!["m1".into()]), "[message_id=m10] y").is_empty());
+        assert!(filter_message_ids(Some(vec!["[REDACTED_ID]".into()]), tx).is_empty());
+        assert!(filter_message_ids(Some(vec!["missing".into()]), tx).is_empty());
+    }
+
+    #[test]
+    fn action_null_message_ids_is_unanchored() {
+        let ids = filter_message_ids(None, "[message_id=a] x");
+        assert!(ids.is_empty());
     }
 }
