@@ -10,8 +10,20 @@ export const toneLabelsFr: Record<Tone, string> = {
   Empathetic: "Empathique",
 };
 
-export function composeRewriteStyleFromTone(): string {
-  switch (state.tone) {
+export type RewriteStyleName =
+  | "Neutral"
+  | "Formal"
+  | "Casual"
+  | "Concise"
+  | "Polite"
+  | "Assertive"
+  | "Apologetic";
+
+export const SHORTEN_REWRITE_STYLE: RewriteStyleName = "Concise";
+export const SHORTEN_LABEL_FR = "Raccourcir";
+
+export function rewriteStyleForTone(tone: string | null | undefined): RewriteStyleName {
+  switch (tone) {
     case "Professional":
       return "Formal";
     case "Casual":
@@ -23,6 +35,10 @@ export function composeRewriteStyleFromTone(): string {
     default:
       return "Neutral";
   }
+}
+
+export function composeRewriteStyleFromTone(): string {
+  return rewriteStyleForTone(state.tone);
 }
 
 /** Libellé français d’un style `llm_rewrite_compose` (Formal, Concise, …). */
@@ -43,4 +59,13 @@ export function rewriteStyleLabelFr(style: string): string {
     default:
       return "neutre";
   }
+}
+
+export function toneStyleMappingRows(): { label: string; style: RewriteStyleName }[] {
+  const rows = tones.map((t) => ({
+    label: toneLabelsFr[t],
+    style: rewriteStyleForTone(t),
+  }));
+  rows.push({ label: SHORTEN_LABEL_FR, style: SHORTEN_REWRITE_STYLE });
+  return rows;
 }

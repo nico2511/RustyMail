@@ -1133,10 +1133,64 @@ pub fn assist_facts_json_schema() -> Value {
     })
 }
 
+pub fn agent_slots_json_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "slots": {
+                "type": "array",
+                "maxItems": 5,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "start": { "type": "string" },
+                        "end": { "type": "string" }
+                    },
+                    "required": ["start", "end"],
+                    "additionalProperties": false
+                }
+            }
+        },
+        "required": ["slots"],
+        "additionalProperties": false
+    })
+}
+
+pub fn assist_actions_json_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "actions": {
+                "type": "array",
+                "maxItems": 6,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": { "type": "string" },
+                        "owner": { "type": "string" },
+                        "dueHint": { "type": "string" },
+                        "messageIds": { "type": "array", "items": { "type": "string" } }
+                    },
+                    "required": ["text"],
+                    "additionalProperties": false
+                }
+            }
+        },
+        "required": ["actions"],
+        "additionalProperties": false
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn agent_slots_schema_max_five_items() {
+        let s = agent_slots_json_schema();
+        assert_eq!(s["properties"]["slots"]["maxItems"], 5);
+    }
 
     #[test]
     fn summary_rejects_too_many_bullets() {

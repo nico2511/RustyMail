@@ -99,6 +99,7 @@
       "promptsReadOnly": "Read-only — custom editing coming later.",
       "promptsOutputLang": "User output language: {lang}",
       "promptsSkillsHeading": "Skills (reply assistant)",
+      "promptsToneMappingHeading": "Composer tones → rewrite styles",
       "promptsNoCatalog": "Catalog unavailable (run the Tauri app).",
       "promptsLoadError": "Could not load catalog: {error}"
     }

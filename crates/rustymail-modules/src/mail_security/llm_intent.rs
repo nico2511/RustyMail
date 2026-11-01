@@ -14,7 +14,7 @@ use rustymail_domain::{
 use rustymail_llm::{gen_params_with_grammar, LlmEngine, LlmError};
 
 const MAX_LLM_FINDING_CODE_LEN: usize = 64;
-const MAX_LLM_MESSAGE_FR_CHARS: usize = 512;
+const MAX_LLM_MESSAGE_CHARS: usize = 512;
 const MAX_LLM_FINDINGS: usize = 3;
 
 #[derive(Deserialize)]
@@ -29,7 +29,8 @@ struct LlmSecurityPack {
 struct LlmFindingIn {
     code: String,
     severity: MailSecurityFindingSeverity,
-    message_fr: String,
+    #[serde(alias = "messageFr")]
+    message: String,
 }
 
 fn findings_digest(fr: &[MailSecurityFinding]) -> String {
@@ -101,10 +102,10 @@ fn valid_llm_finding_code(code: &str) -> bool {
 
 fn valid_llm_finding_in(f: &LlmFindingIn) -> bool {
     let code = f.code.trim();
-    let message_fr = f.message_fr.trim();
+    let message = f.message.trim();
     valid_llm_finding_code(code)
-        && !message_fr.is_empty()
-        && message_fr.chars().count() <= MAX_LLM_MESSAGE_FR_CHARS
+        && !message.is_empty()
+        && message.chars().count() <= MAX_LLM_MESSAGE_CHARS
 }
 
 /// Validation structurelle + sémantique légère après désérialisation JSON.
@@ -126,8 +127,8 @@ fn normalize_msg(s: &str) -> String {
 }
 
 /// Rejette les reprises cosmétique des messages heuristiques déjà affichés.
-fn llm_message_adds_value(heuristic: &[MailSecurityFinding], message_fr: &str) -> bool {
-    let norm = normalize_msg(message_fr);
+fn llm_message_adds_value(heuristic: &[MailSecurityFinding], message: &str) -> bool {
+    let norm = normalize_msg(message);
     if norm.chars().count() < 12 {
         return false;
     }
@@ -159,15 +160,15 @@ fn sanitize_llm_findings(
             continue;
         }
         let code = f.code.trim();
-        let message_fr = f.message_fr.trim();
-        if !llm_message_adds_value(heuristic, message_fr) {
+        let message = f.message.trim();
+        if !llm_message_adds_value(heuristic, message) {
             continue;
         }
         out.push(MailSecurityFinding {
             kind: MailSecurityFindingKind::LlmIntent,
             code: code.to_string(),
             severity: f.severity,
-            message_fr: message_fr.to_string(),
+            message_fr: message.to_string(),
         });
     }
     out
@@ -326,7 +327,7 @@ mod tests {
                 .map(|i| LlmFindingIn {
                     code: format!("code_{i}"),
                     severity: MailSecurityFindingSeverity::Info,
-                    message_fr: "ok".into(),
+                    message: "ok".into(),
                 })
                 .collect(),
         };
@@ -339,7 +340,7 @@ mod tests {
             findings: vec![LlmFindingIn {
                 code: "BAD".into(),
                 severity: MailSecurityFindingSeverity::Info,
-                message_fr: "x".into(),
+                message: "x".into(),
             }],
         };
         assert!(!validate_security_pack(&pack));
@@ -347,12 +348,12 @@ mod tests {
 
     #[test]
     fn sanitize_drops_oversized_message() {
-        let long = "é".repeat(MAX_LLM_MESSAGE_FR_CHARS + 1);
+        let long = "é".repeat(MAX_LLM_MESSAGE_CHARS + 1);
         let kept = sanitize_llm_findings(
             vec![LlmFindingIn {
                 code: "test_code".into(),
                 severity: MailSecurityFindingSeverity::Info,
-                message_fr: long,
+                message: long,
             }],
             &[],
         );
@@ -366,7 +367,7 @@ mod tests {
             vec![LlmFindingIn {
                 code: "many_hyperlinks".into(),
                 severity: MailSecurityFindingSeverity::Attention,
-                message_fr: "Beaucoup de liens (heuristique).".into(),
+                message: "Beaucoup de liens (heuristique).".into(),
             }],
             &base.findings,
         );
@@ -380,11 +381,53 @@ mod tests {
             vec![LlmFindingIn {
                 code: "credential_ask".into(),
                 severity: MailSecurityFindingSeverity::Suspicion,
-                message_fr: "Demande explicite de mot de passe ou de code dans le corps.".into(),
+                message: "Demande explicite de mot de passe ou de code dans le corps.".into(),
             }],
             &base.findings,
         );
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].code, "credential_ask");
+    }
+
+    #[test]
+    fn parse_finding_with_message_key() {
+        let f: LlmFindingIn = serde_json::from_str(
+            r#"{"code":"urgency_pressure","severity":"attention","message":"Pression temporelle."}"#,
+        )
+        .unwrap();
+        assert_eq!(f.message, "Pression temporelle.");
+    }
+
+    #[test]
+    fn parse_finding_with_message_fr_alias() {
+        let f: LlmFindingIn = serde_json::from_str(
+            r#"{"code":"urgency_pressure","severity":"attention","messageFr":"Alias."}"#,
+        )
+        .unwrap();
+        assert_eq!(f.message, "Alias.");
+    }
+
+    #[test]
+    fn parse_finding_rejects_duplicate_message_keys() {
+        let parsed = serde_json::from_str::<LlmFindingIn>(
+            r#"{"code":"x","severity":"info","message":"a","messageFr":"b"}"#,
+        );
+        match parsed {
+            Err(e) => assert!(e.to_string().contains("duplicate")),
+            Ok(_) => panic!("expected duplicate field error"),
+        }
+    }
+
+    #[test]
+    fn security_gbnf_uses_message_key() {
+        assert!(SECURITY_FINDINGS_GBNF.contains("message"));
+        assert!(!SECURITY_FINDINGS_GBNF.contains("messageFr"));
+    }
+
+    #[test]
+    fn security_prompt_en_has_no_french_only_wording() {
+        let sys = crate::prompts::system_prompt_for_language("security_llm", "en");
+        assert!(!sys.contains("French"));
+        assert!(!sys.contains("messageFr"));
     }
 }

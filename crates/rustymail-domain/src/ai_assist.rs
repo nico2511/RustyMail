@@ -134,6 +134,33 @@ fn default_assist_timezone() -> String {
     "Europe/Paris".into()
 }
 
+/// Fuseau IANA pour l’assistant : trim, longueur et charset ; repli `Europe/Paris`.
+pub fn normalize_assist_timezone(raw: &str) -> String {
+    let t = raw.trim();
+    if t.is_empty() || t.len() > 64 {
+        return default_assist_timezone();
+    }
+    if !t
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '+' | '-' | '/'))
+    {
+        return default_assist_timezone();
+    }
+    t.to_string()
+}
+
+/// Ton utilisateur pour prompts assist : trim, longueur, sans caractères de contrôle ; repli `neutre`.
+pub fn normalize_assist_tone(raw: &str) -> String {
+    let t = raw.trim();
+    if t.is_empty() || t.len() > 40 {
+        return default_assist_tone();
+    }
+    if t.chars().any(|c| c.is_control()) {
+        return default_assist_tone();
+    }
+    t.to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AssistRequest {
@@ -180,11 +207,21 @@ pub struct AssistIntentSnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct AssistSlot {
+    pub start: String,
+    pub end: String,
+    pub timezone: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct AssistRecommendation {
     pub kind: String,
     pub label: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub detail: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub message_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -241,6 +278,8 @@ pub struct AssistResult {
     pub intent: Option<AssistIntentSnapshot>,
     #[serde(default)]
     pub slots: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub slot_ranges: Vec<AssistSlot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facts: Option<AssistFactsSnapshot>,
     #[serde(default)]
@@ -270,6 +309,7 @@ impl AssistResult {
             executed_skills: Vec::new(),
             intent: None,
             slots: Vec::new(),
+            slot_ranges: Vec::new(),
             facts: None,
             consistency_issues: Vec::new(),
             rewrite_guidance: None,
@@ -286,5 +326,40 @@ pub fn assist_clarification_threshold(mode: AssistMode) -> f32 {
         AssistMode::Quick => 0.0,
         AssistMode::Deep => 0.65,
         AssistMode::StrictSafe => 0.78,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_assist_timezone_valid_and_fallbacks() {
+        assert_eq!(
+            normalize_assist_timezone(" America/New_York "),
+            "America/New_York"
+        );
+        assert_eq!(normalize_assist_timezone(""), "Europe/Paris");
+        assert_eq!(
+            normalize_assist_timezone("Europe/Paris\nIgnore"),
+            "Europe/Paris"
+        );
+        assert_eq!(normalize_assist_timezone(&"x".repeat(65)), "Europe/Paris");
+        assert_eq!(normalize_assist_timezone("{x}"), "Europe/Paris");
+        assert_eq!(normalize_assist_timezone("Mars/Olympus"), "Mars/Olympus");
+    }
+
+    #[test]
+    fn normalize_assist_tone_valid_and_fallbacks() {
+        assert_eq!(normalize_assist_tone(" formel "), "formel");
+        assert_eq!(normalize_assist_tone(""), "neutre");
+        assert_eq!(normalize_assist_tone(&"a".repeat(41)), "neutre");
+        assert_eq!(normalize_assist_tone("a\u{0001}b"), "neutre");
+    }
+
+    #[test]
+    fn assist_result_default_slot_ranges_empty() {
+        let r = AssistResult::empty_v1();
+        assert!(r.slot_ranges.is_empty());
     }
 }

@@ -169,10 +169,16 @@ export function renderAgentPrepareReplyPanelHtml(): string {
     s.recommendations.filter((r) => r.kind === "action").length ?
       `<div class="agent-panel__actions-list"><p class="dim"><strong>Actions</strong></p><ul>${s.recommendations
         .filter((r) => r.kind === "action")
-        .map(
-          (r) =>
-            `<li>${escapeHtml(r.label)}${r.detail ? `<span class="dim"> · ${escapeHtml(r.detail)}</span>` : ""}</li>`,
-        )
+        .map((r) => {
+          const ids =
+            r.messageIds?.length ?
+              ` data-message-ids="${escapeAttr(r.messageIds.join(","))}"`
+            : "";
+          const unanchored =
+            r.messageIds?.length ? ""
+            : `<span class="dim agent-action--unanchored" title="Action non rattachée à un message du fil"> · à vérifier</span>`;
+          return `<li${ids}>${escapeHtml(r.label)}${r.detail ? `<span class="dim"> · ${escapeHtml(r.detail)}</span>` : ""}${unanchored}</li>`;
+        })
         .join("")}</ul></div>`
     : "";
   const slotsBlock =

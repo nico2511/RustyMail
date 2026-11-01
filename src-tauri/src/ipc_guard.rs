@@ -1,6 +1,8 @@
 //! Garde commune pour les flux IPC sensibles (cohérence entrées, éviter payloads absurdes).
 
-use rustymail_domain::{Draft, SearchQuery};
+use rustymail_domain::{
+    normalize_assist_timezone, normalize_assist_tone, AssistUserPrefs, Draft, SearchQuery,
+};
 
 const MAX_TOKEN_LEN: usize = 512;
 const MAX_ACCOUNT_ID_LEN: usize = 320;
@@ -531,6 +533,17 @@ pub fn validate_imap_thread_move(
     Ok(())
 }
 
+/// Préférences assist (`userPrefs` IPC) : ton et fuseau normalisés (source unique domaine).
+pub fn normalize_assist_user_prefs(p: Option<&AssistUserPrefs>) -> (String, String) {
+    match p {
+        Some(prefs) => (
+            normalize_assist_tone(&prefs.tone),
+            normalize_assist_timezone(&prefs.timezone),
+        ),
+        None => (normalize_assist_tone(""), normalize_assist_timezone("")),
+    }
+}
+
 /// Journalisation hors chemins utilisateur (`user@domain` → `***@domain`).
 pub fn audit_email_shadow(value: &str) -> String {
     let trim = value.trim();
@@ -633,5 +646,31 @@ mod tests {
         assert!(normalize_page_size(Some(MAX_PAGE_SIZE + 1), 50).is_err());
         assert!(normalize_page_offset(Some(MAX_PAGE_OFFSET + 1)).is_err());
         assert!(normalize_imap_sync_limit(Some(MAX_IMAP_SYNC_LIMIT + 1)).is_err());
+    }
+
+    #[test]
+    fn normalize_assist_user_prefs_defaults_and_sanitizes() {
+        assert_eq!(
+            normalize_assist_user_prefs(None),
+            ("neutre".into(), "Europe/Paris".into())
+        );
+        let prefs = AssistUserPrefs {
+            lang: "fr".into(),
+            tone: " formel ".into(),
+            timezone: "America/New_York".into(),
+        };
+        assert_eq!(
+            normalize_assist_user_prefs(Some(&prefs)),
+            ("formel".into(), "America/New_York".into())
+        );
+        let bad = AssistUserPrefs {
+            lang: "fr".into(),
+            tone: "x\u{0001}".into(),
+            timezone: "bad\nzone".into(),
+        };
+        assert_eq!(
+            normalize_assist_user_prefs(Some(&bad)),
+            ("neutre".into(), "Europe/Paris".into())
+        );
     }
 }
