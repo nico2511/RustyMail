@@ -1,5 +1,6 @@
 //! Orchestration assistance fil — routing skills, plan d’exécution, garde créneaux.
 
+use std::collections::HashSet;
 use std::time::Instant;
 
 use rustymail_domain::{
@@ -105,6 +106,23 @@ pub fn transcript_message_header(
         "[message_id={message_id}] rôle={}{mailbox} de {sender} ({received_at}) :",
         role.label()
     )
+}
+
+/// Identifiants exacts des messages présents dans le transcript (en-têtes `[message_id=…]`).
+pub(crate) fn transcript_message_ids(transcript: &str) -> HashSet<String> {
+    let mut ids = HashSet::new();
+    let prefix = "[message_id=";
+    let mut rest = transcript;
+    while let Some(start) = rest.find(prefix) {
+        let after = &rest[start + prefix.len()..];
+        if let Some(end) = after.find(']') {
+            ids.insert(after[..end].trim().to_string());
+            rest = &after[end + 1..];
+        } else {
+            break;
+        }
+    }
+    ids
 }
 
 /// Skills activés par défaut si `enabled_skills` est vide.
@@ -345,6 +363,7 @@ fn slots_to_recommendations(slots: &[String]) -> Vec<AssistRecommendation> {
             kind: "slot".into(),
             label: s.clone(),
             detail: String::new(),
+            message_ids: Vec::new(),
         })
         .collect()
 }
@@ -629,6 +648,7 @@ pub fn run_assist_phase(
             )?;
             if let Some(s) = agent_out.slots.as_ref() {
                 result.slots = s.slots.clone();
+                result.slot_ranges = s.slot_ranges.clone();
                 result.recommendations = slots_to_recommendations(&s.slots);
             }
         }
@@ -927,5 +947,15 @@ mod tests {
         };
         let plan = assist_routing_plan(&r, None, "", Some(&facts));
         assert!(plan.needs_clarification);
+    }
+
+    #[test]
+    fn transcript_message_ids_exact_headers() {
+        let tx = "[message_id=m1] a\n[message_id=m10] b\n[message_id=m2] c";
+        let ids = transcript_message_ids(tx);
+        assert_eq!(ids.len(), 3);
+        assert!(ids.contains("m1"));
+        assert!(ids.contains("m10"));
+        assert!(ids.contains("m2"));
     }
 }

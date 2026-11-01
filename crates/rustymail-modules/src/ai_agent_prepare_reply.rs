@@ -8,10 +8,13 @@ use crate::ai_assist_facts::{facts_block_for_draft, sender_proposes_meeting};
 use crate::ai_assist_thread::facts_support_scheduling;
 use crate::ai_llm_contracts::{ensure_reply_draft_output, introduces_llm_meta};
 use crate::ai_llm_util::{
-    budget_report, cancelled_llm_err, gen_params_text, generate_fil_json, output_room_after_prompt,
-    resolve_max_output_tokens, truncate_chars, untrusted_mail_for_engine,
+    budget_report, cancelled_llm_err, gen_params_text, generate_fil_json, generate_fil_json_ex,
+    output_room_after_prompt, resolve_max_output_tokens, truncate_chars, untrusted_mail_for_engine,
 };
-use rustymail_domain::{AssistFactsSnapshot, AssistUserPrefs};
+use chrono::{Datelike, Local, NaiveDateTime, Weekday};
+use rustymail_domain::{
+    normalize_assist_timezone, AssistFactsSnapshot, AssistSlot, AssistUserPrefs,
+};
 use rustymail_llm::{LlmEngine, LlmError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -81,6 +84,8 @@ pub struct AgentDraftResult {
 #[serde(rename_all = "camelCase")]
 pub struct AgentSlotsResult {
     pub slots: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub slot_ranges: Vec<AssistSlot>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,7 +118,165 @@ fn default_tone_hint() -> String {
 #[derive(Deserialize)]
 struct SlotsDto {
     #[serde(default)]
-    slots: Vec<String>,
+    slots: Vec<serde_json::Value>,
+}
+
+enum SlotIn {
+    Range { start: String, end: String },
+    Text(String),
+}
+
+fn slot_in_from_value(v: &serde_json::Value) -> Option<SlotIn> {
+    match v {
+        serde_json::Value::String(s) => Some(SlotIn::Text(s.clone())),
+        serde_json::Value::Object(map) => {
+            let start = map.get("start").and_then(|x| x.as_str())?;
+            let end = map.get("end").and_then(|x| x.as_str())?;
+            Some(SlotIn::Range {
+                start: start.to_string(),
+                end: end.to_string(),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn parse_slot_naive(raw: &str) -> Option<NaiveDateTime> {
+    let t = raw.trim();
+    if let Ok(dt) = NaiveDateTime::parse_from_str(t, "%Y-%m-%dT%H:%M") {
+        return Some(dt);
+    }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(t, "%Y-%m-%dT%H:%M:%S") {
+        return Some(dt);
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(t) {
+        return Some(dt.naive_local());
+    }
+    None
+}
+
+fn format_slot_naive(dt: NaiveDateTime) -> String {
+    dt.format("%Y-%m-%dT%H:%M").to_string()
+}
+
+fn neutral_slot_label(start: NaiveDateTime, end: NaiveDateTime) -> String {
+    format!(
+        "{} {}–{}",
+        start.format("%Y-%m-%d"),
+        start.format("%H:%M"),
+        end.format("%H:%M")
+    )
+}
+
+fn weekday_fr(w: Weekday) -> &'static str {
+    match w {
+        Weekday::Mon => "lundi",
+        Weekday::Tue => "mardi",
+        Weekday::Wed => "mercredi",
+        Weekday::Thu => "jeudi",
+        Weekday::Fri => "vendredi",
+        Weekday::Sat => "samedi",
+        Weekday::Sun => "dimanche",
+    }
+}
+
+fn validate_slot_ranges(
+    raw: Vec<SlotIn>,
+    now: NaiveDateTime,
+    tz: &str,
+) -> (Vec<AssistSlot>, Vec<String>) {
+    let had_range = raw.iter().any(|item| matches!(item, SlotIn::Range { .. }));
+
+    if !had_range {
+        let mut slots: Vec<String> = raw
+            .into_iter()
+            .filter_map(|item| match item {
+                SlotIn::Text(s) => {
+                    let t = s.trim();
+                    if t.is_empty() {
+                        None
+                    } else {
+                        Some(t.chars().take(120).collect::<String>())
+                    }
+                }
+                SlotIn::Range { .. } => None,
+            })
+            .take(5)
+            .collect();
+        slots.dedup();
+        return (Vec::new(), slots);
+    }
+
+    let horizon = now + chrono_duration_days(60);
+    let mut ranges: Vec<(NaiveDateTime, NaiveDateTime)> = Vec::new();
+
+    for item in raw {
+        let SlotIn::Range { start, end } = item else {
+            continue;
+        };
+        let Some(start_dt) = parse_slot_naive(&start) else {
+            continue;
+        };
+        let Some(end_dt) = parse_slot_naive(&end) else {
+            continue;
+        };
+        if end_dt <= start_dt {
+            continue;
+        }
+        if start_dt <= now {
+            continue;
+        }
+        if start_dt > horizon {
+            continue;
+        }
+        if start_dt.date() != end_dt.date() {
+            continue;
+        }
+        let mins = (end_dt - start_dt).num_minutes();
+        if !(15..=240).contains(&mins) {
+            continue;
+        }
+        if matches!(start_dt.weekday(), Weekday::Sat | Weekday::Sun) {
+            continue;
+        }
+        ranges.push((start_dt, end_dt));
+    }
+
+    if ranges.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    ranges.sort_by_key(|(s, _)| *s);
+    ranges.dedup_by(|a, b| a.0 == b.0 && a.1 == b.1);
+    ranges.truncate(5);
+
+    let slot_ranges: Vec<AssistSlot> = ranges
+        .iter()
+        .map(|(s, e)| AssistSlot {
+            start: format_slot_naive(*s),
+            end: format_slot_naive(*e),
+            timezone: tz.to_string(),
+        })
+        .collect();
+    let slots: Vec<String> = ranges
+        .iter()
+        .map(|(s, e)| neutral_slot_label(*s, *e))
+        .collect();
+    (slot_ranges, slots)
+}
+
+fn chrono_duration_days(days: i64) -> chrono::TimeDelta {
+    chrono::TimeDelta::try_days(days).unwrap_or_else(|| chrono::TimeDelta::MAX)
+}
+
+fn slots_user_suffix(tz: &str) -> String {
+    let now = Local::now().naive_local();
+    let wd = weekday_fr(now.weekday());
+    format!(
+        "\nPropose des créneaux pertinents pour répondre à la demande de rendez-vous.\n\
+Date et heure actuelles ({tz}) : {} ({wd}).",
+        now.format("%Y-%m-%dT%H:%M")
+    )
 }
 
 const MIN_DRAFT_OUTPUT_ROOM: u32 = 320;
@@ -243,8 +406,8 @@ pub fn agent_prepare_reply_step(
     let ctx = truncate_chars(thread_context, 24_000);
     let lang = draft_language.trim();
     let lang = if lang.is_empty() { "fr" } else { lang };
-    let tz = user_prefs.timezone.trim();
-    let tz = if tz.is_empty() { "Europe/Paris" } else { tz };
+    let tz = normalize_assist_timezone(&user_prefs.timezone);
+    let tz_ref = tz.as_str();
     match step {
         AgentPrepareReplyStep::AnalyzeIntent => {
             let system = crate::prompts::system_prompt_for_language("agent_intent", lang);
@@ -306,34 +469,36 @@ pub fn agent_prepare_reply_step(
                     step,
                     intent: None,
                     draft: None,
-                    slots: Some(AgentSlotsResult { slots: Vec::new() }),
+                    slots: Some(AgentSlotsResult {
+                        slots: Vec::new(),
+                        slot_ranges: Vec::new(),
+                    }),
                 });
             }
             let mut system = crate::prompts::system_prompt_for_language("agent_slots", lang);
-            system = system.replace("{timezone}", tz);
-            let dto: SlotsDto = generate_fil_json(
+            system = system.replace("{timezone}", tz_ref);
+            let suffix = slots_user_suffix(tz_ref);
+            let dto: SlotsDto = generate_fil_json_ex(
                 engine,
                 system.as_str(),
                 &ctx,
                 "agent-slots-thread",
                 "Fil :\n",
-                "\nPropose des créneaux pertinents pour répondre à la demande de rendez-vous.",
+                &suffix,
                 24_000,
                 256,
                 768,
-            )?;
-            let slots: Vec<String> = dto
-                .slots
-                .into_iter()
-                .map(|s| s.trim().chars().take(120).collect())
-                .filter(|s: &String| !s.is_empty())
-                .take(6)
-                .collect();
+                Some(crate::ai_llm_contracts::agent_slots_json_schema()),
+            )?
+            .0;
+            let parsed: Vec<SlotIn> = dto.slots.iter().filter_map(slot_in_from_value).collect();
+            let now = Local::now().naive_local();
+            let (slot_ranges, slots) = validate_slot_ranges(parsed, now, tz_ref);
             Ok(AgentStepResult {
                 step,
                 intent: None,
                 draft: None,
-                slots: Some(AgentSlotsResult { slots }),
+                slots: Some(AgentSlotsResult { slots, slot_ranges }),
             })
         }
     }
@@ -481,5 +646,169 @@ mod tests {
             .find("FIN CONTENU NON FIABLE: agent-draft-thread")
             .expect("block end");
         assert!(block_end < pref_start);
+    }
+
+    fn nd(s: &str) -> NaiveDateTime {
+        NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M").unwrap()
+    }
+
+    #[test]
+    fn validate_slot_accepts_valid_range() {
+        let now = nd("2026-11-01T09:00");
+        let raw = vec![SlotIn::Range {
+            start: "2026-11-05T14:00".into(),
+            end: "2026-11-05T15:00".into(),
+        }];
+        let (ranges, slots) = validate_slot_ranges(raw, now, "Europe/Paris");
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].start, "2026-11-05T14:00");
+        assert_eq!(slots, vec!["2026-11-05 14:00–15:00"]);
+    }
+
+    #[test]
+    fn validate_slot_rejects_past_and_weekend() {
+        let now = nd("2026-11-05T10:00");
+        let past = validate_slot_ranges(
+            vec![SlotIn::Range {
+                start: "2026-11-05T09:00".into(),
+                end: "2026-11-05T10:00".into(),
+            }],
+            now,
+            "Europe/Paris",
+        );
+        assert!(past.0.is_empty() && past.1.is_empty());
+        let sat = validate_slot_ranges(
+            vec![SlotIn::Range {
+                start: "2026-11-07T14:00".into(),
+                end: "2026-11-07T15:00".into(),
+            }],
+            now,
+            "Europe/Paris",
+        );
+        assert!(sat.0.is_empty());
+    }
+
+    #[test]
+    fn validate_slot_rejects_bad_order_and_duration() {
+        let now = nd("2026-11-01T09:00");
+        let end_before = validate_slot_ranges(
+            vec![SlotIn::Range {
+                start: "2026-11-05T15:00".into(),
+                end: "2026-11-05T14:00".into(),
+            }],
+            now,
+            "Europe/Paris",
+        );
+        assert!(end_before.0.is_empty());
+        let equal = validate_slot_ranges(
+            vec![SlotIn::Range {
+                start: "2026-11-05T14:00".into(),
+                end: "2026-11-05T14:00".into(),
+            }],
+            now,
+            "Europe/Paris",
+        );
+        assert!(equal.0.is_empty());
+        let short = validate_slot_ranges(
+            vec![SlotIn::Range {
+                start: "2026-11-05T14:00".into(),
+                end: "2026-11-05T14:05".into(),
+            }],
+            now,
+            "Europe/Paris",
+        );
+        assert!(short.0.is_empty());
+        let long = validate_slot_ranges(
+            vec![SlotIn::Range {
+                start: "2026-11-05T08:00".into(),
+                end: "2026-11-05T15:00".into(),
+            }],
+            now,
+            "Europe/Paris",
+        );
+        assert!(long.0.is_empty());
+    }
+
+    #[test]
+    fn validate_slot_accepts_rfc3339_local_wall() {
+        let now = nd("2026-11-01T09:00");
+        let (ranges, _) = validate_slot_ranges(
+            vec![SlotIn::Range {
+                start: "2026-11-05T14:00:00+02:00".into(),
+                end: "2026-11-05T15:00:00+02:00".into(),
+            }],
+            now,
+            "Europe/Paris",
+        );
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].start, "2026-11-05T14:00");
+    }
+
+    #[test]
+    fn validate_slot_string_fallback() {
+        let now = nd("2026-11-01T09:00");
+        let (_, slots) =
+            validate_slot_ranges(vec![SlotIn::Text("Thu 2pm".into())], now, "Europe/Paris");
+        assert_eq!(slots, vec!["Thu 2pm"]);
+    }
+
+    #[test]
+    fn validate_slot_invalid_ranges_no_text_fallback() {
+        let now = nd("2026-11-01T09:00");
+        let (r, s) = validate_slot_ranges(
+            vec![
+                SlotIn::Range {
+                    start: "2020-01-01T10:00".into(),
+                    end: "2020-01-01T11:00".into(),
+                },
+                SlotIn::Text("ignored".into()),
+            ],
+            now,
+            "Europe/Paris",
+        );
+        assert!(r.is_empty() && s.is_empty());
+    }
+
+    #[test]
+    fn validate_slot_null_like_entries_skipped() {
+        let now = nd("2026-11-01T09:00");
+        let v = serde_json::json!({"slots":[
+            null,
+            {"start":"2026-11-05T14:00","end":"2026-11-05T15:00"}
+        ]});
+        let dto: SlotsDto = serde_json::from_value(v).unwrap();
+        let parsed: Vec<SlotIn> = dto.slots.iter().filter_map(slot_in_from_value).collect();
+        let (ranges, _) = validate_slot_ranges(parsed, now, "Europe/Paris");
+        assert_eq!(ranges.len(), 1);
+    }
+
+    #[test]
+    fn validate_slot_dedup_and_max_five() {
+        let now = nd("2026-11-01T09:00");
+        let raw: Vec<SlotIn> = (0..7)
+            .map(|i| SlotIn::Range {
+                start: format!("2026-11-0{}T14:00", 3 + i),
+                end: format!("2026-11-0{}T15:00", 3 + i),
+            })
+            .collect();
+        let dup = raw
+            .into_iter()
+            .chain([SlotIn::Range {
+                start: "2026-11-03T14:00".into(),
+                end: "2026-11-03T15:00".into(),
+            }])
+            .collect();
+        let (ranges, _) = validate_slot_ranges(dup, now, "Europe/Paris");
+        assert_eq!(ranges.len(), 5);
+    }
+
+    #[test]
+    fn agent_slots_result_omits_empty_slot_ranges() {
+        let r = AgentSlotsResult {
+            slots: vec!["x".into()],
+            slot_ranges: Vec::new(),
+        };
+        let v = serde_json::to_value(&r).unwrap();
+        assert!(v.get("slotRanges").is_none());
     }
 }
