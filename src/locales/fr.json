@@ -99,6 +99,7 @@
       "promptsReadOnly": "Lecture seule — modification personnalisée à venir.",
       "promptsOutputLang": "Langue de sortie utilisateur : {lang}",
       "promptsSkillsHeading": "Skills (assistant réponse)",
+      "promptsToneMappingHeading": "Tons du compositeur → styles de réécriture",
       "promptsNoCatalog": "Catalogue indisponible (lancez l’app Tauri).",
       "promptsLoadError": "Impossible de charger le catalogue : {error}"
     }

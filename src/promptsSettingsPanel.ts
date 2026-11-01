@@ -1,3 +1,4 @@
+import { toneStyleMappingRows, rewriteStyleLabelFr } from "./app/core/composeTone";
 import { t } from "./i18n";
 import { getAssistSkillUi } from "./assistAgent";
 import type { SettingsAiPanelDeps } from "./settingsAiPanel";
@@ -61,11 +62,25 @@ export function renderPromptsSettingsBody(
         item.linkedSkills.length ?
           `<p class="dim" style="margin:4px 0 0;font-size:12px">Skills: ${escapeHtml(item.linkedSkills.join(", "))}</p>`
         : "";
+      const toneTable =
+        item.id === "writing" ?
+          (() => {
+            const rows = toneStyleMappingRows()
+              .map(
+                (row) =>
+                  `<tr><td>${escapeHtml(row.label)}</td><td><code>${escapeHtml(row.style)}</code> · ${escapeHtml(rewriteStyleLabelFr(row.style))}</td></tr>`,
+              )
+              .join("");
+            return `<h5 class="settings-ai-subsection__title" style="margin:12px 0 6px;font-size:13px">${escapeHtml(t("settings.ai.promptsToneMappingHeading"))}</h5>
+        <table class="dim" style="font-size:12px;border-collapse:collapse;width:100%"><tbody>${rows}</tbody></table>`;
+          })()
+        : "";
       return `<details class="settings-prompt-entry surface-sm" style="margin:0 0 8px;padding:10px 12px;border-radius:var(--radius-lg)">
         <summary style="cursor:pointer;font-weight:600">${escapeHtml(featureLabel(item.id))} <span class="dim">(${escapeHtml(item.id)})</span></summary>
         <p class="dim" style="margin:8px 0 4px;font-size:12px">${escapeHtml(item.feature)}</p>
         ${vars}
         ${skills}
+        ${toneTable}
         <pre class="settings-prompt-template" style="margin:10px 0 0;padding:10px;font-size:11px;line-height:1.45;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto;background:var(--surface-2)">${escapeHtml(item.templateEn)}</pre>
       </details>`;
     })

@@ -1,6 +1,6 @@
 import { escapeAttr, escapeHtml } from "../../../ui/sanitize";
 import { composeAiBusyKind } from "../../core/composeAiJobs";
-import { toneLabelsFr, tones } from "../../core/composeTone";
+import { SHORTEN_LABEL_FR, SHORTEN_REWRITE_STYLE, toneLabelsFr, tones } from "../../core/composeTone";
 import { iconSvg } from "../../lib/iconSvg";
 import type { Tone } from "../../types";
 import {
@@ -177,9 +177,9 @@ export function renderComposeToolbar(props: ComposeToolbarProps): string {
         })}
         ${aiButton({
           action: "compose-ai-rewrite",
-          label: "Raccourcir",
+          label: SHORTEN_LABEL_FR,
           title: "Raccourcit tout le message. Pour une zone : sélection + clic droit.",
-          extra: ` data-rewrite-style="Concise" data-compose-cmd="ai:shorten"`,
+          extra: ` data-rewrite-style="${escapeAttr(SHORTEN_REWRITE_STYLE)}" data-compose-cmd="ai:shorten"`,
           quiet: true,
           spinning: busy === "shorten",
           blocked,
