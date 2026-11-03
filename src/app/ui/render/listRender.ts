@@ -22,6 +22,7 @@ import { iconSvg } from "../../lib/iconSvg";
 import { accountHueForId, accountShortLabel } from "../../lib/accountHue";
 import { initials } from "../../lib/tags";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
+import { t } from "../../../i18n";
 import { state } from "../../state";
 import type { ThreadListItem } from "../../types";
 import {
@@ -300,11 +301,18 @@ export function renderList(mode: "full" | "threads-only" | "filters-only" = "ful
       `<p class="inbox-mailbox-note dim">Stockage local (SQLite). Aucune donnée envoyée au serveur IMAP.</p>`
     : "";
 
+  const loadingRow =
+    state.mailListLoading && !visible.length && !draftBoxVirtual
+      ? `<div class="inbox-empty" aria-busy="true">
+           <p class="inbox-empty-title dim">${escapeHtml(t("common.loading"))}</p>
+         </div>`
+      : "";
   const inboxListPanelHtml = `
       <div class="inbox-panel surface">
-        <div class="inbox-thread-list" role="list">
+        <div class="inbox-thread-list" role="list" aria-busy="${state.mailListLoading ? "true" : "false"}">
           ${
-            visible.length
+            loadingRow ||
+            (visible.length
               ? visible.map(renderThreadRow).join("")
               : `<div class="inbox-empty">
                   <p class="inbox-empty-title">${draftBoxVirtual ? "Aucun brouillon sauvegardé" : "Aucune conversation"}</p>
@@ -315,7 +323,7 @@ export function renderList(mode: "full" | "threads-only" | "filters-only" = "ful
                         ? "Aucun message ne correspond. Essayez un autre mot-clé, le dossier « Tout », ou synchronisez la boîte."
                         : "Changez de filtre ou de dossier, ou lancez une synchronisation."
                   }</p>
-                </div>`
+                </div>`)
           }
         </div>
         ${

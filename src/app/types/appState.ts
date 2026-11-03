@@ -90,6 +90,8 @@ export type State = {
   accountsLoadError: string;
   /** Dernière erreur de chargement liste (`list_threads`) — affichée sous la barre du dossier. */
   mailListError: string;
+  /** Liste en cours de chargement après changement de dossier (indicateur léger). */
+  mailListLoading: boolean;
   /** Échec `list_imap_mailboxes` : la liste précédente reste affichée. */
   mailboxListError: string;
   /** Trousseau SQLCipher inaccessible : écran bloquant, aucune réécriture de clé. */
