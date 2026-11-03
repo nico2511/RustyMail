@@ -893,13 +893,19 @@ fn draft_orphan_session_open(
 const SAVED_DRAFT_LIST_LIMIT_DEFAULT: usize = 200;
 
 #[tauri::command]
-fn saved_drafts_count(paths: State<'_, AppPaths>, account_id: String) -> Result<i64, String> {
+async fn saved_drafts_count(paths: State<'_, AppPaths>, account_id: String) -> Result<i64, String> {
     ipc_guard::validate_account_id(&account_id)?;
-    rustymail_infrastructure::sqlite_saved_drafts_count(&paths.db_path, account_id.trim())
+    let db_path = paths.inner().db_path.clone();
+    let account_id = account_id.trim().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        rustymail_infrastructure::sqlite_saved_drafts_count(&db_path, &account_id)
+    })
+    .await
+    .map_err(|e| format!("saved_drafts_count join: {e}"))?
 }
 
 #[tauri::command]
-fn saved_draft_list(
+async fn saved_draft_list(
     paths: State<'_, AppPaths>,
     account_id: String,
     limit: Option<u32>,
@@ -909,7 +915,13 @@ fn saved_draft_list(
         .unwrap_or(SAVED_DRAFT_LIST_LIMIT_DEFAULT as u32)
         .max(1)
         .min(500) as usize;
-    rustymail_infrastructure::sqlite_saved_draft_list(&paths.db_path, account_id.trim(), lim)
+    let db_path = paths.inner().db_path.clone();
+    let account_id = account_id.trim().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        rustymail_infrastructure::sqlite_saved_draft_list(&db_path, &account_id, lim)
+    })
+    .await
+    .map_err(|e| format!("saved_draft_list join: {e}"))?
 }
 
 #[tauri::command]

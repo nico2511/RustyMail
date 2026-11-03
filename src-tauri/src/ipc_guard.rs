@@ -580,6 +580,12 @@ mod tests {
     }
 
     #[test]
+    fn saved_drafts_ipc_rejects_invalid_account_before_database() {
+        assert!(validate_account_id("not-an-id").is_err());
+        assert!(validate_account_id("../secrets").is_err());
+    }
+
+    #[test]
     fn mailbox_rejects_newlines() {
         assert!(validate_mailbox("INBOX").is_ok());
         assert!(validate_mailbox("a\nb").is_err());
