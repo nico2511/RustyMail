@@ -25,6 +25,8 @@ mod imap_tombstones;
 mod inline_compose_images;
 mod keyring_store;
 mod lang_detect;
+#[cfg(test)]
+mod list_threads_perf_tests;
 mod mail_autoconfig;
 mod mail_classify;
 mod mail_ops;
@@ -347,6 +349,52 @@ pub(crate) fn resolve_scoped_mailbox_from_path(
         .map_err(|e| e.to_string())
 }
 
+const LIST_THREADS_PAGE_SQL: &str = "
+        WITH cand AS (
+          SELECT DISTINCT thread_id FROM messages
+          WHERE account_id = ?1 AND lower(trim(mailbox)) = lower(trim(?2))
+        )
+        SELECT t.id, t.subject, t.tags, COALESCE(t.is_followed, 0)
+        FROM cand JOIN threads t ON t.id = cand.thread_id
+        WHERE t.account_id = ?1
+        ORDER BY (SELECT max(received_at) FROM messages WHERE thread_id = t.id) DESC, t.id
+        LIMIT ?3 OFFSET ?4
+        ";
+
+pub(crate) fn mailbox_perf_kind(resolved_mailbox: &str) -> &'static str {
+    if org_scan::is_inbox_like_mailbox(resolved_mailbox) {
+        return "inbox";
+    }
+    if org_scan::is_drafts_like_mailbox(resolved_mailbox) {
+        return "drafts";
+    }
+    if mail_ops::is_trash_like_mailbox(resolved_mailbox) {
+        return "trash";
+    }
+    if org_scan::is_archive_like_mailbox(resolved_mailbox) {
+        return "archive";
+    }
+    let lower = resolved_mailbox.trim().to_ascii_lowercase();
+    if lower.contains("sent") || lower.contains("envoy") {
+        return "sent";
+    }
+    "other"
+}
+
+pub(crate) fn format_perf_list_threads_log(ms: u128, rows: usize, kind: &str) -> String {
+    format!("perf list_threads ms={ms} rows={rows} kind={kind}")
+}
+
+fn log_perf_list_threads(elapsed: std::time::Duration, rows: usize, kind: &str) {
+    let ms = elapsed.as_millis();
+    let line = format_perf_list_threads_log(ms, rows, kind);
+    if ms >= 150 {
+        log::info!("{line}");
+    } else {
+        log::debug!("{line}");
+    }
+}
+
 pub fn sqlite_list_threads_page_scoped(
     db_path: impl AsRef<Path>,
     account_id: &str,
@@ -354,6 +402,7 @@ pub fn sqlite_list_threads_page_scoped(
     limit: usize,
     offset: usize,
 ) -> Result<Vec<ThreadListItem>, rusqlite::Error> {
+    let perf_started = std::time::Instant::now();
     let connection = open_sqlite_migrated(db_path.as_ref())?;
     seed_if_empty(&connection)?;
     let resolved = resolve_scoped_mailbox_for_account(&connection, account_id, mailbox)?;
@@ -370,22 +419,7 @@ pub fn sqlite_list_threads_page_scoped(
     } else {
         vec![account_email]
     };
-    let mut statement = connection.prepare(
-        "
-        SELECT id, subject, tags, COALESCE(is_followed, 0) FROM threads
-        WHERE account_id = ?1
-          AND EXISTS (
-            SELECT 1 FROM messages m
-            WHERE m.thread_id = threads.id
-              AND m.account_id = ?1
-              AND lower(trim(m.mailbox)) = lower(trim(?2))
-          )
-        ORDER BY
-          (SELECT max(received_at) FROM messages WHERE thread_id = threads.id) DESC,
-          id
-        LIMIT ?3 OFFSET ?4
-        ",
-    )?;
+    let mut statement = connection.prepare(LIST_THREADS_PAGE_SQL)?;
     let mut out = Vec::new();
     for row in statement.query_map(
         params![
@@ -416,6 +450,11 @@ pub fn sqlite_list_threads_page_scoped(
             newsletter::thread_blocks_reply(&thread, &account_emails, &rules);
         out.push(item);
     }
+    log_perf_list_threads(
+        perf_started.elapsed(),
+        out.len(),
+        mailbox_perf_kind(&resolved),
+    );
     Ok(out)
 }
 
@@ -986,6 +1025,7 @@ pub fn sqlite_mailbox_inbox_filter_counts(
     account_id: &str,
     mailbox: &str,
 ) -> Result<MailboxInboxFilterCounts, String> {
+    let perf_started = std::time::Instant::now();
     let connection = open_sqlite_migrated(db_path.as_ref()).map_err(|e| e.to_string())?;
     let account_id = account_id.trim();
     let resolved = resolve_scoped_mailbox_for_account(&connection, account_id, mailbox)
@@ -1008,13 +1048,9 @@ pub fn sqlite_mailbox_inbox_filter_counts(
     let all: usize = connection
         .query_row(
             "
-            SELECT COUNT(DISTINCT t.id) FROM threads t
-            WHERE t.account_id = ?1
-              AND EXISTS (
-                SELECT 1 FROM messages m
-                WHERE m.thread_id = t.id AND m.account_id = ?1
-                  AND lower(trim(m.mailbox)) = lower(trim(?2))
-              )
+            SELECT COUNT(DISTINCT m.thread_id) FROM messages m
+            JOIN threads t ON t.id = m.thread_id AND t.account_id = ?1
+            WHERE m.account_id = ?1 AND lower(trim(m.mailbox)) = lower(trim(?2))
             ",
             params![account_id, resolved.as_str()],
             |row| row.get::<_, i64>(0),
@@ -1064,11 +1100,11 @@ pub fn sqlite_mailbox_inbox_filter_counts(
     let mut stmt = connection
         .prepare(
             "
-            SELECT id, subject, tags, COALESCE(is_followed, 0) FROM threads
-            WHERE account_id = ?1
+            SELECT t.id, t.subject, t.tags, COALESCE(t.is_followed, 0) FROM threads t
+            WHERE t.account_id = ?1
               AND EXISTS (
                 SELECT 1 FROM messages m
-                WHERE m.thread_id = threads.id AND m.account_id = ?1
+                WHERE m.thread_id = t.id AND m.account_id = ?1
                   AND lower(trim(m.mailbox)) = lower(trim(?2))
               )
             ",
@@ -1098,10 +1134,14 @@ pub fn sqlite_mailbox_inbox_filter_counts(
             focused += 1;
         }
     }
-    log::debug!(
-        "mailbox_inbox_filter_counts focused_auto_ms={}",
-        t_focused.elapsed().as_millis()
-    );
+    let focused_auto_ms = t_focused.elapsed().as_millis();
+    let total_ms = perf_started.elapsed().as_millis();
+    let line = format!("perf filter_counts ms={total_ms} focused_auto_ms={focused_auto_ms}");
+    if total_ms >= 150 {
+        log::info!("{line}");
+    } else {
+        log::debug!("{line}");
+    }
 
     Ok(MailboxInboxFilterCounts {
         all,
@@ -1155,6 +1195,7 @@ pub(crate) fn reset_sqlite_migrated_memo_for_tests() {
         Err(p) => p.into_inner(),
     };
     memo.clear();
+    sqlite_crypto::clear_sqlcipher_fast_path_memo_for_tests();
 }
 
 /// Avis persisté quand la sauvegarde `*.pre-<version>.bak` a échoué ou a été sautée.
@@ -1184,6 +1225,29 @@ pub fn local_today_iso() -> String {
     use chrono::Datelike;
     let date = chrono::Local::now().date_naive();
     format!("{:04}-{:02}-{:02}", date.year(), date.month(), date.day())
+}
+
+fn migrate_create_perf_index(connection: &Connection, name: &str, ddl: &str) {
+    let exists: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?1",
+            [name],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    if exists > 0 {
+        return;
+    }
+    let started = std::time::Instant::now();
+    if let Err(err) = connection.execute(ddl, []) {
+        let code = err
+            .sqlite_error_code()
+            .map(|c| format!("{c:?}"))
+            .unwrap_or_else(|| err.to_string());
+        log::warn!("migrate index {name} échec : {code}");
+        return;
+    }
+    log::info!("migrate index {name} en {:?}", started.elapsed());
 }
 
 fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
@@ -1352,6 +1416,18 @@ fn migrate(connection: &Connection) -> Result<(), rusqlite::Error> {
     let _ = connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_messages_thread_id ON messages(thread_id)",
         [],
+    );
+    migrate_create_perf_index(
+        connection,
+        "idx_messages_account_mbnorm_thread",
+        "CREATE INDEX IF NOT EXISTS idx_messages_account_mbnorm_thread \
+         ON messages(account_id, lower(trim(mailbox)), thread_id)",
+    );
+    migrate_create_perf_index(
+        connection,
+        "idx_messages_thread_received",
+        "CREATE INDEX IF NOT EXISTS idx_messages_thread_received \
+         ON messages(thread_id, received_at)",
     );
     let _ = connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_threads_account_mailbox ON threads(account_id, mailbox)",
