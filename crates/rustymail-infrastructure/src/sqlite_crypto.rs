@@ -1,7 +1,10 @@
 //! SQLCipher : clé dans le trousseau OS, migration transparente des bases SQLite en clair.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+#[cfg(test)]
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use rusqlite::Connection;
@@ -10,6 +13,95 @@ use rusqlite::Connection;
 use crate::KEYRING_SERVICE;
 
 static DB_KEY_CACHE: OnceLock<Vec<u8>> = OnceLock::new();
+static SQLCIPHER_FAST_PATH_PATHS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
+#[cfg(test)]
+static FAST_PATH_OPEN_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+fn fast_path_paths_guard() -> &'static Mutex<HashSet<PathBuf>> {
+    SQLCIPHER_FAST_PATH_PATHS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn canonical_db_path(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn is_sqlcipher_fast_path_eligible(path: &Path) -> bool {
+    let key = canonical_db_path(path);
+    match fast_path_paths_guard().lock() {
+        Ok(guard) => guard.contains(&key),
+        Err(poisoned) => poisoned.into_inner().contains(&key),
+    }
+}
+
+fn note_sqlcipher_fast_path_eligible(path: &Path) {
+    let key = canonical_db_path(path);
+    match fast_path_paths_guard().lock() {
+        Ok(mut guard) => {
+            guard.insert(key);
+        }
+        Err(poisoned) => {
+            poisoned.into_inner().insert(key);
+        }
+    }
+}
+
+pub(crate) fn forget_sqlcipher_fast_path(path: &Path) {
+    let key = canonical_db_path(path);
+    match fast_path_paths_guard().lock() {
+        Ok(mut guard) => {
+            guard.remove(&key);
+        }
+        Err(poisoned) => {
+            poisoned.into_inner().remove(&key);
+        }
+    }
+}
+
+pub(crate) fn clear_sqlcipher_fast_path_memo_for_tests() {
+    match fast_path_paths_guard().lock() {
+        Ok(mut guard) => guard.clear(),
+        Err(poisoned) => poisoned.into_inner().clear(),
+    }
+    #[cfg(test)]
+    FAST_PATH_OPEN_COUNT.store(0, Ordering::SeqCst);
+}
+
+#[cfg(test)]
+pub(crate) fn sqlcipher_fast_path_open_count_for_tests() -> usize {
+    FAST_PATH_OPEN_COUNT.load(Ordering::SeqCst)
+}
+
+fn log_sqlite_open(elapsed: std::time::Duration, fast_path: bool) {
+    let ms = elapsed.as_millis();
+    let line = format!("perf sqlite_open ms={ms} fast_path={fast_path}");
+    if ms >= 100 {
+        log::info!("{line}");
+    } else {
+        log::debug!("{line}");
+    }
+}
+
+fn try_sqlcipher_fast_open(path: &Path, key: &[u8]) -> Result<Option<Connection>, rusqlite::Error> {
+    if !path.is_file() || !is_sqlcipher_fast_path_eligible(path) {
+        return Ok(None);
+    }
+    let started = std::time::Instant::now();
+    let conn = Connection::open(path)?;
+    apply_cipher_key(&conn, key)?;
+    match cipher_probe(&conn) {
+        Ok(()) => {
+            #[cfg(test)]
+            FAST_PATH_OPEN_COUNT.fetch_add(1, Ordering::SeqCst);
+            log_sqlite_open(started.elapsed(), true);
+            Ok(Some(conn))
+        }
+        Err(err) if is_notadb(&err) => {
+            forget_sqlcipher_fast_path(path);
+            Ok(None)
+        }
+        Err(err) => Err(err),
+    }
+}
 const PLAINTEXT_BACKUP_SUFFIX: &str = ".pre-sqlcipher.bak";
 /// Fichier d'export SQLCipher (nom historique du code, pas `*.encrypt-staging`).
 const ENCRYPT_STAGING_SUFFIX: &str = ".encrypting";
@@ -296,6 +388,7 @@ fn is_notadb(err: &rusqlite::Error) -> bool {
 }
 
 fn quarantine_unreadable(path: &Path) -> Result<PathBuf, String> {
+    forget_sqlcipher_fast_path(path);
     let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
     let stem = path
         .file_name()
@@ -324,6 +417,7 @@ fn notadb_error(detail: &str) -> rusqlite::Error {
 }
 
 fn recover_interrupted(path: &Path, key: &[u8]) -> Result<(), rusqlite::Error> {
+    forget_sqlcipher_fast_path(path);
     if try_restore_plaintext_backup(path).is_ok() && is_plaintext_sqlite_file(path) {
         return migrate_plaintext_to_encrypted(path, key)
             .map_err(|e| rusqlite::Error::InvalidPath(e.into()));
@@ -340,8 +434,20 @@ fn recover_interrupted(path: &Path, key: &[u8]) -> Result<(), rusqlite::Error> {
     ))
 }
 
+fn mark_successful_encrypted_open(path: &Path, elapsed: std::time::Duration) {
+    if path.is_file() {
+        note_sqlcipher_fast_path_eligible(path);
+    }
+    log_sqlite_open(elapsed, false);
+}
+
 /// Ouvre (ou crée) la base avec une clé explicite. Les tests de clé fausse passent par ici.
 fn open_with_key(path: &Path, key: &[u8]) -> Result<Connection, rusqlite::Error> {
+    if let Some(conn) = try_sqlcipher_fast_open(path, key)? {
+        return Ok(conn);
+    }
+
+    let full_started = std::time::Instant::now();
     if !path.exists() {
         if migration_interrupted(path) {
             recover_interrupted(path, key)?;
@@ -351,6 +457,7 @@ fn open_with_key(path: &Path, key: &[u8]) -> Result<Connection, rusqlite::Error>
             }
             let conn = Connection::open(path)?;
             apply_cipher_key(&conn, key)?;
+            mark_successful_encrypted_open(path, full_started.elapsed());
             return Ok(conn);
         }
     }
@@ -367,6 +474,7 @@ fn open_with_key(path: &Path, key: &[u8]) -> Result<Connection, rusqlite::Error>
                 remove_migration_artifacts(path);
                 let conn = Connection::open(path)?;
                 apply_cipher_key(&conn, key)?;
+                mark_successful_encrypted_open(path, full_started.elapsed());
                 return Ok(conn);
             }
             Err(err) if is_notadb(&err) => {
@@ -394,6 +502,7 @@ fn open_with_key(path: &Path, key: &[u8]) -> Result<Connection, rusqlite::Error>
             remove_migration_artifacts(path);
             let conn = Connection::open(path)?;
             apply_cipher_key(&conn, key)?;
+            mark_successful_encrypted_open(path, full_started.elapsed());
             Ok(conn)
         }
         Err(err) if is_notadb(&err) => {
@@ -404,6 +513,7 @@ fn open_with_key(path: &Path, key: &[u8]) -> Result<Connection, rusqlite::Error>
                 apply_cipher_key(&conn, key)?;
                 cipher_probe(&conn)?;
                 remove_migration_artifacts(path);
+                mark_successful_encrypted_open(path, full_started.elapsed());
                 Ok(conn)
             } else {
                 let dest = quarantine_unreadable(path)
