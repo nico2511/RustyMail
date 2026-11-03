@@ -8,7 +8,8 @@
     "later": "Later",
     "refresh": "Refresh",
     "settings": "Settings",
-    "none": "— None —"
+    "none": "— None —",
+    "loading": "Loading…"
   },
   "nav": {
     "inbox": "Inbox",

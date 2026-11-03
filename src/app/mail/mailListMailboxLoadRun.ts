@@ -20,16 +20,23 @@ import {
 } from "./mailListLoadSavedDraftsRun";
 import { loadUnifiedInboxThreadPage, shouldLoadUnifiedInbox } from "./mailListLoadUnifiedRun";
 import { beginMailListLoad, isMailListLoadCurrent } from "./mailListLoadGeneration";
+import { scheduleMailListSecondaryRender } from "./mailListDeferredRender";
+
+function finishMailListLoading(): void {
+  state.mailListLoading = false;
+}
 
 export async function loadMailView(append: boolean = false) {
   if (!append) invalidateIdleAiCachePrefetch();
   if (shouldLoadUnifiedInbox()) {
     await loadUnifiedInboxThreadPage(append);
+    finishMailListLoading();
     return;
   }
   if (isSavedDraftsMailboxSelected()) {
     if (append) return;
     await loadSavedDraftsAsThreadList();
+    finishMailListLoading();
     return;
   }
 
@@ -40,6 +47,7 @@ export async function loadMailView(append: boolean = false) {
       state.threadOffset = 0;
       state.hasMoreThreads = false;
     }
+    finishMailListLoading();
     return;
   }
   const payload = {
@@ -54,11 +62,13 @@ export async function loadMailView(append: boolean = false) {
     state.mailListError =
       state.mailListError ||
       "Mode navigateur : les boîtes mail se chargent dans l’application Tauri (`npm run tauri:dev`).";
+    finishMailListLoading();
     page = [];
   } else {
     try {
       page = await withTimeout(invoke<ThreadListItem[]>("list_threads", payload), BOOT_INVOKE_TIMEOUT_MS);
       if (!isMailListLoadCurrent(token)) return;
+      finishMailListLoading();
       state.mailListError = "";
     } catch (firstError) {
       // Réponse d’un dossier quitté entre-temps : ni erreur ni liste vidée.
@@ -71,9 +81,11 @@ export async function loadMailView(append: boolean = false) {
             BOOT_INVOKE_TIMEOUT_MS,
           );
           if (!isMailListLoadCurrent(token)) return;
+          finishMailListLoading();
           state.mailListError = "";
         } catch (retryError) {
           if (!isMailListLoadCurrent(token)) return;
+          finishMailListLoading();
           const raw = tauriErrorMessage(retryError);
           const detail = /timeout/i.test(raw)
             ? "délai dépassé pendant la préparation locale — réessayez dans un instant"
@@ -92,6 +104,7 @@ export async function loadMailView(append: boolean = false) {
         }
       } else {
         console.error("list_threads", firstError);
+        finishMailListLoading();
         state.mailListError = `Impossible de charger les conversations : ${firstDetail}`;
         toast.error(state.mailListError);
         if (append) return;
@@ -111,6 +124,6 @@ export async function loadMailView(append: boolean = false) {
   scheduleMailboxDigestRefresh();
   scheduleIdleAiCachePrefetch();
   void loadInboxFilterCounts().then(() => {
-    if (state.view === "list") render();
+    scheduleMailListSecondaryRender();
   });
 }

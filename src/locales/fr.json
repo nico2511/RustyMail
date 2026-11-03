@@ -8,7 +8,8 @@
     "later": "Plus tard",
     "refresh": "Rafraîchir",
     "settings": "Paramètres",
-    "none": "— Aucun —"
+    "none": "— Aucun —",
+    "loading": "Chargement…"
   },
   "nav": {
     "inbox": "Réception",

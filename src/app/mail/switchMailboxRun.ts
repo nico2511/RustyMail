@@ -15,12 +15,14 @@ import { invalidateIdleAiCachePrefetch } from "./idleAiCachePrefetch";
 import { exitSearchModeForMailboxBrowse } from "./searchMailboxBrowseExit";
 import { refreshSavedDraftsMailboxCount } from "./savedDraftsMailboxCountRefresh";
 import { clearThreadAiSummaryState } from "./threadAiSummaryState";
+import { scheduleMailListSecondaryRender } from "./mailListDeferredRender";
 
 export type SwitchMailboxRunDeps = {
   loadMailView: (append?: boolean) => Promise<void>;
 };
 
 let switchMailboxRunDeps: SwitchMailboxRunDeps | null = null;
+let switchMailboxGeneration = 0;
 
 export function registerSwitchMailboxRunDeps(deps: SwitchMailboxRunDeps): void {
   switchMailboxRunDeps = deps;
@@ -31,8 +33,22 @@ function switchDeps(): SwitchMailboxRunDeps {
   return switchMailboxRunDeps;
 }
 
+function resetListForMailboxSwitch(): void {
+  state.threads = [];
+  state.threadOffset = 0;
+  state.hasMoreThreads = false;
+  state.selectedThreadId = undefined;
+  state.selectedThread = undefined;
+  state.mailListLoading = true;
+}
+
 export async function switchMailbox(nextMailbox: string): Promise<void> {
   if (state.view === "folderManager") return;
+  const generation = ++switchMailboxGeneration;
+  const perfClick =
+    import.meta.env.DEV && typeof performance !== "undefined" ? performance.now() : null;
+  let perfFirstRender: number | null = null;
+
   if (
     state.view === "thread" ||
     state.view === "contacts" ||
@@ -61,15 +77,31 @@ export async function switchMailbox(nextMailbox: string): Promise<void> {
   state.listFilter = defaultListFilterFromPrefs();
   resetMailboxDigestForNavigation();
   invalidateIdleAiCachePrefetch();
+  resetListForMailboxSwitch();
+  render();
+  if (perfClick != null) perfFirstRender = performance.now();
+
   await switchDeps().loadMailView(false);
+  if (generation !== switchMailboxGeneration) return;
+
   cancelMailboxDigestLiveDebounce();
   if (mailboxDigestSlotInList()) {
     void enqueueMailboxDigestRefreshWhenIdle(false);
   }
-  await refreshSavedDraftsMailboxCount();
+  void refreshSavedDraftsMailboxCount().then(() => {
+    if (generation === switchMailboxGeneration) scheduleMailListSecondaryRender();
+  });
+
   if (!state.threads.some((t) => t.id === state.selectedThreadId)) {
     state.selectedThreadId = state.threads[0]?.id;
     state.selectedThread = undefined;
   }
   render();
+
+  if (perfClick != null && perfFirstRender != null) {
+    const listDone = performance.now();
+    console.debug(
+      `[perf] switchMailbox clic→1er rendu ${Math.round(perfFirstRender - perfClick)} ms, clic→liste ${Math.round(listDone - perfClick)} ms`,
+    );
+  }
 }
