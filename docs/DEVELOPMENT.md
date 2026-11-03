@@ -63,6 +63,10 @@ Copy [`.env.example`](../.env.example) → `.env` for OAuth client IDs during de
 
 Filter: warn by default; `rustymail_lib`, `rustymail_infrastructure` and `rustymail::audit` at info; `html5ever` at error. `migrate()` and the FTS backfill log their durations (backfill also logs the batch count). Settings → Général → **Ouvrir le dossier des journaux**.
 
+### Mesurer la latence
+
+Sur Windows, ouvrir `%LOCALAPPDATA%\com.rustymail.desktop\logs\rustymail.log` (ou **Paramètres → Général → Ouvrir le dossier des journaux**). Après un changement de dossier, repérer les lignes `perf list_threads ms=… rows=… kind=inbox|sent|…` (≥ 150 ms en `info`, sinon `debug`), `perf sqlite_open ms=… fast_path=true|false` (seuil 100 ms), et `perf filter_counts ms=… focused_auto_ms=…`. Au premier lancement après mise à jour : `migrate index idx_messages_account_mbnorm_thread en …`. En dev Vite, la console affiche `[perf] switchMailbox clic→1er rendu …` (aucune donnée personnelle).
+
 ## CI
 
 | Workflow | Trigger | Action |
