@@ -12,6 +12,8 @@ import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { state } from "../state";
+import { writeFolderListCacheAfterSuccessfulPage } from "./mailListFolderCacheApply";
+import { folderListLoadHadCacheHit } from "./mailListFolderCacheLoadContext";
 
 let savedDraftListGeneration = 0;
 
@@ -72,9 +74,11 @@ export async function loadSavedDraftsAsThreadList(): Promise<void> {
       state.selectedThreadId = state.threads[0]?.id;
       state.selectedThread = undefined;
     }
+    writeFolderListCacheAfterSuccessfulPage(visible, false);
   } catch (error) {
     if (gen !== savedDraftListGeneration) return;
     console.error("saved_draft_list", error);
+    if (folderListLoadHadCacheHit()) return;
     toast.error(`Liste des brouillons : ${tauriErrorMessage(error)}`);
     state.threads = [];
     state.threadOffset = 0;

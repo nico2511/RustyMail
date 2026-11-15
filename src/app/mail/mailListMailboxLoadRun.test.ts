@@ -18,6 +18,7 @@ vi.mock("./idleAiCachePrefetch", () => ({
 }));
 
 import { state } from "../state";
+import { readFolderListCache } from "./mailListFolderCache";
 import { loadMailView } from "./mailListMailboxLoadRun";
 
 const row = (id: string, mailbox: string) => ({ id, subject: id, mailbox, unread: false }) as never;
@@ -68,5 +69,24 @@ describe("loadMailView — garde de génération", () => {
     await slow;
     expect(state.threads.map((t) => t.id)).toEqual(["a1"]);
     expect(state.mailListError).toBe("");
+  });
+
+  it("une réponse tardive met quand même à jour le cache du dossier", async () => {
+    state.selectedMailbox = "INBOX";
+    const slow = loadMailView();
+    await flush();
+    state.selectedMailbox = "Archives";
+    const fast = loadMailView();
+    await flush();
+    pending[1]!.resolve([row("a1", "Archives")]);
+    await fast;
+    pending[0]!.resolve([row("i1", "INBOX"), row("i2", "INBOX")]);
+    await slow;
+    const cached = readFolderListCache({
+      accountId: "acc",
+      mailbox: "INBOX",
+      followedOnly: false,
+    });
+    expect(cached?.threads.map((t) => t.id)).toEqual(["i1", "i2"]);
   });
 });

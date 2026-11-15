@@ -11,7 +11,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("../dispatch", () => ({ render: vi.fn() }));
 vi.mock("../../imapWatchFocus", () => ({ notifyImapWatchFocusedMailbox: vi.fn() }));
-vi.mock("../../navigation", () => ({ navReset: vi.fn() }));
+vi.mock("../../navigation", () => ({ navReset: vi.fn(), readListScrollY: () => 0 }));
 vi.mock("../core/accountContext", () => ({ currentAccount: () => ({ id: "acc@example.com" }) }));
 vi.mock("../lib/tauriRuntime", () => ({ isTauriRuntime: () => true }));
 vi.mock("./accountDefaultPrefs", () => ({ defaultListFilterFromPrefs: () => "all" }));
@@ -36,19 +36,64 @@ vi.mock("./mailListDeferredRender", () => ({
 
 import { render } from "../dispatch";
 import { state } from "../state";
+import {
+  readFolderListCache,
+  resetFolderListCacheForTests,
+  writeFolderListCache,
+} from "./mailListFolderCache";
 import { registerSwitchMailboxRunDeps, switchMailbox } from "./switchMailboxRun";
 import { loadMailView } from "./mailListMailboxLoadRun";
 
-const row = (id: string) => ({ id, subject: id, mailbox: "INBOX", unread: false }) as never;
+const row = (id: string, extra: Partial<Record<string, unknown>> = {}) =>
+  ({ id, subject: id, mailbox: "INBOX", unread: false, pinned: false, ...extra }) as never;
 
 async function flush(): Promise<void> {
   for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+}
+
+async function waitForCmd(cmd: string): Promise<Pending> {
+  for (let i = 0; i < 30; i++) {
+    await flush();
+    const hit = pending.find((p) => p.cmd === cmd);
+    if (hit) return hit;
+  }
+  throw new Error(`missing invoke ${cmd}`);
+}
+
+async function resolvePendingListThreads(ids: string[], index = 0): Promise<void> {
+  for (let i = 0; i < 30; i++) {
+    await flush();
+    const all = pending.filter((p) => p.cmd === "list_threads");
+    if (all.length > index) {
+      all[index]!.resolve(ids.map((id) => row(id)));
+      break;
+    }
+  }
+  for (const p of [...pending].filter((x) => x.cmd === "saved_drafts_count")) {
+    p.resolve(0);
+  }
+  await flush();
+}
+
+function seedFolderCache(mailbox: string, ids: string[], selectedId?: string): void {
+  writeFolderListCache(
+    { accountId: "acc@example.com", mailbox, followedOnly: false },
+    {
+      threads: ids.map((id) => row(id)),
+      hasMoreThreads: false,
+      threadOffset: ids.length,
+      selectedThreadId: selectedId ?? ids[0],
+      listScrollY: 0,
+      updatedAt: Date.now(),
+    },
+  );
 }
 
 describe("switchMailbox — rendu immédiat et garde", () => {
   beforeEach(() => {
     pending.length = 0;
     vi.mocked(render).mockClear();
+    resetFolderListCacheForTests();
     state.view = "list";
     state.selectedMailbox = "INBOX";
     state.threads = [row("old")];
@@ -57,6 +102,12 @@ describe("switchMailbox — rendu immédiat et garde", () => {
     state.listFilter = "all" as never;
     state.accounts = [{ id: "acc@example.com" } as never];
     state.selectedAccountId = "acc@example.com";
+    state.mailListError = "";
+    state.dbLockedMessage = "";
+    state.threadPageSize = 50;
+    state.hasMoreThreads = false;
+    state.threadOffset = 1;
+    document.body.innerHTML = `<div class="inbox-thread-list"></div>`;
     registerSwitchMailboxRunDeps({ loadMailView });
   });
 
@@ -102,5 +153,70 @@ describe("switchMailbox — rendu immédiat et garde", () => {
     pending.find((p) => p.cmd === "list_threads")!.reject(new Error("fail"));
     await run;
     expect(state.mailListLoading).toBe(false);
+  });
+
+  it("hit de cache — render avant list_threads avec threads déjà chargés", async () => {
+    seedFolderCache("Sent", ["s1", "s2"]);
+    const hitRun = switchMailbox("Sent");
+    await flush();
+    expect(state.mailListLoading).toBe(false);
+    expect(state.threads.map((t) => t.id)).toEqual(["s1", "s2"]);
+    expect(render).toHaveBeenCalled();
+    await resolvePendingListThreads(["s1", "s2"]);
+    await hitRun;
+  });
+
+  it("revalidate silencieux si page identique", async () => {
+    seedFolderCache("Sent", ["s1"]);
+    state.selectedThreadId = "s1";
+    const rendersBefore = vi.mocked(render).mock.calls.length;
+    const run = switchMailbox("Sent");
+    await flush();
+    expect(state.selectedThreadId).toBe("s1");
+    await resolvePendingListThreads(["s1"]);
+    await run;
+    expect(state.selectedThreadId).toBe("s1");
+    expect(vi.mocked(render).mock.calls.length - rendersBefore).toBeLessThanOrEqual(2);
+  });
+
+  it("revalidate avec nouveau fil en tête conserve la sélection", async () => {
+    seedFolderCache("Sent", ["s1", "s2"], "s2");
+    const run = switchMailbox("Sent");
+    await flush();
+    await resolvePendingListThreads(["s0", "s1", "s2"]);
+    await run;
+    expect(state.threads[0]!.id).toBe("s0");
+    expect(state.selectedThreadId).toBe("s2");
+  });
+
+
+  it("erreur de revalidate sur hit ne vide pas la liste", async () => {
+    seedFolderCache("Sent", ["s1"]);
+    const run = switchMailbox("Sent");
+    await flush();
+    expect(state.threads.map((t) => t.id)).toEqual(["s1"]);
+    const req = await waitForCmd("list_threads");
+    req.reject(new Error("fail"));
+    await run;
+    expect(state.threads.map((t) => t.id)).toEqual(["s1"]);
+    expect(state.mailListLoading).toBe(false);
+  });
+
+  it("base verrouillée vide le cache", async () => {
+    state.mailboxes = ["INBOX", "Sent", "Trash"];
+    seedFolderCache("Sent", ["s1"]);
+    const run = switchMailbox("Sent");
+    await flush();
+    const req = await waitForCmd("list_threads");
+    req.reject(new Error("Base verrouillée : trousseau"));
+    await run;
+    expect(state.dbLockedMessage).toBeTruthy();
+    expect(
+      readFolderListCache({
+        accountId: "acc@example.com",
+        mailbox: "Sent",
+        followedOnly: false,
+      }),
+    ).toBeUndefined();
   });
 });
