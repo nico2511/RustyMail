@@ -10,6 +10,7 @@ import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 import { invokeMailboxManageKind } from "./mailboxManageKindInvokeRun";
 import { requireMailboxManageActionDeps } from "./mailboxManageActionContext";
 import { refreshMailboxes } from "./refreshMailboxesRun";
+import { invalidateFolderListCache } from "./mailListFolderCache";
 
 export async function mailboxManageAction(
   kind: "create" | "rename" | "delete" | "subscribe",
@@ -43,10 +44,17 @@ export async function mailboxManageAction(
     }
   }
   const d = requireMailboxManageActionDeps();
+  const previousMailbox = state.selectedMailbox || "";
   try {
     const msg = await invokeMailboxManageKind(kind, account);
     if (msg === null) return;
     toast(msg);
+    if (kind === "rename" || kind === "delete") {
+      invalidateFolderListCache({ accountId: account.id, mailbox: previousMailbox });
+    }
+    if (kind === "delete") {
+      invalidateFolderListCache({ accountId: account.id });
+    }
     await refreshMailboxes(account.id);
     ensureValidSelectedMailbox();
     state.mailboxManageOpen = false;

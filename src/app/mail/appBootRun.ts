@@ -7,6 +7,7 @@ import { bootDeferredLlmStatusAndPrefetch } from "./appBootLlmDeferRun";
 import { bootLoadInitialMailData } from "./appBootMailDataRun";
 import { bootInitShellAndRuntime } from "./appBootRuntimeRun";
 import { quietStartupUpdateCheck } from "./desktopUpdate";
+import { clearFolderListCache } from "./mailListFolderCache";
 
 export async function boot(): Promise<void> {
   try {
@@ -19,6 +20,7 @@ export async function boot(): Promise<void> {
     const detail = tauriErrorMessage(error);
     if (detail.includes("Base verrouillée")) {
       state.dbLockedMessage = DB_LOCKED_MESSAGE;
+      clearFolderListCache();
       render();
       return;
     }

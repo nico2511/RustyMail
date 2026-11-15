@@ -9,6 +9,7 @@ import { orgApplyStatusMessage } from "./orgApplyStatusMessage";
 import { refreshMailboxesAfterImapChange } from "./orgRefreshMailboxesAfterImap";
 import { refreshOrganizationReport } from "./orgOrganizationReportRefresh";
 import { requireOrgApplyRunDeps } from "./orgApplyRunContext";
+import { invalidateFolderListCache, invalidateFolderListCacheMailboxes } from "./mailListFolderCache";
 
 export async function runOrgApply(
   accountId: string,
@@ -48,6 +49,12 @@ export async function runOrgApply(
     const hadImapChange =
       p.done > 0 || (p.mailboxesToSync?.length ?? 0) > 0 || (p.threadsAffected?.length ?? 0) > 0;
     if (hadImapChange) {
+      const mailboxes = p.mailboxesToSync ?? [];
+      if (mailboxes.length) {
+        invalidateFolderListCacheMailboxes(accountId, mailboxes);
+      } else {
+        invalidateFolderListCache({ accountId });
+      }
       await refreshMailboxesAfterImapChange();
       if (state.view === "list" && isTauriRuntime()) {
         try {

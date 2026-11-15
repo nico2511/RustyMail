@@ -8,6 +8,8 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { persistDraft } from "./composePersistDraft";
+import { LOCAL_SAVED_DRAFTS_MAILBOX } from "../../mailboxKinds";
+import { invalidateFolderListCache } from "./mailListFolderCache";
 import { requireComposeDraftLocalSaveDeps } from "./composeDraftLocalSaveContext";
 import { saveDraftRevisionNow } from "./composeDraftRevisionSaveRun";
 
@@ -33,6 +35,7 @@ export async function saveDraftToSavedListNow(opts?: { silentToast?: boolean }):
     );
     const tid = newId.trim();
     if (tid.length) state.savedDraftRecordId = tid;
+    invalidateFolderListCache({ accountId, mailbox: LOCAL_SAVED_DRAFTS_MAILBOX });
     if (!opts?.silentToast) {
       toast.success("Enregistré dans « Sauvés ».");
     }

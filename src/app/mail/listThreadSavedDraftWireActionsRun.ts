@@ -9,6 +9,8 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { openConfirmModal } from "../modals/promptConfirm";
 import { loadMailView } from "./mailListView";
+import { LOCAL_SAVED_DRAFTS_MAILBOX } from "../../mailboxKinds";
+import { invalidateFolderListCache } from "./mailListFolderCache";
 import { refreshSavedDraftsMailboxCount, saveDraftToSavedListNow } from "./accountWireActions";
 import { forgetSavedDraftLocally, savedDraftThreadId } from "./savedDraftListLocalForget";
 
@@ -51,6 +53,7 @@ export async function tryHandleListThreadSavedDraftWire(action: string, element?
         try {
           await withTimeout(invoke("saved_draft_delete", { accountId, savedDraftId: sid }), MAIL_ACTION_TIMEOUT_MS);
           toast.success("Brouillon retiré de la liste.");
+          invalidateFolderListCache({ accountId, mailbox: LOCAL_SAVED_DRAFTS_MAILBOX });
           await loadMailView(false);
           await refreshSavedDraftsMailboxCount();
           render();

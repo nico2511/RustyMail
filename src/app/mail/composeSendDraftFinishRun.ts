@@ -3,6 +3,8 @@ import { syncPreviewOpenFromComposeLayout } from "./composeLayoutState";
 import { fetchOpenThreadOrNotify } from "./fetchOpenThread";
 import { toast } from "../lib/toast";
 import { state } from "../state";
+import { composeSendAccount } from "../core/composeSendAccount";
+import { invalidateFolderListCacheAfterSend } from "./mailListFolderCacheBridge";
 
 export type ComposeSendDraftRunDeps = {
   loadMailView: (append: boolean) => Promise<void>;
@@ -32,6 +34,8 @@ export function toastSplitImapNotices(notes: Array<string | null | undefined> | 
 
 export async function finishComposeAfterSuccessfulSend(keepThreadId: string | undefined): Promise<void> {
   const d = composeSendDraftRunDeps();
+  const accountId = composeSendAccount()?.id?.trim();
+  if (accountId) invalidateFolderListCacheAfterSend(accountId);
   await d.loadMailView(false);
   await d.loadMailboxUnread();
   if (keepThreadId) {

@@ -8,6 +8,7 @@ import { toast } from "../lib/toast";
 import { openConfirmModal } from "../modals/promptConfirm";
 import { render } from "../dispatch";
 import { state } from "../state";
+import { invalidateFolderListCache } from "./mailListFolderCache";
 
 export type EmptyTrashMailboxDeps = {
   loadMailView: () => Promise<void>;
@@ -58,6 +59,7 @@ export async function onEmptyTrashMailbox(): Promise<void> {
       MAIL_ACTION_TIMEOUT_MS,
     );
     toast(msg);
+    invalidateFolderListCache({ accountId: account.id, mailbox });
     if (state.view === "thread") {
       state.view = "list";
       state.selectedThread = undefined;

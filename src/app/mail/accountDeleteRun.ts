@@ -11,6 +11,7 @@ import type { Account } from "../../accountSetup";
 import { ensureValidSelectedMailbox } from "./accountDefaultPrefs";
 import { normalizeAccountRow } from "./accountRowNormalize";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
+import { invalidateFolderListCacheAccountAndUnified } from "./mailListFolderCache";
 import { refreshMailboxes } from "./refreshMailboxesRun";
 
 export async function deleteSettingsAccount() {
@@ -51,6 +52,7 @@ export async function deleteSettingsAccount() {
     }
     state.settingsSelectedAccountId = state.accounts[0]?.id ?? "new";
     state.accountMessage = "Compte supprimé.";
+    invalidateFolderListCacheAccountAndUnified(id);
     if (isTauriRuntime()) {
       await refreshMailboxes(currentAccount()?.id ?? null);
       ensureValidSelectedMailbox();
