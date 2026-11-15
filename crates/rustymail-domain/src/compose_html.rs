@@ -378,17 +378,13 @@ fn rewrite_tags(input: &str) -> String {
 /// Styles présentationnels sûrs (tableaux / images). Refuse url(), expression, position, etc.
 fn safe_presentation_style(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
-    if lower.contains("url(")
+    !(lower.contains("url(")
         || lower.contains("expression")
         || lower.contains("behavior")
         || lower.contains("javascript:")
         || lower.contains("@import")
         || lower.contains("position:")
-        || lower.contains("z-index")
-    {
-        return false;
-    }
-    true
+        || lower.contains("z-index"))
 }
 
 fn class_allowed_for_compose(value: &str) -> bool {
