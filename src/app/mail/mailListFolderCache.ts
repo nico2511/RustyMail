@@ -129,7 +129,8 @@ function forEachAccountEntry(
   accountId: string,
   fn: (serialized: string, entry: FolderListCacheEntry) => void,
 ): void {
-  for (const [serialized, entry] of store) {
+  // Snapshot — touchLru() delete+set pendant l’itération relirait la même clé à l’infini.
+  for (const [serialized, entry] of [...store]) {
     if (serialized.startsWith(`${accountId}\0`)) {
       fn(serialized, entry);
     }
