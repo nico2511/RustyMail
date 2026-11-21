@@ -60,6 +60,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
+          shared-key: windows-${{ runner.image }}-${{ runner.imageVersion }}
 
       - name: cargo test
         run: cargo test --workspace --all-targets

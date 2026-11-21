@@ -82,6 +82,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
+          shared-key: windows-${{ runner.image }}-${{ runner.imageVersion }}
 
       - name: Install frontend dependencies
         run: npm ci
