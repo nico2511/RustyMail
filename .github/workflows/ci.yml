@@ -56,11 +56,16 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Runner image id
+        id: runner-image
+        shell: bash
+        run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
-          shared-key: windows-${{ runner.image }}-${{ runner.imageVersion }}
+          shared-key: windows-${{ steps.runner-image.outputs.id }}
 
       - name: cargo test
         run: cargo test --workspace --all-targets
