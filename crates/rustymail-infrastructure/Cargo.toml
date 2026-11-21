@@ -22,7 +22,7 @@ socket2 = { version = "0.5", features = ["all"] }
 futures = "0.3.31"
 mailparse = "0.15.0"
 serde = { workspace = true }
-lettre = { version = "0.11.22", default-features = false, features = ["smtp-transport", "builder", "tokio1", "tokio1-native-tls"] }
+lettre = { version = "0.11.24", default-features = false, features = ["smtp-transport", "builder", "tokio1", "tokio1-native-tls"] }
 pulldown-cmark = "0.10.3"
 mime_guess = "2.0.5"
 dirs = "5.0.1"

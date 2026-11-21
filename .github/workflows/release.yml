@@ -79,9 +79,15 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Runner image id
+        id: runner-image
+        shell: bash
+        run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
+          shared-key: windows-${{ steps.runner-image.outputs.id }}
 
       - name: Install frontend dependencies
         run: npm ci
