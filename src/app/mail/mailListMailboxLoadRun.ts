@@ -1,8 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ThreadListItem } from "../types";
 import { BOOT_INVOKE_TIMEOUT_MS } from "../core/timeouts";
-import { render } from "../dispatch";
-import { tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
+import { DB_LOCKED_MESSAGE, tauriErrorMessage, withTimeout } from "../lib/tauriCommand";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { toast } from "../lib/toast";
 import { invalidateIdleAiCachePrefetch, scheduleIdleAiCachePrefetch } from "./idleAiCachePrefetch";
@@ -19,15 +18,46 @@ import {
   loadSavedDraftsAsThreadList,
 } from "./mailListLoadSavedDraftsRun";
 import { loadUnifiedInboxThreadPage, shouldLoadUnifiedInbox } from "./mailListLoadUnifiedRun";
-import { beginMailListLoad, isMailListLoadCurrent } from "./mailListLoadGeneration";
+import {
+  beginMailListLoad,
+  isMailListLoadCurrent,
+  type MailListLoadToken,
+} from "./mailListLoadGeneration";
 import { scheduleMailListSecondaryRender } from "./mailListDeferredRender";
+import { clearFolderListCache } from "./mailListFolderCache";
+import {
+  applyFirstPageWithSilentRevalidate,
+  writeFolderListCacheAfterSuccessfulPage,
+} from "./mailListFolderCacheApply";
+import { currentFolderListCacheKey } from "./mailListFolderCacheBridge";
+import {
+  bindFolderListCaptureForGen,
+  beginFolderListLoad,
+  folderListCaptureForGen,
+  folderListLoadHadCacheHit,
+  releaseFolderListCaptureForGen,
+} from "./mailListFolderCacheLoadContext";
 
 function finishMailListLoading(): void {
   state.mailListLoading = false;
 }
 
+function handleListThreadsLockedError(detail: string): void {
+  if (detail.includes("Base verrouillée")) {
+    state.dbLockedMessage = DB_LOCKED_MESSAGE;
+    clearFolderListCache();
+  }
+}
+
+function shouldKeepListOnRevalidateError(token: MailListLoadToken): boolean {
+  return folderListCaptureForGen(token.gen)?.hadCacheHit ?? folderListLoadHadCacheHit();
+}
+
 export async function loadMailView(append: boolean = false) {
-  if (!append) invalidateIdleAiCachePrefetch();
+  if (!append) {
+    invalidateIdleAiCachePrefetch();
+    beginFolderListLoad(currentFolderListCacheKey(), folderListLoadHadCacheHit());
+  }
   if (shouldLoadUnifiedInbox()) {
     await loadUnifiedInboxThreadPage(append);
     finishMailListLoading();
@@ -57,6 +87,11 @@ export async function loadMailView(append: boolean = false) {
     followedOnly: state.listFilter === "starred",
   };
   const token = beginMailListLoad(append);
+  bindFolderListCaptureForGen(
+    token.gen,
+    currentFolderListCacheKey(),
+    folderListLoadHadCacheHit(),
+  );
   let page: ThreadListItem[];
   if (!isTauriRuntime()) {
     state.mailListError =
@@ -67,26 +102,45 @@ export async function loadMailView(append: boolean = false) {
   } else {
     try {
       page = await withTimeout(invoke<ThreadListItem[]>("list_threads", payload), BOOT_INVOKE_TIMEOUT_MS);
-      if (!isMailListLoadCurrent(token)) return;
+      if (!isMailListLoadCurrent(token)) {
+        writeFolderListCacheAfterSuccessfulPage(page, append, token);
+        return;
+      }
       finishMailListLoading();
       state.mailListError = "";
     } catch (firstError) {
       // Réponse d’un dossier quitté entre-temps : ni erreur ni liste vidée.
-      if (!isMailListLoadCurrent(token)) return;
+      if (!isMailListLoadCurrent(token)) {
+        releaseFolderListCaptureForGen(token.gen);
+        return;
+      }
       const firstDetail = tauriErrorMessage(firstError);
+      handleListThreadsLockedError(firstDetail);
       if (/timeout/i.test(firstDetail) && !append) {
         try {
           page = await withTimeout(
             invoke<ThreadListItem[]>("list_threads", payload),
             BOOT_INVOKE_TIMEOUT_MS,
           );
-          if (!isMailListLoadCurrent(token)) return;
+          if (!isMailListLoadCurrent(token)) {
+            writeFolderListCacheAfterSuccessfulPage(page, append, token);
+            return;
+          }
           finishMailListLoading();
           state.mailListError = "";
         } catch (retryError) {
-          if (!isMailListLoadCurrent(token)) return;
+          if (!isMailListLoadCurrent(token)) {
+            releaseFolderListCaptureForGen(token.gen);
+            return;
+          }
           finishMailListLoading();
           const raw = tauriErrorMessage(retryError);
+          handleListThreadsLockedError(raw);
+          if (shouldKeepListOnRevalidateError(token)) {
+            console.error("list_threads (revalidate)", firstError, retryError);
+            releaseFolderListCaptureForGen(token.gen);
+            return;
+          }
           const detail = /timeout/i.test(raw)
             ? "délai dépassé pendant la préparation locale — réessayez dans un instant"
             : raw;
@@ -105,6 +159,11 @@ export async function loadMailView(append: boolean = false) {
       } else {
         console.error("list_threads", firstError);
         finishMailListLoading();
+        handleListThreadsLockedError(firstDetail);
+        if (shouldKeepListOnRevalidateError(token)) {
+          releaseFolderListCaptureForGen(token.gen);
+          return;
+        }
         state.mailListError = `Impossible de charger les conversations : ${firstDetail}`;
         toast.error(state.mailListError);
         if (append) return;
@@ -119,8 +178,17 @@ export async function loadMailView(append: boolean = false) {
       }
     }
   }
-  applyServerThreadPage(page, append);
-  syncSelectionAfterThreadPage(page.length);
+  const capture = folderListCaptureForGen(token.gen);
+  if (
+    !append &&
+    applyFirstPageWithSilentRevalidate(page, append, capture?.hadCacheHit)
+  ) {
+    writeFolderListCacheAfterSuccessfulPage(page, append, token);
+  } else {
+    applyServerThreadPage(page, append);
+    syncSelectionAfterThreadPage(page.length);
+    if (!append) writeFolderListCacheAfterSuccessfulPage(page, append, token);
+  }
   scheduleMailboxDigestRefresh();
   scheduleIdleAiCachePrefetch();
   void loadInboxFilterCounts().then(() => {

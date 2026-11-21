@@ -23,6 +23,7 @@ import {
   maybeTriggerSemanticReindex,
   notifySyncCompletionToasts,
 } from "./syncInboxStatusRun";
+import { invalidateFolderListCache, invalidateFolderListCacheMailboxes } from "./mailListFolderCache";
 
 export type { SyncInboxOptions } from "./syncInboxBatchRun";
 
@@ -34,12 +35,20 @@ export async function syncInbox(options?: SyncInboxOptions): Promise<void> {
 
   try {
     const targets = await resolveImapSyncTargets(account, mailbox, syncAllFolders, options);
+    if (syncAllFolders) {
+      invalidateFolderListCache({ accountId: account.id });
+    } else if (targets.length) {
+      invalidateFolderListCacheMailboxes(account.id, targets);
+    }
     const outcome = await runBatchedImapSync(account, targets, mailbox, syncAllFolders);
     const results = outcome.results ?? [];
     const skippedOnServer = outcome.skippedNotOnServer ?? [];
     const syncErrors = outcome.syncErrors ?? [];
     const aliases = outcome.syncedMailboxAliases ?? [];
     const selectionChangedByAlias = applySyncedMailboxAliases(aliases);
+    for (const a of aliases) {
+      invalidateFolderListCache({ accountId: account.id, mailbox: a.requested });
+    }
     await refreshMailboxListAfterSyncIfNeeded(
       account,
       syncAllFolders,

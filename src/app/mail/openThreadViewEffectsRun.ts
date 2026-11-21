@@ -9,6 +9,7 @@ import { toast } from "../lib/toast";
 import { render } from "../dispatch";
 import { isTauriRuntime } from "../lib/tauriRuntime";
 import { loadMailboxUnread } from "./mailListView";
+import { patchFolderListCacheThread } from "./mailListFolderCache";
 import { state } from "../state";
 import type { OpenThreadDeps } from "./openThreadViewDepsRun";
 
@@ -112,6 +113,7 @@ export async function markOpenedThreadReadIfUnread(
   }
   // Met à jour state seulement — pas de render() : le fil a déjà le unread local,
   // et un paint BAL après Retour (ou un 2ᵉ rebuild liste) gelait l’UI.
+  patchFolderListCacheThread(accountId, threadId, { unread: false });
   await loadMailboxUnread().catch(() => {});
 }
 

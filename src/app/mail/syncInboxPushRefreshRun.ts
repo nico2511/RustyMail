@@ -1,4 +1,6 @@
 import { isTauriRuntime } from "../lib/tauriRuntime";
+import { currentAccount } from "../core/accountContext";
+import { invalidateFolderListCache } from "./mailListFolderCache";
 import { render } from "../dispatch";
 import { state } from "../state";
 import { loadMailboxUnread } from "./mailListView";
@@ -11,6 +13,10 @@ import {
 export async function refreshUiAfterImapPush(mailboxHint?: string): Promise<void> {
   if (!isTauriRuntime()) return;
   const pushed = (mailboxHint || "").trim();
+  const account = currentAccount();
+  if (account?.id && pushed) {
+    invalidateFolderListCache({ accountId: account.id, mailbox: pushed });
+  }
   const current = (state.selectedMailbox || "INBOX").trim();
   const sameFolder =
     !pushed ||

@@ -14,6 +14,7 @@ import {
   optimisticRemoveThreadFromList,
   rollbackThreadListChange,
 } from "./threadListMoveOptimisticRun";
+import { invalidateFolderListCacheAfterTrashArchive } from "./mailListFolderCacheBridge";
 
 export async function onThreadMove(
   kind: "trash" | "archive",
@@ -46,6 +47,12 @@ export async function onThreadMove(
       MAIL_ACTION_TIMEOUT_MS,
     );
     toast(msg);
+    invalidateFolderListCacheAfterTrashArchive({
+      accountId,
+      sourceMailbox: mailbox,
+      threadId,
+      kind,
+    });
     void d.loadMailboxUnread();
     if (!state.selectedThreadId) state.selectedThreadId = state.threads[0]?.id;
     render();

@@ -8,6 +8,7 @@ import { render } from "../dispatch";
 import { state } from "../state";
 import { fetchOpenThreadOrNotify } from "./fetchOpenThread";
 import { loadMailView, loadMailboxUnread } from "./mailListView";
+import { invalidateFolderListCacheAfterSend } from "./mailListFolderCacheBridge";
 import { currentThreadIdForReply } from "./composeThreadReply";
 import { toastSendDraftImapNotice } from "./sendDraftImapNotice";
 import { pollSendDraftUntilTerminal } from "./composeSendDraftInvokeRun";
@@ -95,6 +96,8 @@ export async function sendQuickReply(kind: "reply" | "reply-all"): Promise<void>
     toast.success(kind === "reply" ? "Réponse envoyée." : "Réponse à tous envoyée.");
     toastSendDraftImapNotice(sendOutcome);
     if (quickInput) quickInput.value = "";
+    const accountId = composeSendAccount()?.id?.trim();
+    if (accountId) invalidateFolderListCacheAfterSend(accountId);
     await loadMailView(false);
     await loadMailboxUnread();
     if (state.selectedThreadId) {

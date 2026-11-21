@@ -14,6 +14,7 @@ import {
   optimisticRemoveThreadFromList,
   rollbackThreadListChange,
 } from "./threadListMoveOptimisticRun";
+import { invalidateFolderListCacheAfterMove } from "./mailListFolderCacheBridge";
 
 export async function onThreadMoveTo(threadId: string, destMailbox: string): Promise<void> {
   const tid = String(threadId ?? "").trim();
@@ -47,6 +48,12 @@ export async function onThreadMoveTo(threadId: string, destMailbox: string): Pro
       MAIL_ACTION_TIMEOUT_MS,
     );
     toast(msg);
+    invalidateFolderListCacheAfterMove({
+      accountId: account.id,
+      sourceMailbox: source,
+      destMailbox: dest,
+      threadId: tid,
+    });
     state.moveOpen = false;
     state.moveThreadId = undefined;
     void d.loadMailboxUnread();

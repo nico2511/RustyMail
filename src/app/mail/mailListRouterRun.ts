@@ -9,6 +9,14 @@ import {
 import { loadMailView } from "./mailListMailboxLoadRun";
 import { loadThreadsForSearchContext } from "./mailListSearchContextRun";
 import { requireMailListDeps } from "./mailListViewContext";
+import {
+  applyFolderListCacheEntry,
+  currentFolderListCacheKey,
+  persistCurrentFolderListCache,
+  restoreListScrollYAfterRender,
+  tryReadFolderListCacheForKey,
+} from "./mailListFolderCacheBridge";
+import { beginFolderListLoad, clearFolderListLoadContext } from "./mailListFolderCacheLoadContext";
 
 export async function reloadCurrentThreadList(append = false): Promise<void> {
   const deps = requireMailListDeps();
@@ -30,6 +38,7 @@ export async function reloadCurrentThreadList(append = false): Promise<void> {
 export async function applyListFilter(next: typeof state.listFilter): Promise<void> {
   const deps = requireMailListDeps();
   const prevFilter = state.listFilter;
+  persistCurrentFolderListCache(undefined, prevFilter === "starred");
   state.listFilter = next;
   state.searchNewsletterRule = null;
   if (state.view !== "folderManager") {
@@ -40,13 +49,39 @@ export async function applyListFilter(next: typeof state.listFilter): Promise<vo
     render();
     return;
   }
+  const starredChanged = (prevFilter === "starred") !== (next === "starred");
+  let cacheHit = false;
+  let pendingScrollY = 0;
+  if (
+    !isSavedDraftsVirtualMailbox(mb) &&
+    isTauriRuntime() &&
+    starredChanged &&
+    !deps.isSearchActive()
+  ) {
+    const loadKey = currentFolderListCacheKey(mb, next === "starred");
+    const cached = tryReadFolderListCacheForKey(loadKey);
+    if (cached) {
+      cacheHit = true;
+      applyFolderListCacheEntry(cached);
+      pendingScrollY = cached.listScrollY;
+    } else {
+      state.threads = [];
+      state.threadOffset = 0;
+      state.hasMoreThreads = false;
+      state.selectedThreadId = undefined;
+      state.selectedThread = undefined;
+      state.mailListLoading = true;
+    }
+    beginFolderListLoad(loadKey, cacheHit);
+  }
   render();
+  if (cacheHit) restoreListScrollYAfterRender(pendingScrollY);
   if (!isSavedDraftsVirtualMailbox(mb) && isTauriRuntime()) {
-    const starredChanged = (prevFilter === "starred") !== (next === "starred");
     if (deps.isSearchActive()) {
       await deps.searchThreads();
     } else if (starredChanged) {
       await loadMailView(false);
+      clearFolderListLoadContext();
     }
   }
 }

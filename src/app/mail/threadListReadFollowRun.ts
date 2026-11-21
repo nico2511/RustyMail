@@ -14,6 +14,7 @@ import {
   requireThreadListActionsDeps,
   sourceMailboxForThread,
 } from "./threadListActionsContext";
+import { patchFolderListCacheThread } from "./mailListFolderCache";
 
 export async function onThreadSeen(kind: "read" | "unread", threadId: string): Promise<void> {
   if (!threadId.trim()) return;
@@ -39,6 +40,9 @@ export async function onThreadSeen(kind: "read" | "unread", threadId: string): P
       MAIL_ACTION_TIMEOUT_MS,
     );
     toast(msg);
+    patchFolderListCacheThread(account.id, threadId, {
+      unread: kind === "unread",
+    });
     await reloadCurrentThreadList(false);
     await d.loadMailboxUnread();
     if (state.view === "thread" && state.selectedThreadId === threadId) {
@@ -80,6 +84,7 @@ export async function onThreadToggleFollow(threadId: string): Promise<void> {
         break;
       }
     }
+    patchFolderListCacheThread(account.id, tid, { followed: next });
     toast.success(next ? "Fil ajouté au suivi." : "Fil retiré du suivi.");
     render();
     await reloadCurrentThreadList(false);

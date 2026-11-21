@@ -16,6 +16,18 @@ import { exitSearchModeForMailboxBrowse } from "./searchMailboxBrowseExit";
 import { refreshSavedDraftsMailboxCount } from "./savedDraftsMailboxCountRefresh";
 import { clearThreadAiSummaryState } from "./threadAiSummaryState";
 import { scheduleMailListSecondaryRender } from "./mailListDeferredRender";
+import { formatSwitchMailboxPerfLog } from "./mailListFolderCache";
+import {
+  applyFolderListCacheEntry,
+  currentFolderListCacheKey,
+  persistCurrentFolderListCache,
+  restoreListScrollYAfterRender,
+  tryReadFolderListCacheForKey,
+} from "./mailListFolderCacheBridge";
+import {
+  beginFolderListLoad,
+  clearFolderListLoadContext,
+} from "./mailListFolderCacheLoadContext";
 
 export type SwitchMailboxRunDeps = {
   loadMailView: (append?: boolean) => Promise<void>;
@@ -48,6 +60,12 @@ export async function switchMailbox(nextMailbox: string): Promise<void> {
   const perfClick =
     import.meta.env.DEV && typeof performance !== "undefined" ? performance.now() : null;
   let perfFirstRender: number | null = null;
+  let cacheHit = false;
+  let pendingScrollY = 0;
+
+  const prevMailbox = state.selectedMailbox;
+  const prevFilter = state.listFilter;
+  persistCurrentFolderListCache(prevMailbox, prevFilter === "starred");
 
   if (
     state.view === "thread" ||
@@ -77,11 +95,23 @@ export async function switchMailbox(nextMailbox: string): Promise<void> {
   state.listFilter = defaultListFilterFromPrefs();
   resetMailboxDigestForNavigation();
   invalidateIdleAiCachePrefetch();
-  resetListForMailboxSwitch();
+
+  const loadKey = currentFolderListCacheKey();
+  const cached = tryReadFolderListCacheForKey(loadKey);
+  if (cached) {
+    cacheHit = true;
+    applyFolderListCacheEntry(cached);
+    pendingScrollY = cached.listScrollY;
+  } else {
+    resetListForMailboxSwitch();
+  }
+  beginFolderListLoad(loadKey, cacheHit);
   render();
   if (perfClick != null) perfFirstRender = performance.now();
+  if (cacheHit) restoreListScrollYAfterRender(pendingScrollY);
 
   await switchDeps().loadMailView(false);
+  clearFolderListLoadContext();
   if (generation !== switchMailboxGeneration) return;
 
   cancelMailboxDigestLiveDebounce();
@@ -101,7 +131,12 @@ export async function switchMailbox(nextMailbox: string): Promise<void> {
   if (perfClick != null && perfFirstRender != null) {
     const listDone = performance.now();
     console.debug(
-      `[perf] switchMailbox clic→1er rendu ${Math.round(perfFirstRender - perfClick)} ms, clic→liste ${Math.round(listDone - perfClick)} ms`,
+      formatSwitchMailboxPerfLog({
+        cacheHit,
+        mailbox: state.selectedMailbox,
+        firstRenderMs: Math.round(perfFirstRender - perfClick),
+        listDoneMs: Math.round(listDone - perfClick),
+      }),
     );
   }
 }
